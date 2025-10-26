@@ -1,0 +1,51 @@
+{
+  "name": "assembler-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint-and-format": "yarn lint:fix && yarn format",
+    "typecheck": "nuxt typecheck",
+    "build:registry": "tsx scripts/build-registry.mts",
+    "clean:cache": "rm -rf .nuxt .output node_modules/.cache"
+  },
+  "dependencies": {
+    "@iconify-json/lucide": "^1.2.70",
+    "@iconify-json/simple-icons": "^1.2.54",
+    "@iconify-json/vscode-icons": "^1.2.32",
+    "@nuxt/content": "^3.7.1",
+    "@nuxt/image": "^1.11.0",
+    "@nuxt/ui": "^4.0.1",
+    "@oxc-parser/wasm": "^0.60.0",
+    "better-sqlite3": "^12.4.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "nuxt": "^4.1.3",
+    "nuxt-llms": "0.1.3",
+    "nuxt-og-image": "^5.1.12",
+    "pathe": "^2.0.3",
+    "tailwind-merge": "^3.3.1",
+    "vue": "^3.5.22",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@nuxt/eslint": "^1.9.0",
+    "eslint": "^9.38.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vue-tsc": "^3.1.1"
+  },
+  "resolutions": {
+    "unimport": "4.1.1"
+  }
+}
