@@ -6,9 +6,10 @@ navigation: false
 layout: default
 ---
 
-## ::u-page-hero
-
-## orientation: vertical
+::u-page-hero
+---
+orientation: vertical
+---
 
 #top
 :hero-background
@@ -21,65 +22,50 @@ Create stunning web applications with AssemblerUI's modern, accessible, and cust
 
 #links
 :::u-button
-
 ---
-
 to: /getting-started
 size: xl
 trailing-icon: i-lucide-arrow-right
-
 ---
-
 Get started
 :::
 
 :::u-button
-
 ---
-
 icon: i-simple-icons-github
 color: neutral
 variant: outline
 size: xl
 to: https://github.com/assembler-ui/assembler-ui
-target: \_blank
-
+target: _blank
 ---
-
 View on GitHub
 :::
 ::
 
 ::u-page-section
+
 #title
 Registry-based Component System
 
 #links
 :::u-button
-
 ---
-
 color: neutral
 size: lg
-target: \_blank
+target: _blank
 to: /components
-trailingIcon: i-lucide-arrow-right
+trailing-icon: i-lucide-arrow-right
 variant: subtle
-
 ---
-
 Browse Components
 :::
 
 #features
 :::u-page-feature
-
 ---
-
 icon: i-lucide-package
-
 ---
-
 #title
 Copy & Paste Components
 
@@ -88,13 +74,9 @@ Built on shadcn-vue principles. Copy the component code directly into your proje
 :::
 
 :::u-page-feature
-
 ---
-
 icon: i-lucide-accessibility
-
 ---
-
 #title
 Accessibility First
 
@@ -103,13 +85,9 @@ Every component follows WCAG guidelines and includes proper ARIA attributes, key
 :::
 
 :::u-page-feature
-
 ---
-
 icon: i-lucide-palette
-
 ---
-
 #title
 Fully Customizable
 
@@ -118,13 +96,9 @@ Built with CSS custom properties and a flexible design system. Customize colors,
 :::
 
 :::u-page-feature
-
 ---
-
 icon: i-lucide-download
-
 ---
-
 #title
 CLI & Registry
 
@@ -133,13 +107,9 @@ Use our CLI to add components instantly or browse our registry to find the perfe
 :::
 
 :::u-page-feature
-
 ---
-
 icon: i-lucide-zap
-
 ---
-
 #title
 Lightweight & Fast
 
@@ -148,13 +118,9 @@ Optimized components with minimal dependencies. Only add what you need and keep 
 :::
 
 :::u-page-feature
-
 ---
-
 icon: i-lucide-code-2
-
 ---
-
 #title
 TypeScript Ready
 
@@ -164,35 +130,28 @@ Full TypeScript support with comprehensive type definitions for better developme
 ::
 
 ::u-page-section
+
 #title
 Developer Experience
 
 #links
 :::u-button
-
 ---
-
 color: neutral
 size: lg
-target: \_blank
+target: _blank
 to: /getting-started/usage
-trailingIcon: i-lucide-arrow-right
+trailing-icon: i-lucide-arrow-right
 variant: subtle
-
 ---
-
 Learn More
 :::
 
 #features
 :::u-page-feature
-
 ---
-
 icon: i-lucide-puzzle
-
 ---
-
 #title
 Vue 3 Composition API
 
@@ -201,13 +160,9 @@ Built with Vue 3's Composition API and composables for maximum flexibility and r
 :::
 
 :::u-page-feature
-
 ---
-
 icon: i-lucide-paintbrush
-
 ---
-
 #title
 Design System
 
@@ -216,13 +171,9 @@ Consistent design tokens for colors, typography, spacing, and shadows. Build coh
 :::
 
 :::u-page-feature
-
 ---
-
 icon: i-lucide-file-code
-
 ---
-
 #title
 Detailed Documentation
 
@@ -231,13 +182,9 @@ Comprehensive documentation with live examples, API references, and best practic
 :::
 
 :::u-page-feature
-
 ---
-
 icon: i-lucide-terminal
-
 ---
-
 #title
 Modern Tooling
 
@@ -246,13 +193,9 @@ Works seamlessly with Vite, Nuxt, and other modern Vue tools. Includes CLI for e
 :::
 
 :::u-page-feature
-
 ---
-
 icon: i-lucide-github
-
 ---
-
 #title
 Open Source
 
@@ -261,38 +204,13 @@ Completely open source and community-driven. Contribute components, report issue
 :::
 
 :::u-page-feature
-
 ---
-
 icon: i-lucide-heart
-
 ---
-
 #title
 Community Driven
 
 #description
 Built by developers, for developers. Join our growing community and help make AssemblerUI even better.
-:::
-::
-
-::u-page-section
-:::u-page-c-t-a
-
----
-
-links: - label: Get Started
-to: '/getting-started'
-trailingIcon: i-lucide-arrow-right - label: View Components
-to: '/components'
-variant: subtle
-icon: i-lucide-package
-title: Ready to build something amazing?
-description: Join developers worldwide who are building beautiful applications with AssemblerUI. Start creating today.
-class: dark:bg-neutral-950
-
----
-
-:stars-bg
 :::
 ::

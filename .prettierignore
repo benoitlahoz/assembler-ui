@@ -30,3 +30,6 @@ public/
 
 # Registry files (generated)
 registry/
+
+# Content files with MDC syntax (protect from Prettier formatting)
+content/**/*.md
