@@ -49,6 +49,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import CodeViewerTab from './common/CodeViewerTab.vue'
 
 interface Props {
   label?: string
