@@ -1,19 +1,19 @@
-import type { z } from 'zod';
-import type { Registry, registryItemTypeSchema } from '../registry/schema';
+import type { z } from "zod";
+import type { Registry, registryItemTypeSchema } from "../registry/schema";
 // @sts-nocheck
-import { existsSync, promises as fs } from 'node:fs';
-import path from 'node:path';
-import { registry } from '../registry';
-import { buildRegistry as crawlContent } from './crawl-content';
-import { registryEntrySchema, registrySchema } from '../registry/schema';
+import { existsSync, promises as fs } from "node:fs";
+import path from "node:path";
+import { registry } from "../registry";
+import { buildRegistry as crawlContent } from "./crawl-content";
+import { registryEntrySchema, registrySchema } from "../registry/schema";
 
-const REGISTRY_PATH = path.join(process.cwd(), 'public/r');
+const REGISTRY_PATH = path.join(process.cwd(), "public/r");
 
 const REGISTRY_INDEX_WHITELIST: z.infer<typeof registryItemTypeSchema>[] = [
-  'registry:ui',
-  'registry:block',
+  "registry:ui",
+  "registry:block",
   // "registry:example",
-  'registry:hook',
+  "registry:hook",
 ];
 
 // ----------------------------------------------------------------------------
@@ -37,27 +37,18 @@ async function buildStyles(registry: Registry) {
           const file = {
             path: _file.path,
             type: _file.type,
-            content: '',
-            target: _file.target ?? '',
+            content: "",
+            target: _file.target ?? "",
           };
 
           let content: string;
           try {
-            if (file.type === 'registry:hook') {
-              content = await fs.readFile(
-                path.join(process.cwd(), file.path),
-                'utf8'
-              );
+            if (file.type === "registry:hook") {
+              content = await fs.readFile(path.join(process.cwd(), file.path), "utf8");
             } else {
               content = await fs.readFile(
-                path.join(
-                  process.cwd(),
-                  'components',
-                  'content',
-                  'assembler',
-                  file.path
-                ),
-                'utf8'
+                path.join(process.cwd(), "components", "content", "assembler", file.path),
+                "utf8",
               );
             }
           } catch (error) {
@@ -65,7 +56,7 @@ async function buildStyles(registry: Registry) {
             return;
           }
 
-          const target = file.target || '';
+          const target = file.target || "";
 
           return {
             path: file.path,
@@ -73,7 +64,7 @@ async function buildStyles(registry: Registry) {
             content,
             target,
           };
-        })
+        }),
       );
     }
 
@@ -90,7 +81,7 @@ async function buildStyles(registry: Registry) {
     if (payload.success) {
       await writeFile(
         path.join(targetPath, `${item.name}.json`),
-        JSON.stringify(payload.data, null, 2)
+        JSON.stringify(payload.data, null, 2),
       );
     }
   }
@@ -113,12 +104,12 @@ try {
   await buildStyles(result.data);
 
   // eslint-disable-next-line no-console
-  console.log('✅ Done!');
+  console.log("✅ Done!");
 } catch (error) {
   console.error(error);
   process.exit(1);
 }
 
 async function writeFile(path: string, payload: any) {
-  return fs.writeFile(path, `${payload}\r\n`, 'utf8');
+  return fs.writeFile(path, `${payload}\r\n`, "utf8");
 }

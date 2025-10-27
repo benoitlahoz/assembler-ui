@@ -16,9 +16,13 @@ logs
 # Misc
 .DS_Store
 .fleet
-.idea
+.idea/workspace.xml
 
 # Local env files
 .env
 .env.*
 !.env.example
+
+# Registry files
+public/r
+__registry__

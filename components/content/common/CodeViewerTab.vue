@@ -6,7 +6,7 @@
     :code="rawString"
   >
     <CodeCopy
-      class="absolute -top-10 right-0"
+      class="absolute -top-12 right-0"
       :code="rawString"
     />
     <code class="min-w-full overflow-auto px-2 leading-4">
@@ -68,7 +68,7 @@ async function loadAndProcessComponentCode() {
     rawString.value = updateImportPaths(componentCode);
     codeHtml.value = hljs.highlightAuto(rawString.value, ["ts", "html", "css", "js", "d.ts"]).value;
   } catch (error) {
-    throw new Error("Error loading component code:", error);
+    throw new Error("Error loading component code:", error as Error);
   }
 }
 
@@ -79,7 +79,7 @@ async function fetchComponentCode() {
   if (!loadRawComponent) throw new Error(`Component not found: ${path}`);
 
   const mod = await loadRawComponent();
-  return (mod as unknown).trim();
+  return (mod as string).trim();
 }
 
 // Update import paths in the raw code using MagicString

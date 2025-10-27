@@ -2,7 +2,7 @@
 <template>
   <!-- @vue-expect-error -->
   <ProsePre
-    :class="cn('overflow-auto max-h-128 px-5', $props.class)"
+    :class="cn('overflow-auto max-h-[32rem] px-5', $props.class)"
     :code="rawString"
     v-bind="props"
   >
@@ -42,6 +42,7 @@ const rawComponents = import.meta.glob(`../assembler/**/*.{vue,ts,js,d.ts}`, {
   query: "?raw",
   import: "default",
 });
+// console.log(rawComponents);
 
 // Compute the component path based on props
 const componentPath = computed(

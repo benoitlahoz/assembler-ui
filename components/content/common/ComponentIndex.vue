@@ -120,8 +120,7 @@ async function groupByCategory() {
 
   const categoryMap: { [key: string]: Category } = {};
 
-  data.forEach((item) => {
-    if (!item._path) return;
+  data.forEach((item: any) => {
     if (item._dir === "") return;
     if (locale.value === "en" && !item._path.startsWith("/components")) return;
     if (locale.value !== "en" && item._path.startsWith("/components")) return;
