@@ -23,7 +23,7 @@ export const dockVariants = cva("flex items-center justify-center rounded-full",
 });
 
 export const dockItemVariants = cva(
-  "flex items-center justify-center rounded-full transition-all cursor-pointer",
+  "flex items-center justify-center transition-transform duration-200 cursor-pointer will-change-transform",
   {
     variants: {
       size: {

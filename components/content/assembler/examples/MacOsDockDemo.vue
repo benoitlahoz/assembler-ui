@@ -6,6 +6,7 @@
         orientation="horizontal"
         color="accent"
         class="px-16"
+        expand="bottom"
       >
         <MacOsDockItem :active="true">
           <img
@@ -35,6 +36,7 @@
       <MacOsDock
         orientation="vertical"
         size="md"
+        expand="right"
       >
         <MacOsDockItem :active="true">
           <img
@@ -66,6 +68,7 @@
         <MacOsDock
           orientation="vertical"
           size="sm"
+          expand="right"
         >
           <MacOsDockItem :active="true">
             <img
@@ -95,6 +98,7 @@
         <MacOsDock
           orientation="horizontal"
           size="lg"
+          expand="top"
         >
           <MacOsDockItem :active="true">
             <img

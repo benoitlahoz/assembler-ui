@@ -1,7 +1,7 @@
 <template>
   <div
     data-slot="dock"
-    :class="dockClass"
+    :class="cn('relative', 'overflow-visible', 'border-2 border-red-500', dockClass)"
   >
     <slot :orientation="props.orientation" />
   </div>
@@ -16,6 +16,7 @@ export interface DockProps {
   orientation?: DockOrientation;
   color?: DockVariants["color"];
   size?: "sm" | "md" | "lg";
+  expand?: "bottom" | "top" | "left" | "right";
   class?: HTMLAttributes["class"];
 }
 
@@ -23,10 +24,12 @@ const props = withDefaults(defineProps<DockProps>(), {
   orientation: undefined,
   color: "default",
   size: "sm",
+  expand: undefined,
 });
 
 provide("dock-size", props.size);
 provide("dock-orientation", props.orientation);
+provide("dock-expand", props.expand);
 
 const dockClass = computed(() => {
   let classes = "";

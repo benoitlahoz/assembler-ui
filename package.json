@@ -27,6 +27,8 @@
     "@types/lodash.template": "^4.5.3",
     "@uiw/color-convert": "^2.8.0",
     "@vueuse/core": "^13.9.0",
+    "@vueuse/math": "^14.0.0",
+    "@vueuse/motion": "^3.0.3",
     "canvas-confetti": "^1.9.3",
     "class-variance-authority": "^0.7.1",
     "cobe": "^0.6.4",
