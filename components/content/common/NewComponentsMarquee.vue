@@ -68,7 +68,7 @@ async function loadNewComponents() {
     if (locale.value !== "en" && item._path.startsWith("/components")) continue;
 
     // Only components with a lime badge
-     
+
     const hasLimeBadge = (item.navBadges ?? []).some((b: any) => b.type === "lime");
     if (hasLimeBadge) {
       results.push({
