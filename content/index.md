@@ -1,216 +1,245 @@
 ---
+title: Assembler UI
+description: A modern and accessible Vue component library for your web applications
 seo:
-  title: AssemblerUI - Modern Vue Component Library
-  description: Build beautiful, accessible, and performant web applications with AssemblerUI's comprehensive component library.
-navigation: false
-layout: default
+  title: Assembler UI - Modern Vue Components
+  description: Discover Assembler UI, a collection of elegant and functional Vue components to build outstanding user interfaces.
 ---
 
-::u-page-hero
+::u-page-hero{class="dark:bg-gradient-to-b from-neutral-900 to-neutral-950"}
 ---
 orientation: vertical
 ---
-
 #top
 :hero-background
 
 #title
-Build Amazing [Interfaces]{.text-primary}.
+Assembler [UI]{.text-primary}.
 
 #description
-Create stunning web applications with AssemblerUI's modern, accessible, and customizable Vue components. Built on shadcn-vue principles for maximum flexibility.
+A collection of modern, accessible, and customizable Vue components. Built with Vue 3, TypeScript, and Tailwind CSS to create outstanding user interfaces.
 
 #links
-:::u-button
----
-to: /getting-started
-size: xl
-trailing-icon: i-lucide-arrow-right
----
-Get started
-:::
+  :::u-button
+  ---
+  to: /getting-started
+  size: xl
+  trailing-icon: i-lucide-arrow-right
+  ---
+  Get started
+  :::
 
-:::u-button
----
-icon: i-simple-icons-github
-color: neutral
-variant: outline
-size: xl
-to: https://github.com/assembler-ui/assembler-ui
-target: _blank
----
-View on GitHub
-:::
+  :::u-button
+  ---
+  icon: i-simple-icons-github
+  color: neutral
+  variant: outline
+  size: xl
+  to: https://github.com/benoitlahoz/assembler-ui
+  target: _blank
+  ---
+  View on GitHub
+  :::
 ::
 
-::u-page-section
-
+::u-page-section{class="dark:bg-neutral-950"}
 #title
-Registry-based Component System
+Available Components
+
+#description
+Explore our collection of ready-to-use components
 
 #links
-:::u-button
----
-color: neutral
-size: lg
-target: _blank
-to: /components
-trailing-icon: i-lucide-arrow-right
-variant: subtle
----
-Browse Components
-:::
+  :::u-button
+  ---
+  color: neutral
+  size: lg
+  to: /components
+  trailingIcon: i-lucide-arrow-right
+  variant: subtle
+  ---
+  View all components
+  :::
 
 #features
-:::u-page-feature
----
-icon: i-lucide-package
----
-#title
-Copy & Paste Components
+  :::u-page-feature
+  ---
+  icon: i-lucide-mouse-pointer-click
+  ---
+  #title
+  Button
 
-#description
-Built on shadcn-vue principles. Copy the component code directly into your project and customize it to fit your needs perfectly.
-:::
+  #description
+  Button component with multiple variants, sizes, and states. Full support for interactions and accessibility.
 
-:::u-page-feature
----
-icon: i-lucide-accessibility
----
-#title
-Accessibility First
+  #links
+  :::u-button
+  ---
+  to: /components/button
+  size: sm
+  variant: ghost
+  trailingIcon: i-lucide-arrow-right
+  ---
+  View Button
+  :::
+  :::
 
-#description
-Every component follows WCAG guidelines and includes proper ARIA attributes, keyboard navigation, and screen reader support out of the box.
-:::
+  :::u-page-feature
+  ---
+  icon: i-lucide-code
+  ---
+  #title
+  CodeViewer
 
-:::u-page-feature
----
-icon: i-lucide-palette
----
-#title
-Fully Customizable
+  #description
+  Code display with syntax highlighting, Preview/Code tabs, and integrated copy button.
 
-#description
-Built with CSS custom properties and a flexible design system. Customize colors, spacing, typography, and more to match your brand.
-:::
+  #links
+  :::u-button
+  ---
+  to: /components/code-viewer
+  size: sm
+  variant: ghost
+  trailingIcon: i-lucide-arrow-right
+  ---
+  View CodeViewer
+  :::
+  :::
 
-:::u-page-feature
----
-icon: i-lucide-download
----
-#title
-CLI & Registry
+  :::u-page-feature
+  ---
+  icon: i-lucide-terminal
+  ---
+  #title
+  InstallationCli
 
-#description
-Use our CLI to add components instantly or browse our registry to find the perfect components for your project.
-:::
+  #description
+  Command-line installation interface with support for npm, yarn, pnpm, and bun.
 
-:::u-page-feature
----
-icon: i-lucide-zap
----
-#title
-Lightweight & Fast
+  #links
+  :::u-button
+  ---
+  to: /components/installation-cli
+  size: sm
+  variant: ghost
+  trailingIcon: i-lucide-arrow-right
+  ---
+  View InstallationCli
+  :::
+  :::
 
-#description
-Optimized components with minimal dependencies. Only add what you need and keep your application performant.
-:::
+  :::u-page-feature
+  ---
+  icon: i-lucide-play
+  ---
+  #title
+  ComponentLoader
 
-:::u-page-feature
----
-icon: i-lucide-code-2
----
-#title
-TypeScript Ready
+  #description
+  Dynamic component loading with error and loading state management.
 
-#description
-Full TypeScript support with comprehensive type definitions for better development experience and runtime safety.
-:::
+  #links
+  :::u-button
+  ---
+  to: /components/component-loader
+  size: sm
+  variant: ghost
+  trailingIcon: i-lucide-arrow-right
+  ---
+  View ComponentLoader
+  :::
+  :::
 ::
 
-::u-page-section
-
+::u-page-section{class="dark:bg-neutral-950"}
 #title
-Developer Experience
-
-#links
-:::u-button
----
-color: neutral
-size: lg
-target: _blank
-to: /getting-started/usage
-trailing-icon: i-lucide-arrow-right
-variant: subtle
----
-Learn More
-:::
+Key Features
 
 #features
-:::u-page-feature
----
-icon: i-lucide-puzzle
----
-#title
-Vue 3 Composition API
+  :::u-page-feature
+  ---
+  icon: i-lucide-accessibility
+  ---
+  #title
+  Accessibility
 
-#description
-Built with Vue 3's Composition API and composables for maximum flexibility and reusability across your application.
-:::
+  #description
+  All components follow WCAG standards and include proper ARIA attributes for an inclusive experience.
+  :::
 
-:::u-page-feature
----
-icon: i-lucide-paintbrush
----
-#title
-Design System
+  :::u-page-feature
+  ---
+  icon: i-lucide-palette
+  ---
+  #title
+  Customizable
 
-#description
-Consistent design tokens for colors, typography, spacing, and shadows. Build cohesive interfaces that scale.
-:::
+  #description
+  Easily customizable theme with Tailwind CSS. CSS variables and props to adapt the design to your needs.
+  :::
 
-:::u-page-feature
----
-icon: i-lucide-file-code
----
-#title
-Detailed Documentation
+  :::u-page-feature
+  ---
+  icon: i-lucide-zap
+  ---
+  #title
+  Performance
 
-#description
-Comprehensive documentation with live examples, API references, and best practices for every component.
-:::
+  #description
+  Optimized for performance with tree-shaking, lazy loading, and lightweight components.
+  :::
 
-:::u-page-feature
----
-icon: i-lucide-terminal
----
-#title
-Modern Tooling
+  :::u-page-feature
+  ---
+  icon: i-lucide-shield-check
+  ---
+  #title
+  TypeScript
 
-#description
-Works seamlessly with Vite, Nuxt, and other modern Vue tools. Includes CLI for easy component management.
-:::
+  #description
+  Full TypeScript support with strict types and a great developer experience.
+  :::
 
-:::u-page-feature
----
-icon: i-lucide-github
----
-#title
-Open Source
+  :::u-page-feature
+  ---
+  icon: i-lucide-moon
+  ---
+  #title
+  Dark mode
 
-#description
-Completely open source and community-driven. Contribute components, report issues, and help shape the future.
-:::
+  #description
+  Native dark mode support with smooth transitions and system preference respect.
+  :::
 
-:::u-page-feature
----
-icon: i-lucide-heart
----
-#title
-Community Driven
+  :::u-page-feature
+  ---
+  icon: i-lucide-smartphone
+  ---
+  #title
+  Responsive
 
-#description
-Built by developers, for developers. Join our growing community and help make AssemblerUI even better.
-:::
+  #description
+  Responsive design by default with optimized breakpoints for all devices.
+  :::
+::
+
+::u-page-section{class="dark:bg-gradient-to-b from-neutral-950 to-neutral-900"}
+  :::u-page-c-t-a
+  ---
+  links:
+    - label: Get started now
+      to: '/getting-started'
+      trailingIcon: i-lucide-arrow-right
+    - label: View on GitHub
+      to: 'https://github.com/benoitlahoz/assembler-ui'
+      target: _blank
+      variant: subtle
+      icon: i-simple-icons-github
+  title: Ready to build something amazing?
+  description: Join developers using Assembler UI to create modern and accessible user interfaces.
+  class: dark:bg-neutral-950
+  ---
+
+  :stars-bg
+  :::
 ::

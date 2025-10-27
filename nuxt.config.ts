@@ -14,7 +14,7 @@ export default defineNuxtConfig({
     {
       path: '~/components',
       pathPrefix: false,
-      ignore: ['**/index.ts', '**/shaders.ts', '**/types.ts'],
+      ignore: ['index.ts'],
     },
   ],
 
@@ -39,6 +39,10 @@ export default defineNuxtConfig({
           searchDepth: 1,
         },
       },
+    },
+    // Configuration des composants MDC
+    highlight: {
+      theme: 'github-dark',
     },
   },
   alias: {

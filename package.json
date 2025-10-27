@@ -17,6 +17,7 @@
     "clean:cache": "rm -rf .nuxt .output node_modules/.cache"
   },
   "dependencies": {
+    "@highlightjs/vue-plugin": "^2.1.0",
     "@iconify-json/lucide": "^1.2.70",
     "@iconify-json/simple-icons": "^1.2.54",
     "@iconify-json/vscode-icons": "^1.2.32",

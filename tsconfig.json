@@ -18,5 +18,5 @@
     "**/*.vue",
     "lib/**/*",
     "components/**/*"
-  ]
+, "app/components/content/code", "app/components/content/component-loader"  ]
 }

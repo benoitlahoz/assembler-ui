@@ -4,6 +4,6 @@ import eslintConfigPrettier from 'eslint-config-prettier'
 
 export default withNuxt(eslintConfigPrettier, {
   rules: {
-    // Votre configuration personnalisée
+    '@typescript-eslint/no-explicit-any': 'off',
   },
 })

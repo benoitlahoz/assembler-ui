@@ -50,7 +50,7 @@ async function copyPage() {
 </script>
 
 <template>
-  <UButtonGroup>
+  <div class="flex">
     <UButton
       label="Copy page"
       :icon="copied ? 'i-lucide-copy-check' : 'i-lucide-copy'"
@@ -60,6 +60,7 @@ async function copyPage() {
       :ui="{
         leadingIcon: [copied ? 'text-primary' : 'text-neutral', 'size-3.5'],
       }"
+      class="rounded-r-none border-r-0"
       @click="copyPage"
     />
     <UDropdownMenu
@@ -73,7 +74,7 @@ async function copyPage() {
         content: 'w-48',
       }"
     >
-      <UButton icon="i-lucide-chevron-down" size="sm" color="neutral" variant="outline" />
+      <UButton icon="i-lucide-chevron-down" size="sm" color="neutral" variant="outline" class="rounded-l-none" />
     </UDropdownMenu>
-  </UButtonGroup>
+  </div>
 </template>
