@@ -2,13 +2,20 @@
 export default defineNuxtConfig({
   extends: ['shadcn-docs-nuxt'],
 
-  modules: [
-    '@nuxt/content',
-    '@nuxt/eslint',
-    '@nuxt/test-utils',
-    '@nuxt/ui',
-    'nuxt-component-meta',
-  ],
+  content: {
+    documentDriven: true,
+    highlight: {
+      theme: {
+        // Default theme
+        default: 'github-light',
+        // Theme used in dark-mode
+        dark: 'github-dark',
+      }
+    }
+  },
+
+  modules: ['@nuxt/image', '@nuxt/eslint'],
+
   devtools: { enabled: true },
 
   compatibilityDate: '2024-07-06',
