@@ -159,7 +159,7 @@ function buildContent(dir: string, contentRoot: string, accumulated: DirConfig[]
         return clean;
       });
       const urlPath = urlParts.join("/");
-      const url = `https://inspira-ui.com/docs/${urlPath}`;
+      const url = `https://benoitlaahoz.github.io/docs/${urlPath}`;
 
       // Read and process the Markdown content.
       const rawContent = readFileSync(fullPath, "utf-8");
@@ -175,7 +175,7 @@ function buildContent(dir: string, contentRoot: string, accumulated: DirConfig[]
 export default defineNitroPlugin((nitroApp: NitroApp) => {
   nitroApp.hooks.hook("llms:generate:full", async (_event, _options, contents) => {
     const contentRoot = resolve(process.cwd(), "content");
-    let markdownOutput = "# Complete documentation of Inspira UI\n\n";
+    let markdownOutput = "# Complete documentation of Assembler UI\n\n";
     markdownOutput += buildContent(contentRoot, contentRoot);
     contents.push(markdownOutput.trim());
   });

@@ -1,10 +1,11 @@
 import animate from "tailwindcss-animate";
+import { setupInspiraUI } from "@inspira-ui/plugins";
 
 export default {
   darkMode: "selector",
   safelist: ["dark"],
   prefix: "",
-  content: [],
+  content: ["./components/**/*.{vue,js,ts,jsx,tsx}"],
   theme: {
     container: {
       center: true,
@@ -123,5 +124,5 @@ export default {
     },
   },
 
-  plugins: [animate],
+  plugins: [animate, setupInspiraUI],
 };

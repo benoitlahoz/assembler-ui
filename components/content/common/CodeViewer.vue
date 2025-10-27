@@ -80,6 +80,7 @@ async function fetchComponentCode() {
 function updateImportPaths(code: string) {
   const magicString = new MagicString(code);
   magicString.replaceAll("~/components/content/assembler/", "@/components/");
+  magicString.replaceAll("~/components/content/common/", "@/components/ui/");
   magicString.replaceAll("~/composables/", "@/composables/");
   return magicString.toString();
 }

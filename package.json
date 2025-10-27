@@ -18,6 +18,7 @@
     "build:copy": "cp public/_routes.json dist/_routes.json"
   },
   "dependencies": {
+    "@inspira-ui/plugins": "0.0.1",
     "@number-flow/vue": "^0.4.8",
     "@nuxt/fonts": "^0.11.4",
     "@nuxt/image": "^1.11.0",
@@ -71,6 +72,7 @@
     "globals": "^16.3.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.6",
+    "lucide-vue-next": "^0.548.0",
     "prettier": "^3.6.2",
     "tailwind-merge": "^3.3.1",
     "tsx": "^4.20.5",

@@ -1,14 +1,25 @@
 <template>
-  <div
+  <Separator
+    orientation="vertical"
     :class="
-      cn('relative block bg-secondary', orientation === 'vertical' ? 'w-4/5 h-0.5' : 'h-4/5 w-0.5')
+      cn(
+        props.variant ? separatorVariants({ variant: props.variant }) : separatorVariants(),
+        props.class,
+      )
     "
-  ></div>
+  />
 </template>
 
 <script setup lang="ts">
-import { ORIENTATION_INJECTION_KEY } from "./injectionKeys";
-import { cn } from "~/lib/utils";
+import type { HTMLAttributes } from "vue";
+import { cn } from "@/lib/utils";
+import { separatorVariants } from ".";
+import { Separator } from "~/components/content/common/separator";
 
-const orientation = inject(ORIENTATION_INJECTION_KEY, "vertical");
+interface DockSeparatorProps {
+  class?: HTMLAttributes["class"];
+  variant?: "default" | "primary" | "destructive" | "secondary";
+}
+
+const props = defineProps<DockSeparatorProps>();
 </script>

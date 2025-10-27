@@ -1,0 +1,42 @@
+---
+title: MacOsDock
+description: Un composant dock inspiré de macOS, personnalisable et réactif.
+---
+
+::ComponentLoader{label="Aperçu" componentName="MacOsDockDemo" type="examples"}
+::
+
+## Installation via CLI
+
+::InstallationCli{componentId="macos-dock"}
+::
+
+## Installation manuelle
+
+Copiez et collez le code suivant :
+
+::code-group
+:CodeViewerTab{filename="MacOsDock.vue" language="vue" componentName="MacOsDock" type="ui" id="macos-dock"}
+:CodeViewerTab{filename="MacOsDockItem.vue" language="vue" componentName="MacOsDockItem" type="ui" id="macos-dock"}
+:CodeViewerTab{filename="MacOsDockSeparator.vue" language="vue" componentName="MacOsDockSeparator" type="ui" id="macos-dock"}
+:CodeViewerTab{filename="index.ts" language="ts" componentName="index" extension="ts" type="ui" id="macos-dock"}
+::
+
+## API
+
+| Prop         | Type       | Default         | Description                                              |
+| ------------ | ---------- | --------------- | -------------------------------------------------------- |
+| `position`   | `string`   | `bottom-center` | Position du dock (ex: top-left, bottom-center, etc.)     |
+| `orientation`| `string`   | `horizontal`    | Orientation du dock (horizontal ou vertical)             |
+| `class`      | `string`   | `""`            | Classes CSS additionnelles                               |
+| `size`       | `string`   | `md`            | Taille des items du dock (`sm`, `md`, `lg`)              |
+| `active`     | `boolean`  | `false`         | État actif d'un item                                     |
+
+## Fonctionnalités
+
+- **Style macOS** : Dock moderne, arrondi et ombré.
+- **Orientation et position** : Personnalisez l'alignement et la direction.
+- **Items interactifs** : État actif, hover, icônes personnalisables.
+- **Séparateurs** : Ajoutez des séparateurs verticaux ou horizontaux.
+- **Slot par défaut** : Ajoutez n'importe quel contenu dans les items.
+
