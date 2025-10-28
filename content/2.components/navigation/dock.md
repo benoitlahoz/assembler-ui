@@ -44,6 +44,8 @@ Copy and paste the following files into the same folder:
 
 ::
 
+## Examples
+
 ### Horizontal expands from top to bottom
 
 ::ComponentLoader{label="Preview" componentName="SimpleDockDemoHorizontalTop" type="examples"}

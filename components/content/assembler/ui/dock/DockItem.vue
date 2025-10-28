@@ -55,10 +55,7 @@ const distance = computed(() => {
   return val > MAX_DISTANCE ? MAX_DISTANCE : val;
 });
 
-// Project the distance to a size value between MAX_SIZE (close) and MIN_SIZE (far),
-// en fonction de l'orientation (largeur pour horizontal, hauteur pour vertical)
 const sizeSync = computed(() => {
-  // Pour horizontal, on magnifie la largeur ; pour vertical, la hauteur
   return useProjection(distance, [0, MAX_DISTANCE], [MIN_SIZE * magnify.value, MIN_SIZE]).value;
 });
 
@@ -74,14 +71,27 @@ const fontSize = computed(() => {
 });
 
 // Animate the width of the dock item based on the mouse distance
-watch(sizeSync, () => {
-  push(orientation.value === "horizontal" ? "width" : "height", sizeSync.value, motionProperties, {
-    type: "spring",
-    mass: 0.1,
-    stiffness: 150,
-    damping: 12,
-  });
-});
+watch(
+  () => [orientation.value, sizeSync.value],
+  () => {
+    if (orientation.value === "horizontal") {
+      push("width", sizeSync.value, motionProperties, {
+        type: "spring",
+        mass: 0.1,
+        stiffness: 150,
+        damping: 12,
+      });
+    } else {
+      push("height", sizeSync.value, motionProperties, {
+        type: "spring",
+        mass: 0.1,
+        stiffness: 150,
+        damping: 12,
+      });
+    }
+  },
+  { immediate: true },
+);
 
 const onClick = () => {
   emit("click");
