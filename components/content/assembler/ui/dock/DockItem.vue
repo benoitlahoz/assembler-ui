@@ -51,6 +51,7 @@ const distance = computed(() => {
     orientation.value === "horizontal"
       ? Math.abs(mouseX.value - bounds.x - bounds.width / 2)
       : Math.abs(mouseY.value - bounds.y - bounds.height / 2);
+
   // Clamp the distance to MAX_DISTANCE
   return val > MAX_DISTANCE ? MAX_DISTANCE : val;
 });

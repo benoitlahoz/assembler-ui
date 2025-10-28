@@ -56,12 +56,12 @@ Copy and paste the following files into the same folder:
 ::ComponentLoader{label="Preview" componentName="SimpleDockDemoHorizontalCenter" type="examples"}
 ::
 
-### Vertical Dock (left)
+### Vertical expands from left to right
 
 ::ComponentLoader{label="Preview" componentName="SimpleDockDemoVerticalLeft" type="examples"}
 ::
 
-### Vertical Dock (right)
+### Vertical expands from right to left
 
 ::ComponentLoader{label="Preview" componentName="SimpleDockDemoVerticalRight" type="examples"}
 ::
@@ -75,12 +75,12 @@ Copy and paste the following files into the same folder:
 
 ### Dock
 
-| Prop          | Type   | Description                                                         |
-| ------------- | ------ | ------------------------------------------------------------------- |
-| `class`       | string | Additional CSS classes to apply to the dock.                        |
-| `magnify`     | number | Magnification factor on hover (default: 60).                        |
-| `orientation` | string | Dock orientation (`vertical`, `horizontal`). Default: `horizontal`. |
-| `expand`      | string | Expansion area (`start`, `center`, `end`).                          |
+| Prop          | Type   | Description                                  | Default      |
+| ------------- | ------ | -------------------------------------------- | ------------ |
+| `class`       | string | Additional CSS classes to apply to the dock. | —            |
+| `magnify`     | number | Magnification factor on hover.               | 60           |
+| `orientation` | string | Dock orientation (`vertical`, `horizontal`). | "horizontal" |
+| `expand`      | string | Expansion area (`start`, `center`, `end`).   | "center"     |
 
 **Slots**
 
@@ -90,10 +90,10 @@ Copy and paste the following files into the same folder:
 
 ### DockItem
 
-| Prop      | Type    | Description                                       |
-| --------- | ------- | ------------------------------------------------- |
-| `class`   | string  | Additional CSS classes for the item.              |
-| `animate` | boolean | Enable or disable item animation (default: false) |
+| Prop      | Type    | Description                          | Default |
+| --------- | ------- | ------------------------------------ | ------- |
+| `class`   | string  | Additional CSS classes for the item. | —       |
+| `animate` | boolean | Enable or disable item animation     | false   |
 
 **Slots**
 
@@ -105,9 +105,9 @@ Copy and paste the following files into the same folder:
 
 Allows you to add a visual separator between two DockItems.
 
-| Prop    | Type   | Description                              |
-| ------- | ------ | ---------------------------------------- |
-| `class` | string | Additional CSS classes for the separator |
+| Prop    | Type   | Description                              | Default |
+| ------- | ------ | ---------------------------------------- | ------- |
+| `class` | string | Additional CSS classes for the separator | —       |
 
 ## Credits
 

@@ -39,8 +39,8 @@ watch(
 );
 
 const onMouseMove = (event: MouseEvent) => {
-  mouseX.value = event.pageX;
-  mouseY.value = event.pageY;
+  mouseX.value = event.clientX;
+  mouseY.value = event.clientY;
 };
 
 const onMouseLeave = () => {
