@@ -19,16 +19,22 @@ const props = withDefaults(defineProps<DockProps>(), {
 
 const mouseX = ref(Infinity);
 const mouseY = ref(Infinity);
+const expand = ref(props.expand);
 const magnify = ref(Number(props.magnify));
+const orientation = ref(props.orientation);
 
 provide("mouse-x", mouseX);
 provide("mouse-y", mouseY);
+provide("expand", expand);
 provide("magnify", magnify);
+provide("orientation", orientation);
 
 watch(
-  () => props.magnify,
-  (newVal) => {
-    magnify.value = Number(newVal);
+  () => [props.expand, props.magnify, props.orientation],
+  () => {
+    expand.value = props.expand;
+    magnify.value = Number(props.magnify);
+    orientation.value = props.orientation;
   },
 );
 

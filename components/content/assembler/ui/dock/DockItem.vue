@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, ref, watch, type HTMLAttributes } from "vue";
+import { computed, ref, watch, type HTMLAttributes, type Ref } from "vue";
 import { cn } from "@/lib/utils";
 import { useProjection } from "@vueuse/math";
 import {
@@ -10,9 +10,10 @@ import {
 
 export interface DockItemProps {
   class?: HTMLAttributes["class"];
+  animate?: boolean;
 }
 
-const props = withDefaults(defineProps<DockItemProps>(), {});
+const props = withDefaults(defineProps<DockItemProps>(), { animate: false });
 const emit = defineEmits<{
   (e: "click"): void;
 }>();
@@ -20,7 +21,11 @@ const emit = defineEmits<{
 // Mouse position injected from parent context
 const mouseX: Ref<number> = inject("mouse-x", ref(Infinity));
 const mouseY: Ref<number> = inject("mouse-y", ref(Infinity));
+const expand: Ref<"start" | "end" | "center"> = inject("expand", ref("start")) as Ref<
+  "start" | "end" | "center"
+>;
 const magnify: Ref<number> = inject("magnify", ref(2.5));
+const orientation: Ref<string> = inject("orientation", ref("horizontal"));
 
 // Reference to the dock item element
 const target = ref<HTMLElement>();
@@ -77,24 +82,30 @@ const onClick = () => {
 </script>
 
 <template>
-  <div
-    ref="target"
-    v-motion="motionProperties"
-    data-slot="dock-item"
-    :class="
-      cn(
-        'aspect-square w-10 rounded-full bg-foreground text-background flex items-center justify-center font-bold select-none',
-        props.class,
-      )
-    "
-    @click="onClick"
+  <AnimationBounceMacOs
+    :enabled="animate"
+    :expand="expand"
+    :orientation="orientation === 'horizontal' ? 'vertical' : 'horizontal'"
   >
     <div
-      class="text-black w-full h-full flex items-center justify-center"
-      :style="{ fontSize }"
-      draggable="false"
+      ref="target"
+      v-motion="motionProperties"
+      data-slot="dock-item"
+      :class="
+        cn(
+          'aspect-square w-10 rounded-full bg-transparent flex items-center justify-center font-bold select-none',
+          props.class,
+        )
+      "
+      @click="onClick"
     >
-      <slot> </slot>
+      <div
+        class="text-foreground w-full h-full flex items-center justify-center"
+        :style="{ fontSize }"
+        draggable="false"
+      >
+        <slot></slot>
+      </div>
     </div>
-  </div>
+  </AnimationBounceMacOs>
 </template>

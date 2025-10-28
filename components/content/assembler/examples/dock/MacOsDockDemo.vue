@@ -119,6 +119,7 @@ const items = ref([
           <DockItem
             v-if="item.type === 'icon' || item.type === 'iconify'"
             class="p-1 rounded-lg drop-shadow-2xl shadow-2xl bg-gray-600 dark:bg-gray-700"
+            :animate="item.loading"
             @click="item.onClick!()"
           >
             <div class="w-full h-full flex items-center justify-center relative">

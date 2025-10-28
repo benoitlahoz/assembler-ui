@@ -3,7 +3,10 @@ title: Dock
 description: A macOS-style dock with magnifying icons as you hover over them.
 ---
 
-::ComponentLoader{label="Preview" componentName="DockDemo" type="examples"}  
+::ComponentLoader{label="Preview" componentName="SimpleDockDemo" type="examples"}  
+::
+
+::ComponentLoader{label="Preview" componentName="MacOsDockDemo" type="examples"}  
 ::
 
 ## Install using CLI

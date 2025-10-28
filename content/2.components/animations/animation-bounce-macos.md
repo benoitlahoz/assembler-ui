@@ -1,6 +1,6 @@
-title: AnimationBounce
+---
+title: AnimationBounceMacOs
 description: A component to animate an element with a MacOS dock-style bounce effect.
-
 ---
 
 ::ComponentLoader{label="Preview" componentName="AnimationBounceMacOsDemo" type="examples"}
