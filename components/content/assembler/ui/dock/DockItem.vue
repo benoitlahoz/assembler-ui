@@ -36,8 +36,11 @@ const MAX_DISTANCE = 100;
 // Minimum size (in px) of the dock item
 const MIN_SIZE = 40;
 
-// Motion properties for the dock item
-const { motionProperties } = useMotionProperties(target, { width: MIN_SIZE, y: 0 });
+// Motion properties for the dock item : width pour horizontal, height pour vertical
+const { motionProperties } = useMotionProperties(
+  target,
+  orientation.value === "vertical" ? { height: MIN_SIZE, x: 0 } : { width: MIN_SIZE, y: 0 },
+);
 const { push } = useMotionTransitions();
 
 // Compute the relative distance from the mouse to the center of the dock item
@@ -51,8 +54,12 @@ const distance = computed(() => {
   return val > MAX_DISTANCE ? MAX_DISTANCE : val;
 });
 
-// Project the distance to a size value between MAX_SIZE (close) and MIN_SIZE (far)
-const sizeSync = useProjection(distance, [0, MAX_DISTANCE], [MIN_SIZE * magnify.value, MIN_SIZE]);
+// Project the distance to a size value between MAX_SIZE (close) and MIN_SIZE (far),
+// en fonction de l'orientation (largeur pour horizontal, hauteur pour vertical)
+const sizeSync = computed(() => {
+  // Pour horizontal, on magnifie la largeur ; pour vertical, la hauteur
+  return useProjection(distance, [0, MAX_DISTANCE], [MIN_SIZE * magnify.value, MIN_SIZE]).value;
+});
 
 // Compute a font size proportional to the size (between 1.25rem and 2.5rem)
 const fontSize = computed(() => {
@@ -92,7 +99,7 @@ const onClick = () => {
       data-slot="dock-item"
       :class="
         cn(
-          'aspect-square w-10 rounded-full bg-transparent flex items-center justify-center font-bold select-none',
+          'aspect-square rounded-full bg-transparent flex items-center justify-center font-bold select-none',
           `${orientation === 'horizontal' ? 'w-10' : 'h-10'}`,
           props.class,
         )
