@@ -1,22 +1,21 @@
 ---
 title: Dock
-description: A macOS-style dock with magnifying icons as you hover over them.
+description: A macOS-style dock with magnifying icons on hover.
 ---
 
-::ComponentLoader{label="Preview" componentName="SimpleDockDemo" type="examples"}  
+::ComponentLoader{label="Preview" componentName="SimpleDockDemoHorizontalBottom" type="examples"}
 ::
 
-::ComponentLoader{label="Preview" componentName="MacOsDockDemo" type="examples"}  
-::
+## Installation
 
-## Install using CLI
+### With the CLI
 
 ::InstallationCli{componentId="dock"}
 ::
 
-## Install Manually
+### Manual installation
 
-Copy and paste the following code in the same folder
+Copy and paste the following files into the same folder:
 
 ::code-group
 
@@ -27,32 +26,88 @@ Copy and paste the following code in the same folder
 
 ::
 
-## API
+### Using the CLI
 
-::steps
+::InstallationCli{componentId="dock"}
+::
 
-### `Dock`
+### Manual installation
 
-| Prop Name       | Type     | Description                                                           |
-| --------------- | -------- | --------------------------------------------------------------------- |
-| `class`         | `string` | Additional classes to apply to the dock container.                    |
-| `magnification` | `number` | Magnification factor for the dock icons on hover (default: 60).       |
-| `distance`      | `number` | Distance from the icon center where magnification applies.            |
-| `direction`     | `string` | Alignment of icons (`top`, `middle`, `bottom`) (default: middle).     |
-| `orientation`   | `string` | Orientation of Dock (`vertical`, `horizontal`) (default: horizontal). |
+Copy and paste the following files into the same folder:
 
-| Slot Name | Description                                          |
-| --------- | ---------------------------------------------------- |
-| `default` | Dock Dock or other child components to be displayed. |
+::code-group
 
-### `DockIcon`
-
-| Slot Name | Description                                             |
-| --------- | ------------------------------------------------------- |
-| `default` | Component or icon to be displayed inside the dock icon. |
+:CodeViewerTab{filename="Dock.vue" language="vue" componentName="Dock" type="ui" id="dock"}
+:CodeViewerTab{filename="DockItem.vue" language="vue" componentName="DockItem" type="ui" id="dock"}
+:CodeViewerTab{filename="DockSeparator.vue" language="vue" componentName="DockSeparator" type="ui" id="dock"}
+:CodeViewerTab{filename="index.ts" language="ts" componentName="index" extension="ts" type="ui" id="dock"}
 
 ::
 
+### Horizontal expands from top to bottom
+
+::ComponentLoader{label="Preview" componentName="SimpleDockDemoHorizontalTop" type="examples"}
+::
+
+### Horizontal expands from center
+
+::ComponentLoader{label="Preview" componentName="SimpleDockDemoHorizontalCenter" type="examples"}
+::
+
+### Vertical Dock (left)
+
+::ComponentLoader{label="Preview" componentName="SimpleDockDemoVerticalLeft" type="examples"}
+::
+
+### Vertical Dock (right)
+
+::ComponentLoader{label="Preview" componentName="SimpleDockDemoVerticalRight" type="examples"}
+::
+
+### macOS Style Dock
+
+::ComponentLoader{label="Preview" componentName="MacOsDockDemo" type="examples"}
+::
+
+## API & Properties
+
+### Dock
+
+| Prop          | Type   | Description                                                         |
+| ------------- | ------ | ------------------------------------------------------------------- |
+| `class`       | string | Additional CSS classes to apply to the dock.                        |
+| `magnify`     | number | Magnification factor on hover (default: 60).                        |
+| `orientation` | string | Dock orientation (`vertical`, `horizontal`). Default: `horizontal`. |
+| `expand`      | string | Expansion area (`start`, `center`, `end`).                          |
+
+**Slots**
+
+| Slot    | Description                                       |
+| ------- | ------------------------------------------------- |
+| default | The DockItem or DockSeparator elements to display |
+
+### DockItem
+
+| Prop      | Type    | Description                                       |
+| --------- | ------- | ------------------------------------------------- |
+| `class`   | string  | Additional CSS classes for the item.              |
+| `animate` | boolean | Enable or disable item animation (default: false) |
+
+**Slots**
+
+| Slot    | Description                                   |
+| ------- | --------------------------------------------- |
+| default | Icon or component to display in the DockItem. |
+
+### DockSeparator
+
+Allows you to add a visual separator between two DockItems.
+
+| Prop    | Type   | Description                              |
+| ------- | ------ | ---------------------------------------- |
+| `class` | string | Additional CSS classes for the separator |
+
 ## Credits
 
-- Credits to macOS Dock for the design inspiration and the fantastic hover magnification effect.
+- Inspired by shadcn-io: https://www.shadcn.io/components/dock/mac-os-dock
+- Adapted from NuxtLego: https://nuxt-lego.vercel.app/blueprints/magnified-dock
