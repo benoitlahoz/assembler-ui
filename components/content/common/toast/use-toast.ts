@@ -1,5 +1,3 @@
-/* eslint-disable func-style */
-
 import type { Component, VNode } from "vue";
 import type { ToastProps } from ".";
 import { computed, ref } from "vue";
