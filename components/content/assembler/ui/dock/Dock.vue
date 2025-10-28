@@ -55,11 +55,20 @@ const onMouseLeave = () => {
     class="border border-border"
     :class="
       cn(
-        'flex h-16 w-fit items-end gap-4 rounded-2xl bg-opacity-20 backdrop-blur-md px-4 z-10',
+        'flex gap-4 rounded-2xl bg-opacity-20 backdrop-blur-md z-10',
         {
-          'items-start pt-3': props.expand === 'end',
-          'items-end pb-3': props.expand === 'start',
-          'items-center': props.expand === 'center',
+          'w-fit h-16 px-4 items-start pt-3':
+            props.orientation === 'horizontal' && props.expand === 'end',
+          'w-fit h-16 px-4 items-end pb-3':
+            props.orientation === 'horizontal' && props.expand === 'start',
+          'w-fit h-16 px-4 items-center':
+            props.orientation === 'horizontal' && props.expand === 'center',
+          'h-fit w-16 py-4 flex-col items-start pl-3':
+            props.orientation === 'vertical' && props.expand === 'end',
+          'h-fit w-16 py-4 flex-col items-end pr-3':
+            props.orientation === 'vertical' && props.expand === 'start',
+          'h-fit w-16 py-4 flex-col items-center':
+            props.orientation === 'vertical' && props.expand === 'center',
         },
         props.class,
       )

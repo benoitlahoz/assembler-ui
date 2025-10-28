@@ -33,42 +33,41 @@ const target = ref<HTMLElement>();
 // --- Constants ---
 // Maximum distance (in px) for the hover effect influence
 const MAX_DISTANCE = 100;
-// Minimum width (in px) of the dock item
-const MIN_WIDTH = 40;
+// Minimum size (in px) of the dock item
+const MIN_SIZE = 40;
 
 // Motion properties for the dock item
-const { motionProperties } = useMotionProperties(target, { width: MIN_WIDTH, y: 0 });
+const { motionProperties } = useMotionProperties(target, { width: MIN_SIZE, y: 0 });
 const { push } = useMotionTransitions();
 
 // Compute the relative distance from the mouse to the center of the dock item
 const distance = computed(() => {
-  const bounds = target.value?.getBoundingClientRect() ?? { x: 0, width: 0 };
-  const val = Math.abs(mouseX.value - bounds.x - bounds.width / 2);
+  const bounds = target.value?.getBoundingClientRect() ?? { x: 0, y: 0, width: 0, height: 0 };
+  const val =
+    orientation.value === "horizontal"
+      ? Math.abs(mouseX.value - bounds.x - bounds.width / 2)
+      : Math.abs(mouseY.value - bounds.y - bounds.height / 2);
   // Clamp the distance to MAX_DISTANCE
   return val > MAX_DISTANCE ? MAX_DISTANCE : val;
 });
 
-// Project the distance to a width value between MAX_WIDTH (close) and MIN_WIDTH (far)
-const widthSync = useProjection(
-  distance,
-  [0, MAX_DISTANCE],
-  [MIN_WIDTH * magnify.value, MIN_WIDTH],
-);
+// Project the distance to a size value between MAX_SIZE (close) and MIN_SIZE (far)
+const sizeSync = useProjection(distance, [0, MAX_DISTANCE], [MIN_SIZE * magnify.value, MIN_SIZE]);
 
-// Compute a font size proportional to the width (between 1.25rem and 2.5rem)
+// Compute a font size proportional to the size (between 1.25rem and 2.5rem)
 const fontSize = computed(() => {
-  // Map width from [MIN_WIDTH, MAX_WIDTH] to [1.25, 2.5] rem
+  // Map size from [MIN_SIZE, MAX_SIZE] to [1.25, 2.5] rem
   const minRem = 1.25;
   const maxRem = 2.5;
-  const width = widthSync.value;
-  const size =
-    ((width - MIN_WIDTH) / (MIN_WIDTH * magnify.value - MIN_WIDTH)) * (maxRem - minRem) + minRem;
-  return `${size}rem`;
+  const size = sizeSync.value;
+  const mappedSize =
+    ((size - MIN_SIZE) / (MIN_SIZE * magnify.value - MIN_SIZE)) * (maxRem - minRem) + minRem;
+  return `${mappedSize}rem`;
 });
 
 // Animate the width of the dock item based on the mouse distance
-watch(widthSync, () => {
-  push("width", widthSync.value, motionProperties, {
+watch(sizeSync, () => {
+  push(orientation.value === "horizontal" ? "width" : "height", sizeSync.value, motionProperties, {
     type: "spring",
     mass: 0.1,
     stiffness: 150,
@@ -94,6 +93,7 @@ const onClick = () => {
       :class="
         cn(
           'aspect-square w-10 rounded-full bg-transparent flex items-center justify-center font-bold select-none',
+          `${orientation === 'horizontal' ? 'w-10' : 'h-10'}`,
           props.class,
         )
       "
