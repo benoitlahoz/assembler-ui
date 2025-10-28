@@ -1,3 +1,28 @@
+<script setup lang="ts">
+import Toaster from "shadcn-docs-nuxt/components/ui/toast/Toaster.vue";
+import Aside from "./components/layout/Aside.vue";
+
+const { page } = useContent();
+const config = useConfig();
+const route = useRoute();
+const { themeClass, radius } = useThemes();
+
+const baseRouteName = computed(() => useRouteBaseName()(route));
+
+useSeoMeta({
+  description: config.value.site.description,
+  ogDescription: config.value.site.description,
+  twitterCard: "summary_large_image",
+});
+
+useHead({
+  bodyAttrs: {
+    class: themeClass.value,
+    style: `--radius: ${radius.value}rem;`,
+  },
+});
+</script>
+
 <template>
   <NuxtLoadingIndicator
     :color="false"
@@ -35,28 +60,3 @@
   <Toaster />
   <LayoutFooter />
 </template>
-
-<script setup lang="ts">
-import Toaster from "shadcn-docs-nuxt/components/ui/toast/Toaster.vue";
-import Aside from "./components/layout/Aside.vue";
-
-const { page } = useContent();
-const config = useConfig();
-const route = useRoute();
-const { themeClass, radius } = useThemes();
-
-const baseRouteName = computed(() => useRouteBaseName()(route));
-
-useSeoMeta({
-  description: config.value.site.description,
-  ogDescription: config.value.site.description,
-  twitterCard: "summary_large_image",
-});
-
-useHead({
-  bodyAttrs: {
-    class: themeClass.value,
-    style: `--radius: ${radius.value}rem;`,
-  },
-});
-</script>

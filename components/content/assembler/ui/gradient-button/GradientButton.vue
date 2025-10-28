@@ -1,18 +1,3 @@
-<template>
-  <button
-    :class="
-      cn(
-        'relative flex items-center justify-center min-w-28 min-h-10 overflow-hidden before:absolute before:-inset-[200%] animate-rainbow rainbow-btn',
-        props.class,
-      )
-    "
-  >
-    <span class="btn-content inline-flex size-full items-center justify-center px-4 py-2">
-      <slot />
-    </span>
-  </button>
-</template>
-
 <script lang="ts" setup>
 import { cn } from "@/lib/utils";
 import { computed } from "vue";
@@ -51,6 +36,21 @@ const borderWidthInPx = computed(() => `${props.borderWidth}px`);
 const borderRadiusInPx = computed(() => `${props.borderRadius}px`);
 const blurPx = computed(() => `${props.blur}px`);
 </script>
+
+<template>
+  <button
+    :class="
+      cn(
+        'relative flex items-center justify-center min-w-28 min-h-10 overflow-hidden before:absolute before:-inset-[200%] animate-rainbow rainbow-btn',
+        props.class,
+      )
+    "
+  >
+    <span class="btn-content inline-flex size-full items-center justify-center px-4 py-2">
+      <slot />
+    </span>
+  </button>
+</template>
 
 <style scoped>
 .animate-rainbow::before {

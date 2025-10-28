@@ -1,3 +1,11 @@
+<script setup lang="ts">
+import { cn } from "@/lib/utils";
+
+defineProps({
+  class: String,
+});
+</script>
+
 <template>
   <svg
     :class="cn('animate-spin h-5 w-5', $props.class)"
@@ -18,11 +26,3 @@
     ></path>
   </svg>
 </template>
-
-<script setup lang="ts">
-import { cn } from "@/lib/utils";
-
-defineProps({
-  class: String,
-});
-</script>

@@ -1,3 +1,29 @@
+<script setup lang="ts">
+const isDark = computed(() => useColorMode().value == "dark");
+const globeConfig = {
+  pointSize: 1,
+  globeColor: "#FFF",
+  showAtmosphere: true,
+  atmosphereColor: "#FFFFFF",
+  atmosphereAltitude: 0.2,
+  emissive: "#FFF",
+  emissiveIntensity: 0.9,
+  shininess: 0.9,
+  polygonColor: "rgba(0,0,0,1)",
+  ambientLight: "#FFF",
+  directionalLeftLight: "#ffffff",
+  directionalTopLight: "#ffffff",
+  pointLight: "#ffffff",
+  arcTime: 1000,
+  arcLength: 1,
+  rings: 1,
+  maxRings: 10,
+  initialPosition: { lat: 22.3193, lng: 114.1694 },
+  autoRotate: true,
+  autoRotateSpeed: 0.5,
+};
+</script>
+
 <template>
   <section
     class="relative mx-auto flex min-h-[52rem] max-w-[800px] flex-col items-center justify-center gap-2 py-8 max-sm:min-h-[48rem] lg:py-24 lg:pb-20 md:py-12 md:pb-8"
@@ -79,29 +105,3 @@
     </div>
   </section>
 </template>
-
-<script setup lang="ts">
-const isDark = computed(() => useColorMode().value == "dark");
-const globeConfig = {
-  pointSize: 1,
-  globeColor: "#FFF",
-  showAtmosphere: true,
-  atmosphereColor: "#FFFFFF",
-  atmosphereAltitude: 0.2,
-  emissive: "#FFF",
-  emissiveIntensity: 0.9,
-  shininess: 0.9,
-  polygonColor: "rgba(0,0,0,1)",
-  ambientLight: "#FFF",
-  directionalLeftLight: "#ffffff",
-  directionalTopLight: "#ffffff",
-  pointLight: "#ffffff",
-  arcTime: 1000,
-  arcLength: 1,
-  rings: 1,
-  maxRings: 10,
-  initialPosition: { lat: 22.3193, lng: 114.1694 },
-  autoRotate: true,
-  autoRotateSpeed: 0.5,
-};
-</script>

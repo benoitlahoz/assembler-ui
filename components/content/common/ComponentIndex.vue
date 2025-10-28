@@ -1,53 +1,3 @@
-<template>
-  <div class="flex w-full flex-col flex-wrap gap-4">
-    <UiAccordion
-      v-if="categories.length > 0"
-      v-model="openCategories"
-      type="multiple"
-    >
-      <UiAccordionItem
-        v-for="(category, index) in categories"
-        :key="`categoryCategory_${category.name + index}`"
-        :value="category.category"
-      >
-        <UiAccordionTrigger>
-          <span class="flex items-center gap-2 w-full">
-            {{ index + 1 + ". " + category.name.replaceAll("-", " ") }}
-            <span class="text-muted-foreground text-sm"> ({{ category.components.length }}) </span>
-          </span>
-        </UiAccordionTrigger>
-        <UiAccordionContent>
-          <ClientOnly>
-            <CardSpotlight
-              v-for="(component, indexJ) in category.components"
-              :key="`componentIndex_${component.title + indexJ}`"
-              class="relative my-3 h-screen max-h-14 max-w-lg cursor-pointer flex-row items-center justify-between gap-4 overflow-hidden rounded-2xl border border-zinc-200 p-6 dark:border-zinc-800 dark:bg-zinc-900/50"
-              :gradient-color="gradientColor"
-              slot-class="w-full"
-            >
-              <NuxtLink :to="component.path">
-                <div class="flex w-full flex-row items-center justify-center">
-                  <div class="mr-2 text-right">{{ indexJ + 1 }}.</div>
-                  <div class="mr-2 font-heading">{{ component.title }}</div>
-                  <Badge
-                    v-for="badge in component.navBadges"
-                    :key="`${badge}_${component.title}_${index}`"
-                    :type="badge.type"
-                  >
-                    {{ badge.value }}
-                  </Badge>
-                  <span class="flex flex-1"></span>
-                  <span> View → </span>
-                </div>
-              </NuxtLink>
-            </CardSpotlight>
-          </ClientOnly>
-        </UiAccordionContent>
-      </UiAccordionItem>
-    </UiAccordion>
-  </div>
-</template>
-
 <script setup lang="ts">
 import type { QueryBuilderParams } from "@nuxt/content";
 
@@ -145,3 +95,53 @@ async function groupByCategory() {
   openCategories.value = categories.value.map((cat) => cat.category);
 }
 </script>
+
+<template>
+  <div class="flex w-full flex-col flex-wrap gap-4">
+    <UiAccordion
+      v-if="categories.length > 0"
+      v-model="openCategories"
+      type="multiple"
+    >
+      <UiAccordionItem
+        v-for="(category, index) in categories"
+        :key="`categoryCategory_${category.name + index}`"
+        :value="category.category"
+      >
+        <UiAccordionTrigger>
+          <span class="flex items-center gap-2 w-full">
+            {{ index + 1 + ". " + category.name.replaceAll("-", " ") }}
+            <span class="text-muted-foreground text-sm"> ({{ category.components.length }}) </span>
+          </span>
+        </UiAccordionTrigger>
+        <UiAccordionContent>
+          <ClientOnly>
+            <CardSpotlight
+              v-for="(component, indexJ) in category.components"
+              :key="`componentIndex_${component.title + indexJ}`"
+              class="relative my-3 h-screen max-h-14 max-w-lg cursor-pointer flex-row items-center justify-between gap-4 overflow-hidden rounded-2xl border border-zinc-200 p-6 dark:border-zinc-800 dark:bg-zinc-900/50"
+              :gradient-color="gradientColor"
+              slot-class="w-full"
+            >
+              <NuxtLink :to="component.path">
+                <div class="flex w-full flex-row items-center justify-center">
+                  <div class="mr-2 text-right">{{ indexJ + 1 }}.</div>
+                  <div class="mr-2 font-heading">{{ component.title }}</div>
+                  <Badge
+                    v-for="badge in component.navBadges"
+                    :key="`${badge}_${component.title}_${index}`"
+                    :type="badge.type"
+                  >
+                    {{ badge.value }}
+                  </Badge>
+                  <span class="flex flex-1"></span>
+                  <span> View → </span>
+                </div>
+              </NuxtLink>
+            </CardSpotlight>
+          </ClientOnly>
+        </UiAccordionContent>
+      </UiAccordionItem>
+    </UiAccordion>
+  </div>
+</template>

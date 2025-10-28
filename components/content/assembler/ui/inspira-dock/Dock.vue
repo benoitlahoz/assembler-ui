@@ -7,15 +7,14 @@ import AppIcon from "./DockItem.vue";
 const mouseX = ref(Infinity);
 const mouseY = ref(Infinity);
 
-const props = withDefaults(
-  defineProps<{
-    class?: HTMLAttributes["class"];
-    expand?: "top" | "bottom" | "middle";
-  }>(),
-  {
-    expand: "middle",
-  },
-);
+export interface DockProps {
+  class?: HTMLAttributes["class"];
+  expand?: "start" | "end" | "center";
+}
+
+const props = withDefaults(defineProps<DockProps>(), {
+  expand: "center",
+});
 </script>
 
 <template>
@@ -25,9 +24,9 @@ const props = withDefaults(
       cn(
         'flex h-16 w-fit items-end gap-4 rounded-2xl bg-muted bg-opacity-20 backdrop-blur-md px-4 z-10',
         {
-          'items-start pt-3': props.expand === 'bottom',
-          'items-end pb-3': props.expand === 'top',
-          'items-center': props.expand === 'middle',
+          'items-start pt-3': props.expand === 'end',
+          'items-end pb-3': props.expand === 'start',
+          'items-center': props.expand === 'center',
         },
         props.class,
       )
@@ -39,7 +38,6 @@ const props = withDefaults(
       v-for="i in 8"
       :key="i"
       :mouse-x="mouseX"
-      :expand="props.expand"
     />
   </div>
 </template>

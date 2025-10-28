@@ -1,10 +1,3 @@
-<template>
-  <MDC
-    class="mt-6"
-    :value="commands"
-  />
-</template>
-
 <script setup lang="ts">
 interface Props {
   componentId: string;
@@ -34,5 +27,12 @@ yarn dlx shadcn-vue@latest add "${url}"
 ::
 `;
 </script>
+
+<template>
+  <MDC
+    class="mt-6"
+    :value="commands"
+  />
+</template>
 
 <style scoped></style>

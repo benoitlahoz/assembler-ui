@@ -1,3 +1,16 @@
+<script setup lang="ts">
+import { ref } from "vue";
+
+const containerRef = ref(null);
+const div1Ref = ref(null);
+const div2Ref = ref(null);
+const div3Ref = ref(null);
+const div4Ref = ref(null);
+const div5Ref = ref(null);
+const div6Ref = ref(null);
+const div7Ref = ref(null);
+</script>
+
 <template>
   <section class="mx-auto mt-36 flex max-w-7xl flex-col items-center justify-center">
     <div class="text-center text-5xl font-semibold max-md:text-4xl">
@@ -138,16 +151,3 @@
     </ClientOnly>
   </section>
 </template>
-
-<script setup lang="ts">
-import { ref } from "vue";
-
-const containerRef = ref(null);
-const div1Ref = ref(null);
-const div2Ref = ref(null);
-const div3Ref = ref(null);
-const div4Ref = ref(null);
-const div5Ref = ref(null);
-const div6Ref = ref(null);
-const div7Ref = ref(null);
-</script>

@@ -9,9 +9,8 @@ import {
 
 const props = defineProps<{
   mouseX: number;
-  expand?: "top" | "bottom" | "middle";
 }>();
-const { mouseX, expand } = toRefs(props);
+const { mouseX } = toRefs(props);
 
 const target = ref<HTMLElement>();
 

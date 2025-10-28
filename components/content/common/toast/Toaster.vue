@@ -1,3 +1,11 @@
+<script setup lang="ts">
+import { isVNode } from "vue";
+import { Toast, ToastClose, ToastDescription, ToastProvider, ToastTitle, ToastViewport } from ".";
+import { useToast } from "./use-toast";
+
+const { toasts } = useToast();
+</script>
+
 <template>
   <ToastProvider>
     <Toast
@@ -24,11 +32,3 @@
     <ToastViewport />
   </ToastProvider>
 </template>
-
-<script setup lang="ts">
-import { isVNode } from "vue";
-import { Toast, ToastClose, ToastDescription, ToastProvider, ToastTitle, ToastViewport } from ".";
-import { useToast } from "./use-toast";
-
-const { toasts } = useToast();
-</script>

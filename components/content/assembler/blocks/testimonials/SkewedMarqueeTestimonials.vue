@@ -1,3 +1,56 @@
+<script setup lang="ts">
+const isDark = computed(() => useColorMode().value == "dark");
+
+// Reviews data
+const reviews = [
+  {
+    name: "kiri",
+    username: "@kiruba_selvi6",
+    body: "Oooohhh wowww...!!",
+    img: "https://cdn.inspira-ui.com/images/x-logo.svg",
+  },
+  {
+    name: "Sébastien Chopin",
+    username: "@Atinux",
+    body: "You ship 🚢",
+    img: "https://cdn.inspira-ui.com/images/x-logo.svg",
+  },
+  {
+    name: "Mattia Guariglia",
+    username: "@matt_guariglia",
+    body: "Omg 🥰",
+    img: "https://cdn.inspira-ui.com/images/x-logo.svg",
+  },
+  {
+    name: "Nelson🐐",
+    username: "@Mathiasokafor3",
+    body: "Thank you so much for all you do for the Vue/nuxt eco system.",
+    img: "https://cdn.inspira-ui.com/images/x-logo.svg",
+  },
+  {
+    name: "Premdas Vm",
+    username: "@premdasvm",
+    body: "Man, this is soo good! I've been jealous of React because their eco-system had Magic UI and other ones like this. Inspira UI is 🔥🙌🏼",
+    img: "https://cdn.inspira-ui.com/images/x-logo.svg",
+  },
+  {
+    name: "Pierre",
+    username: "@PierreHenryBap",
+    body: "It looks really awesome! Just noticed it a couple of days ago and I can’t wait to try it out.",
+    img: "https://cdn.inspira-ui.com/images/x-logo.svg",
+  },
+  {
+    name: "Waldemar Enns",
+    username: "@WaldemarEnns",
+    body: "Awesome! ⭐️ed it immediately",
+    img: "https://cdn.inspira-ui.com/images/x-logo.svg",
+  },
+];
+
+// Rows
+const firstRow = ref(reviews);
+</script>
+
 <template>
   <div class="flex w-full max-w-7xl flex-col items-center justify-center p-4">
     <div class="py-12 text-3xl font-semibold sm:text-4xl">
@@ -105,59 +158,6 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-const isDark = computed(() => useColorMode().value == "dark");
-
-// Reviews data
-const reviews = [
-  {
-    name: "kiri",
-    username: "@kiruba_selvi6",
-    body: "Oooohhh wowww...!!",
-    img: "https://cdn.inspira-ui.com/images/x-logo.svg",
-  },
-  {
-    name: "Sébastien Chopin",
-    username: "@Atinux",
-    body: "You ship 🚢",
-    img: "https://cdn.inspira-ui.com/images/x-logo.svg",
-  },
-  {
-    name: "Mattia Guariglia",
-    username: "@matt_guariglia",
-    body: "Omg 🥰",
-    img: "https://cdn.inspira-ui.com/images/x-logo.svg",
-  },
-  {
-    name: "Nelson🐐",
-    username: "@Mathiasokafor3",
-    body: "Thank you so much for all you do for the Vue/nuxt eco system.",
-    img: "https://cdn.inspira-ui.com/images/x-logo.svg",
-  },
-  {
-    name: "Premdas Vm",
-    username: "@premdasvm",
-    body: "Man, this is soo good! I've been jealous of React because their eco-system had Magic UI and other ones like this. Inspira UI is 🔥🙌🏼",
-    img: "https://cdn.inspira-ui.com/images/x-logo.svg",
-  },
-  {
-    name: "Pierre",
-    username: "@PierreHenryBap",
-    body: "It looks really awesome! Just noticed it a couple of days ago and I can’t wait to try it out.",
-    img: "https://cdn.inspira-ui.com/images/x-logo.svg",
-  },
-  {
-    name: "Waldemar Enns",
-    username: "@WaldemarEnns",
-    body: "Awesome! ⭐️ed it immediately",
-    img: "https://cdn.inspira-ui.com/images/x-logo.svg",
-  },
-];
-
-// Rows
-const firstRow = ref(reviews);
-</script>
 
 <style scoped>
 .marquee {

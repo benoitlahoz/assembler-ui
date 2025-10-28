@@ -1,12 +1,3 @@
-<template>
-  <ToastTitle
-    v-bind="delegatedProps"
-    :class="cn('text-sm font-semibold [&+div]:text-xs', props.class)"
-  >
-    <slot />
-  </ToastTitle>
-</template>
-
 <script setup lang="ts">
 import { cn } from "@/lib/utils";
 import { ToastTitle, type ToastTitleProps } from "reka-ui";
@@ -20,3 +11,12 @@ const delegatedProps = computed(() => {
   return delegated;
 });
 </script>
+
+<template>
+  <ToastTitle
+    v-bind="delegatedProps"
+    :class="cn('text-sm font-semibold [&+div]:text-xs', props.class)"
+  >
+    <slot />
+  </ToastTitle>
+</template>

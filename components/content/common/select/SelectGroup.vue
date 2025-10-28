@@ -1,3 +1,9 @@
+<script setup lang="ts">
+import { SelectGroup, type SelectGroupProps } from "reka-ui";
+
+const props = defineProps<SelectGroupProps>();
+</script>
+
 <template>
   <SelectGroup
     data-slot="select-group"
@@ -6,9 +12,3 @@
     <slot />
   </SelectGroup>
 </template>
-
-<script setup lang="ts">
-import { SelectGroup, type SelectGroupProps } from "reka-ui";
-
-const props = defineProps<SelectGroupProps>();
-</script>

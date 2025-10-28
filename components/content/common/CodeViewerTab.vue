@@ -1,23 +1,4 @@
 <!-- eslint-disable vue/no-v-html -->
-<template>
-  <div
-    :icon="icon"
-    :class="cn('relative flex max-h-[32rem]', $props.class)"
-    :code="rawString"
-  >
-    <CodeCopy
-      class="absolute -top-12 right-0"
-      :code="rawString"
-    />
-    <code class="min-w-full overflow-auto px-2 leading-4">
-      <pre
-        class="text-sm"
-        v-html="codeHtml"
-      ></pre>
-    </code>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { MagicString } from "vue/compiler-sfc";
@@ -91,3 +72,22 @@ function updateImportPaths(code: string) {
   return magicString.toString();
 }
 </script>
+
+<template>
+  <div
+    :icon="icon"
+    :class="cn('relative flex max-h-[32rem]', $props.class)"
+    :code="rawString"
+  >
+    <CodeCopy
+      class="absolute -top-12 right-0"
+      :code="rawString"
+    />
+    <code class="min-w-full overflow-auto px-2 leading-4">
+      <pre
+        class="text-sm"
+        v-html="codeHtml"
+      ></pre>
+    </code>
+  </div>
+</template>

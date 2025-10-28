@@ -1,3 +1,26 @@
+<script setup lang="ts">
+defineProps<{ isMobile: boolean }>();
+
+const { navDirFromPath } = useContentHelpers();
+const config = useConfig();
+const { locale, defaultLocale, navigation } = useI18nDocs();
+
+const tree = computed(() => {
+  const route = useRoute();
+  const path = route.path.split("/");
+  if (config.value.aside.useLevel) {
+    const leveledPath = path.splice(0, locale.value === defaultLocale ? 2 : 3).join("/");
+
+    const dir = navDirFromPath(leveledPath, navigation.value);
+    return dir ?? [];
+  }
+
+  return navigation.value;
+});
+
+const path = computed(() => useRoute().path);
+</script>
+
 <template>
   <UiScrollArea
     orientation="vertical"
@@ -58,26 +81,3 @@
     />
   </UiScrollArea>
 </template>
-
-<script setup lang="ts">
-defineProps<{ isMobile: boolean }>();
-
-const { navDirFromPath } = useContentHelpers();
-const config = useConfig();
-const { locale, defaultLocale, navigation } = useI18nDocs();
-
-const tree = computed(() => {
-  const route = useRoute();
-  const path = route.path.split("/");
-  if (config.value.aside.useLevel) {
-    const leveledPath = path.splice(0, locale.value === defaultLocale ? 2 : 3).join("/");
-
-    const dir = navDirFromPath(leveledPath, navigation.value);
-    return dir ?? [];
-  }
-
-  return navigation.value;
-});
-
-const path = computed(() => useRoute().path);
-</script>

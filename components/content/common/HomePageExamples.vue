@@ -1,3 +1,11 @@
+<script lang="ts" setup>
+import {
+  PATTERN_BACKGROUND_DIRECTION,
+  PATTERN_BACKGROUND_SPEED,
+  PATTERN_BACKGROUND_VARIANT,
+} from "../assembler/ui/pattern-background";
+</script>
+
 <template>
   <div class="my-16 mt-24 flex flex-col items-center justify-center">
     <BlurReveal
@@ -58,11 +66,3 @@
     </PatternBackground>
   </div>
 </template>
-
-<script lang="ts" setup>
-import {
-  PATTERN_BACKGROUND_DIRECTION,
-  PATTERN_BACKGROUND_SPEED,
-  PATTERN_BACKGROUND_VARIANT,
-} from "../assembler/ui/pattern-background";
-</script>

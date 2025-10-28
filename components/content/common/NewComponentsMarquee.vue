@@ -1,43 +1,3 @@
-<template>
-  <div class="relative w-full py-4">
-    <!-- Title -->
-    <div class="mb-6 text-2xl font-medium z-10">Recently added:</div>
-    <!-- Marquee Container -->
-    <div class="overflow-hidden relative">
-      <!-- Vignette -->
-      <div class="pointer-events-none vignette vignette-left"></div>
-      <div class="pointer-events-none vignette vignette-right"></div>
-
-      <!-- Marquee Row -->
-      <Marquee>
-        <div
-          v-for="comp in newComponents"
-          :key="`new_${comp.path}`"
-          class="marquee-card group min-w-[220px] max-w-xs bg-white/60 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 shadow-lg rounded-xl px-6 py-4 flex flex-col items-start justify-center cursor-pointer transition hover:-translate-y-1 hover:shadow-2xl"
-        >
-          <NuxtLink
-            :to="comp.path"
-            class="w-full h-full flex flex-col items-start no-underline"
-          >
-            <div
-              class="font-semibold text-lg text-zinc-900 dark:text-white group-hover:text-primary transition"
-            >
-              {{ comp.name }}
-            </div>
-            <div class="text-zinc-500 text-sm mt-1">{{ comp.category }}</div>
-            <Badge
-              type="lime"
-              class="mt-2"
-            >
-              New
-            </Badge>
-          </NuxtLink>
-        </div>
-      </Marquee>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 const newComponents = ref<{ name: string; category: string; path: string }[]>([]);
 const { locale } = useI18nDocs();
@@ -82,6 +42,46 @@ async function loadNewComponents() {
   newComponents.value = results;
 }
 </script>
+
+<template>
+  <div class="relative w-full py-4">
+    <!-- Title -->
+    <div class="mb-6 text-2xl font-medium z-10">Recently added:</div>
+    <!-- Marquee Container -->
+    <div class="overflow-hidden relative">
+      <!-- Vignette -->
+      <div class="pointer-events-none vignette vignette-left"></div>
+      <div class="pointer-events-none vignette vignette-right"></div>
+
+      <!-- Marquee Row -->
+      <Marquee>
+        <div
+          v-for="comp in newComponents"
+          :key="`new_${comp.path}`"
+          class="marquee-card group min-w-[220px] max-w-xs bg-white/60 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 shadow-lg rounded-xl px-6 py-4 flex flex-col items-start justify-center cursor-pointer transition hover:-translate-y-1 hover:shadow-2xl"
+        >
+          <NuxtLink
+            :to="comp.path"
+            class="w-full h-full flex flex-col items-start no-underline"
+          >
+            <div
+              class="font-semibold text-lg text-zinc-900 dark:text-white group-hover:text-primary transition"
+            >
+              {{ comp.name }}
+            </div>
+            <div class="text-zinc-500 text-sm mt-1">{{ comp.category }}</div>
+            <Badge
+              type="lime"
+              class="mt-2"
+            >
+              New
+            </Badge>
+          </NuxtLink>
+        </div>
+      </Marquee>
+    </div>
+  </div>
+</template>
 
 <style scoped>
 /* Vignette effect */

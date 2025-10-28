@@ -1,18 +1,4 @@
 <!-- eslint-disable vue/no-v-html -->
-<template>
-  <!-- @vue-expect-error -->
-  <ProsePre
-    :class="cn('overflow-auto max-h-[32rem] px-5', $props.class)"
-    :code="rawString"
-    v-bind="props"
-  >
-    <span
-      class="text-sm"
-      v-html="codeHtml"
-    ></span>
-  </ProsePre>
-</template>
-
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { MagicString } from "vue/compiler-sfc";
@@ -85,3 +71,17 @@ function updateImportPaths(code: string) {
   return magicString.toString();
 }
 </script>
+
+<template>
+  <!-- @vue-expect-error -->
+  <ProsePre
+    :class="cn('overflow-auto max-h-[32rem] px-5', $props.class)"
+    :code="rawString"
+    v-bind="props"
+  >
+    <span
+      class="text-sm"
+      v-html="codeHtml"
+    ></span>
+  </ProsePre>
+</template>

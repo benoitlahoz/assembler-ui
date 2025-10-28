@@ -1,34 +1,3 @@
-<template>
-  <section class="mx-auto flex max-w-7xl flex-col items-center justify-center">
-    <div class="mb-6 py-12 text-5xl font-semibold">{{ $t("page.home.Features") }}</div>
-    <span class="flex flex-row flex-wrap items-center justify-center gap-6">
-      <ClientOnly>
-        <CardSpotlight
-          v-for="feature in features"
-          :key="feature.title"
-          class="relative flex h-screen max-h-64 max-w-96 flex-col items-start justify-start overflow-hidden rounded-2xl border border-zinc-200 px-6 py-8 shadow-xl backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/50"
-          :gradient-color="isDark ? '#262626' : '#E9E9E9'"
-        >
-          <SmartIcon
-            :name="feature.icon || 'lucide:rocket'"
-            class="mb-2"
-            :size="22"
-          />
-          <h3 class="relative z-50 mb-4 text-xl font-bold dark:text-white">
-            {{ feature.title }}
-          </h3>
-
-          <p class="relative z-50 mb-4 text-base font-normal text-zinc-500">
-            {{ feature.description }}
-          </p>
-
-          <Meteors />
-        </CardSpotlight>
-      </ClientOnly>
-    </span>
-  </section>
-</template>
-
 <script lang="ts" setup>
 const isDark = computed(() => useColorMode().value == "dark");
 
@@ -71,3 +40,34 @@ const features = [
   },
 ];
 </script>
+
+<template>
+  <section class="mx-auto flex max-w-7xl flex-col items-center justify-center">
+    <div class="mb-6 py-12 text-5xl font-semibold">{{ $t("page.home.Features") }}</div>
+    <span class="flex flex-row flex-wrap items-center justify-center gap-6">
+      <ClientOnly>
+        <CardSpotlight
+          v-for="feature in features"
+          :key="feature.title"
+          class="relative flex h-screen max-h-64 max-w-96 flex-col items-start justify-start overflow-hidden rounded-2xl border border-zinc-200 px-6 py-8 shadow-xl backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/50"
+          :gradient-color="isDark ? '#262626' : '#E9E9E9'"
+        >
+          <SmartIcon
+            :name="feature.icon || 'lucide:rocket'"
+            class="mb-2"
+            :size="22"
+          />
+          <h3 class="relative z-50 mb-4 text-xl font-bold dark:text-white">
+            {{ feature.title }}
+          </h3>
+
+          <p class="relative z-50 mb-4 text-base font-normal text-zinc-500">
+            {{ feature.description }}
+          </p>
+
+          <Meteors />
+        </CardSpotlight>
+      </ClientOnly>
+    </span>
+  </section>
+</template>

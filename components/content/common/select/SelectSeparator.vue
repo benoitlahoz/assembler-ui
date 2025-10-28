@@ -1,11 +1,3 @@
-<template>
-  <SelectSeparator
-    data-slot="select-separator"
-    v-bind="delegatedProps"
-    :class="cn('bg-border pointer-events-none -mx-1 my-1 h-px', props.class)"
-  />
-</template>
-
 <script setup lang="ts">
 import { cn } from "@/lib/utils";
 import { SelectSeparator, type SelectSeparatorProps } from "reka-ui";
@@ -19,3 +11,11 @@ const delegatedProps = computed(() => {
   return delegated;
 });
 </script>
+
+<template>
+  <SelectSeparator
+    data-slot="select-separator"
+    v-bind="delegatedProps"
+    :class="cn('bg-border pointer-events-none -mx-1 my-1 h-px', props.class)"
+  />
+</template>
