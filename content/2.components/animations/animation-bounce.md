@@ -28,13 +28,13 @@ Copiez et collez le code suivant dans le même dossier :
 
 ### `AnimationBounce`
 
-| Prop Name   | Type      | Description                                              |
-| ----------- | --------- | ------------------------------------------------------ |
-| `enabled`   | `boolean` | Active ou désactive l'animation (par défaut : `true`). |
+| Prop Name | Type      | Description                                            |
+| --------- | --------- | ------------------------------------------------------ |
+| `enabled` | `boolean` | Active ou désactive l'animation (par défaut : `true`). |
 
-| Slot Name | Description                                 |
-| --------- | ------------------------------------------- |
-| `default` | Élément à animer (icône, bouton, etc.).     |
+| Slot Name | Description                             |
+| --------- | --------------------------------------- |
+| `default` | Élément à animer (icône, bouton, etc.). |
 
 ::
 
