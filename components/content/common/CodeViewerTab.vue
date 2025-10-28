@@ -84,6 +84,7 @@ function updateImportPaths(code: string) {
       :code="rawString"
     />
     <code class="min-w-full overflow-auto px-2 leading-4">
+      <!-- eslint-disable vue/no-v-html -->
       <pre
         class="text-sm"
         v-html="codeHtml"

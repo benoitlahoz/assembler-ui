@@ -29,8 +29,9 @@ const DEPENDENCIES = new Map<string, string[]>([
   ["@uiw/color-convert", []],
 ]);
 
-// This map is used when a basic Inspira UI component internally uses another Inspira component.
+// This map is used when a basic Assembler UI component internally uses another Assembler component.
 const COMPONENT_DEPENDENCIES = new Map<string, string[]>([
+  ["dock", ["animation-bounce-macos"]],
   ["scroll-island", ["animated-circular-progressbar"]],
   ["bg-silk", ["shader-toy"]],
   ["bg-stractium", ["shader-toy"]],

@@ -7,6 +7,7 @@ import {
   useMotionTransitions,
   MotionDirective as vMotion,
 } from "@vueuse/motion";
+import { AnimationBounceMacOs } from "~/components/content/assembler/ui/animation-bounce-macos";
 
 export interface DockItemProps {
   class?: HTMLAttributes["class"];

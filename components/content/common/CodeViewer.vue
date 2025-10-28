@@ -79,6 +79,7 @@ function updateImportPaths(code: string) {
     :code="rawString"
     v-bind="props"
   >
+    <!-- eslint-disable vue/no-v-html -->
     <span
       class="text-sm"
       v-html="codeHtml"
