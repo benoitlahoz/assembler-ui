@@ -32,6 +32,7 @@ const hovered = ref<string>("No Item Hovered");
             class="w-3/4 h-3/4 min-w-3/4 min-h-3/4"
           />
         </DockItem>
+        <DockSeparator />
         <DockItem
           @mouseover="hovered = 'GitHub'"
           @mouseleave="hovered = 'No Item Hovered'"

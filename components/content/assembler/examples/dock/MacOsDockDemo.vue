@@ -106,10 +106,26 @@ const items = ref([
       background-size: cover;
       background-position: center;`"
   >
+    <div
+      class="w-full flex flex-1 items-center justify-center rounded-lg bg-background/20 dark:bg-background/30 mx-4 mb-4 border border-muted/10 backdrop-blur-xs"
+    >
+      <div class="p-4 text-foreground w-128 h-64 overflow-y-auto flex flex-col gap-2">
+        <h1 class="text-xl font-bold">Active Items</h1>
+        <div class="font-semibold ml-4 flex flex-col gap-1">
+          <div
+            v-for="item in items.filter((it) => it.active === true)"
+            :key="item.label"
+            class="font-semibold"
+          >
+            {{ item.label }}
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="w-full h-fit flex justify-center">
       <Dock
         class="bg-background/50 dark:bg-background/30 border-muted/10"
-        expand="end"
+        expand="start"
         magnify="1.75"
       >
         <template
@@ -147,22 +163,6 @@ const items = ref([
           ></DockSeparator>
         </template>
       </Dock>
-    </div>
-    <div
-      class="w-full flex flex-1 items-center justify-center rounded-lg bg-background/20 dark:bg-background/30 mx-4 mt-4 border border-muted/10 backdrop-blur-xs"
-    >
-      <div class="p-4 text-foreground w-128 h-64 overflow-y-auto flex flex-col gap-2">
-        <h1 class="text-xl font-bold">Active Items</h1>
-        <div class="font-semibold ml-4 flex flex-col gap-1">
-          <div
-            v-for="item in items.filter((it) => it.active === true)"
-            :key="item.label"
-            class="font-semibold"
-          >
-            {{ item.label }}
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </template>

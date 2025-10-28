@@ -1,17 +1,19 @@
 ---
-title: AnimationBounceMacOs
+title: macOS Dock Bounce
 description: A component to animate an element with a MacOS dock-style bounce effect.
 ---
 
 ::ComponentLoader{label="Preview" componentName="AnimationBounceMacOsDemo" type="examples"}
 ::
 
-## Installation via CLI
+## Installation
+
+### Using the CLI
 
 ::InstallationCli{componentId="animation-bounce-macos"}
 ::
 
-## Manual installation
+### Manual installation
 
 Copy and paste the following code into the same folder:
 

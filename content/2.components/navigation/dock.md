@@ -8,24 +8,6 @@ description: A macOS-style dock with magnifying icons on hover.
 
 ## Installation
 
-### With the CLI
-
-::InstallationCli{componentId="dock"}
-::
-
-### Manual installation
-
-Copy and paste the following files into the same folder:
-
-::code-group
-
-:CodeViewerTab{filename="Dock.vue" language="vue" componentName="Dock" type="ui" id="dock"}
-:CodeViewerTab{filename="DockItem.vue" language="vue" componentName="DockItem" type="ui" id="dock"}
-:CodeViewerTab{filename="DockSeparator.vue" language="vue" componentName="DockSeparator" type="ui" id="dock"}
-:CodeViewerTab{filename="index.ts" language="ts" componentName="index" extension="ts" type="ui" id="dock"}
-
-::
-
 ### Using the CLI
 
 ::InstallationCli{componentId="dock"}
