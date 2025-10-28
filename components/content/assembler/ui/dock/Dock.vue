@@ -6,14 +6,14 @@ import { cn } from "@/lib/utils";
 
 export interface DockProps {
   class?: HTMLAttributes["class"];
-  direction?: "horizontal" | "vertical";
+  orientation?: "horizontal" | "vertical";
   expand?: "start" | "end" | "center";
   magnify?: number | string;
 }
 
 const props = withDefaults(defineProps<DockProps>(), {
   expand: "center",
-  direction: "horizontal",
+  orientation: "horizontal",
   magnify: 2.5,
 });
 

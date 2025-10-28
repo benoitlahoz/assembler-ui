@@ -3,6 +3,7 @@ import { ref } from "vue";
 
 const enabled = ref(false);
 const expand = ref<"start" | "end" | "center">("start");
+const orientation = ref<"vertical" | "horizontal">("vertical");
 const isAnimating = ref(false);
 
 function trigger() {
@@ -28,9 +29,10 @@ function onAnimationCancel() {
 <template>
   <div class="w-full flex flex-col items-center justify-center min-h-128">
     <div class="flex flex-col items-center gap-6 py-8">
-      <AnimationBounce
+      <AnimationBounceMacOs
         :enabled="enabled"
         :expand="expand"
+        :orientation="orientation"
         @start="onAnimationStart"
         @end="onAnimationEnd"
         @cancel="onAnimationCancel"
@@ -40,13 +42,31 @@ function onAnimationCancel() {
           alt="Finder Icon"
           class="w-16 h-16"
         />
-      </AnimationBounce>
+      </AnimationBounceMacOs>
       <button
         class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition"
         @click="trigger"
       >
         Bounce !
       </button>
+      <div class="flex gap-4 mt-4">
+        <label class="flex items-center gap-2">
+          <input
+            v-model="orientation"
+            type="radio"
+            value="vertical"
+          />
+          Vertical
+        </label>
+        <label class="flex items-center gap-2">
+          <input
+            v-model="orientation"
+            type="radio"
+            value="horizontal"
+          />
+          Horizontal
+        </label>
+      </div>
       <div class="flex gap-4 mt-4">
         <label class="flex items-center gap-2">
           <input

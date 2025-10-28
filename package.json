@@ -13,8 +13,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "prepare": "husky",
-    "dev:registry": "REGISTRY_URL=http://localhost:5173/r tsx ./scripts/build-registry.mts",
-    "build:registry": "tsx ./scripts/build-registry.mts",
+    "dev:registry": "rimraf ./public/r && REGISTRY_URL=http://localhost:5173/r tsx ./scripts/build-registry.mts",
+    "build:registry": "rimraf ./public/r && tsx ./scripts/build-registry.mts",
     "build:copy": "cp public/_routes.json dist/_routes.json"
   },
   "dependencies": {
@@ -76,6 +76,7 @@
     "lint-staged": "^16.1.6",
     "lucide-vue-next": "^0.548.0",
     "prettier": "^3.6.2",
+    "rimraf": "^6.0.1",
     "tailwind-merge": "^3.3.1",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",

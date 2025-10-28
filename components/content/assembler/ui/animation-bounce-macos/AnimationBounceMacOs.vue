@@ -1,57 +1,61 @@
 <script setup lang="ts">
-import { ref, watch, defineProps, nextTick, onMounted, onBeforeUnmount, defineEmits } from "vue";
+import { ref, watch, nextTick, onMounted, onBeforeUnmount, type HTMLAttributes } from "vue";
+import { cn } from "@/lib/utils";
 
 const emit = defineEmits(["start", "end", "cancel"]);
 
-const props = defineProps({
-  enabled: {
-    type: Boolean,
-    default: true,
-  },
-  amplitude: {
-    type: Number,
-    default: 0.5, // 0.5 = 50% de la hauteur du slot
-  },
-  expand: {
-    type: String,
-    default: "start", // 'start', 'end', 'center'
-    validator: (v: string) => ["start", "end", "center"].includes(v),
-  },
+export interface AnimationBounceMacOsProps {
+  class?: HTMLAttributes["class"];
+  enabled?: boolean;
+  amplitude?: number;
+  expand?: "start" | "end" | "center";
+  orientation?: "vertical" | "horizontal";
+}
+
+const props = withDefaults(defineProps<AnimationBounceMacOsProps>(), {
+  enabled: false,
+  amplitude: 0.5, // 0.5 = 50% de la hauteur du slot
+  expand: "start", // 'start', 'end', 'center'
+  orientation: "vertical", // 'vertical' ou 'horizontal'
 });
 
 const isAnimating = ref(false);
 let bounceTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const slotEl = ref<HTMLElement | null>(null);
-const bounceHeight = ref(0);
+const bounceAmount = ref(0);
 
-function updateBounceHeight() {
+function updateBounceAmount() {
   if (slotEl.value) {
     const rect = slotEl.value.getBoundingClientRect();
-    bounceHeight.value = rect.height * props.amplitude;
+    if (props.orientation === "horizontal") {
+      bounceAmount.value = rect.width * props.amplitude;
+    } else {
+      bounceAmount.value = rect.height * props.amplitude;
+    }
   }
 }
 
 let resizeObserver: ResizeObserver | null = null;
 onMounted(() => {
-  updateBounceHeight();
+  updateBounceAmount();
   if (slotEl.value && "ResizeObserver" in window) {
-    resizeObserver = new ResizeObserver(() => updateBounceHeight());
+    resizeObserver = new ResizeObserver(() => updateBounceAmount());
     resizeObserver.observe(slotEl.value);
   } else {
-    window.addEventListener("resize", updateBounceHeight);
+    window.addEventListener("resize", updateBounceAmount);
   }
 });
 onBeforeUnmount(() => {
   if (resizeObserver && slotEl.value) resizeObserver.disconnect();
-  window.removeEventListener("resize", updateBounceHeight);
+  window.removeEventListener("resize", updateBounceAmount);
 });
 
 function startBounceLoop() {
   if (!props.enabled) return;
   isAnimating.value = false;
   nextTick(() => {
-    updateBounceHeight();
+    updateBounceAmount();
     isAnimating.value = true;
     emit("start");
   });
@@ -92,8 +96,18 @@ watch(
 
 <template>
   <div
-    :class="['animation-bounce', { 'is-animating': isAnimating }, `expand-${props.expand}`]"
-    :style="{ '--bounce-amount': bounceHeight + 'px' }"
+    :class="
+      cn(
+        [
+          'animation-bounce',
+          { 'is-animating': isAnimating },
+          `expand-${props.expand}`,
+          `orientation-${props.orientation}`,
+        ],
+        props.class,
+      )
+    "
+    :style="{ '--bounce-amount': bounceAmount + 'px' }"
     @animationend="onAnimationEnd"
     @click="startBounceLoop"
   >
@@ -111,17 +125,88 @@ watch(
   display: inline-block;
   cursor: pointer;
 }
-/* Animation vers le haut (start) */
-.animation-bounce.is-animating.expand-start {
+/* Animation verticale (par défaut) */
+.animation-bounce.is-animating.expand-start.orientation-vertical {
   animation: bounce-macos-up 0.6s cubic-bezier(0.28, 0.84, 0.42, 1) 1;
 }
-/* Animation vers le bas (end) */
-.animation-bounce.is-animating.expand-end {
+.animation-bounce.is-animating.expand-end.orientation-vertical {
   animation: bounce-macos-down 0.6s cubic-bezier(0.28, 0.84, 0.42, 1) 1;
+}
+/* Animation horizontale */
+.animation-bounce.is-animating.expand-start.orientation-horizontal {
+  animation: bounce-macos-right 0.6s cubic-bezier(0.28, 0.84, 0.42, 1) 1;
+}
+.animation-bounce.is-animating.expand-end.orientation-horizontal {
+  animation: bounce-macos-left 0.6s cubic-bezier(0.28, 0.84, 0.42, 1) 1;
 }
 /* Animation scale (center) */
 .animation-bounce.is-animating.expand-center {
   animation: bounce-macos-scale 0.6s cubic-bezier(0.28, 0.84, 0.42, 1) 1;
+}
+@keyframes bounce-macos-right {
+  0% {
+    transform: translateX(0);
+  }
+  10% {
+    transform: translateX(calc(0.33 * var(--bounce-amount, 24px)));
+  }
+  20% {
+    transform: translateX(calc(0.66 * var(--bounce-amount, 24px)));
+  }
+  30% {
+    transform: translateX(var(--bounce-amount, 24px));
+  }
+  40% {
+    transform: translateX(calc(0.66 * var(--bounce-amount, 24px)));
+  }
+  50% {
+    transform: translateX(calc(0.33 * var(--bounce-amount, 24px)));
+  }
+  60% {
+    transform: translateX(calc(0.15 * var(--bounce-amount, 24px)));
+  }
+  70% {
+    transform: translateX(calc(0.08 * var(--bounce-amount, 24px)));
+  }
+  80% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes bounce-macos-left {
+  0% {
+    transform: translateX(0);
+  }
+  10% {
+    transform: translateX(calc(-0.33 * var(--bounce-amount, 24px)));
+  }
+  20% {
+    transform: translateX(calc(-0.66 * var(--bounce-amount, 24px)));
+  }
+  30% {
+    transform: translateX(calc(-1 * var(--bounce-amount, 24px)));
+  }
+  40% {
+    transform: translateX(calc(-0.66 * var(--bounce-amount, 24px)));
+  }
+  50% {
+    transform: translateX(calc(-0.33 * var(--bounce-amount, 24px)));
+  }
+  60% {
+    transform: translateX(calc(-0.15 * var(--bounce-amount, 24px)));
+  }
+  70% {
+    transform: translateX(calc(-0.08 * var(--bounce-amount, 24px)));
+  }
+  80% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(0);
+  }
 }
 @keyframes bounce-macos-up {
   0% {
