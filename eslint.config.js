@@ -58,7 +58,7 @@ export default withNuxt(
       "import/newline-after-import": "error",
       "import/no-duplicates": "error",
       "import/no-unresolved": "off", //Need eslint-import-resolver-typescript, waiting for flatconfig and error fix on package side
-      "func-style": ["error", "declaration"],
+      "func-style": "off",
       "vue/multi-word-component-names": "off",
       "vue/require-default-prop": "off",
       "vue/no-multiple-template-root": "off",
