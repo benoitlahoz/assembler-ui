@@ -65,7 +65,7 @@ export default withNuxt(
       "vue/block-order": [
         "error",
         {
-          order: ["template", "script", "style"],
+          order: ["script", "template", "style"],
         },
       ],
       "vue/block-lang": [
