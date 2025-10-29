@@ -1,9 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  modules: [
-    "@nuxt/content",
-    "@nuxt/eslint",
-    "@nuxt/scripts",
-    "@nuxt/ui"
-  ]
-})
+  app: {
+    baseURL: '/assembler-ui/', // Nécessaire pour GitHub Pages
+  },
+  modules: ['@nuxt/content', '@nuxt/eslint', '@nuxt/scripts', '@nuxt/ui'],
+});
