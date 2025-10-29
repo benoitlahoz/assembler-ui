@@ -1,0 +1,17 @@
+*.md
+*.yml
+
+# Node & build outputs
+node_modules
+.output
+.nuxt
+dist
+.cache
+
+# Miscellaneous
+logs
+*.log
+.DS_Store
+.idea
+.eslintcache
+.env*
