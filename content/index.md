@@ -6,21 +6,22 @@ seo:
     Powered by Nuxt UI.
 ---
 
+
 ::u-page-hero
 #title
-Write beautiful docs with Markdown
+AssemblerUI: Build your interfaces with elegance
 
 #description
-Ship fast, flexible, and SEO-optimized documentation with beautiful design out of the box.
+A modern and modular UI component library to quickly create beautiful, consistent, and high-performance web applications.
 
-Docus brings the best of the Nuxt ecosystem into one CLI.
+AssemblerUI accelerates interface development with reusable components, modern design, and easy integration with Nuxt/Vue.
 
 #links
   :::u-button
   ---
   color: neutral
   size: xl
-  to: /getting-started/installation
+  to: /1.getting-started/2.introduction
   trailing-icon: i-lucide-arrow-right
   ---
   Get started
@@ -31,93 +32,66 @@ Docus brings the best of the Nuxt ecosystem into one CLI.
   color: neutral
   icon: simple-icons-github
   size: xl
-  to: https://github.com/nuxt-content/docus
+  to: https://github.com/benoitlahoz/assembler-ui
   variant: outline
   ---
-  Star on GitHub
+  View on GitHub
   :::
 ::
 
+
 ::u-page-section
 #title
-Shipped with many features
+Why choose AssemblerUI?
 
 #features
   :::u-page-feature
   ---
-  icon: i-simple-icons-nuxt
-  target: _blank
-  to: https://nuxt.com
+  icon: i-lucide-layers
   ---
   #title
-  Built with [Nuxt 4]{.text-primary}
-  
+  Reusable & modular components
   #description
-  Optimized by the most famous Vue framework. Docus gives you everything you need to build fast, performant, and SEO-friendly websites.
+  Save time with a complete library of ready-to-use, customizable, and consistent UI components.
   :::
 
   :::u-page-feature
   ---
-  icon: i-simple-icons-nuxt
-  target: _blank
-  to: https://ui.nuxt.com/
+  icon: i-lucide-palette
   ---
   #title
-  Powered by [Nuxt UI]{.text-primary}
-  
+  Modern & accessible design
   #description
-  Beautiful out of the box, minimal by design but highly customizable. Docus leverages Nuxt UI to give you the best docs writing experience with zero boilerplate, just focus on your content.
+  Offer your users a polished visual experience, following accessibility standards and the latest UI/UX trends.
   :::
 
   :::u-page-feature
   ---
-  icon: i-simple-icons-nuxt
-  target: _blank
-  to: https://content.nuxt.com
+  icon: i-lucide-plug
   ---
   #title
-  Enhanced Markdown syntax by [Nuxt Content]{.text-primary}
-  
+  Easy integration with Nuxt/Vue
   #description
-  The only thing you need to take care about is writing your content. Write your pages in Markdown and extend with MDC syntax to embed Nuxt UI or custom Vue components. Structure, routing, and rendering are handled for you.
+  Install, import, and start using components in your Nuxt or Vue projects within minutes.
   :::
 
   :::u-page-feature
   ---
-  icon: i-simple-icons-nuxt
-  target: _blank
-  to: https://nuxt.com/docs/guide/directory-structure/app-config
+  icon: i-lucide-book-open
   ---
   #title
-  Customize with [Nuxt App Config]{.text-primary}
-  
+  Clear documentation & examples
   #description
-  Update colors, social links, header logos and component styles globally using the `app.config.ts`, no direct code modifications required.
+  Benefit from detailed guides, concrete examples, and best practices for a quick start.
   :::
 
   :::u-page-feature
   ---
-  icon: i-simple-icons-nuxt
-  target: _blank
-  to: https://content.nuxt.com/studio
+  icon: i-lucide-git-branch
   ---
   #title
-  Collaborate on [Nuxt Studio]{.text-primary}
-  
+  Open source & scalable
   #description
-  Write and manage your content visually, with zero Markdown knowledge required. Let your non technical colleagues collaborate on the documentation and integrate Vue components without code skills.
-  :::
-
-  :::u-page-feature
-  ---
-  icon: i-simple-icons-nuxt
-  target: _blank
-  to: https://ui.nuxt.com/components/content-search
-  ---
-  #title
-  Built-in navigation and [full-text search]{.text-primary}
-  
-  #description
-  Only focus on ordering your content, Docus handles the search modal and auto-generates the side navigation for you.
+  Contribute to AssemblerUI on GitHub and enjoy an active community.
   :::
 ::
