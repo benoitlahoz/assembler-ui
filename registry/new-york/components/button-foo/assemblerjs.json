@@ -1,0 +1,30 @@
+{
+  "type": "registry:ui",
+  "name": "button-foo",
+  "title": "Button Foo",
+  "description": "A simple knob component that displays a button with \"Hello World\" text.",
+  "files": [
+    {
+      "path": "index.ts",
+      "type": "registry:ui"
+    },
+    {
+      "path": "ButtonFoo.vue",
+      "type": "registry:ui",
+      "props": [
+        {
+          "name": "foo",
+          "type": "string",
+          "default": "-",
+          "description": "An optional string property named foo."
+        },
+        {
+          "name": "bar",
+          "type": "number",
+          "default": "42",
+          "description": "A required number property named bar."
+        }
+      ]
+    }
+  ]
+}

@@ -9,7 +9,7 @@ export type RegistryItem = {
 export interface RegistryFile {
   path: string;
   type: string;
-  props: PropInfo[];
+  props?: PropInfo[];
 }
 
 export type PropInfo = {

@@ -31,14 +31,12 @@ export const getComponentMetaFromFolder = (folderPath: string) => {
   };
 };
 
-export const extractSFCProps = (filePath: string) => {
-  const source = readFileSync(filePath, 'utf-8');
+export const extractSFCProps = (filePath: string, sourceOverride?: string) => {
+  const source = sourceOverride ?? readFileSync(filePath, 'utf-8');
   const { descriptor } = parse(source);
   const script = descriptor.scriptSetup || descriptor.script;
   if (!script) return [];
-  // Utilise la fonction extraite pour associer les descriptions @ajs-prop aux props
   const propDescriptions = extractAjsPropDescriptions(script.content);
-
   const sourceFile = ts.createSourceFile(
     filePath,
     script.content,
@@ -49,7 +47,6 @@ export const extractSFCProps = (filePath: string) => {
   const defaultsMap = findWithDefaults(sourceFile);
   const props: PropInfo[] = [];
   visit(sourceFile, props, defaultsMap, sourceFile);
-  // Fusionne les descriptions trouvées textuellement
   for (const prop of props) {
     if (propDescriptions[prop.name]) {
       prop.description = propDescriptions[prop.name];
@@ -61,20 +58,45 @@ export const extractSFCProps = (filePath: string) => {
 export const createRegistryItem = (folderPath: string): RegistryItem => {
   const meta = getComponentMetaFromFolder(folderPath);
   const vueFilePath = meta.path ? require('path').join(folderPath, meta.path) : '';
-  const props = vueFilePath ? extractSFCProps(vueFilePath) : [];
+  let vueSource = '';
+  if (vueFilePath) {
+    try {
+      vueSource = readFileSync(vueFilePath, 'utf-8');
+    } catch (e) {
+      vueSource = '';
+    }
+  }
+  let description = meta.description;
+  let props: PropInfo[] = [];
+  if (vueSource) {
+    if (typeof extractAjsItemDescription === 'function') {
+      const desc = extractAjsItemDescription(vueSource, true);
+      if (desc) description = desc;
+    }
+    props = extractSFCProps(vueFilePath, vueSource);
+  }
+  // Ajoute tous les fichiers .ts du dossier
+  const files = require('fs')
+    .readdirSync(folderPath)
+    .filter((f: string) => f.endsWith('.ts'))
+    .map((f: string) => ({
+      path: f,
+      type: 'registry:ui',
+      props: undefined,
+    }));
+  // Ajoute le fichier .vue à la fin
+  files.push({
+    path: meta.path,
+    type: 'registry:ui',
+    props,
+  });
   return {
-    type: 'component',
+    type: 'registry:ui',
     name: meta.name,
     title: meta.title,
-    description: meta.description,
-    files: [
-      {
-        path: meta.path,
-        type: 'vue',
-        props,
-      },
-    ],
+    description,
+    files,
   };
 };
 
-console.log(createRegistryItem('registry/new-york/components/knob'));
+console.log(JSON.stringify(createRegistryItem('registry/new-york/components/knob'), null, 2));
