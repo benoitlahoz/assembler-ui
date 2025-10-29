@@ -4,4 +4,5 @@ export default defineNuxtConfig({
     baseURL: '/assembler-ui/',
   },
   modules: ['@nuxt/content', '@nuxt/eslint', '@nuxt/scripts', '@nuxt/ui'],
+  robots: { robotsTxt: false },
 });

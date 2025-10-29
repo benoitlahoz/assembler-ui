@@ -17,7 +17,7 @@ jobs:
       - run: yarn
       - run: yarn build --preset github_pages
       - name: Add .nojekyll file
-        run: touch ./.output/public/.nojekyll
+        run: touch ./.output/.nojekyll
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
