@@ -21,7 +21,7 @@ AssemblerUI accelerates interface development with reusable components, modern d
   ---
   color: neutral
   size: xl
-  to: /1.getting-started/2.introduction
+  to: /getting-started/introduction
   trailing-icon: i-lucide-arrow-right
   ---
   Get started
