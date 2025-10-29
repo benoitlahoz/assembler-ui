@@ -2,6 +2,9 @@
 export default defineNuxtConfig({
   app: {
     baseURL: '/assembler-ui/',
+    head: {
+      link: [{ rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' }],
+    },
   },
   modules: ['@nuxt/content', '@nuxt/eslint', '@nuxt/scripts', '@nuxt/ui'],
   robots: { robotsTxt: false },
