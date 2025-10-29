@@ -3,7 +3,14 @@ export default defineNuxtConfig({
   app: {
     baseURL: '/assembler-ui/',
     head: {
-      link: [{ rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' }],
+      link: [
+        { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
+        { rel: 'manifest', href: '/site.webmanifest' },
+        { rel: 'apple-touch-icon', sizes: '192x192', href: '/android-chrome-192x192.png' },
+        { rel: 'apple-touch-icon', sizes: '512x512', href: '/android-chrome-512x512.png' },
+        { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/android-chrome-192x192.png' },
+        { rel: 'icon', type: 'image/png', sizes: '512x512', href: '/android-chrome-512x512.png' },
+      ],
     },
   },
   modules: ['@nuxt/content', '@nuxt/eslint', '@nuxt/scripts', '@nuxt/ui'],

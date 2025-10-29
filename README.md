@@ -7,6 +7,10 @@ This is the default Docus starter template that provides everything you need to 
 > [!TIP]
 > If you're looking for i18n support, check out the [i18n starter](https://github.com/nuxt-themes/docus/tree/main/.starters/i18n).
 
+## Credits 
+
+- [AssemblerUI Icon created by verluk](https://www.flaticon.com/free-icons/lego "lego icons") - Flaticon
+
 ## ✨ Features
 
 - 🎨 **Beautiful Design** - Clean, modern documentation theme
