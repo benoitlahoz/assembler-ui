@@ -9,7 +9,7 @@
     "lint:fix": "eslint . --fix",
     "add:component": "npx shadcn-vue@latest add",
     "registry:build": "shadcn-vue build",
-    "parse:component": "tsx scripts/parse-sfc-props.ts"
+    "parse:component": "tsx scripts/parse-component.ts"
   },
   "dependencies": {
     "@anymud/nuxt-module-alias": "^0.1.6",

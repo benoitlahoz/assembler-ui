@@ -6,5 +6,6 @@
       "@/*": ["./app/*"]
     },
     "types": ["@types/node", "@nuxt/types"]
-  }
+  },
+  "include": ["scripts/**/*"]
 }

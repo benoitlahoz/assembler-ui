@@ -1,6 +1,6 @@
 import * as ts from 'typescript';
 import { conditionally } from '@assemblerjs/core';
-import type { PropInfo } from './types';
+import type { PropInfo } from '../types';
 
 export const handleExportDefaultProps = (
   node: ts.Node,

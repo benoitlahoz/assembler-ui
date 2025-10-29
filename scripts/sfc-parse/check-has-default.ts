@@ -4,18 +4,24 @@ import { isWithDefaultsObject } from './is-with-defaults-object';
 
 export const checkHasDefault = conditionally({
   if: ({ node }: { node: ts.Node; sourceFile: ts.SourceFile }) => {
-    return !!(
-      ts.isVariableStatement(node) &&
-      node.declarationList.declarations.length &&
-      ts.isCallExpression(node.declarationList.declarations[0].initializer!) &&
-      ts.isIdentifier(node.declarationList.declarations[0].initializer!.expression) &&
-      node.declarationList.declarations[0].initializer!.expression.escapedText === 'withDefaults'
-    );
+    if (!ts.isVariableStatement(node)) return false;
+    const decls = node.declarationList.declarations;
+    if (!decls.length) return false;
+    const decl = decls[0];
+    if (!decl) return false;
+    if (!decl.initializer || !ts.isCallExpression(decl.initializer)) return false;
+    const callExpr = decl.initializer;
+    if (!ts.isIdentifier(callExpr.expression)) return false;
+    return callExpr.expression.escapedText === 'withDefaults';
   },
   then: ({ node, sourceFile }: { node: ts.Node; sourceFile: ts.SourceFile }) => {
     let defaultsMap: Record<string, string> = {};
-    const decl = (node as ts.VariableStatement).declarationList.declarations[0];
-    const initializer = decl.initializer as ts.CallExpression;
+    const decls = (node as ts.VariableStatement).declarationList.declarations;
+    if (!decls.length) return {};
+    const decl = decls[0];
+    if (!decl) return {};
+    if (!decl.initializer || !ts.isCallExpression(decl.initializer)) return {};
+    const initializer = decl.initializer;
     const args = initializer.arguments;
 
     const defaultsObj = isWithDefaultsObject(args);
