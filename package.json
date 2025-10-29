@@ -3,7 +3,6 @@
   "scripts": {
     "dev": "nuxt dev --extends docus",
     "build": "nuxt build --extends docus",
-    "prepare": "husky",
     "format": "prettier . --check",
     "format:fix": "prettier . --write",
     "lint": "eslint .",
@@ -24,7 +23,6 @@
   },
   "devDependencies": {
     "clsx": "^2.1.1",
-    "husky": "^9.1.7",
     "prettier": "^3.6.2",
     "tailwind-merge": "^3.3.1"
   },
