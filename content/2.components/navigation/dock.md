@@ -60,7 +60,7 @@ Copy and paste the following files into the same folder:
 | Prop          | Type   | Description                                  | Default      |
 | ------------- | ------ | -------------------------------------------- | ------------ |
 | `class`       | string | Additional CSS classes to apply to the dock. | —            |
-| `magnify`     | number | Magnification factor on hover.               | 60           |
+| `magnify`     | number | Magnification factor on hover.               | 2.5          |
 | `orientation` | string | Dock orientation (`vertical`, `horizontal`). | "horizontal" |
 | `expand`      | string | Expansion area (`start`, `center`, `end`).   | "center"     |
 

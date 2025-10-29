@@ -125,7 +125,7 @@ async function groupByCategory() {
             >
               <NuxtLink :to="component.path">
                 <div class="flex w-full flex-row items-center justify-center">
-                  <div class="mr-2 text-right">{{ indexJ + 1 }}.</div>
+                  <div class="mr-4 text-right"></div>
                   <div class="mr-2 font-heading">{{ component.title }}</div>
                   <Badge
                     v-for="badge in component.navBadges"

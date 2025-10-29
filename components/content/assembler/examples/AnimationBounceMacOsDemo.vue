@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { AnimationBounceMacOs } from "~/components/content/assembler/ui/animation-bounce-macos";
 
 const enabled = ref(false);
 const expand = ref<"start" | "end" | "center">("start");

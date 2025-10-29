@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { ref } from "vue";
+import { Dock, DockItem, DockSeparator } from "@/components/content/assembler/ui/dock";
 
 const items = ref([
   {
@@ -153,7 +154,7 @@ const items = ref([
               />
               <div
                 v-if="item.active"
-                class="absolute -top-3 w-1 h-1 rounded-full bg-foreground/60 pointer-events-none"
+                class="absolute -bottom-3 w-1 h-1 rounded-full bg-foreground/60 pointer-events-none"
               ></div>
             </div>
           </DockItem>
