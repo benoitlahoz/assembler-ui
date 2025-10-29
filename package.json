@@ -6,19 +6,24 @@
     "format": "prettier . --check",
     "format:fix": "prettier . --write",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "add:component": "npx shadcn-vue@latest add"
   },
   "dependencies": {
+    "@anymud/nuxt-module-alias": "^0.1.6",
     "@nuxt/content": "3.7.1",
     "@nuxt/eslint": "1.10.0",
     "@nuxt/scripts": "0.13.0",
     "@nuxt/ui": "4.1.0",
     "@unhead/vue": "^2.0.3",
+    "@vueuse/core": "^14.0.0",
     "better-sqlite3": "^12.2.0",
     "class-variance-authority": "^0.7.1",
     "docus": "latest",
     "eslint": "^9.0.0",
     "nuxt": "^4.1.2",
+    "reka-ui": "^2.6.0",
+    "shadcn-nuxt": "2.3.2",
     "typescript": "^5.6.3"
   },
   "devDependencies": {

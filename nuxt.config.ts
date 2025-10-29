@@ -1,5 +1,23 @@
+import { resolve } from 'node:path';
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
+  /*
+  vite: {
+    resolve: {
+      alias: {
+        '@': resolve(__dirname),
+      },
+    },
+  },
+  alias: {
+    components: resolve(__dirname, 'app', 'components'),
+    composables: resolve(__dirname, 'lib', 'composables'),
+    utils: resolve(__dirname, 'lib', 'utils'),
+    ui: resolve(__dirname, 'app', 'components', 'ui'),
+    lib: resolve(__dirname, 'lib'),
+  },
+  */
   app: {
     baseURL: '/assembler-ui/',
     head: {
@@ -13,7 +31,14 @@ export default defineNuxtConfig({
       ],
     },
   },
-  modules: ['@nuxt/content', '@nuxt/eslint', '@nuxt/scripts', '@nuxt/ui'],
+  modules: [
+    '@anymud/nuxt-module-alias',
+    '@nuxt/content',
+    '@nuxt/eslint',
+    '@nuxt/scripts',
+    '@nuxt/ui',
+    'shadcn-nuxt',
+  ],
   robots: { robotsTxt: false },
   llms: {
     domain: 'https://benoitlahoz.github.io/assembler-ui',
@@ -62,6 +87,12 @@ export default defineNuxtConfig({
           },
         ],
       },
+    ],
+  },
+  components: {
+    dirs: [
+      { path: '~/components', pathPrefix: false, extensions: ['.vue'], ignore: ['**/index.ts'] },
+      { path: '~/../components', pathPrefix: false, extensions: ['.vue'], ignore: ['**/index.ts'] },
     ],
   },
 });
