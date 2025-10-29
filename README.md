@@ -1,62 +1,72 @@
-# Nuxt Docs Template
+# Docus Default Starter
 
-[![Nuxt UI](https://img.shields.io/badge/Made%20with-Nuxt%20UI-00DC82?logo=nuxt&labelColor=020420)](https://ui.nuxt.com)
+> A beautiful, minimal starter for creating documentation with Docus
 
-Use this template to build your own documentation with [Nuxt UI](https://ui.nuxt.com) quickly.
+This is the default Docus starter template that provides everything you need to build beautiful documentation sites with Markdown and Vue components.
 
-- [Live demo](https://docs-template.nuxt.dev/)
-- [Documentation](https://ui.nuxt.com/docs/getting-started/installation)
+> [!TIP]
+> If you're looking for i18n support, check out the [i18n starter](https://github.com/nuxt-themes/docus/tree/main/.starters/i18n).
 
-<a href="https://docs-template.nuxt.dev/" target="_blank">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://ui.nuxt.com/assets/templates/nuxt/docs-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="https://ui.nuxt.com/assets/templates/nuxt/docs-light.png">
-    <img alt="Nuxt Docs Template" src="https://ui.nuxt.com/assets/templates/nuxt/docs-light.png">
-  </picture>
-</a>
+## ✨ Features
 
-## Quick Start
+- 🎨 **Beautiful Design** - Clean, modern documentation theme
+- 📱 **Responsive** - Mobile-first responsive design  
+- 🌙 **Dark Mode** - Built-in dark/light mode support
+- 🔍 **Search** - Full-text search functionality
+- 📝 **Markdown Enhanced** - Extended markdown with custom components
+- 🎨 **Customizable** - Easy theming and brand customization
+- ⚡ **Fast** - Optimized for performance with Nuxt 4
+- 🔧 **TypeScript** - Full TypeScript support
 
-```bash [Terminal]
-npm create nuxt@latest -- -t github:nuxt-ui-templates/docs
-```
-
-## Deploy your own
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-name=docs&repository-url=https%3A%2F%2Fgithub.com%2Fnuxt-ui-templates%2Fdocs&demo-image=https%3A%2F%2Fui.nuxt.com%2Fassets%2Ftemplates%2Fnuxt%2Fdocs-dark.png&demo-url=https%3A%2F%2Fdocs-template.nuxt.dev%2F&demo-title=Nuxt%20Docs%20Template&demo-description=A%20documentation%20template%20powered%20by%20Nuxt%20Content.)
-
-## Setup
-
-Make sure to install the dependencies:
+## 🚀 Quick Start
 
 ```bash
-pnpm install
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
 ```
 
-## Development Server
+Your documentation site will be running at `http://localhost:3000`
 
-Start the development server on `http://localhost:3000`:
+## 📁 Project Structure
+
+```
+my-docs/
+├── content/              # Your markdown content
+│   ├── index.md         # Homepage
+│   ├── 1.getting-started/  # Getting started section
+│   └── 2.essentials/    # Essential documentation
+├── public/              # Static assets
+└── package.json         # Dependencies and scripts
+```
+
+## ⚡ Built with
+
+This starter comes pre-configured with:
+
+- [Nuxt 4](https://nuxt.com) - The web framework
+- [Nuxt Content](https://content.nuxt.com/) - File-based CMS
+- [Nuxt UI](https://ui.nuxt.com) - UI components
+- [Nuxt Image](https://image.nuxt.com/) - Optimized images
+- [Tailwind CSS 4](https://tailwindcss.com/) - Utility-first CSS
+- [Docus Layer](https://www.npmjs.com/package/docus) - Documentation theme
+
+## 📖 Documentation
+
+For detailed documentation on customizing your Docus project, visit the [Docus Documentation](https://docus.dev)
+
+## 🚀 Deployment
+
+Build for production:
 
 ```bash
-pnpm dev
+npm run build
 ```
 
-## Production
+The built files will be in the `.output` directory, ready for deployment to any hosting provider that supports Node.js.
 
-Build the application for production:
+## 📄 License
 
-```bash
-pnpm build
-```
-
-Locally preview production build:
-
-```bash
-pnpm preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
-
-## Renovate integration
-
-Install [Renovate GitHub app](https://github.com/apps/renovate/installations/select_target) on your repository and you are good to go.
+[MIT License](https://opensource.org/licenses/MIT) 
