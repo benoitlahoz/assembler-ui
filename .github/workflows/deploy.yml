@@ -17,6 +17,8 @@ jobs:
       # Pick your own package manager and build script
       - run: yarn
       - run: yarn build --preset github_pages
+      - name: Add .nojekyll file
+        run: touch ./.output/public/.nojekyll
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -36,8 +38,6 @@ jobs:
     # Specify runner + deployment step
     runs-on: ubuntu-latest
     steps:
-      - name: Add .nojekyll file
-        run: touch ./.output/public/.nojekyll
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
