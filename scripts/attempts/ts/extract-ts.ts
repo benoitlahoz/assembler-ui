@@ -2,14 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import * as ts from 'typescript';
 
-export interface TsTypeExtract {
-  name: string;
-  kind: 'interface' | 'type' | 'enum';
-}
-
 export interface TsFileExtract {
   fileName: string;
-  types: TsTypeExtract[];
+  types: { name: string; type: string }[];
   description?: string;
   category?: string;
   author?: string;
@@ -49,17 +44,17 @@ export function extractTs(filePath: string): TsFileExtract {
 
   // const imports: string[] = [];
   // const exports: string[] = [];
-  const types: TsTypeExtract[] = [];
+  const types: { name: string; type: string }[] = [];
 
   function visit(node: ts.Node) {
     if (ts.isInterfaceDeclaration(node)) {
-      types.push({ name: node.name.text, kind: 'interface' });
+      types.push({ name: node.name.text, type: 'interface' });
     }
     if (ts.isTypeAliasDeclaration(node)) {
-      types.push({ name: node.name.text, kind: 'type' });
+      types.push({ name: node.name.text, type: 'type' });
     }
     if (ts.isEnumDeclaration(node)) {
-      types.push({ name: node.name.text, kind: 'enum' });
+      types.push({ name: node.name.text, type: 'enum' });
     }
     ts.forEachChild(node, visit);
   }

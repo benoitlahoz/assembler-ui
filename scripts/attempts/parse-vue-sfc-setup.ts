@@ -1,4 +1,6 @@
 import fs from 'fs';
+import pathModule from 'path';
+import config from '../../assembler-ui.config';
 import { parse } from '@vue/compiler-sfc';
 import { extractDescriptionAndAuthor } from './vue-sfc-setup/description-and-author';
 import { extractEmits } from './vue-sfc-setup/emits';
@@ -13,8 +15,14 @@ import { extractCssVars } from './vue-sfc-setup/css-vars';
 import { convertHtmlToPug } from './vue-sfc-setup/pug-converter';
 
 // Main exported function
-export const extractVueSfcSetup = (file: string) => {
-  const absPath = file.startsWith('/') ? file : `${process.cwd()}/${file}`;
+export const extractVueSfcSetup = (filePath: string) => {
+  const absPath = filePath.startsWith('/') ? filePath : `${process.cwd()}/${filePath}`;
+  // Chemin relatif à config.globalPath et toujours préfixé par config.globalPath
+  let relPath = absPath.includes(config.globalPath)
+    ? pathModule.relative(config.globalPath, absPath)
+    : filePath;
+  // Toujours préfixer par config.globalPath (et éviter les doubles slashs)
+  relPath = pathModule.join(config.globalPath, relPath).replace(/\\/g, '/');
   const vueSource = fs.readFileSync(absPath, 'utf-8');
   const { descriptor } = parse(vueSource);
   const script = descriptor.scriptSetup || descriptor.script;
@@ -54,7 +62,7 @@ export const extractVueSfcSetup = (file: string) => {
     pugString = convertHtmlToPug(descriptor.template.content);
   }
   return {
-    file,
+    path: relPath,
     description,
     author,
     childComponents,

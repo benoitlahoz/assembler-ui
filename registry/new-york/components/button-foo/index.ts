@@ -4,13 +4,13 @@
  * @author John Doe <john.doe@example.com>
  */
 
-export type ButtonFooProps = {
+export interface ButtonFooProps {
   /**
    * The label to display on the button
    * @default "Hello World"
    */
   label?: string;
-};
+}
 
 // @ajs-description A simple knob component that displays a button with "Hello World" text.
 // @ajs-category buttons

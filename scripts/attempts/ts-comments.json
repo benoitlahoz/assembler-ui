@@ -1,23 +1,33 @@
 {
-  "ts": {
-    "file": "registry/new-york/components/button-foo/index.ts",
-    "description": "A simple knob component that displays a button with \"Hello World\" text",
-    "author": "John Doe <john.doe",
-    "category": "buttons",
-    "types": [
-      {
-        "name": "ButtonFooProps",
-        "kind": "type"
+  "name": "button-foo",
+  "title": "ButtonFoo",
+  "path": "registry/new-york/components/button-foo/index.ts",
+  "description": "A simple knob component that displays a button with \"Hello World\" text",
+  "author": "John Doe <john.doe",
+  "category": "buttons",
+  "source": "/**\n * A simple knob component that displays a button with \"Hello World\" text\n * @category buttons\n * @author John Doe <john.doe@example.com>\n */\n\nexport interface ButtonFooProps {\n  /**\n   * The label to display on the button\n   * @default \"Hello World\"\n   */\n  label?: string;\n}\n\n// @ajs-description A simple knob component that displays a button with \"Hello World\" text.\n// @ajs-category buttons\nexport { default as ButtonFoo } from './ButtonFoo.vue';\nexport { default as ButtonFooBar } from './ButtonFooBar.vue';\nexport { default as ButtonFooNoSetup } from './ButtonFooNoSetup.vue';\n",
+  "items": [
+    {
+      "name": "index",
+      "path": "registry/new-york/components/button-foo/index.ts",
+      "doc": {
+        "description": "A simple knob component that displays a button with \"Hello World\" text",
+        "author": "John Doe <john.doe",
+        "category": "buttons",
+        "types": [
+          {
+            "name": "ButtonFooProps",
+            "type": "interface"
+          }
+        ],
+        "source": "/**\n * A simple knob component that displays a button with \"Hello World\" text\n * @category buttons\n * @author John Doe <john.doe@example.com>\n */\n\nexport interface ButtonFooProps {\n  /**\n   * The label to display on the button\n   * @default \"Hello World\"\n   */\n  label?: string;\n}\n\n// @ajs-description A simple knob component that displays a button with \"Hello World\" text.\n// @ajs-category buttons\nexport { default as ButtonFoo } from './ButtonFoo.vue';\nexport { default as ButtonFooBar } from './ButtonFooBar.vue';\nexport { default as ButtonFooNoSetup } from './ButtonFooNoSetup.vue';\n"
       }
-    ],
-    "source": "/**\n * A simple knob component that displays a button with \"Hello World\" text\n * @category buttons\n * @author John Doe <john.doe@example.com>\n */\n\nexport type ButtonFooProps = {\n  /**\n   * The label to display on the button\n   * @default \"Hello World\"\n   */\n  label?: string;\n};\n\n// @ajs-description A simple knob component that displays a button with \"Hello World\" text.\n// @ajs-category buttons\nexport { default as ButtonFoo } from './ButtonFoo.vue';\nexport { default as ButtonFooBar } from './ButtonFooBar.vue';\nexport { default as ButtonFooNoSetup } from './ButtonFooNoSetup.vue';\n"
-  },
-  "vue": [
+    },
     {
       "name": "ButtonFoo",
-      "file": "/Users/benoitlahoz/Documents/Development/assembler-ui/registry/new-york/components/button-foo/ButtonFoo.vue",
+      "path": "components/button-foo/ButtonFoo.vue",
       "doc": {
-        "file": "/Users/benoitlahoz/Documents/Development/assembler-ui/registry/new-york/components/button-foo/ButtonFoo.vue",
+        "path": "registry/new-york/components/button-foo/ButtonFoo.vue",
         "description": "",
         "author": "John Doe <john.doe@example.com>",
         "childComponents": [
@@ -203,9 +213,9 @@
     },
     {
       "name": "ButtonFooBar",
-      "file": "/Users/benoitlahoz/Documents/Development/assembler-ui/registry/new-york/components/button-foo/ButtonFooBar.vue",
+      "path": "components/button-foo/ButtonFooBar.vue",
       "doc": {
-        "file": "/Users/benoitlahoz/Documents/Development/assembler-ui/registry/new-york/components/button-foo/ButtonFooBar.vue",
+        "path": "registry/new-york/components/button-foo/ButtonFooBar.vue",
         "description": "",
         "author": "",
         "childComponents": [],
@@ -238,9 +248,9 @@
     },
     {
       "name": "ButtonFooNoSetup",
-      "file": "/Users/benoitlahoz/Documents/Development/assembler-ui/registry/new-york/components/button-foo/ButtonFooNoSetup.vue",
+      "path": "components/button-foo/ButtonFooNoSetup.vue",
       "doc": {
-        "file": "/Users/benoitlahoz/Documents/Development/assembler-ui/registry/new-york/components/button-foo/ButtonFooNoSetup.vue",
+        "path": "registry/new-york/components/button-foo/ButtonFooNoSetup.vue",
         "description": "A simple knob component that displays a button with \"Hello World\" text",
         "author": "John Doe <john.doe@example.com>",
         "childComponents": [
