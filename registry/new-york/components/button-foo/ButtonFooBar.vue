@@ -1,16 +1,15 @@
 <script setup lang="ts">
-// @ajs-author John Doe <john.doe@example.com>
 import { Button } from '@/components/ui/button';
 
 const props = withDefaults(
   defineProps<{
     // @ajs-prop An optional string property named foo.
     foo?: string;
-    // @ajs-prop A required number property named bar.
-    bar: number;
+    // @ajs-prop A required number property named ack.
+    ack: number;
   }>(),
   {
-    bar: 42,
+    ack: 1242,
   }
 );
 </script>

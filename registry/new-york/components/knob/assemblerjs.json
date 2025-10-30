@@ -3,13 +3,15 @@
   "name": "knob",
   "title": "Knob",
   "description": "A simple knob component that displays a button with \"Hello World\" text.",
+  "author": "Benoît Lahoz <info@benoitlahoz.io>",
+  "category": "controls",
   "files": [
     {
-      "path": "index.ts",
+      "path": "registry/new-york/components/knob/index.ts",
       "type": "registry:ui"
     },
     {
-      "path": "Knob.vue",
+      "path": "registry/new-york/components/knob/Knob.vue",
       "type": "registry:ui",
       "props": [
         {
@@ -24,7 +26,8 @@
           "default": "42",
           "description": "A required number property named bar."
         }
-      ]
+      ],
+      "description": "A simple knob component that displays a button with \"Hello World\" text."
     }
   ]
 }

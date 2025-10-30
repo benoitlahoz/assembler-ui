@@ -1,0 +1,15 @@
+{
+  "$schema": "https://shadcn-vue.com/schema/registry-item.json",
+  "name": "use-foo",
+  "type": "registry:hook",
+  "title": "useFoo",
+  "author": "Benoît Lahoz <info@benoitlahoz.io>",
+  "description": "",
+  "files": [
+    {
+      "path": "registry/new-york/composables/use-foo/useFoo.ts",
+      "content": "export const useFoo = () => {\n  const description = 'This is a foo composable used for demonstration purposes.';\n  return description;\n};\n",
+      "type": "registry:hook"
+    }
+  ]
+}

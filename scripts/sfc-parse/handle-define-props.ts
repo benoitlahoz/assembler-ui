@@ -26,7 +26,7 @@ export const handleDefineProps = (node: ts.Node, props: PropInfo[], sourceFile: 
       if (!initializer.typeArguments || initializer.typeArguments.length === 0) return;
       const typeArg = initializer.typeArguments[0];
       if (!typeArg || !ts.isTypeLiteralNode(typeArg)) return;
-      // Prépare la détection textuelle des descriptions @ajs-prop
+      // Prepares the textual detection of @ajs-prop descriptions
       const propDescriptions = extractAjsPropDescriptions(sourceFile.getFullText());
       typeArg.members.forEach((member) => {
         if (ts.isPropertySignature(member) && member.type && member.name) {
@@ -36,15 +36,15 @@ export const handleDefineProps = (node: ts.Node, props: PropInfo[], sourceFile: 
               ? member.name.text
               : undefined;
           let description: string | undefined = undefined;
-          // Recherche d'un commentaire JSDoc @ajs-prop
-          // Utilisation de l'API TypeScript pour récupérer les tags JSDoc
+          // Searches for a JSDoc @ajs-prop comment
+          // Uses the TypeScript API to retrieve JSDoc tags
           const jsDocTags = ts.getJSDocTags(member);
           for (const tag of jsDocTags) {
             if (tag.tagName && tag.tagName.escapedText === 'ajs-prop' && tag.comment) {
               if (typeof tag.comment === 'string') {
                 description = tag.comment.trim();
               } else if (Array.isArray(tag.comment)) {
-                // Si c'est un NodeArray<JSDocComment>, on concatène les textes
+                // If it's a NodeArray<JSDocComment>, concatenate the texts
                 description = tag.comment
                   .map((c: any) => c.text)
                   .join(' ')
@@ -53,7 +53,7 @@ export const handleDefineProps = (node: ts.Node, props: PropInfo[], sourceFile: 
               break;
             }
           }
-          // Recherche dans les commentaires JSDoc bruts si pas trouvé dans les tags
+          // Searches in raw JSDoc comments if not found in the tags
           if (!description) {
             const jsDocs = ts.getJSDocCommentsAndTags(member);
             for (const doc of jsDocs) {
@@ -66,7 +66,7 @@ export const handleDefineProps = (node: ts.Node, props: PropInfo[], sourceFile: 
               }
             }
           }
-          // Recherche textuelle via extractAjsPropDescriptions
+          // Textual search via extractAjsPropDescriptions
           if (!description && name && propDescriptions[name]) {
             description = propDescriptions[name];
           }

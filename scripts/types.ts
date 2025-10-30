@@ -1,7 +1,18 @@
+export type RegistryItemType =
+  | 'registry:ui'
+  | 'registry:block'
+  | 'registry:hook'
+  | 'registry:lib'
+  | 'registry:component'
+  | 'registry:page'
+  | 'registry:file';
+
 export type RegistryItem = {
-  type: string;
+  type: RegistryItemType;
   name: string;
+  author?: string;
   title?: string;
+  category?: string;
   description?: string;
   files: RegistryFile[];
 };
@@ -9,6 +20,7 @@ export type RegistryItem = {
 export interface RegistryFile {
   path: string;
   type: string;
+  author?: string;
   props?: PropInfo[];
 }
 

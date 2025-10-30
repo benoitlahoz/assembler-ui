@@ -1,5 +1,5 @@
-// Extraction d'une description @ajs-prop pour une prop à partir du code source d'un bloc script
-// Renvoie un objet { [propName]: description }
+// Extracts an @ajs-prop description for a prop from the source code of a script block
+// Returns an object { [propName]: description }
 
 export const extractAjsPropDescriptions = (scriptContent: string): Record<string, string> => {
   const propDescriptions: Record<string, string> = {};
@@ -12,9 +12,9 @@ export const extractAjsPropDescriptions = (scriptContent: string): Record<string
       lastAjsProp = match[1].trim();
       continue;
     }
-    // Cherche une déclaration de prop juste après le commentaire
+    // Looks for a prop declaration just after the comment
     if (lastAjsProp) {
-      // Ex: foo?: string; ou bar: number;
+      // E.g.: foo?: string; or bar: number;
       const propMatch = line.match(/([a-zA-Z0-9_]+)\s*[:?]/);
       if (propMatch && typeof propMatch[1] === 'string') {
         const propName = propMatch[1];

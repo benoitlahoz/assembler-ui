@@ -1,0 +1,13 @@
+{
+  "type": "registry:hook",
+  "name": "use-foo",
+  "title": "useFoo",
+  "description": "",
+  "author": "Benoît Lahoz <info@benoitlahoz.io>",
+  "files": [
+    {
+      "path": "registry/new-york/composables/use-foo/useFoo.ts",
+      "type": "registry:hook"
+    }
+  ]
+}

@@ -1,6 +1,62 @@
 {
-  "$schema": "https://shadcn-vue.com/schema/registry.json",
-  "name": "acme",
-  "homepage": "https://acme.com",
-  "items": []
+  "$schema": "https://shadcn-vue.com/schema/registry-item.json",
+  "name": "Assembler UI",
+  "homepage": "https://benoitlahoz.github.io/assembler-ui",
+  "items": [
+    {
+      "type": "registry:ui",
+      "name": "button-foo",
+      "title": "ButtonFoo",
+      "description": "A simple knob component that displays a button with \"Hello World\" text.",
+      "author": "Benoît Lahoz <info@benoitlahoz.io>",
+      "files": [
+        {
+          "path": "registry/new-york/components/button-foo/index.ts",
+          "type": "registry:ui"
+        },
+        {
+          "path": "registry/new-york/components/button-foo/ButtonFoo.vue",
+          "type": "registry:ui",
+          "author": "John Doe <john.doe@example.com>"
+        },
+        {
+          "path": "registry/new-york/components/button-foo/ButtonFooBar.vue",
+          "type": "registry:ui",
+          "author": "Benoît Lahoz <info@benoitlahoz.io>"
+        }
+      ]
+    },
+    {
+      "type": "registry:ui",
+      "name": "knob",
+      "title": "Knob",
+      "description": "A simple knob component that displays a button with \"Hello World\" text.",
+      "author": "Benoît Lahoz <info@benoitlahoz.io>",
+      "files": [
+        {
+          "path": "registry/new-york/components/knob/index.ts",
+          "type": "registry:ui"
+        },
+        {
+          "path": "registry/new-york/components/knob/Knob.vue",
+          "type": "registry:ui",
+          "description": "A simple knob component that displays a button with \"Hello World\" text.",
+          "author": "Benoît Lahoz <info@benoitlahoz.io>"
+        }
+      ]
+    },
+    {
+      "type": "registry:hook",
+      "name": "use-foo",
+      "title": "useFoo",
+      "description": "",
+      "author": "Benoît Lahoz <info@benoitlahoz.io>",
+      "files": [
+        {
+          "path": "registry/new-york/composables/use-foo/useFoo.ts",
+          "type": "registry:hook"
+        }
+      ]
+    }
+  ]
 }

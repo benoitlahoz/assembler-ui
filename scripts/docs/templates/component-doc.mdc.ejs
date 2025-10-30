@@ -1,0 +1,51 @@
+---
+title: <%= title %>
+description: <%= description %>
+---
+
+## <%= title %>
+
+<%= description %>
+
+### Author
+<%= author %>
+
+## Usage
+
+### Basic Example
+
+::code-preview
+---
+class: "[&>div]:*:my-0 [&>div]:*:w-full"
+---
+```vue [<%= mainFileName %>]
+<template>
+  <<%= componentName %> />
+</template>
+```
+#code
+````mdc
+```vue [<%= mainFileName %>]
+<template>
+  <<%= componentName %> />
+</template>
+```
+````
+::
+
+<% if (props && props.length) { %>
+## Props
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+<% props.forEach(function(prop) { %>| <%= prop.name %> | <%= prop.type %> | <%= prop.default %> | <%= prop.description %> |
+<% }); %>
+<% } %>
+
+## Advanced Usage
+
+<!-- Add more code-preview/code-group/code-tree blocks as needed for advanced examples -->
+
+::tip
+You can copy and adapt this template for any component documentation.
+::

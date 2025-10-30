@@ -1,4 +1,4 @@
-// Peut prendre soit un chemin de fichier, soit le contenu du fichier
+// Can take either a file path or the file content
 export const extractAjsItemDescription = (
   fileOrContent: string,
   isContent = false

@@ -1,15 +1,17 @@
 {
   "type": "registry:ui",
   "name": "button-foo",
-  "title": "Button Foo",
+  "title": "ButtonFoo",
   "description": "A simple knob component that displays a button with \"Hello World\" text.",
+  "author": "John Doe <john.doe@example.com>",
+  "category": "buttons",
   "files": [
     {
-      "path": "index.ts",
+      "path": "registry/new-york/components/button-foo/index.ts",
       "type": "registry:ui"
     },
     {
-      "path": "ButtonFoo.vue",
+      "path": "registry/new-york/components/button-foo/ButtonFoo.vue",
       "type": "registry:ui",
       "props": [
         {
@@ -23,6 +25,24 @@
           "type": "number",
           "default": "42",
           "description": "A required number property named bar."
+        }
+      ]
+    },
+    {
+      "path": "registry/new-york/components/button-foo/ButtonFooBar.vue",
+      "type": "registry:ui",
+      "props": [
+        {
+          "name": "foo",
+          "type": "string",
+          "default": "-",
+          "description": "An optional string property named foo."
+        },
+        {
+          "name": "ack",
+          "type": "number",
+          "default": "1242",
+          "description": "A required number property named ack."
         }
       ]
     }
