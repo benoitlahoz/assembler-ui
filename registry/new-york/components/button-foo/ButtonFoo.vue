@@ -7,12 +7,45 @@
 import { ref, inject, provide } from 'vue';
 import { Button } from '@/components/ui/button';
 
+/**
+ * Possible return types for myFunc.
+ */
+type FuncReturn = 'foo' | 'bar' | 'baz';
+
+/**
+ * An example interface with a sample property
+ */
+interface MyInterface {
+  /**
+   * A sample string property
+   */
+  sampleProp: string;
+  /**
+   * Another sample number property
+   */
+  sampleNumber: number;
+  foo(): void;
+}
+
 const exposed = ref('');
 const other: ref<string> = ref('other exposed');
-const myFunc = () => {
+const myFunc = (): FuncReturn => {
   console.log('This is my function');
   return 'foo';
 };
+
+/**
+ * Définit les slots disponibles pour ce composant.
+ */
+
+const slots = defineSlots({
+  /**
+   * Slot principal par défaut
+   */
+  default: (props: { label: string }) => {},
+  // Slot pour l'icône à gauche
+  icon: () => {},
+});
 
 /**
  * Injects a value with key 'someKey'.
@@ -69,5 +102,7 @@ defineExpose({
     <slot>Hello World</slot>
     <!-- Icon slot for the button -->
     <slot name="icon" />
+    <!-- Right icon slot for the button -->
+    <slot name="icon-right" />
   </Button>
 </template>

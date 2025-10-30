@@ -55,6 +55,9 @@ export const extractProps = (scriptContent: string, absPath: string) => {
                   .replace(/^\/\*\*|\*\/$/g, '')
                   .replace(/^[*\s]+/gm, '')
                   .trim();
+              } else if (cmt.startsWith('//')) {
+                // Prend le dernier commentaire simple ligne trouvé
+                description = cmt.replace(/^\/\//, '').trim();
               }
             }
             props.push({ name: propName, type, default: defaultValue, description });

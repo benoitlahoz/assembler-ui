@@ -7,7 +7,7 @@
       "name": "foo",
       "type": "string",
       "default": "-",
-      "description": ""
+      "description": "An optional string property named foo"
     },
     {
       "name": "bar",
@@ -19,11 +19,18 @@
   "slots": [
     {
       "name": "default",
-      "description": ""
+      "description": "Slot principal par défaut",
+      "params": "props: { label: string }"
     },
     {
       "name": "icon",
-      "description": ""
+      "description": "Slot pour l'icône à gauche",
+      "params": "-"
+    },
+    {
+      "name": "icon-right",
+      "description": "Right icon slot for the button",
+      "params": "-"
     }
   ],
   "emits": [
@@ -46,7 +53,7 @@
     {
       "name": "myFunc",
       "description": "An exposed function that logs a message and returns 'foo'",
-      "type": "() => string"
+      "type": "() => FuncReturn"
     }
   ],
   "injects": [
@@ -63,6 +70,13 @@
       "value": "'providedValue'",
       "type": "string",
       "description": "Provides a value with key 'someOtherKey'."
+    }
+  ],
+  "types": [
+    {
+      "name": "FuncReturn",
+      "type": "'foo' | 'bar' | 'baz'",
+      "description": "-"
     }
   ]
 }

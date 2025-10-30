@@ -7,6 +7,7 @@ import { extractProps } from './vue/props';
 import { extractInjects } from './vue/injects';
 import { extractProvides } from './vue/provides';
 import { extractSlots } from './vue/slots';
+import { extractComponentTypes } from './vue/types';
 
 // Fonction principale exportée
 export const extractVueDoc = (vueFilePath: string) => {
@@ -22,6 +23,7 @@ export const extractVueDoc = (vueFilePath: string) => {
   let exposes: Array<{ name: string; description: string; type?: string }> = [];
   let injects: Array<{ key: string; default?: any; type?: string; description: string }> = [];
   let provides: Array<{ key: string; value?: any; type?: string; description: string }> = [];
+  let types: any[] = [];
   if (script) {
     const descAndAuthor = extractDescriptionAndAuthor(script.content);
     description = descAndAuthor.description;
@@ -31,6 +33,7 @@ export const extractVueDoc = (vueFilePath: string) => {
     exposes = extractExposes(script.content, absPath);
     injects = extractInjects(script.content, absPath);
     provides = extractProvides(script.content, absPath);
+    types = extractComponentTypes(script.content, absPath);
   }
   if (descriptor.template && descriptor.template.content) {
     slots = extractSlots(script ? script.content : '', absPath, descriptor.template.content);
@@ -45,6 +48,7 @@ export const extractVueDoc = (vueFilePath: string) => {
     exposes,
     injects,
     provides,
+    types,
   };
 };
 

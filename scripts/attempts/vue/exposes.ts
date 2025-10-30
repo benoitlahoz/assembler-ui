@@ -184,6 +184,8 @@ export const extractExposes = (scriptContent: string, absPath: string) => {
                   .replace(/^\/\*\*|\*\/$/g, '')
                   .replace(/^[*\s]+/gm, '')
                   .trim();
+              } else if (cmt.startsWith('//')) {
+                description = cmt.replace(/^\/\//, '').trim();
               }
             }
             const initializer = prop.initializer;
