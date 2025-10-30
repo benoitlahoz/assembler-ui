@@ -1,3 +1,7 @@
+/**
+ * A simple knob component that displays a button with "Hello World" text
+ * @category buttons
+ */
 // @ajs-description A simple knob component that displays a button with "Hello World" text.
 // @ajs-category buttons
 export { default as ButtonFoo } from './ButtonFoo.vue';

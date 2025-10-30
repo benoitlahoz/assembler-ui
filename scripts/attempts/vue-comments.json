@@ -1,0 +1,47 @@
+{
+  "file": "registry/new-york/components/button-foo/ButtonFoo.vue",
+  "description": "A simple knob component that displays a button with \"Hello World\" text",
+  "author": "John Doe <john.doe@example.com>",
+  "props": [
+    {
+      "name": "foo",
+      "type": "string",
+      "default": "-",
+      "description": "An optional string property named foo"
+    },
+    {
+      "name": "bar",
+      "type": "number",
+      "default": 42,
+      "description": "A required number property named bar"
+    }
+  ],
+  "slots": [
+    {
+      "name": "default",
+      "description": "Text of the button"
+    },
+    {
+      "name": "icon",
+      "description": "Icon slot for the button"
+    }
+  ],
+  "emits": [
+    {
+      "name": "click",
+      "description": "Emitted when the button is clicked"
+    }
+  ],
+  "exposes": [
+    {
+      "name": "exposed",
+      "description": "An exposed string property",
+      "type": "Ref<string>"
+    },
+    {
+      "name": "other",
+      "description": "Another exposed string property",
+      "type": "ref<string>"
+    }
+  ]
+}

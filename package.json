@@ -12,7 +12,8 @@
     "add:component": "npx shadcn-vue@latest add",
     "parse:component": "tsx scripts/create-description-files.ts",
     "create:registry": "tsx scripts/create-registry-file.ts",
-    "build:registry": "yarn create:registry && shadcn-vue build"
+    "build:registry": "yarn create:registry && shadcn-vue build",
+    "attempt": "tsx scripts/attempts/vue-comments.ts"
   },
   "repository": {
     "type": "git",
