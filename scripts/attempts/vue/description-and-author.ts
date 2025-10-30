@@ -1,5 +1,3 @@
-import ts from 'typescript';
-
 export const extractDescriptionAndAuthor = (scriptContent: string) => {
   let description = '';
   let author = '';

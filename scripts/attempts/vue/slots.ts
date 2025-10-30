@@ -87,7 +87,7 @@ export const extractSlots = (
   }
   // 3. Retourne la liste des slots (defineSlots prioritaire, premier commentaire trouvé)
   // Remplace params undefined par '-'
-  return Object.values(slotsMap).map(slot => ({
+  return Object.values(slotsMap).map((slot) => ({
     ...slot,
     params: slot.params === undefined ? '-' : slot.params,
   }));

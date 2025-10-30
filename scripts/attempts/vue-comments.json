@@ -2,6 +2,10 @@
   "file": "registry/new-york/components/button-foo/ButtonFoo.vue",
   "description": "A simple knob component that displays a button with \"Hello World\" text",
   "author": "John Doe <john.doe@example.com>",
+  "childComponents": [
+    "MyChild",
+    "OtherChild"
+  ],
   "props": [
     {
       "name": "foo",
@@ -31,6 +35,11 @@
       "name": "icon-right",
       "description": "Right icon slot for the button",
       "params": "-"
+    },
+    {
+      "name": "static-named",
+      "description": "",
+      "params": "-"
     }
   ],
   "emits": [
@@ -58,6 +67,30 @@
   ],
   "injects": [
     {
+      "key": "symKey",
+      "default": "'defaultSym'",
+      "type": "string",
+      "description": "Inject avec clé symbole"
+    },
+    {
+      "key": "objKey",
+      "default": "0",
+      "type": "number",
+      "description": "Inject avec clé objet"
+    },
+    {
+      "key": "computedKey",
+      "default": "false",
+      "type": "boolean",
+      "description": "Inject avec clé computed"
+    },
+    {
+      "key": "spread",
+      "default": "{ ...spreadObj }",
+      "type": "any",
+      "description": "Inject avec spread"
+    },
+    {
       "key": "someKey",
       "default": "'defaultValue'",
       "type": "string",
@@ -65,6 +98,30 @@
     }
   ],
   "provides": [
+    {
+      "key": "symKey",
+      "value": "'valSym'",
+      "type": "string",
+      "description": "Provide avec clé symbole"
+    },
+    {
+      "key": "objKey",
+      "value": "123",
+      "type": "number",
+      "description": "Provide avec clé objet"
+    },
+    {
+      "key": "computedKey",
+      "value": "true",
+      "type": "boolean",
+      "description": "Provide avec clé computed"
+    },
+    {
+      "key": "spread",
+      "value": "{ ...spreadObj }",
+      "type": "any",
+      "description": "Provide avec spread"
+    },
     {
       "key": "someOtherKey",
       "value": "'providedValue'",
@@ -74,9 +131,61 @@
   ],
   "types": [
     {
+      "name": "ExportedType",
+      "type": "{ foo: string }",
+      "description": "-"
+    },
+    {
+      "name": "ExportedInterface",
+      "type": "interface",
+      "description": "-",
+      "properties": [
+        {
+          "name": "bar",
+          "type": "number",
+          "description": "-"
+        }
+      ]
+    },
+    {
       "name": "FuncReturn",
       "type": "'foo' | 'bar' | 'baz'",
-      "description": "-"
+      "description": "Possible return types for myFunc."
+    },
+    {
+      "name": "MyInterface",
+      "type": "interface",
+      "description": "An example interface with a sample property",
+      "properties": [
+        {
+          "name": "sampleProp",
+          "type": "string",
+          "description": "A sample string property"
+        },
+        {
+          "name": "sampleNumber",
+          "type": "number",
+          "description": "Another sample number property"
+        }
+      ],
+      "methods": [
+        {
+          "name": "foo",
+          "signature": "foo(): void;",
+          "description": "-"
+        }
+      ]
     }
-  ]
+  ],
+  "cssVars": [
+    {
+      "name": "--btn-radius",
+      "value": "4px",
+      "description": "Rayon de bordure du bouton"
+    }
+  ],
+  "source": {
+    "html": "<script setup lang=\"ts\">\nimport { onMounted, onUpdated, onUnmounted, onBeforeMount } from 'vue';\n\nonMounted(() => {\n  console.log('Mounted!');\n});\nonUpdated(() => {\n  console.log('Updated!');\n});\nonUnmounted(() => {\n  console.log('Unmounted!');\n});\nonBeforeMount(() => {\n  console.log('Before mount!');\n});\n// Imports variés pour test\nimport type { Ref } from 'vue';\nimport * as All from '@/lib/utils';\nimport { something, another as alias } from '@/lib/utils';\nimport DefaultExport from '@/lib/utils';\n\n// Exports variés pour test\nexport const exportedConst = 123;\nexport let exportedLet = 'abc';\nexport var exportedVar = true;\nexport function exportedFn() {\n  return 'fn';\n}\nexport type ExportedType = { foo: string };\nexport interface ExportedInterface {\n  bar: number;\n}\nexport default function () {\n  return 'default';\n}\n// Cas avancés pour provide/inject\nconst symKey = Symbol('symKey');\nconst objKey = { foo: 'bar' };\nconst computedKey = `prefix_${foo}`;\nconst spreadObj = { a: 1, b: 2 };\n\n// Provide avec clé symbole\nprovide(symKey, 'valSym');\n// Provide avec clé objet\nprovide(objKey, 123);\n// Provide avec clé computed\nprovide(computedKey, true);\n// Provide avec spread\nprovide('spread', { ...spreadObj });\n\n// Inject avec clé symbole\nconst injectedSym = inject(symKey, 'defaultSym');\n// Inject avec clé objet\nconst injectedObj = inject(objKey, 0);\n// Inject avec clé computed\nconst injectedComputed = inject(computedKey, false);\n// Inject avec spread\nconst injectedSpread = inject('spread', { ...spreadObj });\n/**\n * A simple knob component that displays a button with \"Hello World\" text\n * @author John Doe <john.doe@example.com>\n */\n// @ajs-author John Doe <john.doe@example.com>\nimport { ref, inject, provide } from 'vue';\nimport { Button } from '@/components/ui/button';\n\n/**\n * Possible return types for myFunc.\n */\ntype FuncReturn = 'foo' | 'bar' | 'baz';\n\n/**\n * An example interface with a sample property\n */\ninterface MyInterface {\n  /**\n   * A sample string property\n   */\n  sampleProp: string;\n  /**\n   * Another sample number property\n   */\n  sampleNumber: number;\n  foo(): void;\n}\n\nconst exposed = ref('');\nconst other: ref<string> = ref('other exposed');\nconst myFunc = (): FuncReturn => {\n  console.log('This is my function');\n  return 'foo';\n};\n\n/**\n * Définit les slots disponibles pour ce composant.\n */\n\nconst slots = defineSlots({\n  /**\n   * Slot principal par défaut\n   */\n  default: (props: { label: string }) => {},\n  // Slot pour l'icône à gauche\n  icon: () => {},\n});\n\n/**\n * Injects a value with key 'someKey'.\n */\nconst injected = inject('someKey', 'defaultValue');\n\n/**\n * Provides a value with key 'someOtherKey'.\n */\nprovide('someOtherKey', 'providedValue');\n\nconst props = withDefaults(\n  defineProps<{\n    // @ajs-prop An optional string property named foo.\n    // An optional string property named foo\n    foo?: string;\n    // @ajs-prop A required number property named bar.\n    /**\n     * A required number property named bar\n     */\n    bar: number;\n  }>(),\n  {\n    bar: 42,\n  }\n);\n\nconst emit = defineEmits<{\n  /**\n   * Emitted when the button is clicked\n   */\n  (e: 'click'): void;\n}>();\n\ndefineExpose({\n  /**\n   * An exposed string property\n   */\n  exposed,\n  /**\n   * Another exposed string property\n   */\n  other,\n  /**\n   * An exposed function that logs a message and returns 'foo'\n   */\n  myFunc,\n});\n</script>\n\n<template>\n  <Button\n    class=\"btn-main\"\n    :class=\"['dynamic-class', { 'btn-secondary': true }]\"\n    @custom-event=\"onCustomEvent\"\n    v-foo\n  >\n    <!-- Text of the button -->\n    <slot>Hello World</slot>\n    <!-- Icon slot for the button -->\n    <slot name=\"icon\" />\n    <!-- Right icon slot for the button -->\n    <slot name=\"icon-right\" />\n    <MyChild :foo=\"foo\">\n      <template #header>Header slot</template>\n      <template v-slot:footer>Footer slot</template>\n      <template #dynamicSlot>Dynamic slot</template>\n    </MyChild>\n    <OtherChild bar=\"42\">\n      <slot :name=\"'named-dynamic'\">Named dynamic slot</slot>\n      <slot name=\"static-named\">Static named slot</slot>\n    </OtherChild>\n  </Button>\n</template>\n\n<style scoped>\n.btn-main {\n  color: red;\n}\n.btn-secondary {\n  color: blue;\n}\n.dynamic-class {\n  font-weight: bold;\n}\n\n/* Couleur principale du bouton */\n:root {\n  --btn-main-color: #ff0000;\n  /* Rayon de bordure du bouton */\n  --btn-radius: 4px;\n  /* Padding horizontal du bouton */\n  --btn-padding-x: 1.5em;\n}\n</style>\n",
+    "pug": "<script setup lang=\"ts\">\nimport { onMounted, onUpdated, onUnmounted, onBeforeMount } from 'vue';\n\nonMounted(() => {\n  console.log('Mounted!');\n});\nonUpdated(() => {\n  console.log('Updated!');\n});\nonUnmounted(() => {\n  console.log('Unmounted!');\n});\nonBeforeMount(() => {\n  console.log('Before mount!');\n});\n// Imports variés pour test\nimport type { Ref } from 'vue';\nimport * as All from '@/lib/utils';\nimport { something, another as alias } from '@/lib/utils';\nimport DefaultExport from '@/lib/utils';\n\n// Exports variés pour test\nexport const exportedConst = 123;\nexport let exportedLet = 'abc';\nexport var exportedVar = true;\nexport function exportedFn() {\n  return 'fn';\n}\nexport type ExportedType = { foo: string };\nexport interface ExportedInterface {\n  bar: number;\n}\nexport default function () {\n  return 'default';\n}\n// Cas avancés pour provide/inject\nconst symKey = Symbol('symKey');\nconst objKey = { foo: 'bar' };\nconst computedKey = `prefix_${foo}`;\nconst spreadObj = { a: 1, b: 2 };\n\n// Provide avec clé symbole\nprovide(symKey, 'valSym');\n// Provide avec clé objet\nprovide(objKey, 123);\n// Provide avec clé computed\nprovide(computedKey, true);\n// Provide avec spread\nprovide('spread', { ...spreadObj });\n\n// Inject avec clé symbole\nconst injectedSym = inject(symKey, 'defaultSym');\n// Inject avec clé objet\nconst injectedObj = inject(objKey, 0);\n// Inject avec clé computed\nconst injectedComputed = inject(computedKey, false);\n// Inject avec spread\nconst injectedSpread = inject('spread', { ...spreadObj });\n/**\n * A simple knob component that displays a button with \"Hello World\" text\n * @author John Doe <john.doe@example.com>\n */\n// @ajs-author John Doe <john.doe@example.com>\nimport { ref, inject, provide } from 'vue';\nimport { Button } from '@/components/ui/button';\n\n/**\n * Possible return types for myFunc.\n */\ntype FuncReturn = 'foo' | 'bar' | 'baz';\n\n/**\n * An example interface with a sample property\n */\ninterface MyInterface {\n  /**\n   * A sample string property\n   */\n  sampleProp: string;\n  /**\n   * Another sample number property\n   */\n  sampleNumber: number;\n  foo(): void;\n}\n\nconst exposed = ref('');\nconst other: ref<string> = ref('other exposed');\nconst myFunc = (): FuncReturn => {\n  console.log('This is my function');\n  return 'foo';\n};\n\n/**\n * Définit les slots disponibles pour ce composant.\n */\n\nconst slots = defineSlots({\n  /**\n   * Slot principal par défaut\n   */\n  default: (props: { label: string }) => {},\n  // Slot pour l'icône à gauche\n  icon: () => {},\n});\n\n/**\n * Injects a value with key 'someKey'.\n */\nconst injected = inject('someKey', 'defaultValue');\n\n/**\n * Provides a value with key 'someOtherKey'.\n */\nprovide('someOtherKey', 'providedValue');\n\nconst props = withDefaults(\n  defineProps<{\n    // @ajs-prop An optional string property named foo.\n    // An optional string property named foo\n    foo?: string;\n    // @ajs-prop A required number property named bar.\n    /**\n     * A required number property named bar\n     */\n    bar: number;\n  }>(),\n  {\n    bar: 42,\n  }\n);\n\nconst emit = defineEmits<{\n  /**\n   * Emitted when the button is clicked\n   */\n  (e: 'click'): void;\n}>();\n\ndefineExpose({\n  /**\n   * An exposed string property\n   */\n  exposed,\n  /**\n   * Another exposed string property\n   */\n  other,\n  /**\n   * An exposed function that logs a message and returns 'foo'\n   */\n  myFunc,\n});\n</script>\n\n<template lang=\"pug\">\n<!-- Text of the button -->\n<!-- Icon slot for the button -->\n<!-- Right icon slot for the button -->\nButton(class=\"btn-main\" :class=\"['dynamic-class', { 'btn-secondary': true }]\" @custom-event=\"onCustomEvent\" v-foo)\n  slot\n    | Hello World\n  slot(name=\"icon\")\n  slot(name=\"icon-right\")\n  MyChild(:foo=\"foo\")\n    template(#header)\n      | Header slot\n    template(v-slot:footer)\n      | Footer slot\n    template(#dynamicSlot)\n      | Dynamic slot\n  OtherChild(bar=\"42\")\n    slot(:name=\"'named-dynamic'\")\n      | Named dynamic slot\n    slot(name=\"static-named\")\n      | Static named slot\n</template>\n      <template v-slot:footer>Footer slot</template>\n      <template #dynamicSlot>Dynamic slot</template>\n    </MyChild>\n    <OtherChild bar=\"42\">\n      <slot :name=\"'named-dynamic'\">Named dynamic slot</slot>\n      <slot name=\"static-named\">Static named slot</slot>\n    </OtherChild>\n  </Button>\n</template>\n\n<style scoped>\n.btn-main {\n  color: red;\n}\n.btn-secondary {\n  color: blue;\n}\n.dynamic-class {\n  font-weight: bold;\n}\n\n/* Couleur principale du bouton */\n:root {\n  --btn-main-color: #ff0000;\n  /* Rayon de bordure du bouton */\n  --btn-radius: 4px;\n  /* Padding horizontal du bouton */\n  --btn-padding-x: 1.5em;\n}\n</style>\n"
+  }
 }

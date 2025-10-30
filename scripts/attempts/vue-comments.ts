@@ -8,8 +8,11 @@ import { extractInjects } from './vue/injects';
 import { extractProvides } from './vue/provides';
 import { extractSlots } from './vue/slots';
 import { extractComponentTypes } from './vue/types';
+import { extractChildComponents } from './vue/child-components';
+import { extractCssVars } from './vue/css-vars';
+import { convertHtmlToPug } from './vue/pug-converter';
 
-// Fonction principale exportée
+// Main exported function
 export const extractVueDoc = (vueFilePath: string) => {
   const absPath = vueFilePath.startsWith('/') ? vueFilePath : `${process.cwd()}/${vueFilePath}`;
   const vueSource = fs.readFileSync(absPath, 'utf-8');
@@ -24,6 +27,8 @@ export const extractVueDoc = (vueFilePath: string) => {
   let injects: Array<{ key: string; default?: any; type?: string; description: string }> = [];
   let provides: Array<{ key: string; value?: any; type?: string; description: string }> = [];
   let types: any[] = [];
+  let childComponents: string[] = [];
+  let cssVars: { name: string; value: string; description: string }[] = [];
   if (script) {
     const descAndAuthor = extractDescriptionAndAuthor(script.content);
     description = descAndAuthor.description;
@@ -37,11 +42,22 @@ export const extractVueDoc = (vueFilePath: string) => {
   }
   if (descriptor.template && descriptor.template.content) {
     slots = extractSlots(script ? script.content : '', absPath, descriptor.template.content);
+    childComponents = extractChildComponents(descriptor.template.content);
+  }
+  if (descriptor.styles && descriptor.styles.length > 0) {
+    // Only take the first <style> block (or concatenate all)
+    cssVars = extractCssVars(descriptor.styles.map((s) => s.content).join('\n'));
+  }
+  // Compose the source property
+  let pugString = '';
+  if (descriptor.template && descriptor.template.content) {
+    pugString = convertHtmlToPug(descriptor.template.content);
   }
   return {
     file: vueFilePath,
     description,
     author,
+    childComponents,
     props,
     slots,
     emits,
@@ -49,10 +65,21 @@ export const extractVueDoc = (vueFilePath: string) => {
     injects,
     provides,
     types,
+    cssVars,
+    source: {
+      html: vueSource,
+      pug:
+        descriptor.template && descriptor.template.content && pugString
+          ? vueSource.replace(
+              /<template[^>]*>[\s\S]*?<\/template>/,
+              `<template lang="pug">\n${pugString}\n</template>`
+            )
+          : vueSource,
+    },
   };
 };
 
-// Utilisation CLI
+// CLI usage
 if (require.main === module) {
   const vueFilePath = process.argv[2] || 'registry/new-york/components/button-foo/ButtonFoo.vue';
   const result = extractVueDoc(vueFilePath);

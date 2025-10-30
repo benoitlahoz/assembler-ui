@@ -4,6 +4,16 @@ export interface ComponentTypeInfo {
   name: string;
   type: string;
   description?: string;
+  properties?: Array<{
+    name: string;
+    type: string;
+    description: string;
+  }>;
+  methods?: Array<{
+    name: string;
+    signature: string;
+    description: string;
+  }>;
 }
 
 /**
@@ -59,10 +69,58 @@ export function extractComponentTypes(scriptContent: string, absPath: string): C
         }
       }
       if (!jsdoc) jsdoc = '-';
+      // Propriétés et méthodes détaillées
+      const properties: Array<{ name: string; type: string; description: string }> = [];
+      const methods: Array<{ name: string; signature: string; description: string }> = [];
+      for (const member of node.members) {
+        if (ts.isPropertySignature(member) && member.name && ts.isIdentifier(member.name)) {
+          let propDesc = '-';
+          const propRanges = ts.getLeadingCommentRanges(scriptContent, member.pos) || [];
+          for (const range of propRanges) {
+            const cmt = scriptContent.slice(range.pos, range.end).trim();
+            if (cmt.startsWith('/**')) {
+              propDesc = cmt
+                .replace(/^\/\*\*|\*\/$/g, '')
+                .replace(/^[*\s]+/gm, '')
+                .trim();
+            } else if (cmt.startsWith('//')) {
+              propDesc = cmt.replace(/^\/\//, '').trim();
+            }
+          }
+          properties.push({
+            name: member.name.text,
+            type: member.type ? member.type.getText() : 'any',
+            description: propDesc || '-',
+          });
+        } else if (ts.isMethodSignature(member) && member.name && ts.isIdentifier(member.name)) {
+          let methDesc = '-';
+          const methRanges = ts.getLeadingCommentRanges(scriptContent, member.pos) || [];
+          for (const range of methRanges) {
+            const cmt = scriptContent.slice(range.pos, range.end).trim();
+            if (cmt.startsWith('/**')) {
+              methDesc = cmt
+                .replace(/^\/\*\*|\*\/$/g, '')
+                .replace(/^[*\s]+/gm, '')
+                .trim();
+            } else if (cmt.startsWith('//')) {
+              methDesc = cmt.replace(/^\/\//, '').trim();
+            }
+          }
+          // Signature TypeScript complète
+          const sig = member.getText();
+          methods.push({
+            name: member.name.text,
+            signature: sig,
+            description: methDesc || '-',
+          });
+        }
+      }
       types.push({
         name: node.name.text,
         type: 'interface',
         description: jsdoc,
+        properties: properties.length ? properties : undefined,
+        methods: methods.length ? methods : undefined,
       });
     }
     ts.forEachChild(node, visit);
