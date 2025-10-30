@@ -26,30 +26,84 @@ export const extractExposes = (scriptContent: string, absPath: string) => {
           ts.isIdentifier(prop.name) &&
           (prop.name.text === 'expose' || prop.name.text === 'exposes')
         ) {
-          if (ts.isObjectLiteralExpression(prop.initializer)) {
+          // Cas expose: ['foo', 'bar'] avec commentaires
+          if (ts.isArrayLiteralExpression(prop.initializer)) {
+            for (const element of prop.initializer.elements) {
+              if (ts.isStringLiteral(element)) {
+                // Cherche le commentaire juste au-dessus dans le code source
+                let description = '';
+                const ranges = ts.getLeadingCommentRanges(scriptContent, element.pos) || [];
+                let descParts: string[] = [];
+                for (let i = ranges.length - 1; i >= 0; i--) {
+                  const range = ranges[i];
+                  if (!range) continue;
+                  const between = scriptContent.slice(range.end, element.pos);
+                  if (/^([ \t]*\r?\n)*$/.test(between)) {
+                    const cmt = scriptContent.slice(range.pos, range.end).trim();
+                    if (cmt.startsWith('/**')) {
+                      descParts.unshift(
+                        cmt
+                          .replace(/^\/\*\*|\*\/$/g, '')
+                          .replace(/^[*\s]+/gm, '')
+                          .trim()
+                      );
+                    } else if (cmt.startsWith('//')) {
+                      descParts.unshift(cmt.replace(/^\/\//, '').trim());
+                    } else if (cmt.startsWith('/*')) {
+                      descParts.unshift(
+                        cmt
+                          .replace(/^\/\*|\*\/$/g, '')
+                          .replace(/^[*\s]+/gm, '')
+                          .trim()
+                      );
+                    }
+                  } else {
+                    break;
+                  }
+                }
+                description = descParts.join('\n').trim();
+                exposes.push({ name: element.text, description, type: undefined });
+              }
+            }
+          }
+          // Cas expose: { foo: ..., bar: ... }
+          else if (ts.isObjectLiteralExpression(prop.initializer)) {
             for (const e of prop.initializer.properties) {
               if (ts.isPropertyAssignment(e) && ts.isIdentifier(e.name)) {
                 const name = e.name.text;
                 let type: string | undefined = undefined;
                 let description = '';
+                // Récupère tous les commentaires (ligne et multilignes) juste au-dessus
                 const ranges = ts.getLeadingCommentRanges(scriptContent, e.pos) || [];
-                if (ranges.length > 0) {
-                  const lastRange = ranges[ranges.length - 1];
-                  if (lastRange) {
-                    const between = scriptContent.slice(lastRange.end, e.pos);
-                    if (/^([ \t]*\r?\n)*$/.test(between)) {
-                      const cmt = scriptContent.slice(lastRange.pos, lastRange.end).trim();
-                      if (cmt.startsWith('/**')) {
-                        description = cmt
+                let descParts: string[] = [];
+                for (let i = ranges.length - 1; i >= 0; i--) {
+                  const range = ranges[i];
+                  if (!range) continue;
+                  const between = scriptContent.slice(range.end, e.pos);
+                  if (/^([ \t]*\r?\n)*$/.test(between)) {
+                    const cmt = scriptContent.slice(range.pos, range.end).trim();
+                    if (cmt.startsWith('/**')) {
+                      descParts.unshift(
+                        cmt
                           .replace(/^\/\*\*|\*\/$/g, '')
                           .replace(/^[*\s]+/gm, '')
-                          .trim();
-                      } else if (cmt.startsWith('//')) {
-                        description = cmt.replace(/^\/\//, '').trim();
-                      }
+                          .trim()
+                      );
+                    } else if (cmt.startsWith('//')) {
+                      descParts.unshift(cmt.replace(/^\/\//, '').trim());
+                    } else if (cmt.startsWith('/*')) {
+                      descParts.unshift(
+                        cmt
+                          .replace(/^\/\*|\*\/$/g, '')
+                          .replace(/^[*\s]+/gm, '')
+                          .trim()
+                      );
                     }
+                  } else {
+                    break;
                   }
                 }
+                description = descParts.join('\n').trim();
                 // Déduit le type si possible
                 if (ts.isFunctionLike(e.initializer)) {
                   const params = e.initializer.parameters
@@ -67,176 +121,6 @@ export const extractExposes = (scriptContent: string, absPath: string) => {
                 }
                 exposes.push({ name, description, type });
               }
-            }
-          }
-        }
-        // Extraction des méthodes exposées (méthodes)
-        if (
-          ts.isPropertyAssignment(prop) &&
-          ts.isIdentifier(prop.name) &&
-          prop.name.text === 'methods' &&
-          ts.isObjectLiteralExpression(prop.initializer)
-        ) {
-          for (const m of prop.initializer.properties) {
-            if (ts.isMethodDeclaration(m) && ts.isIdentifier(m.name)) {
-              const name = m.name.text;
-              let type: string | undefined = undefined;
-              let description = '';
-              const ranges = ts.getLeadingCommentRanges(scriptContent, m.pos) || [];
-              if (ranges.length > 0) {
-                const lastRange = ranges[ranges.length - 1];
-                if (lastRange) {
-                  const between = scriptContent.slice(lastRange.end, m.pos);
-                  if (/^([ \t]*\r?\n)*$/.test(between)) {
-                    const cmt = scriptContent.slice(lastRange.pos, lastRange.end).trim();
-                    if (cmt.startsWith('/**')) {
-                      description = cmt
-                        .replace(/^\/\*\*|\*\/$/g, '')
-                        .replace(/^[*\s]+/gm, '')
-                        .trim();
-                    } else if (cmt.startsWith('//')) {
-                      description = cmt.replace(/^\/\//, '').trim();
-                    }
-                  }
-                }
-              }
-              // Déduit le type si possible
-              const params = m.parameters
-                .map((p: ts.ParameterDeclaration) => {
-                  const paramName = p.name.getText();
-                  const paramType = p.type ? `: ${p.type.getText()}` : '';
-                  return paramName + paramType;
-                })
-                .join(', ');
-              let returnType = 'any';
-              if (m.type) {
-                returnType = m.type.getText();
-              }
-              type = `(${params}) => ${returnType}`;
-              exposes.push({ name, description, type });
-            } else if (ts.isPropertyAssignment(m) && ts.isIdentifier(m.name)) {
-              // Cas function property: foo: function() {...}
-              const name = m.name.text;
-              let type: string | undefined = undefined;
-              let description = '';
-              const ranges = ts.getLeadingCommentRanges(scriptContent, m.pos) || [];
-              if (ranges.length > 0) {
-                const lastRange = ranges[ranges.length - 1];
-                if (lastRange) {
-                  const between = scriptContent.slice(lastRange.end, m.pos);
-                  if (/^([ \t]*\r?\n)*$/.test(between)) {
-                    const cmt = scriptContent.slice(lastRange.pos, lastRange.end).trim();
-                    if (cmt.startsWith('/**')) {
-                      description = cmt
-                        .replace(/^\/\*\*|\*\/$/g, '')
-                        .replace(/^[*\s]+/gm, '')
-                        .trim();
-                    } else if (cmt.startsWith('//')) {
-                      description = cmt.replace(/^\/\//, '').trim();
-                    }
-                  }
-                }
-              }
-              if (ts.isFunctionLike(m.initializer)) {
-                const params = m.initializer.parameters
-                  .map((p: ts.ParameterDeclaration) => {
-                    const paramName = p.name.getText();
-                    const paramType = p.type ? `: ${p.type.getText()}` : '';
-                    return paramName + paramType;
-                  })
-                  .join(', ');
-                let returnType = 'any';
-                if (m.initializer.type) {
-                  returnType = m.initializer.type.getText();
-                }
-                type = `(${params}) => ${returnType}`;
-              }
-              exposes.push({ name, description, type });
-            }
-          }
-        }
-        // Extraction des computed exposés
-        if (
-          ts.isPropertyAssignment(prop) &&
-          ts.isIdentifier(prop.name) &&
-          prop.name.text === 'computed' &&
-          ts.isObjectLiteralExpression(prop.initializer)
-        ) {
-          for (const c of prop.initializer.properties) {
-            if (ts.isMethodDeclaration(c) && ts.isIdentifier(c.name)) {
-              const name = c.name.text;
-              let type: string | undefined = undefined;
-              let description = '';
-              const ranges = ts.getLeadingCommentRanges(scriptContent, c.pos) || [];
-              if (ranges.length > 0) {
-                const lastRange = ranges[ranges.length - 1];
-                if (lastRange) {
-                  const between = scriptContent.slice(lastRange.end, c.pos);
-                  if (/^([ \t]*\r?\n)*$/.test(between)) {
-                    const cmt = scriptContent.slice(lastRange.pos, lastRange.end).trim();
-                    if (cmt.startsWith('/**')) {
-                      description = cmt
-                        .replace(/^\/\*\*|\*\/$/g, '')
-                        .replace(/^[*\s]+/gm, '')
-                        .trim();
-                    } else if (cmt.startsWith('//')) {
-                      description = cmt.replace(/^\/\//, '').trim();
-                    }
-                  }
-                }
-              }
-              // Déduit le type si possible
-              const params = c.parameters
-                .map((p: ts.ParameterDeclaration) => {
-                  const paramName = p.name.getText();
-                  const paramType = p.type ? `: ${p.type.getText()}` : '';
-                  return paramName + paramType;
-                })
-                .join(', ');
-              let returnType = 'any';
-              if (c.type) {
-                returnType = c.type.getText();
-              }
-              type = `(${params}) => ${returnType}`;
-              exposes.push({ name, description, type });
-            } else if (ts.isPropertyAssignment(c) && ts.isIdentifier(c.name)) {
-              // Cas function property: foo: function() {...}
-              const name = c.name.text;
-              let type: string | undefined = undefined;
-              let description = '';
-              const ranges = ts.getLeadingCommentRanges(scriptContent, c.pos) || [];
-              if (ranges.length > 0) {
-                const lastRange = ranges[ranges.length - 1];
-                if (lastRange) {
-                  const between = scriptContent.slice(lastRange.end, c.pos);
-                  if (/^([ \t]*\r?\n)*$/.test(between)) {
-                    const cmt = scriptContent.slice(lastRange.pos, lastRange.end).trim();
-                    if (cmt.startsWith('/**')) {
-                      description = cmt
-                        .replace(/^\/\*\*|\*\/$/g, '')
-                        .replace(/^[*\s]+/gm, '')
-                        .trim();
-                    } else if (cmt.startsWith('//')) {
-                      description = cmt.replace(/^\/\//, '').trim();
-                    }
-                  }
-                }
-              }
-              if (ts.isFunctionLike(c.initializer)) {
-                const params = c.initializer.parameters
-                  .map((p: ts.ParameterDeclaration) => {
-                    const paramName = p.name.getText();
-                    const paramType = p.type ? `: ${p.type.getText()}` : '';
-                    return paramName + paramType;
-                  })
-                  .join(', ');
-                let returnType = 'any';
-                if (c.initializer.type) {
-                  returnType = c.initializer.type.getText();
-                }
-                type = `(${params}) => ${returnType}`;
-              }
-              exposes.push({ name, description, type });
             }
           }
         }

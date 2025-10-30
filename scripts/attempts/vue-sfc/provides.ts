@@ -20,45 +20,141 @@ export const extractProvides = (scriptContent: string, absPath: string) => {
     if (ts.isExportAssignment(node) && ts.isObjectLiteralExpression(node.expression)) {
       const obj = node.expression;
       for (const prop of obj.properties) {
+        // Propriété provide/provides sous forme objet ou fonction
         if (
-          ts.isPropertyAssignment(prop) &&
-          ts.isIdentifier(prop.name) &&
-          (prop.name.text === 'provide' || prop.name.text === 'provides')
+          (ts.isPropertyAssignment(prop) &&
+            ts.isIdentifier(prop.name) &&
+            (prop.name.text === 'provide' || prop.name.text === 'provides')) ||
+          (ts.isMethodDeclaration(prop) &&
+            ts.isIdentifier(prop.name) &&
+            (prop.name.text === 'provide' || prop.name.text === 'provides'))
         ) {
-          if (ts.isObjectLiteralExpression(prop.initializer)) {
+          // Supporte provide: { ... }
+          if (ts.isPropertyAssignment(prop) && ts.isObjectLiteralExpression(prop.initializer)) {
             for (const e of prop.initializer.properties) {
-              if (ts.isPropertyAssignment(e) && ts.isIdentifier(e.name)) {
-                const key = e.name.text;
+              if (ts.isPropertyAssignment(e)) {
+                let key = '';
+                if (ts.isIdentifier(e.name)) {
+                  key = e.name.text;
+                } else if (ts.isStringLiteral(e.name)) {
+                  key = e.name.text;
+                } else if (ts.isComputedPropertyName(e.name)) {
+                  key = e.name.expression.getText();
+                }
                 let value = e.initializer ? e.initializer.getText() : '';
                 let type: string | undefined = undefined;
-                let desc = '';
                 if (/^['\"].*['\"]$/.test(value)) type = 'string';
                 else if (/^\d+(\.\d+)?$/.test(value)) type = 'number';
                 else if (/^(true|false)$/.test(value)) type = 'boolean';
                 else if (value === '[]') type = 'any[]';
                 else if (value === '{}') type = 'Record<string, any>';
                 else type = 'any';
-                // Cherche le commentaire immédiatement au-dessus (JSDoc ou //), ignore si ligne vide ou code entre les deux
-                let description = '';
+                // Récupère tous les commentaires juste au-dessus
+                let descParts: string[] = [];
                 const ranges = ts.getLeadingCommentRanges(scriptContent, e.pos) || [];
-                if (ranges.length > 0) {
-                  const lastRange = ranges[ranges.length - 1];
-                  if (lastRange) {
-                    const between = scriptContent.slice(lastRange.end, e.pos);
-                    if (/^([ \t]*\r?\n)*$/.test(between)) {
-                      const cmt = scriptContent.slice(lastRange.pos, lastRange.end).trim();
-                      if (cmt.startsWith('/**')) {
-                        desc = cmt
+                for (let i = ranges.length - 1; i >= 0; i--) {
+                  const range = ranges[i];
+                  if (!range) continue;
+                  const between = scriptContent.slice(range.end, e.pos);
+                  if (/^([ \t]*\r?\n)*$/.test(between)) {
+                    const cmt = scriptContent.slice(range.pos, range.end).trim();
+                    if (cmt.startsWith('/**')) {
+                      descParts.unshift(
+                        cmt
                           .replace(/^\/\*\*|\*\/$/g, '')
                           .replace(/^[*\s]+/gm, '')
-                          .trim();
-                      } else if (cmt.startsWith('//')) {
-                        desc = cmt.replace(/^\/\//, '').trim();
+                          .trim()
+                      );
+                    } else if (cmt.startsWith('//')) {
+                      descParts.unshift(cmt.replace(/^\/\//, '').trim());
+                    } else if (cmt.startsWith('/*')) {
+                      descParts.unshift(
+                        cmt
+                          .replace(/^\/\*|\*\/$/g, '')
+                          .replace(/^[*\s]+/gm, '')
+                          .trim()
+                      );
+                    }
+                  } else {
+                    break;
+                  }
+                }
+                const description = descParts.join('\n').trim();
+                provides.push({ key, value, type, description });
+              }
+            }
+          }
+          // Supporte provide: () { return { ... } } ou provide() { return { ... } }
+          else if (
+            (ts.isPropertyAssignment(prop) && ts.isFunctionLike(prop.initializer)) ||
+            ts.isMethodDeclaration(prop)
+          ) {
+            let body = undefined;
+            if (ts.isPropertyAssignment(prop) && ts.isFunctionLike(prop.initializer)) {
+              body = prop.initializer.body;
+            } else if (ts.isMethodDeclaration(prop)) {
+              body = prop.body;
+            }
+            if (body && ts.isBlock(body)) {
+              for (const stmt of body.statements) {
+                if (
+                  ts.isReturnStatement(stmt) &&
+                  stmt.expression &&
+                  ts.isObjectLiteralExpression(stmt.expression)
+                ) {
+                  for (const e of stmt.expression.properties) {
+                    if (ts.isPropertyAssignment(e)) {
+                      let key = '';
+                      if (ts.isIdentifier(e.name)) {
+                        key = e.name.text;
+                      } else if (ts.isStringLiteral(e.name)) {
+                        key = e.name.text;
+                      } else if (ts.isComputedPropertyName(e.name)) {
+                        key = e.name.expression.getText();
                       }
+                      let value = e.initializer ? e.initializer.getText() : '';
+                      let type: string | undefined = undefined;
+                      if (/^['\"].*['\"]$/.test(value)) type = 'string';
+                      else if (/^\d+(\.\d+)?$/.test(value)) type = 'number';
+                      else if (/^(true|false)$/.test(value)) type = 'boolean';
+                      else if (value === '[]') type = 'any[]';
+                      else if (value === '{}') type = 'Record<string, any>';
+                      else type = 'any';
+                      // Récupère tous les commentaires juste au-dessus
+                      let descParts: string[] = [];
+                      const ranges = ts.getLeadingCommentRanges(scriptContent, e.pos) || [];
+                      for (let i = ranges.length - 1; i >= 0; i--) {
+                        const range = ranges[i];
+                        if (!range) continue;
+                        const between = scriptContent.slice(range.end, e.pos);
+                        if (/^([ \t]*\r?\n)*$/.test(between)) {
+                          const cmt = scriptContent.slice(range.pos, range.end).trim();
+                          if (cmt.startsWith('/**')) {
+                            descParts.unshift(
+                              cmt
+                                .replace(/^\/\*\*|\*\/$/g, '')
+                                .replace(/^[*\s]+/gm, '')
+                                .trim()
+                            );
+                          } else if (cmt.startsWith('//')) {
+                            descParts.unshift(cmt.replace(/^\/\//, '').trim());
+                          } else if (cmt.startsWith('/*')) {
+                            descParts.unshift(
+                              cmt
+                                .replace(/^\/\*|\*\/$/g, '')
+                                .replace(/^[*\s]+/gm, '')
+                                .trim()
+                            );
+                          }
+                        } else {
+                          break;
+                        }
+                      }
+                      const description = descParts.join('\n').trim();
+                      provides.push({ key, value, type, description });
                     }
                   }
                 }
-                provides.push({ key, value, type, description: desc });
               }
             }
           }

@@ -31,28 +31,9 @@ const exposed = ref('');
 const other = ref('other exposed');
 
 // --- PROVIDES ---
-/**
- * Provides a value with key 'someOtherKey'.
- */
-provide('someOtherKey', 'providedValue');
-// Provide avec clé symbole
-provide(symKey, 'valSym');
-// Provide avec clé objet
-provide(objKey, 123);
-// Provide avec clé computed
-provide(computedKey, true);
-// Provide avec spread
-provide('spread', { ...spreadObj });
+// (déplacé dans created)
 
 // --- INJECTS ---
-/**
- * Injects a value with key 'someKey'.
- */
-const injected = inject('someKey', 'defaultValue');
-// Inject avec clé symbole
-const injectedSym = inject(symKey, 'defaultSym');
-// Inject avec spread
-const injectedSpread = inject('spread', { ...spreadObj });
 
 export default {
   name: 'ButtonFooNoSetup',
@@ -106,33 +87,81 @@ export default {
    * Propriétés calculées exposées.
    */
   computed: {
+    // ...autres computed...
+    foo() {
+      return this.$props.foo;
+    },
+  },
+  inject: {
+    // Injects a value with key 'someKey'.
+    injected: 'someKey',
+    // Inject avec clé symbole
+    injectedSym: symKey,
+    // Inject avec spread
+    injectedSpread: 'spread',
+  },
+  /**
+   * Fournit des valeurs via l'option provide de l'API Options.
+   */
+  /**
+   * Fournit des valeurs via l'option provide de l'API Options.
+   *
+   * - someOtherKey : Provides a value with key 'someOtherKey'.
+   * - symKey : Provide avec clé symbole
+   * - computedKey : Provide avec clé computed
+   * - spread : Provide avec spread
+   */
+  /**
+   * Fournit des valeurs via l'option provide de l'API Options.
+   *
+   * - someOtherKey : Provides a value with key 'someOtherKey'.
+   * - symKey : Provide avec clé symbole
+   * - computedKey : Provide avec clé computed
+   * - spread : Provide avec spread
+   */
+  provide() {
+    return {
+      // Provides a value with key 'someOtherKey'.
+      someOtherKey: 'providedValue',
+      // Provide avec clé symbole
+      symKey: 'valSym',
+      // Provide avec clé computed
+      computedKey: true,
+      // Provide avec spread
+      spread: { ...spreadObj },
+    };
+  },
+  /**
+   * Expose properties and methods like defineExpose in <script setup>
+   */
+  expose: [
     /**
      * An exposed string property
      */
-    exposed() {
-      return exposed.value;
-    },
+    'exposed',
     /**
      * Another exposed string property
      */
-    other() {
-      return other.value;
-    },
-  },
+    'other',
+    /**
+     * An exposed function that logs a message and returns 'foo'
+     */
+    'myFunc',
+  ],
 };
 </script>
 
 <template>
   <Button class="btn-main" :class="['dynamic-class', { 'btn-secondary': true }]">
     <!-- Text of the button -->
-    <slot :foo="foo">Hello World</slot>
+    <slot :foo="this.foo ?? ''">Hello World</slot>
     <!-- Icon slot for the button -->
     <slot name="icon" />
     <!-- Right icon slot for the button -->
     <slot name="icon-right" />
     <slot :name="'named-dynamic'">Named dynamic slot</slot>
     <slot name="static-named">Static named slot</slot>
-    <MyChild :foo="foo">
+    <MyChild :foo="this.foo ?? ''">
       <template #header>Header slot</template>
       <template v-slot:footer>Footer slot</template>
       <template #dynamicSlot>Dynamic slot</template>
