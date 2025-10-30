@@ -1,23 +1,22 @@
 import fs from 'fs';
 import { parse } from '@vue/compiler-sfc';
-import { extractDescriptionAndAuthor } from './vue/description-and-author';
-import { extractEmits } from './vue/emits';
-import { extractExposes } from './vue/exposes';
-import { extractProps } from './vue/props';
-import { extractInjects } from './vue/injects';
-import { extractProvides } from './vue/provides';
-import { extractSlots } from './vue/slots';
-import { extractComponentTypes } from './vue/types';
-import { extractChildComponents } from './vue/child-components';
-import { extractCssVars } from './vue/css-vars';
-import { convertHtmlToPug } from './vue/pug-converter';
+import { extractDescriptionAndAuthor } from './vue-sfc/description-and-author';
+import { extractEmits } from './vue-sfc/emits';
+import { extractExposes } from './vue-sfc/exposes';
+import { extractProps } from './vue-sfc/props';
+import { extractInjects } from './vue-sfc/injects';
+import { extractProvides } from './vue-sfc/provides';
+import { extractSlotsFromTemplate } from './vue-common/slots-template';
+import { extractComponentTypes } from './vue-sfc/types';
+import { extractChildComponents } from './vue-sfc/child-components';
+import { extractCssVars } from './vue-sfc/css-vars';
+import { convertHtmlToPug } from './vue-sfc/pug-converter';
 
-// Main exported function
-export const extractVueDoc = (vueFilePath: string) => {
-  const absPath = vueFilePath.startsWith('/') ? vueFilePath : `${process.cwd()}/${vueFilePath}`;
+export const extractVueDoc = (file: string) => {
+  const absPath = file.startsWith('/') ? file : `${process.cwd()}/${file}`;
   const vueSource = fs.readFileSync(absPath, 'utf-8');
   const { descriptor } = parse(vueSource);
-  const script = descriptor.scriptSetup || descriptor.script;
+  const script = descriptor.script;
   let description = '';
   let author = '';
   let props: Array<{ name: string; type: string; default?: any; description: string }> = [];
@@ -41,20 +40,18 @@ export const extractVueDoc = (vueFilePath: string) => {
     types = extractComponentTypes(script.content, absPath);
   }
   if (descriptor.template && descriptor.template.content) {
-    slots = extractSlots(script ? script.content : '', absPath, descriptor.template.content);
+    slots = extractSlotsFromTemplate(descriptor.template.content);
     childComponents = extractChildComponents(descriptor.template.content);
   }
   if (descriptor.styles && descriptor.styles.length > 0) {
-    // Only take the first <style> block (or concatenate all)
     cssVars = extractCssVars(descriptor.styles.map((s) => s.content).join('\n'));
   }
-  // Compose the source property
   let pugString = '';
   if (descriptor.template && descriptor.template.content) {
     pugString = convertHtmlToPug(descriptor.template.content);
   }
   return {
-    file: vueFilePath,
+    file,
     description,
     author,
     childComponents,
@@ -72,17 +69,23 @@ export const extractVueDoc = (vueFilePath: string) => {
         descriptor.template && descriptor.template.content && pugString
           ? vueSource.replace(
               /<template[^>]*>[\s\S]*?<\/template>/,
-              `<template lang="pug">\n${pugString}\n</template>`
+              `<template lang=\"pug\">\n${pugString}\n<\/template>`
             )
           : vueSource,
     },
   };
 };
 
-// CLI usage
 if (require.main === module) {
-  const vueFilePath = process.argv[2] || 'registry/new-york/components/button-foo/ButtonFoo.vue';
+  const vueFilePath =
+    process.argv[2] || 'registry/new-york/components/button-foo/ButtonFooNoSetup.vue';
   const result = extractVueDoc(vueFilePath);
-  fs.writeFileSync('scripts/attempts/vue-comments.json', JSON.stringify(result, null, 2), 'utf-8');
-  console.log('Vue comments extraction result written to scripts/attempts/vue-comments.json');
+  fs.writeFileSync(
+    'scripts/attempts/vue-comments-no-setup.json',
+    JSON.stringify(result, null, 2),
+    'utf-8'
+  );
+  console.log(
+    'Vue comments extraction result written to scripts/attempts/vue-comments-no-setup.json'
+  );
 }

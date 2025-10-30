@@ -1,4 +1,5 @@
 import ts from 'typescript';
+import { extractSlotsFromTemplate } from '../vue-common/slots-template';
 
 export interface SlotInfo {
   name: string;
@@ -63,25 +64,21 @@ export const extractSlots = (
   }
   visit(sourceFile);
 
-  // 2. Complète avec les slots du template si non présents dans defineSlots
+  // 2. Complète avec les slots du template si non présents dans defineSlots (via extractSlotsFromTemplate)
   if (templateContent) {
-    // On va parcourir le template ligne par ligne pour associer les commentaires HTML aux slots
-    const lines = templateContent.split(/\r?\n/);
-    let lastComment: string | null = null;
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i] ?? '';
-      const commentMatch = line.match(/<!--\s*(.*?)\s*-->/);
-      if (commentMatch && typeof commentMatch[1] === 'string') {
-        lastComment = commentMatch[1].trim();
-        continue;
-      }
-      const slotMatch = line.match(/<slot(?:\s+name=["']([\w-]+)["'])?[^>]*>/);
-      if (slotMatch) {
-        const name = slotMatch[1] || 'default';
-        if (!slotsMap[name]) {
-          slotsMap[name] = { name, description: lastComment || '', params: undefined };
+    const templateSlots = extractSlotsFromTemplate(templateContent);
+    for (const slot of templateSlots) {
+      if (!slotsMap[slot.name]) {
+        slotsMap[slot.name] = {
+          name: slot.name,
+          description: '',
+          params: slot.params,
+        };
+      } else if (slot.params) {
+        const slotObj = slotsMap[slot.name];
+        if (slotObj && !slotObj.params) {
+          slotObj.params = slot.params;
         }
-        lastComment = null;
       }
     }
   }

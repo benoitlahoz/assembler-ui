@@ -1,14 +1,23 @@
-<script setup lang="ts">
+<script lang="ts">
 /**
  * A simple knob component that displays a button with "Hello World" text
  * @author John Doe <john.doe@example.com>
  */
 import { ref, inject, provide } from 'vue';
-import type { Ref } from 'vue';
 import { Button } from '@/components/ui/button';
 
+// Types d'export
+/**
+ * Possible return types for myFunc.
+ */
 export type ExportedType = { foo: string };
+/**
+ * An example interface with a sample property
+ */
 export interface ExportedInterface {
+  /**
+   * A sample string property
+   */
   bar: number;
 }
 
@@ -18,6 +27,14 @@ const objKey = { key: 'objKey' };
 const computedKey = { toString: () => 'computedKey' };
 const spreadObj = { a: 1, b: 2 };
 
+const exposed = ref('');
+const other = ref('other exposed');
+
+// --- PROVIDES ---
+/**
+ * Provides a value with key 'someOtherKey'.
+ */
+provide('someOtherKey', 'providedValue');
 // Provide avec clé symbole
 provide(symKey, 'valSym');
 // Provide avec clé objet
@@ -27,109 +44,88 @@ provide(computedKey, true);
 // Provide avec spread
 provide('spread', { ...spreadObj });
 
-// Inject avec clé symbole
-const injectedSym = inject(symKey, 'defaultSym');
-// Inject avec spread
-const injectedSpread = inject('spread', { ...spreadObj });
-/**
- * A simple knob component that displays a button with "Hello World" text
- * @author John Doe <john.doe@example.com>
- */
-// @ajs-author John Doe <john.doe@example.com>
-
-/**
- * Possible return types for myFunc.
- */
-type FuncReturn = 'foo' | 'bar' | 'baz';
-
-/**
- * An example interface with a sample property
- */
-interface MyInterface {
-  /**
-   * A sample string property
-   */
-  sampleProp: string;
-  /**
-   * Another sample number property
-   */
-  sampleNumber: number;
-  foo(): void;
-}
-
-const exposed = ref('');
-const other: Ref<string> = ref('other exposed');
-const myFunc = (): FuncReturn => {
-  console.log('This is my function');
-  return 'foo';
-};
-
-/**
- * Définit les slots disponibles pour ce composant.
- */
-
-const slots = defineSlots({
-  /**
-   * Slot principal par défaut
-   */
-  default: (props: { label: string }) => {},
-  // Slot pour l'icône à gauche
-  icon: () => {},
-});
-
+// --- INJECTS ---
 /**
  * Injects a value with key 'someKey'.
  */
 const injected = inject('someKey', 'defaultValue');
+// Inject avec clé symbole
+const injectedSym = inject(symKey, 'defaultSym');
+// Inject avec spread
+const injectedSpread = inject('spread', { ...spreadObj });
 
-/**
- * Provides a value with key 'someOtherKey'.
- */
-provide('someOtherKey', 'providedValue');
-
-const props = withDefaults(
-  defineProps<{
+export default {
+  name: 'ButtonFooNoSetup',
+  /**
+   * Définit les props du composant.
+   */
+  props: {
     // @ajs-prop An optional string property named foo.
-    // An optional string property named foo
-    foo?: string;
+    /**
+     * An optional string property named foo
+     */
+    foo: {
+      type: String,
+      required: false,
+    },
     // @ajs-prop A required number property named bar.
     /**
      * A required number property named bar
      */
-    bar: number;
-  }>(),
-  {
-    bar: 42,
-  }
-);
-
-const emit = defineEmits<{
+    bar: {
+      type: Number,
+      required: true,
+      default: 42,
+    },
+  },
   /**
-   * Emitted when the button is clicked
+   * Définit les événements émis par le composant.
    */
-  (e: 'click'): void;
-}>();
-
-defineExpose({
+  emits: [
+    /**
+     * Emitted when the button is clicked
+     */
+    'click',
+  ],
   /**
-   * An exposed string property
+   * Méthodes du composant.
    */
-  exposed,
+  methods: {
+    /**
+     * An exposed function that logs a message and returns 'foo'
+     */
+    myFunc() {
+      console.log('This is my function');
+      return 'foo';
+    },
+    emitClick() {
+      this.$emit('click');
+    },
+  },
   /**
-   * Another exposed string property
+   * Propriétés calculées exposées.
    */
-  other,
-  /**
-   * An exposed function that logs a message and returns 'foo'
-   */
-  myFunc,
-});
+  computed: {
+    /**
+     * An exposed string property
+     */
+    exposed() {
+      return exposed.value;
+    },
+    /**
+     * Another exposed string property
+     */
+    other() {
+      return other.value;
+    },
+  },
+};
 </script>
 
 <template>
   <Button class="btn-main" :class="['dynamic-class', { 'btn-secondary': true }]">
     <!-- Text of the button -->
-    <slot>Hello World</slot>
+    <slot :foo="foo">Hello World</slot>
     <!-- Icon slot for the button -->
     <slot name="icon" />
     <!-- Right icon slot for the button -->
@@ -149,11 +145,9 @@ defineExpose({
 .btn-main {
   color: red;
 }
-
 .btn-secondary {
   color: blue;
 }
-
 .dynamic-class {
   font-weight: bold;
 }
