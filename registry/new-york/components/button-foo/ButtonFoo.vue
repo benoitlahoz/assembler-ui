@@ -4,18 +4,30 @@
  * @author John Doe <john.doe@example.com>
  */
 // @ajs-author John Doe <john.doe@example.com>
-import { ref } from 'vue';
+import { ref, inject, provide } from 'vue';
 import { Button } from '@/components/ui/button';
 
 const exposed = ref('');
 const other: ref<string> = ref('other exposed');
+const myFunc = () => {
+  console.log('This is my function');
+  return 'foo';
+};
+
+/**
+ * Injects a value with key 'someKey'.
+ */
+const injected = inject('someKey', 'defaultValue');
+
+/**
+ * Provides a value with key 'someOtherKey'.
+ */
+provide('someOtherKey', 'providedValue');
 
 const props = withDefaults(
   defineProps<{
     // @ajs-prop An optional string property named foo.
-    /**
-     * An optional string property named foo
-     */
+    // An optional string property named foo
     foo?: string;
     // @ajs-prop A required number property named bar.
     /**
@@ -44,6 +56,10 @@ defineExpose({
    * Another exposed string property
    */
   other,
+  /**
+   * An exposed function that logs a message and returns 'foo'
+   */
+  myFunc,
 });
 </script>
 

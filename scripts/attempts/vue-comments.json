@@ -7,7 +7,7 @@
       "name": "foo",
       "type": "string",
       "default": "-",
-      "description": "An optional string property named foo"
+      "description": ""
     },
     {
       "name": "bar",
@@ -19,11 +19,11 @@
   "slots": [
     {
       "name": "default",
-      "description": "Text of the button"
+      "description": ""
     },
     {
       "name": "icon",
-      "description": "Icon slot for the button"
+      "description": ""
     }
   ],
   "emits": [
@@ -36,12 +36,33 @@
     {
       "name": "exposed",
       "description": "An exposed string property",
-      "type": "Ref<string>"
+      "type": "Ref<any>"
     },
     {
       "name": "other",
       "description": "Another exposed string property",
       "type": "ref<string>"
+    },
+    {
+      "name": "myFunc",
+      "description": "An exposed function that logs a message and returns 'foo'",
+      "type": "() => string"
+    }
+  ],
+  "injects": [
+    {
+      "key": "someKey",
+      "default": "'defaultValue'",
+      "type": "string",
+      "description": "Injects a value with key 'someKey'."
+    }
+  ],
+  "provides": [
+    {
+      "key": "someOtherKey",
+      "value": "'providedValue'",
+      "type": "string",
+      "description": "Provides a value with key 'someOtherKey'."
     }
   ]
 }

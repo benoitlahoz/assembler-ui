@@ -1,193 +1,12 @@
 import fs from 'fs';
 import { parse } from '@vue/compiler-sfc';
-import ts from 'typescript';
-
-const vueFilePath = process.argv[2] || 'registry/new-york/components/button-foo/ButtonFoo.vue';
-const absPath = vueFilePath.startsWith('/') ? vueFilePath : `${process.cwd()}/${vueFilePath}`;
-const vueSource = fs.readFileSync(absPath, 'utf-8');
-
-const { descriptor } = parse(vueSource);
-const script = descriptor.scriptSetup || descriptor.script;
-
-let description = '';
-let author = '';
-const props: Array<{ name: string; type: string; default?: any; description: string }> = [];
-const slots: Array<{ name: string; description: string }> = [];
-const emits: Array<{ name: string; description: string }> = [];
-const exposes: Array<{ name: string; description: string; type?: string }> = [];
-
-// --- Extraction helpers ---
-const extractDescriptionAndAuthor = (scriptContent: string) => {
-  let description = '';
-  let author = '';
-  const multilineComment = scriptContent.match(/\/\*\*([\s\S]*?)\*\//);
-  if (multilineComment && multilineComment[1]) {
-    const descBlock = multilineComment[1].replace(/^[*\s]+/gm, '').trim();
-    const tagIndex = descBlock.search(/@[a-zA-Z]+/);
-    if (tagIndex > -1) {
-      description = descBlock.slice(0, tagIndex).trim();
-    } else {
-      description = descBlock;
-    }
-    const authorMatch = descBlock.match(/@author\s+(.+)/);
-    if (authorMatch && authorMatch[1]) {
-      author = authorMatch[1].trim();
-    }
-  }
-  return { description, author };
-};
-
-const extractEmits = (scriptContent: string) => {
-  const emits: Array<{ name: string; description: string }> = [];
-  const emitsRegex = /defineEmits\s*<\s*{([\s\S]*?)}\s*>/g;
-  let emitsMatch;
-  while ((emitsMatch = emitsRegex.exec(scriptContent)) !== null) {
-    const emitsBlock = emitsMatch[1];
-    const eventRegex = /\/\*\*([\s\S]*?)\*\/\s*\(e:\s*'([^']+)'\)/g;
-    let eventMatch;
-    while ((eventMatch = eventRegex.exec(emitsBlock ?? '')) !== null) {
-      const description = (eventMatch[1] ?? '').replace(/^[*\s]+/gm, '').trim();
-      const name = eventMatch[2] ?? '';
-      emits.push({ name, description });
-    }
-  }
-  return emits;
-};
-
-const findExposedType = (name: string, code: string): string | undefined => {
-  const refTypeRegex = new RegExp(
-    `const\\s+${name}\\s*=\\s*ref(?:<([a-zA-Z0-9_<>]+)>|)\\s*\\(([^)]*)\\)`,
-    'm'
-  );
-  const typedVarRegex = new RegExp(`const\\s+${name}\\s*:\\s*([^=;]+)`, 'm');
-  let match = code.match(refTypeRegex);
-  if (match) {
-    if (match[1]) {
-      return `Ref<${match[1]}>`;
-    }
-    if (match[2]) {
-      const val = match[2].trim();
-      if (/^['"].*['"]$/.test(val)) return 'Ref<string>';
-      if (/^\d+(\.\d+)?$/.test(val)) return 'Ref<number>';
-      if (/^(true|false)$/.test(val)) return 'Ref<boolean>';
-      if (val === '[]') return 'Ref<any[]>';
-      if (val === '{}') return 'Ref<Record<string, any>>';
-      return 'Ref<any>';
-    }
-    return 'Ref<any>';
-  }
-  match = code.match(typedVarRegex);
-  if (match && match[1]) {
-    return match[1].trim();
-  }
-  if (code.match(new RegExp(`const\\s+${name}\\s*=\\s*ref\\(`))) {
-    return 'Ref<any>';
-  }
-  return undefined;
-};
-
-const extractExposes = (scriptContent: string) => {
-  const exposes: Array<{ name: string; description: string; type?: string }> = [];
-  const exposeRegex = /defineExpose\s*\(\s*{([\s\S]*?)}\s*\)/g;
-  let exposeMatch;
-  while ((exposeMatch = exposeRegex.exec(scriptContent)) !== null) {
-    const exposeBlock = exposeMatch[1];
-    const propRegex = /\/\*\*([\s\S]*?)\*\/\s*([a-zA-Z0-9_]+)\s*[:,}]/g;
-    let propMatch;
-    const foundNames = new Set<string>();
-    while ((propMatch = propRegex.exec(exposeBlock ?? '')) !== null) {
-      const description = (propMatch[1] ?? '').replace(/^[*\s]+/gm, '').trim();
-      const name = propMatch[2] ?? '';
-      const type = findExposedType(name, scriptContent);
-      exposes.push({ name, description, type });
-      foundNames.add(name);
-    }
-    const simplePropRegex = /([a-zA-Z0-9_]+)\s*[,}]/g;
-    let simpleMatch;
-    while ((simpleMatch = simplePropRegex.exec(exposeBlock ?? '')) !== null) {
-      const name = simpleMatch[1] ?? '';
-      if (name && !foundNames.has(name)) {
-        const type = findExposedType(name, scriptContent);
-        exposes.push({ name, description: '', type });
-        foundNames.add(name);
-      }
-    }
-  }
-  return exposes;
-};
-
-const extractProps = (scriptContent: string, absPath: string) => {
-  const props: Array<{ name: string; type: string; default?: any; description: string }> = [];
-  const sourceFile = ts.createSourceFile(
-    absPath,
-    scriptContent,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS
-  );
-  function visit(node: ts.Node) {
-    if (ts.isPropertySignature(node) && node.name && ts.isIdentifier(node.name)) {
-      const propName = node.name.text;
-      let type =
-        node.type && scriptContent
-          ? scriptContent.substring(node.type.pos, node.type.end).trim()
-          : 'any';
-      let defaultValue: any = undefined;
-      let isOptional = false;
-      if (node.questionToken) {
-        isOptional = true;
-      }
-      const withDefaultsMatch = scriptContent.match(/withDefaults\s*\([^,]+,\s*({[\s\S]*?})\s*\)/);
-      if (withDefaultsMatch && withDefaultsMatch[1]) {
-        try {
-          // eslint-disable-next-line no-eval
-          const defaultsObj = eval('(' + withDefaultsMatch[1] + ')');
-          if (Object.prototype.hasOwnProperty.call(defaultsObj, propName)) {
-            defaultValue = defaultsObj[propName];
-          }
-        } catch (e) {
-          const defaultMatch = withDefaultsMatch[1].match(
-            new RegExp(`${propName}\\s*:\\s*([^,}\n]+)`)
-          );
-          if (defaultMatch && defaultMatch[1]) {
-            defaultValue = defaultMatch[1].trim();
-          }
-        }
-      }
-      if (isOptional || typeof defaultValue === 'undefined') {
-        defaultValue = '-';
-      }
-      let description = '';
-      const ranges = ts.getLeadingCommentRanges(scriptContent, node.pos) || [];
-      for (const range of ranges) {
-        const cmt = scriptContent.slice(range.pos, range.end).trim();
-        if (cmt.startsWith('/**')) {
-          description = cmt
-            .replace(/^\/\*\*|\*\/$/g, '')
-            .replace(/^[*\s]+/gm, '')
-            .trim();
-        }
-      }
-      props.push({ name: propName, type, default: defaultValue, description: description || '' });
-    }
-    ts.forEachChild(node, visit);
-  }
-  visit(sourceFile);
-  return props;
-};
-
-const extractSlots = (templateContent: string) => {
-  const slots: Array<{ name: string; description: string }> = [];
-  const slotRegex = /<!--([\s\S]*?)-->\s*<slot([^>]*)>/g;
-  let match;
-  while ((match = slotRegex.exec(templateContent)) !== null) {
-    const description = match[1] ? match[1].replace(/^[\s\*]+/gm, '').trim() : '';
-    const nameMatch = match[2] ? match[2].match(/name\s*=\s*['"]([^'"]+)['"]/) : null;
-    const name = nameMatch && nameMatch[1] ? nameMatch[1] : 'default';
-    slots.push({ name, description });
-  }
-  return slots;
-};
+import { extractDescriptionAndAuthor } from './vue/description-and-author';
+import { extractEmits } from './vue/emits';
+import { extractExposes } from './vue/exposes';
+import { extractProps } from './vue/props';
+import { extractInjects } from './vue/injects';
+import { extractProvides } from './vue/provides';
+import { extractSlots } from './vue/slots';
 
 // Fonction principale exportée
 export const extractVueDoc = (vueFilePath: string) => {
@@ -198,19 +17,23 @@ export const extractVueDoc = (vueFilePath: string) => {
   let description = '';
   let author = '';
   let props: Array<{ name: string; type: string; default?: any; description: string }> = [];
-  let slots: Array<{ name: string; description: string }> = [];
+  let slots: any[] = [];
   let emits: Array<{ name: string; description: string }> = [];
   let exposes: Array<{ name: string; description: string; type?: string }> = [];
+  let injects: Array<{ key: string; default?: any; type?: string; description: string }> = [];
+  let provides: Array<{ key: string; value?: any; type?: string; description: string }> = [];
   if (script) {
     const descAndAuthor = extractDescriptionAndAuthor(script.content);
     description = descAndAuthor.description;
     author = descAndAuthor.author;
     props = extractProps(script.content, absPath);
-    emits = extractEmits(script.content);
-    exposes = extractExposes(script.content);
+    emits = extractEmits(script.content, absPath);
+    exposes = extractExposes(script.content, absPath);
+    injects = extractInjects(script.content, absPath);
+    provides = extractProvides(script.content, absPath);
   }
   if (descriptor.template && descriptor.template.content) {
-    slots = extractSlots(descriptor.template.content);
+    slots = extractSlots(script ? script.content : '', absPath, descriptor.template.content);
   }
   return {
     file: vueFilePath,
@@ -220,6 +43,8 @@ export const extractVueDoc = (vueFilePath: string) => {
     slots,
     emits,
     exposes,
+    injects,
+    provides,
   };
 };
 
