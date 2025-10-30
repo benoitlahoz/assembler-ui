@@ -1,3 +1,5 @@
+import { matchCssVarCommentBlocks } from '../common/css-var-comment-block.regex';
+import { matchCssVars } from '../common/css-var.regex';
 // Extracts CSS variables defined in the style block of a SFC, with their description (preceding comment)
 
 export interface CssVarInfo {
@@ -13,15 +15,10 @@ export interface CssVarInfo {
 export const extractCssVars = (styleContent: string): CssVarInfo[] => {
   const result: CssVarInfo[] = [];
   // Look for comments /* ... */ followed by --var: ...;
-  const regex = /\/\*([^*]+)\*\/\s*([\w\s\-{}:;\n]*)/g;
-  let match;
-  while ((match = regex.exec(styleContent))) {
+  for (const match of matchCssVarCommentBlocks(styleContent)) {
     const comment = match[1] ? match[1].trim().replace(/\s+/g, ' ') : '';
     const block = match[2] || '';
-    // Look for all variables in this block
-    const varRegex = /(--[\w-]+)\s*:\s*([^;]+);/g;
-    let varMatch;
-    while ((varMatch = varRegex.exec(block))) {
+    for (const varMatch of matchCssVars(block)) {
       if (varMatch[1] && varMatch[2]) {
         result.push({
           name: varMatch[1],

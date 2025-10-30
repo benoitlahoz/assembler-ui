@@ -1,5 +1,6 @@
 import htmlTags from 'html-tags';
 import svgTags from 'svg-tags';
+import { tagRegex } from '../common/tag.regex';
 
 const NativeTags = new Set([...htmlTags, ...svgTags]);
 
@@ -9,7 +10,6 @@ const NativeTags = new Set([...htmlTags, ...svgTags]);
  * @returns tableau des noms de composants enfants
  */
 export const extractChildComponents = (templateContent: string): string[] => {
-  const tagRegex = /<([A-Z][\w-]*)\b/g;
   const found = new Set<string>();
   let match;
   while ((match = tagRegex.exec(templateContent))) {

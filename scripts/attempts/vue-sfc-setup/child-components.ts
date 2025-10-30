@@ -2,6 +2,7 @@
 
 import htmlTags from 'html-tags';
 import svgTags from 'svg-tags';
+import { tagRegex } from '../common/tag.regex';
 
 // Set of all native HTML and SVG tags to ignore
 const NativeTags = new Set([...htmlTags, ...svgTags]);
@@ -12,8 +13,6 @@ const NativeTags = new Set([...htmlTags, ...svgTags]);
  * @returns An array of child component names used.
  */
 export const extractChildComponents = (templateContent: string): string[] => {
-  // Regex to find all tags
-  const tagRegex = /<([A-Z][\w-]*)\b/g;
   const found = new Set<string>();
   let match;
   while ((match = tagRegex.exec(templateContent))) {

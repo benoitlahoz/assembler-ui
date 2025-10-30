@@ -1,4 +1,7 @@
 import ts from 'typescript';
+import { testStringLiteral } from '../common/string-literal.regex';
+import { testNumber } from '../common/number.regex';
+import { testBoolean } from '../common/boolean.regex';
 
 /**
  * Extrait les injects depuis l'objet export default d'un SFC classique (clé inject)
@@ -41,9 +44,9 @@ export const extractInjects = (scriptContent: string, absPath: string) => {
                 let desc = '';
                 if (e.initializer) {
                   def = e.initializer.getText();
-                  if (/^['\"].*['\"]$/.test(def)) type = 'string';
-                  else if (/^\d+(\.\d+)?$/.test(def)) type = 'number';
-                  else if (/^(true|false)$/.test(def)) type = 'boolean';
+                  if (testStringLiteral(def)) type = 'string';
+                  else if (testNumber(def)) type = 'number';
+                  else if (testBoolean(def)) type = 'boolean';
                   else if (def === '[]') type = 'any[]';
                   else if (def === '{}') type = 'Record<string, any>';
                   else type = 'any';

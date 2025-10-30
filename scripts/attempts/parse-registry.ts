@@ -6,6 +6,8 @@ import { extractVueSfc } from './parse-vue-sfc';
 import { extractVueSfcSetup } from './parse-vue-sfc-setup';
 
 import config from '../../assembler-ui.config';
+import { vueExportRegex } from './common/vue-export.regex';
+import { scriptSetupRegex } from './common/script-setup.regex';
 
 export const extractFolder = (file: string) => {
   const absPath = file.startsWith('/') ? file : path.resolve(process.cwd(), file);
@@ -48,7 +50,6 @@ export const extractVueExportsFromTsFile = (
 ) => {
   // Chercher les exports de composants Vue
   const vueExports = [];
-  const vueExportRegex = /export\s+\{\s*default\s+as\s+(\w+)\s*\}\s+from\s+['"](.+\.vue)['"]/g;
   let match;
   while ((match = vueExportRegex.exec(tsSource))) {
     vueExports.push({ name: match[1], path: match[2] });
@@ -64,7 +65,7 @@ export const extractVueExportsFromTsFile = (
     const relFile = globalPath ? path.relative(globalPath, vueAbsPath) : vueAbsPath;
     const vueSource = fs.readFileSync(vueAbsPath, 'utf-8');
     // Heuristique : présence de <script setup>
-    const isSetup = /<script\s+setup[\s>]/.test(vueSource);
+    const isSetup = scriptSetupRegex.test(vueSource);
     const doc = isSetup ? extractVueSfcSetup(vueAbsPath) : extractVueSfc(vueAbsPath);
     return { name, path: relFile, doc };
   });

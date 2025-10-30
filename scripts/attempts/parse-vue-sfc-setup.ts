@@ -13,6 +13,7 @@ import { extractComponentTypes } from './vue-sfc-setup/types';
 import { extractChildComponents } from './vue-sfc-setup/child-components';
 import { extractCssVars } from './vue-sfc-setup/css-vars';
 import { convertHtmlToPug } from './vue-sfc-setup/pug-converter';
+import { templateTagRegex } from './common/template-tag.regex';
 
 // Main exported function
 export const extractVueSfcSetup = (filePath: string) => {
@@ -78,10 +79,7 @@ export const extractVueSfcSetup = (filePath: string) => {
       html: vueSource,
       pug:
         descriptor.template && descriptor.template.content && pugString
-          ? vueSource.replace(
-              /<template[^>]*>[\s\S]*?<\/template>/,
-              `<template lang="pug">\n${pugString}\n</template>`
-            )
+          ? vueSource.replace(templateTagRegex, `<template lang="pug">\n${pugString}\n</template>`)
           : vueSource,
     },
   };

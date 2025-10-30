@@ -1,4 +1,5 @@
 import ts from 'typescript';
+import { getWithDefaultsPropRegex } from '../common/with-defaults-prop.regex';
 
 export const extractProps = (scriptContent: string, absPath: string) => {
   const props: Array<{ name: string; type: string; default?: any; description: string }> = [];
@@ -35,9 +36,7 @@ export const extractProps = (scriptContent: string, absPath: string) => {
                   defaultValue = defaultsObj[propName];
                 }
               } catch (e) {
-                const defaultMatch = withDefaultsMatch[1].match(
-                  new RegExp(`${propName}\\s*:\\s*([^,}\n]+)`)
-                );
+                const defaultMatch = withDefaultsMatch[1].match(getWithDefaultsPropRegex(propName));
                 if (defaultMatch && defaultMatch[1]) {
                   defaultValue = defaultMatch[1].trim();
                 }

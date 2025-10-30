@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import * as ts from 'typescript';
+import { matchCommentBlock } from '../common/comment.regex';
 
 export interface TsFileExtract {
   fileName: string;
@@ -26,8 +27,7 @@ export function extractTs(filePath: string): TsFileExtract {
   let description: string | undefined;
   let category: string | undefined;
   let author: string | undefined;
-  const commentRegex = /^\/\*\*([\s\S]*?)\*\//;
-  const match = content.match(commentRegex);
+  const match = matchCommentBlock(content);
   if (match && typeof match[1] === 'string') {
     const comment = match[1];
     // Description = texte libre avant tout tag @
