@@ -13,7 +13,7 @@ import { extractCssVars } from './vue-sfc-setup/css-vars';
 import { convertHtmlToPug } from './vue-sfc-setup/pug-converter';
 
 // Main exported function
-export const extractVueDoc = (file: string) => {
+export const extractVueSfcSetup = (file: string) => {
   const absPath = file.startsWith('/') ? file : `${process.cwd()}/${file}`;
   const vueSource = fs.readFileSync(absPath, 'utf-8');
   const { descriptor } = parse(vueSource);
@@ -82,7 +82,7 @@ export const extractVueDoc = (file: string) => {
 // CLI usage
 if (require.main === module) {
   const vueFilePath = process.argv[2] || 'registry/new-york/components/button-foo/ButtonFoo.vue';
-  const result = extractVueDoc(vueFilePath);
+  const result = extractVueSfcSetup(vueFilePath);
   fs.writeFileSync('scripts/attempts/vue-comments.json', JSON.stringify(result, null, 2), 'utf-8');
   console.log('Vue comments extraction result written to scripts/attempts/vue-comments.json');
 }

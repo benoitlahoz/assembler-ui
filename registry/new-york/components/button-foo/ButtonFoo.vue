@@ -1,6 +1,5 @@
 <script setup lang="ts">
 /**
- * A simple knob component that displays a button with "Hello World" text
  * @author John Doe <john.doe@example.com>
  */
 import { ref, inject, provide } from 'vue';

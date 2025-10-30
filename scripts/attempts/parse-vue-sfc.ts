@@ -12,7 +12,7 @@ import { extractChildComponents } from './vue-sfc/child-components';
 import { extractCssVars } from './vue-sfc/css-vars';
 import { convertHtmlToPug } from './vue-sfc/pug-converter';
 
-export const extractVueDoc = (file: string) => {
+export const extractVueSfc = (file: string) => {
   const absPath = file.startsWith('/') ? file : `${process.cwd()}/${file}`;
   const vueSource = fs.readFileSync(absPath, 'utf-8');
   const { descriptor } = parse(vueSource);
@@ -79,7 +79,7 @@ export const extractVueDoc = (file: string) => {
 if (require.main === module) {
   const vueFilePath =
     process.argv[2] || 'registry/new-york/components/button-foo/ButtonFooNoSetup.vue';
-  const result = extractVueDoc(vueFilePath);
+  const result = extractVueSfc(vueFilePath);
   fs.writeFileSync(
     'scripts/attempts/vue-comments-no-setup.json',
     JSON.stringify(result, null, 2),
