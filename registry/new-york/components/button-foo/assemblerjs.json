@@ -1,5 +1,6 @@
 {
   "$schema": "https://shadcn-vue.com/schema/registry-item.json",
+  "install": "https://benoitlahoz.github.io/assembler-ui/r/button-foo.json",
   "name": "button-foo",
   "title": "ButtonFoo",
   "description": "A simple knob component that displays a button with \"Hello World\" text",

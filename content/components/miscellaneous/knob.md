@@ -17,6 +17,63 @@ description:
 
 
 
+## Install with CLI
+:::code-group{.w-full}
+  
+  ```bash [yarn]
+  yarn dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/knob.json"
+  ```
+  
+  ```bash [npm]
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/knob.json"
+  ```
+
+  ```bash [pnpm]
+  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/knob.json"
+  ```
+  
+  ```bash [bun]
+  bunx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/knob.json"
+  ```
+:::
+
+
+
+## Install Manually
+
+Copy and paste the following code
+::code-tree
+
+
+```vue [Knob.vue]
+<script setup lang="ts">
+// @ajs-description A simple knob component that displays a button with "Hello World" text.
+import { Button } from '@/components/ui/button';
+
+const props = withDefaults(
+  defineProps<{
+    // @ajs-prop An optional string property named foo.
+    foo?: string;
+    // @ajs-prop A required number property named bar.
+    bar: number;
+  }>(),
+  {
+    bar: 42,
+  }
+);
+</script>
+
+<template>
+  <Button>Hello World</Button>
+</template>
+
+```
+
+
+::
+
+
+
 
 ## Knob
 

@@ -1,5 +1,6 @@
 {
   "$schema": "https://shadcn-vue.com/schema/registry-item.json",
+  "install": "https://benoitlahoz.github.io/assembler-ui/r/use-foo.json",
   "name": "use-foo",
   "title": "useFoo",
   "description": "A simple composable that provides a description of the foo feature.",

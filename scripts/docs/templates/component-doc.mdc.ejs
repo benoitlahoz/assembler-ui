@@ -15,6 +15,45 @@ description: <%= typeof description !== 'undefined' ? description : '' %>
   :::
 ::
 
+
+<% if (typeof install !== 'undefined' && install) { %>
+## Install with CLI
+:::code-group{.w-full}
+  
+  ```bash [yarn]
+  yarn dlx shadcn-vue@latest add "<%= install %>"
+  ```
+  
+  ```bash [npm]
+  npx shadcn-vue@latest add "<%= install %>"
+  ```
+
+  ```bash [pnpm]
+  pnpm dlx shadcn-vue@latest add "<%= install %>"
+  ```
+  
+  ```bash [bun]
+  bunx shadcn-vue@latest add "<%= install %>"
+  ```
+:::
+<% } %>
+
+
+## Install Manually
+
+Copy and paste the following code
+::code-tree
+<% if (typeof codes !== 'undefined' && Array.isArray(codes) && codes.length) { %>
+<% codes.forEach(function(codeFile) { 
+  const validExts = ['vue','js','ts','json','html','css','scss','md'];
+  const ext = codeFile.filename.split('.').pop();
+  if (validExts.includes(ext)) { %>
+<%- '```' + codeFile.lang + ' [' + codeFile.filename + ']\n' + codeFile.code.replace(/```/g, '``\u200B`') + '\n```' %>
+<%  }
+}); %>
+<% } %>
+::
+
 <% if (typeof files !== 'undefined' && Array.isArray(files)) { %>
 <% files.forEach(function(file) { %>
 

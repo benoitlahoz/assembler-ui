@@ -17,6 +17,37 @@ description: A simple composable that provides a description of the foo feature.
 
 
 
+## Install with CLI
+:::code-group{.w-full}
+  
+  ```bash [yarn]
+  yarn dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-foo.json"
+  ```
+  
+  ```bash [npm]
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-foo.json"
+  ```
+
+  ```bash [pnpm]
+  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-foo.json"
+  ```
+  
+  ```bash [bun]
+  bunx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-foo.json"
+  ```
+:::
+
+
+
+## Install Manually
+
+Copy and paste the following code
+::code-tree
+
+::
+
+
+
 
 
 ## Advanced Usage

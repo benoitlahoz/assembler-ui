@@ -1,5 +1,6 @@
 {
   "$schema": "https://shadcn-vue.com/schema/registry-item.json",
+  "install": "https://benoitlahoz.github.io/assembler-ui/r/simple-input.json",
   "name": "simple-input",
   "title": "SimpleInput",
   "description": "Index file for input components",

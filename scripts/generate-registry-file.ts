@@ -13,6 +13,10 @@ const RegistryPath = config.registryPath || 'registry.json';
 export async function buildRegistryObject(files: string[]) {
   const items = files.map((filePath) => {
     const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    // Supprimer la propriété install si elle existe
+    if ('install' in content) {
+      delete content.install;
+    }
     // Keep only path and type in each file
     if (Array.isArray(content.files)) {
       content.files = content.files.map((f: Record<string, any>) => {
@@ -22,7 +26,7 @@ export async function buildRegistryObject(files: string[]) {
         };
       });
     }
-    // Remove $schema at item level
+    // Remove $schema at file level
     delete content.$schema;
     return content;
   });

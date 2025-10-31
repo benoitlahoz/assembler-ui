@@ -4,6 +4,7 @@
   "author": "Benoît Lahoz <info@benoitlahoz.io>",
   "scripts": {
     "dev": "yarn generate:docs && nuxt dev --extends docus",
+    "dev:only": "nuxt dev --extends docus",
     "build": "nuxt build --extends docus",
     "format": "prettier . --check",
     "format:fix": "prettier . --write",

@@ -1,5 +1,6 @@
 {
   "$schema": "https://shadcn-vue.com/schema/registry-item.json",
+  "install": "https://benoitlahoz.github.io/assembler-ui/r/knob.json",
   "name": "knob",
   "title": "Knob",
   "category": "miscellaneous",

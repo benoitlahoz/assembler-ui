@@ -74,6 +74,7 @@ export const main = async () => {
             // Réorganiser les clés pour respecter l'ordre souhaité
             const ordered: any = {};
             if (result.$schema) ordered.$schema = result.$schema;
+            ordered.install = `${config.homepage}/r/${result.name}.json`;
             if (result.name) ordered.name = result.name;
             if (result.title) ordered.title = result.title;
             if (result.description) ordered.description = result.description;
