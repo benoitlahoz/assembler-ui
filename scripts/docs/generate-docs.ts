@@ -140,6 +140,12 @@ export async function generateDocs(): Promise<void> {
     if (normalizedType === 'block') codeBasePath = 'src/components/blocks';
     else if (normalizedType === 'hook') codeBasePath = 'src/composables';
 
+    // Définit le default-value pour le code-tree (premier fichier du tableau codes)
+    let codeTreeDefaultValue = '';
+    if (codes.length > 0 && codes[0] && codes[0].filename) {
+      codeTreeDefaultValue = `${codeBasePath}/${codes[0].filename}`;
+    }
+
     const templateData = {
       install: assembler.install || '',
       name: assembler.name,
@@ -149,6 +155,7 @@ export async function generateDocs(): Promise<void> {
       files,
       codes,
       codeBasePath,
+      codeTreeDefaultValue,
     };
 
     const template = fs.readFileSync(templatePath, 'utf-8');

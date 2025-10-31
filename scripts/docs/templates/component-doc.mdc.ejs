@@ -38,7 +38,7 @@ description: <%= typeof description !== 'undefined' ? description : '' %>
 
 ## Install Manually
 
-:::code-tree
+:::code-tree{default-value="<%- codeTreeDefaultValue %>"}
 <% if (typeof codes !== 'undefined' && Array.isArray(codes)) { %>
 <% codes.forEach(function(code) { %>
 ```<%- code.lang %> [<%- codeBasePath %>/<%- code.filename %>]

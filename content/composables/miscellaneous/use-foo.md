@@ -38,7 +38,7 @@ description: A simple composable that provides a description of the foo feature.
 
 ## Install Manually
 
-:::code-tree
+:::code-tree{default-value="src/composables/useFoo.ts"}
 
 
 ```ts [src/composables/useFoo.ts]

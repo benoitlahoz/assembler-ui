@@ -38,7 +38,7 @@ description: Index file for input components
 
 ## Install Manually
 
-:::code-tree
+:::code-tree{default-value="src/components/ui/index.ts"}
 
 
 ```ts [src/components/ui/index.ts]
