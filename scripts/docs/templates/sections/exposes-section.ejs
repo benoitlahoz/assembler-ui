@@ -1,5 +1,5 @@
 ### Expose
 | Name | Type | Description |
 |------|------|-------------|
-<% exposes.forEach(function(item) { %>| `<%= item.name %>`{.primary .text-primary} | <% if (item.type === 'string') { %>:badge{color="blue"}string:: <% } else if (item.type === 'number') { %>:badge{color="orange"}number:: <% } else if (item.type === 'boolean') { %>:badge{color="green"}boolean:: <% } else { %>`<%= item.type || '' %>`<% } %> | <%= item.description %> |
+<% exposes.forEach(function(item) { %>| `<%= item.name %>`{.primary .text-primary} | <% if (item.type === undefined || item.type === null || item.type === '') { %>—<% } else if (item.type === 'string') { %>:badge{color="blue"}string:: <% } else if (item.type === 'number') { %>:badge{color="orange"}number:: <% } else if (item.type === 'boolean') { %>:badge{color="green"}boolean:: <% } else { %>`<%= item.type %>`<% } %> | <% if (!item.description) { %>—<% } else { %><%= item.description %><% } %> |
 <% }); %>

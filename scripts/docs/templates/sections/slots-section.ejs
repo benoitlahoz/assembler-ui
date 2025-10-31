@@ -1,5 +1,5 @@
 ### Slots
 | Name | Description |
 |------|-------------|
-<% slots.forEach(function(slot) { %>| `<%= slot.name %>`{.primary .text-primary} | <%= slot.description %> |
+<% slots.forEach(function(slot) { %>| `<%= slot.name %>`{.primary .text-primary} | <% if (!slot.description) { %>—<% } else { %><%= slot.description %><% } %> |
 <% }); %>

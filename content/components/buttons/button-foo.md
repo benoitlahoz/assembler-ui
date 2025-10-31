@@ -55,7 +55,7 @@ description: A simple knob component that displays a button with &#34;Hello Worl
 |------|-------------|
 | `default`{.primary .text-primary} | Slot principal par défaut |
 | `icon`{.primary .text-primary} | Slot pour l&#39;icône à gauche |
-| `static-named`{.primary .text-primary} |  |
+| `static-named`{.primary .text-primary} | — |
 
 
 
@@ -64,14 +64,14 @@ description: A simple knob component that displays a button with &#34;Hello Worl
   ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-| `symKey`{.primary .text-primary} | `&#39;valSym&#39;` | `string` | Provide avec clé symbole || `objKey`{.primary .text-primary} | `123` | `number` | Provide avec clé objet || `computedKey`{.primary .text-primary} | `true` | `boolean` | Provide avec clé computed || `spread`{.primary .text-primary} | `{ ...spreadObj }` | `any` | Provide avec spread || `someOtherKey`{.primary .text-primary} | `&#39;providedValue&#39;` | `string` | Provides a value with key &#39;someOtherKey&#39;. |
+| `symKey`{.primary .text-primary} | `'valSym'` | `string` | Provide avec clé symbole || `objKey`{.primary .text-primary} | `123` | `number` | Provide avec clé objet || `computedKey`{.primary .text-primary} | `true` | `boolean` | Provide avec clé computed || `spread`{.primary .text-primary} | `{ ...spreadObj }` | `any` | Provide avec spread || `someOtherKey`{.primary .text-primary} | `'providedValue'` | `string` | Provides a value with key &#39;someOtherKey&#39;. |
 
 
 
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
-| `symKey`{.primary .text-primary} | `&#39;defaultSym&#39;` | `string` | Inject avec clé symbole || `spread`{.primary .text-primary} | `{ ...spreadObj }` | `any` | Inject avec spread || `someKey`{.primary .text-primary} | `&#39;defaultValue&#39;` | `string` | Injects a value with key &#39;someKey&#39;. |
+| `symKey`{.primary .text-primary} | `'defaultSym'` | `string` | Inject avec clé symbole || `spread`{.primary .text-primary} | `{ ...spreadObj }` | `any` | Inject avec spread || `someKey`{.primary .text-primary} | `'defaultValue'` | `string` | Injects a value with key &#39;someKey&#39;. |
 
 
 
@@ -90,8 +90,8 @@ description: A simple knob component that displays a button with &#34;Hello Worl
 | Name | Value | Description |
 |------|-------|-------------|
 | `--btn-radius`{.primary .text-primary} | `4px` | Rayon de bordure du bouton |
-| `--btn-main-color`{.primary .text-primary} | `#ff0000` |  |
-| `--btn-padding-x`{.primary .text-primary} | `1.5em` |  |
+| `--btn-main-color`{.primary .text-primary} | `#ff0000` | — |
+| `--btn-padding-x`{.primary .text-primary} | `1.5em` | — |
 
 
 
@@ -606,9 +606,9 @@ A simple knob component that displays a button with &#34;Hello World&#34; text
   ### Slots
 | Name | Description |
 |------|-------------|
-| `default`{.primary .text-primary} |  |
-| `icon`{.primary .text-primary} |  |
-| `static-named`{.primary .text-primary} |  |
+| `default`{.primary .text-primary} | — |
+| `icon`{.primary .text-primary} | — |
+| `static-named`{.primary .text-primary} | — |
 
 
 
@@ -617,23 +617,23 @@ A simple knob component that displays a button with &#34;Hello World&#34; text
   ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-| `someOtherKey`{.primary .text-primary} | `&#39;providedValue&#39;` | `string` | Provides a value with key &#39;someOtherKey&#39;. || `symKey`{.primary .text-primary} | `&#39;valSym&#39;` | `string` | Provide avec clé symbole || `computedKey`{.primary .text-primary} | `true` | `boolean` | Provide avec clé computed || `spread`{.primary .text-primary} | `{ ...spreadObj }` | `any` | Provide avec spread |
+| `someOtherKey`{.primary .text-primary} | `'providedValue'` | `string` | Provides a value with key &#39;someOtherKey&#39;. || `symKey`{.primary .text-primary} | `'valSym'` | `string` | Provide avec clé symbole || `computedKey`{.primary .text-primary} | `true` | `boolean` | Provide avec clé computed || `spread`{.primary .text-primary} | `{ ...spreadObj }` | `any` | Provide avec spread |
 
 
 
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
-| `injected`{.primary .text-primary} | `&#39;someKey&#39;` | `string` | Injects a value with key &#39;someKey&#39;. || `injectedSym`{.primary .text-primary} | `symKey` | `any` | Inject avec clé symbole || `injectedSpread`{.primary .text-primary} | `&#39;spread&#39;` | `string` | Inject avec spread |
+| `injected`{.primary .text-primary} | `'someKey'` | `string` | Injects a value with key &#39;someKey&#39;. || `injectedSym`{.primary .text-primary} | `symKey` | `any` | Inject avec clé symbole || `injectedSpread`{.primary .text-primary} | `'spread'` | `string` | Inject avec spread |
 
 
 
   ### Expose
 | Name | Type | Description |
 |------|------|-------------|
-| `exposed`{.primary .text-primary} | `` | An exposed string property |
-| `other`{.primary .text-primary} | `` | Another exposed string property |
-| `myFunc`{.primary .text-primary} | `` | An exposed function that logs a message and returns &#39;foo&#39; |
+| `exposed`{.primary .text-primary} | — | An exposed string property |
+| `other`{.primary .text-primary} | — | Another exposed string property |
+| `myFunc`{.primary .text-primary} | — | An exposed function that logs a message and returns &#39;foo&#39; |
 
 
 
@@ -643,8 +643,8 @@ A simple knob component that displays a button with &#34;Hello World&#34; text
 | Name | Value | Description |
 |------|-------|-------------|
 | `--btn-radius`{.primary .text-primary} | `4px` | Rayon de bordure du bouton |
-| `--btn-main-color`{.primary .text-primary} | `#ff0000` |  |
-| `--btn-padding-x`{.primary .text-primary} | `1.5em` |  |
+| `--btn-main-color`{.primary .text-primary} | `#ff0000` | — |
+| `--btn-padding-x`{.primary .text-primary} | `1.5em` | — |
 
 
 

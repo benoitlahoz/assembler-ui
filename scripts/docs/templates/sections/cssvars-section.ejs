@@ -1,5 +1,5 @@
 ### CSS Variables
 | Name | Value | Description |
 |------|-------|-------------|
-<% cssVars.forEach(function(cssVar) { %>| `<%= cssVar.name %>`{.primary .text-primary} | <% if (typeof cssVar.value === 'boolean') { %>:badge{color="<%= cssVar.value ? 'green' : 'red' %>"}<%= cssVar.value %>::<% } else if (typeof cssVar.value === 'number') { %>`<%= cssVar.value %>`<% } else if (typeof cssVar.value === 'string' && cssVar.value !== '') { %>`<%= cssVar.value %>`<% } else if (cssVar.value === '' || typeof cssVar.value === 'undefined') { %><span style="color:#aaa">-</span><% } else { %>`<%= cssVar.value %>`<% } %> | <%= cssVar.description %> |
+<% cssVars.forEach(function(cssVar) { %>| `<%= cssVar.name %>`{.primary .text-primary} | <% if (typeof cssVar.value === 'boolean') { %>:badge{color="<%= cssVar.value ? 'green' : 'red' %>"}<%= cssVar.value %>::<% } else if (typeof cssVar.value === 'number') { %>`<%= cssVar.value %>`<% } else if (typeof cssVar.value === 'string' && cssVar.value !== '') { %>`<%= cssVar.value %>`<% } else { %>—<% } %> | <% if (!cssVar.description) { %>—<% } else { %><%= cssVar.description %><% } %> |
 <% }); %>

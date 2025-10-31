@@ -1,5 +1,5 @@
 ### Events
 | Name | Description |
 |------|-------------|
-<% events.forEach(function(event) { %>| `<%= event.name %>`{.primary .text-primary} | <%= event.description %> |
+<% events.forEach(function(event) { %>| `<%= event.name %>`{.primary .text-primary} | <% if (!event.description) { %>—<% } else { %><%= event.description %><% } %> |
 <% }); %>
