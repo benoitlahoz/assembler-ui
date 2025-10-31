@@ -41,13 +41,10 @@ description: A simple composable that provides a description of the foo feature.
 :::code-tree
 
 
-```ts [useFoo.ts]
-/**
- * A simple composable that provides a description of the foo feature.
- * @type registry:hook
- */
+```ts [src/composables/useFoo.ts]
 export const useFoo = () => {
-  const description = 'This is a foo composable used for demonstration purposes.';
+  const description =
+    "This is a foo composable used for demonstration purposes.";
   return description;
 };
 

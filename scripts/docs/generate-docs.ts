@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import ejs from 'ejs';
 import { decode } from 'entities';
+import { stripComments } from './common/strip-comments';
+import { formatCode } from './common/format-code';
 
 type AssemblerDoc = {
   install?: string;
@@ -60,7 +62,7 @@ function getOutputDir(type: string, category?: string): string {
   return path.resolve(process.cwd(), `content/${base}`);
 }
 
-export function generateDocs(): void {
+export async function generateDocs(): Promise<void> {
   const baseDir = path.resolve(process.cwd(), 'registry/new-york');
   const templatePath = path.resolve(process.cwd(), 'scripts/docs/templates/component-doc.mdc.ejs');
   const assemblerJsons = findAssemblerJsons(baseDir);
@@ -77,57 +79,66 @@ export function generateDocs(): void {
     }
 
     // Pour le code-tree, on prend tous les fichiers (vue ou non)
-    const codes = allFiles
-      .map((file) => {
-        let code = '';
-        let lang = '';
-        let filename = path.basename(file.path);
-        // On prend le code brut, sans entités, pour tous les fichiers connus
-        if (file.doc && file.doc.source) {
-          if (typeof file.doc.source === 'object') {
-            // On privilégie .html, sinon on prend la première string longue ou multi-ligne
-            if (file.doc.source.html) {
-              code = file.doc.source.html;
-            } else {
-              const docKeys = ['description', 'tags', 'author', 'category', 'title', 'name'];
-              const firstString = Object.entries(file.doc.source)
-                .filter(
-                  ([k, v]) =>
-                    typeof v === 'string' &&
-                    !docKeys.includes(k) &&
-                    (v.includes('\n') ||
-                      v.length > 40 ||
-                      ['vue', 'js', 'ts', 'json', 'html', 'css', 'scss', 'md'].includes(k))
-                )
-                .map(([k, v]) => v)[0];
-              if (firstString) code = firstString;
+    const codes = (
+      await Promise.all(
+        allFiles.map(async (file) => {
+          let code = '';
+          let lang = '';
+          let filename = path.basename(file.path);
+          // On prend le code brut, sans entités, pour tous les fichiers connus
+          if (file.doc && file.doc.source) {
+            if (typeof file.doc.source === 'object') {
+              // On privilégie .html, sinon on prend la première string longue ou multi-ligne
+              if (file.doc.source.html) {
+                code = file.doc.source.html;
+              } else {
+                const docKeys = ['description', 'tags', 'author', 'category', 'title', 'name'];
+                const firstString = Object.entries(file.doc.source)
+                  .filter(
+                    ([k, v]) =>
+                      typeof v === 'string' &&
+                      !docKeys.includes(k) &&
+                      (v.includes('\n') ||
+                        v.length > 40 ||
+                        ['vue', 'js', 'ts', 'json', 'html', 'css', 'scss', 'md'].includes(k))
+                  )
+                  .map(([k, v]) => v)[0];
+                if (firstString) code = firstString;
+              }
+            } else if (typeof file.doc.source === 'string') {
+              code = file.doc.source;
             }
-          } else if (typeof file.doc.source === 'string') {
-            code = file.doc.source;
           }
-        }
-        const ext = (file.path.split('.').pop() ?? '').toLowerCase();
-        if (ext === 'vue') lang = 'vue';
-        else if (ext === 'js') lang = 'js';
-        else if (ext === 'ts') lang = 'ts';
-        else if (ext === 'json') lang = 'json';
-        else lang = ext;
-        const validExts = ['vue', 'js', 'ts', 'json', 'html', 'css', 'scss', 'md', 'd.ts'];
-        if (!validExts.some((e) => filename.endsWith(e))) return null;
-        if (!code || !code.trim()) return null;
+          const ext = (file.path.split('.').pop() ?? '').toLowerCase();
+          if (ext === 'vue') lang = 'vue';
+          else if (ext === 'js') lang = 'js';
+          else if (ext === 'ts') lang = 'ts';
+          else if (ext === 'json') lang = 'json';
+          else lang = ext;
+          const validExts = ['vue', 'js', 'ts', 'json', 'html', 'css', 'scss', 'md', 'd.ts'];
+          if (!validExts.some((e) => filename.endsWith(e))) return null;
+          if (!code || !code.trim()) return null;
 
-        // Décodage complet (entities) puis suppression des éventuels artefacts restants
-        code = decode(code);
+          // Décodage complet (entities) puis suppression des commentaires puis formatage
+          code = decode(code);
+          code = stripComments(code);
+          code = await formatCode(code, filename);
 
-        return {
-          name: file.name,
-          title: file.title || file.name,
-          code,
-          lang,
-          filename,
-        };
-      })
-      .filter(Boolean);
+          return {
+            name: file.name,
+            title: file.title || file.name,
+            code,
+            lang,
+            filename,
+          };
+        })
+      )
+    ).filter(Boolean);
+
+    // Détermine le chemin de base pour le code-tree selon le type
+    let codeBasePath = 'src/components/ui';
+    if (normalizedType === 'block') codeBasePath = 'src/components/blocks';
+    else if (normalizedType === 'hook') codeBasePath = 'src/composables';
 
     const templateData = {
       install: assembler.install || '',
@@ -137,6 +148,7 @@ export function generateDocs(): void {
       author: assembler.author || '',
       files,
       codes,
+      codeBasePath,
     };
 
     const template = fs.readFileSync(templatePath, 'utf-8');

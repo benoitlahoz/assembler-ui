@@ -41,114 +41,67 @@ description: Index file for input components
 :::code-tree
 
 
-```ts [index.ts]
-/**
- * Index file for input components
- * @author John Smith <john.smith@example.com>
- * @type registry:ui
- * @category inputs
- */
-export { default as SimpleInput } from './SimpleInput.vue';
-export { default as SimpleInputSetup } from './SimpleInputSetup.vue';
+```ts [src/components/ui/index.ts]
+export { default as SimpleInput } from "./SimpleInput.vue";
+export { default as SimpleInputSetup } from "./SimpleInputSetup.vue";
 
 ```
 
-```ts [something.ts]
-/**
- * A something file
- * @type registry:ui
- */
+```ts [src/components/ui/something.ts]
 export const a = 42;
 
 ```
 
-```vue [SimpleInput.vue]
+```vue [src/components/ui/SimpleInput.vue]
 <script lang="ts">
-/**
- * Un champ de saisie simple avec label et placeholder
- * @author Jane Doe <jane.doe@example.com>
- * @type registry:ui
- */
-
-const symKey = Symbol('symKey');
+const symKey = Symbol("symKey");
 
 export default {
-  name: 'SimpleInput',
-  /**
-   * Propriétés du composant
-   */
+  name: "SimpleInput",
+
   props: {
-    /**
-     * Le label affiché au-dessus du champ
-     */
     label: {
       type: String,
       required: false,
-      default: '',
+      default: "",
     },
-    /**
-     * Le placeholder du champ
-     */
+
     placeholder: {
       type: String,
       required: false,
-      default: '',
+      default: "",
     },
-    /**
-     * Valeur du champ
-     */
+
     modelValue: {
       type: String,
       required: false,
-      default: '',
+      default: "",
     },
   },
-  emits: [
-    /**
-     * Émis à chaque modification de la valeur
-     */
-    'update:modelValue',
-  ],
+  emits: ["update:modelValue"],
   inject: {
-    // Injects a value with key 'someKey'.
-    injected: 'someKey',
-    // Inject avec clé symbole
+    injected: "someKey",
+
     injectedSym: symKey,
-    // Inject avec spread
-    injectedSpread: 'spread',
+
+    injectedSpread: "spread",
   },
   provide() {
     return {
-      // Provides a value with key 'someOtherKey'.
-      someOtherKey: 'providedValue',
-      // Provide avec clé symbole
-      symKey: 'valSym',
-      // Provide avec clé computed
+      someOtherKey: "providedValue",
+
+      symKey: "valSym",
+
       computedKey: true,
     };
   },
   methods: {
     onInput(event: Event) {
-      this.$emit('update:modelValue', (event.target as HTMLInputElement).value);
+      this.$emit("update:modelValue", (event.target as HTMLInputElement).value);
     },
   },
-  /**
-   * Expose properties and methods like defineExpose in <script setup>
-   */
-  expose: [
-    /**
-     * An exposed string property
-     */
-    'exposed',
-    /**
-     * Another exposed string property
-     */
-    'other',
-    /**
-     * An exposed function that logs a message and returns 'foo'
-     */
-    'myFunc',
-  ],
+
+  expose: ["exposed", "other", "myFunc"],
 };
 </script>
 
@@ -160,7 +113,12 @@ export default {
     <slot />
   </div>
   <MyComponent />
-  <input :placeholder="placeholder" :value="modelValue" @input="onInput" type="text" />
+  <input
+    :placeholder="placeholder"
+    :value="modelValue"
+    @input="onInput"
+    type="text"
+  />
 </template>
 
 <style scoped>
@@ -186,75 +144,55 @@ label {
 
 ```
 
-```vue [SimpleInputSetup.vue]
+```vue [src/components/ui/SimpleInputSetup.vue]
 <script setup lang="ts">
-/**
- * Un champ de saisie simple avec label et placeholder (API Composition)
- * @author Jane Doe <jane.doe@example.com>
- * @type registry:ui
- */
-import { ref, inject, provide, defineExpose } from 'vue';
+import { ref, inject, provide, defineExpose } from "vue";
 
 const props = defineProps({
-  /**
-   * Le label affiché au-dessus du champ
-   */
   label: {
     type: String,
     required: false,
-    default: '',
+    default: "",
   },
-  /**
-   * Le placeholder du champ
-   */
+
   placeholder: {
     type: String,
     required: false,
-    default: '',
+    default: "",
   },
-  /**
-   * Valeur du champ
-   */
+
   modelValue: {
     type: String,
     required: false,
-    default: '',
+    default: "",
   },
 });
 
 const emit = defineEmits<{
-  /**
-   * Émis à chaque modification de la valeur
-   */
-  (e: 'update:modelValue', value: string): void;
+  (e: "update:modelValue", value: string): void;
 }>();
 
-const symKey = Symbol('symKey');
+const symKey = Symbol("symKey");
 
-// Injection
-const injected = inject('someKey');
+const injected = inject("someKey");
 const injectedSym = inject(symKey);
-const injectedSpread = inject('spread');
+const injectedSpread = inject("spread");
 
-// Fourniture
-provide('someOtherKey', 'providedValue');
-provide(symKey, 'valSym');
-provide('computedKey', true);
+provide("someOtherKey", "providedValue");
+provide(symKey, "valSym");
+provide("computedKey", true);
 
-// Variable bar pour le slot
-const bar = ref('bar');
+const bar = ref("bar");
 
-// Méthodes
 function onInput(event: Event) {
-  emit('update:modelValue', (event.target as HTMLInputElement).value);
+  emit("update:modelValue", (event.target as HTMLInputElement).value);
 }
 
-// Exposition
-const exposed = ref('exposed');
-const other = ref('other');
+const exposed = ref("exposed");
+const other = ref("other");
 function myFunc() {
-  console.log('myFunc called');
-  return 'foo';
+  console.log("myFunc called");
+  return "foo";
 }
 defineExpose({ exposed, other, myFunc });
 </script>
@@ -266,8 +204,13 @@ defineExpose({ exposed, other, myFunc });
     <slot name="useful" :foo="bar" />
     <slot />
   </div>
-  <!-- <MyComponent /> -->
-  <input :placeholder="props.placeholder" :value="props.modelValue" @input="onInput" type="text" />
+
+  <input
+    :placeholder="props.placeholder"
+    :value="props.modelValue"
+    @input="onInput"
+    type="text"
+  />
 </template>
 
 <style scoped>

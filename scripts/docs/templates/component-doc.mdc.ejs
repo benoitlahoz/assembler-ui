@@ -41,7 +41,7 @@ description: <%= typeof description !== 'undefined' ? description : '' %>
 :::code-tree
 <% if (typeof codes !== 'undefined' && Array.isArray(codes)) { %>
 <% codes.forEach(function(code) { %>
-```<%- code.lang %> [<%- code.filename %>]
+```<%- code.lang %> [<%- codeBasePath %>/<%- code.filename %>]
 <%- code.code %>
 ```
 <% }); %>
