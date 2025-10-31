@@ -30,18 +30,12 @@ const spreadObj = { a: 1, b: 2 };
 const exposed = ref('');
 const other = ref('other exposed');
 
-// --- PROVIDES ---
-// (déplacé dans created)
-
-// --- INJECTS ---
-
 export default {
   name: 'ButtonFooNoSetup',
   /**
    * Définit les props du composant.
    */
   props: {
-    // @ajs-prop An optional string property named foo.
     /**
      * An optional string property named foo
      */
@@ -49,7 +43,6 @@ export default {
       type: String,
       required: false,
     },
-    // @ajs-prop A required number property named bar.
     /**
      * A required number property named bar
      */

@@ -17,9 +17,9 @@ export interface ComponentTypeInfo {
 }
 
 /**
- * Extrait les types TypeScript définis dans le <script> d'un composant Vue (SFC classique)
- * @param scriptContent Le contenu du bloc <script>
- * @param absPath Le chemin absolu du fichier (pour le contexte TS)
+ * Extracts TypeScript types defined in the <script> of a Vue component (classic SFC)
+ * @param scriptContent The content of the <script> block
+ * @param absPath The absolute path of the file (for TS context)
  */
 export function extractComponentTypes(scriptContent: string, absPath: string): ComponentTypeInfo[] {
   const types: ComponentTypeInfo[] = [];
@@ -31,7 +31,7 @@ export function extractComponentTypes(scriptContent: string, absPath: string): C
     ts.ScriptKind.TS
   );
   function visit(node: ts.Node) {
-    // Types alias
+    // Type aliases
     if (ts.isTypeAliasDeclaration(node)) {
       let jsdoc = '-';
       const ranges = ts.getLeadingCommentRanges(scriptContent, node.pos) || [];

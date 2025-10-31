@@ -1,98 +1,27 @@
 import ts from 'typescript';
-import { conditionally } from '@assemblerjs/core';
+import { isEmitsProperty } from '../common/is.emits-property';
+import { isArrayLiteral } from '../common/is.array-literal';
+import { getEmitDescriptionFromObjectProperty } from '../common/get-emit-description-from-object-property';
+import { extractCommentDescription } from '../common/extract-comment-description';
 
-function isExportAssignmentObject(node: ts.Node) {
-  return ts.isExportAssignment(node) && ts.isObjectLiteralExpression(node.expression);
-}
-
-function isEmitsProperty(prop: ts.ObjectLiteralElementLike) {
-  // Ajout debug temporaire
-  if (ts.isPropertyAssignment(prop)) {
-    const name = prop.name;
-    let key = '';
-    if (ts.isIdentifier(name)) key = name.text;
-    else if (ts.isStringLiteral(name)) key = name.text;
-    if (key === 'emits') {
-      // eslint-disable-next-line no-console
-      console.log('EMITS PROPERTY DETECTED:', key);
-      return true;
-    }
-  }
-  return false;
-}
-
-function isArrayLiteral(initializer: ts.Expression) {
-  return ts.isArrayLiteralExpression(initializer);
-}
-
-function isStringLiteral(el: ts.Expression) {
-  return ts.isStringLiteral(el);
-}
-
-function hasLeadingComment(ranges: ts.CommentRange[] | undefined) {
-  return !!ranges && ranges.length > 0;
-}
-
-function isSeparatedByBlankLines(
-  scriptContent: string,
-  lastRange: ts.CommentRange,
-  el: ts.Expression
-) {
-  const between = scriptContent.slice(lastRange.end, el.pos);
-  return /^([ \t]*\r?\n)*$/.test(between);
-}
-
-function isJSDocComment(cmt: string) {
-  return cmt.startsWith('/**');
-}
-
-function isLineComment(cmt: string) {
-  return cmt.startsWith('//');
-}
-
-function extractCommentDescription(
-  scriptContent: string,
-  lastRange: ts.CommentRange,
-  el: ts.Expression
-): string {
-  if (!lastRange || !isSeparatedByBlankLines(scriptContent, lastRange, el)) return '';
-  const cmt = scriptContent.slice(lastRange.pos, lastRange.end).trim();
-  let description = '';
-  conditionally({
-    if: () => isJSDocComment(cmt),
-    then: () => {
-      description = cmt
-        .replace(/^\/\*\*|\*\/$/g, '')
-        .replace(/^[*\s]+/gm, '')
-        .trim();
-    },
-  });
-  conditionally({
-    if: () => isLineComment(cmt),
-    then: () => {
-      description = cmt.replace(/^\/\//, '').trim();
-    },
-  });
-  return description;
-}
-
-function handleArrayEmits(
+// Handles emits defined as an array in the SFC
+const handleArrayEmits = (
   initializer: ts.Expression,
   scriptContent: string,
   emits: Array<{ name: string; description: string }>
-) {
+): void => {
   if (!isArrayLiteral(initializer)) return;
   if (ts.isArrayLiteralExpression(initializer)) {
-    // On récupère les commentaires JSDoc associés à chaque élément
+    // Retrieve JSDoc comments associated with each array element
     const elements = initializer.elements;
     for (let i = 0; i < elements.length; i++) {
       const element = elements[i];
       if (typeof element !== 'undefined' && ts.isStringLiteral(element)) {
-        // Cherche un commentaire JSDoc juste avant l'élément
+        // Look for a JSDoc comment just before the element
         let description = '';
         const jsDoc = ts.getJSDocCommentsAndTags?.(element) ?? [];
         if (jsDoc.length > 0) {
-          // Prend le dernier commentaire JSDoc trouvé
+          // Take the last JSDoc comment found
           const last = jsDoc[jsDoc.length - 1];
           if (last && 'comment' in last && typeof (last as any).comment === 'string') {
             description = (last as any).comment.trim();
@@ -100,58 +29,51 @@ function handleArrayEmits(
             description = (last as any).text.trim();
           }
         } else {
-          // Fallback : cherche un commentaire juste avant dans le code source
+          // Fallback: use extractCommentDescription to extract any possible description
           const pos = element.getFullStart();
+          // Simulate a ts.CommentRange covering the last block before the element
+          // Look for the last JSDoc comment before the element
           const before = scriptContent.slice(Math.max(0, pos - 120), pos);
-          const match = before.match(/\*\*([\s\S]*?)\*\//);
-          if (match && match[1]) {
-            description = match[1].replace(/^[*\s]+/gm, '').trim();
+          const match = /\/\*\*([\s\S]*?)\*\//g.exec(before);
+          if (match && match.index !== undefined) {
+            const commentStart = pos - (before.length - match.index);
+            const commentEnd = commentStart + match[0].length;
+            const fakeRange = { pos: commentStart, end: commentEnd } as ts.CommentRange;
+            description = extractCommentDescription(scriptContent, fakeRange, element);
           }
         }
         emits.push({ name: element.text, description });
       }
     }
   }
-}
+};
 
-function handleObjectEmits(
+// Handles emits defined as an object in the SFC
+const handleObjectEmits = (
   initializer: ts.Expression,
   scriptContent: string,
   emits: Array<{ name: string; description: string }>
-) {
+): void => {
   if (!ts.isObjectLiteralExpression(initializer)) return;
   for (const e of initializer.properties) {
     if (ts.isPropertyAssignment(e) && ts.isIdentifier(e.name)) {
       const name = e.name.text;
-      let description = '';
-      const ranges = ts.getLeadingCommentRanges(scriptContent, e.pos) || [];
-      conditionally({
-        if: () => hasLeadingComment(ranges),
-        then: () => {
-          const lastRange = ranges[ranges.length - 1];
-          if (lastRange) {
-            description = extractCommentDescription(
-              scriptContent,
-              lastRange,
-              e.name as ts.Identifier
-            );
-          }
-        },
-      });
+      const description = getEmitDescriptionFromObjectProperty(e, scriptContent);
       emits.push({ name, description });
     }
   }
-}
+};
 
+// Visits the AST to find export default emits definitions
 const visitExportDefaultEmits = (
   node: ts.Node,
   scriptContent: string,
   emits: Array<{ name: string; description: string }>
-) => {
-  // Si c'est un export default { ... }, on traite l'objet exporté et on ne descend pas dans ce même objet
+): void => {
+  // If it's an export default { ... }, process the exported object and do not descend into this same object
   if (ts.isExportAssignment(node) && ts.isObjectLiteralExpression(node.expression)) {
     extractEmitsFromObjectLiteral(node.expression, scriptContent, emits);
-    // On ne descend pas dans node.expression pour éviter le doublon
+    // Do not descend into node.expression to avoid duplicates
     ts.forEachChild(node, (child) => {
       if (child !== node.expression) {
         visitExportDefaultEmits(child, scriptContent, emits);
@@ -159,18 +81,19 @@ const visitExportDefaultEmits = (
     });
     return;
   }
-  // Sinon, on traite les objets littéraux (pour fallback ou patterns alternatifs)
+  // Otherwise, process object literals (for fallback or alternative patterns)
   if (ts.isObjectLiteralExpression(node)) {
     extractEmitsFromObjectLiteral(node, scriptContent, emits);
   }
   ts.forEachChild(node, (child) => visitExportDefaultEmits(child, scriptContent, emits));
 };
 
-function extractEmitsFromObjectLiteral(
+// Extracts emits from an object literal
+const extractEmitsFromObjectLiteral = (
   obj: ts.ObjectLiteralExpression,
   scriptContent: string,
   emits: Array<{ name: string; description: string }>
-) {
+): void => {
   for (const prop of obj.properties) {
     if (isEmitsProperty(prop)) {
       const initializer = (prop as ts.PropertyAssignment).initializer;
@@ -178,14 +101,11 @@ function extractEmitsFromObjectLiteral(
       handleObjectEmits(initializer, scriptContent, emits);
     }
   }
-}
+};
 
-/**
- * Extrait les emits depuis l'objet export default d'un SFC classique
- * @param scriptContent contenu du bloc <script>
- * @param absPath chemin absolu du fichier (pour TS)
- */
-
+// Extracts emits from the export default object of a classic SFC
+// @param scriptContent content of the <script> block
+// @param absPath absolute path of the file (for TS)
 export const extractEmits = (scriptContent: string, absPath: string) => {
   const emits: Array<{ name: string; description: string }> = [];
   const sourceFile = ts.createSourceFile(

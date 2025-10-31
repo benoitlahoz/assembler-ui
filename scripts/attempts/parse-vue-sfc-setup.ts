@@ -11,8 +11,8 @@ import { extractProvides } from './vue-sfc-setup/provides';
 import { extractSlots } from './vue-sfc-setup/slots';
 import { extractComponentTypes } from './vue-sfc-setup/types';
 import { extractChildComponents } from './vue-sfc-setup/child-components';
-import { extractCssVars } from './vue-sfc-setup/css-vars';
-import { convertHtmlToPug } from './vue-sfc-setup/pug-converter';
+import { extractCssVars } from './common/extract-css-vars';
+import { convertHtmlToPug } from './vue-common/pug-converter';
 import { templateTagRegex } from './common/template-tag.regex';
 
 // Main exported function

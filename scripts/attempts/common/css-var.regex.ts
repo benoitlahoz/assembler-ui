@@ -1,5 +1,6 @@
 export const cssVarRegex = /(--[\w-]+)\s*:\s*([^;]+);/g;
 
-export function matchCssVars(str: string): IterableIterator<RegExpMatchArray> {
+// Returns an iterator for all CSS variable matches in a string
+export const matchCssVars = (str: string): IterableIterator<RegExpMatchArray> => {
   return str.matchAll(cssVarRegex);
-}
+};

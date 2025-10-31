@@ -8,11 +8,11 @@ import { extractExposes } from './vue-sfc/exposes';
 import { extractProps } from './vue-sfc/props';
 import { extractInjects } from './vue-sfc/injects';
 import { extractProvides } from './vue-sfc/provides';
-import { extractSlotsFromTemplate } from './vue-common/slots-template';
+import { extractSlots } from './vue-sfc/slots';
 import { extractComponentTypes } from './vue-sfc/types';
 import { extractChildComponents } from './vue-sfc/child-components';
-import { extractCssVars } from './vue-sfc/css-vars';
-import { convertHtmlToPug } from './vue-sfc/pug-converter';
+import { extractCssVars } from './common/extract-css-vars';
+import { convertHtmlToPug } from './vue-common/pug-converter';
 
 export const extractVueSfc = (filePath: string) => {
   const absPath = filePath.startsWith('/') ? filePath : `${process.cwd()}/${filePath}`;
@@ -37,18 +37,24 @@ export const extractVueSfc = (filePath: string) => {
   let childComponents: string[] = [];
   let cssVars: { name: string; value: string; description: string }[] = [];
   if (script) {
-    const descAndAuthor = extractDescriptionAndAuthor(script.content);
+    // Normalisation : supprime les espaces en début de ligne pour fiabiliser le parsing AST
+    let normalizedScript = script.content.replace(/^ +/gm, '');
+    const descAndAuthor = extractDescriptionAndAuthor(normalizedScript);
     description = descAndAuthor.description;
     author = descAndAuthor.author;
-    props = extractProps(script.content, absPath);
-    emits = extractEmits(script.content, absPath);
-    exposes = extractExposes(script.content, absPath);
-    injects = extractInjects(script.content, absPath);
-    provides = extractProvides(script.content, absPath);
-    types = extractComponentTypes(script.content, absPath);
+    const templateContent =
+      descriptor.template && descriptor.template.content ? descriptor.template.content : undefined;
+    const propsResult = extractProps(normalizedScript, absPath);
+    props = Array.isArray(propsResult) ? propsResult : propsResult.props;
+    slots = extractSlots(templateContent);
+    emits = extractEmits(normalizedScript, absPath);
+    exposes = extractExposes(normalizedScript, absPath);
+    injects = extractInjects(normalizedScript, absPath);
+    provides = extractProvides(normalizedScript, absPath);
+    types = extractComponentTypes(normalizedScript, absPath);
   }
   if (descriptor.template && descriptor.template.content) {
-    slots = extractSlotsFromTemplate(descriptor.template.content);
+    // slots déjà extraits ci-dessus
     childComponents = extractChildComponents(descriptor.template.content);
   }
   if (descriptor.styles && descriptor.styles.length > 0) {
@@ -85,8 +91,7 @@ export const extractVueSfc = (filePath: string) => {
 };
 
 if (require.main === module) {
-  const vueFilePath =
-    process.argv[2] || 'registry/new-york/components/button-foo/ButtonFooNoSetup.vue';
+  const vueFilePath = process.argv[2] || 'registry/new-york/components/input/SimpleInput.vue';
   const result = extractVueSfc(vueFilePath);
   fs.writeFileSync(
     'scripts/attempts/vue-comments-no-setup.json',

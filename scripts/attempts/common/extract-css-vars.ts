@@ -10,6 +10,7 @@ export interface CssVarInfo {
  */
 export const extractCssVars = (styleContent: string): CssVarInfo[] => {
   const result: CssVarInfo[] = [];
+  // 1. Extraction avec commentaire (comme avant)
   const regex = /\/\*([^*]+)\*\/\s*([\w\s\-{}:;\n]*)/g;
   let match;
   while ((match = regex.exec(styleContent))) {
@@ -25,6 +26,20 @@ export const extractCssVars = (styleContent: string): CssVarInfo[] => {
           description: comment,
         });
       }
+    }
+  }
+  // 2. Extraction sans commentaire (toutes les vars non déjà listées)
+  const allVarsRegex = /(--[\w-]+)\s*:\s*([^;]+);/g;
+  let allVarMatch;
+  const already = new Set(result.map((v) => v.name));
+  while ((allVarMatch = allVarsRegex.exec(styleContent))) {
+    if (allVarMatch[1] && allVarMatch[2] && !already.has(allVarMatch[1])) {
+      result.push({
+        name: allVarMatch[1],
+        value: allVarMatch[2].trim(),
+        description: '',
+      });
+      already.add(allVarMatch[1]);
     }
   }
   return result;

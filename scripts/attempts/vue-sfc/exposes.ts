@@ -1,9 +1,9 @@
 import ts from 'typescript';
 
 /**
- * Extrait les exposes depuis l'objet export default d'un SFC classique (clé expose ou exposes)
- * @param scriptContent contenu du bloc <script>
- * @param absPath chemin absolu du fichier (pour TS)
+ * Extracts exposes from the export default object of a classic SFC (key expose or exposes)
+ * @param scriptContent content of the <script> block
+ * @param absPath absolute path of the file (for TS)
  */
 
 export const extractExposes = (scriptContent: string, absPath: string) => {
@@ -20,17 +20,17 @@ export const extractExposes = (scriptContent: string, absPath: string) => {
     if (ts.isExportAssignment(node) && ts.isObjectLiteralExpression(node.expression)) {
       const obj = node.expression;
       for (const prop of obj.properties) {
-        // Extraction expose/exposes (rare, mais supporté)
+        // Extraction of expose/exposes (rare, but supported)
         if (
           ts.isPropertyAssignment(prop) &&
           ts.isIdentifier(prop.name) &&
           (prop.name.text === 'expose' || prop.name.text === 'exposes')
         ) {
-          // Cas expose: ['foo', 'bar'] avec commentaires
+          // Case expose: ['foo', 'bar'] with comments
           if (ts.isArrayLiteralExpression(prop.initializer)) {
             for (const element of prop.initializer.elements) {
               if (ts.isStringLiteral(element)) {
-                // Cherche le commentaire juste au-dessus dans le code source
+                // Looks for the comment just above in the source code
                 let description = '';
                 const ranges = ts.getLeadingCommentRanges(scriptContent, element.pos) || [];
                 let descParts: string[] = [];
@@ -66,14 +66,14 @@ export const extractExposes = (scriptContent: string, absPath: string) => {
               }
             }
           }
-          // Cas expose: { foo: ..., bar: ... }
+          // Case expose: { foo: ..., bar: ... }
           else if (ts.isObjectLiteralExpression(prop.initializer)) {
             for (const e of prop.initializer.properties) {
               if (ts.isPropertyAssignment(e) && ts.isIdentifier(e.name)) {
                 const name = e.name.text;
                 let type: string | undefined = undefined;
                 let description = '';
-                // Récupère tous les commentaires (ligne et multilignes) juste au-dessus
+                // Retrieves all comments (single and multi-line) just above
                 const ranges = ts.getLeadingCommentRanges(scriptContent, e.pos) || [];
                 let descParts: string[] = [];
                 for (let i = ranges.length - 1; i >= 0; i--) {
@@ -104,7 +104,7 @@ export const extractExposes = (scriptContent: string, absPath: string) => {
                   }
                 }
                 description = descParts.join('\n').trim();
-                // Déduit le type si possible
+                // Infers the type if possible
                 if (ts.isFunctionLike(e.initializer)) {
                   const params = e.initializer.parameters
                     .map((p: ts.ParameterDeclaration) => {
@@ -128,7 +128,7 @@ export const extractExposes = (scriptContent: string, absPath: string) => {
     }
     ts.forEachChild(node, visitExportDefault);
   }
-  // 2. Extraction via defineExpose({ ... }) dans le code (Composition API)
+  // 2. Extraction via defineExpose({ ... }) in the code (Composition API)
   function visitDefineExpose(node: ts.Node) {
     if (
       ts.isCallExpression(node) &&
@@ -160,7 +160,7 @@ export const extractExposes = (scriptContent: string, absPath: string) => {
                 }
               }
             }
-            // Déduit le type si possible
+            // Infers the type if possible
             if (ts.isFunctionLike(prop.initializer)) {
               const params = prop.initializer.parameters
                 .map((p: ts.ParameterDeclaration) => {

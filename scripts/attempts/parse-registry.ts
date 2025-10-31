@@ -13,10 +13,44 @@ export const extractFolder = (file: string) => {
   const absPath = file.startsWith('/') ? file : path.resolve(process.cwd(), file);
   const tsSource = fs.readFileSync(absPath, 'utf-8');
   const info = extractTs(absPath);
-  const vueItems = extractVueExportsFromTsFile(absPath, tsSource, config.globalPath);
+  const folderDir = path.dirname(absPath);
+  const folder = path.basename(folderDir);
+  // Cherche tous les fichiers .vue du dossier
+  const vueFiles = fs
+    .readdirSync(folderDir)
+    .filter((f) => f.endsWith('.vue'))
+    .map((f) => path.join(folderDir, f));
+  // Parse chaque .vue
+  const vueItems = vueFiles.map((vuePath) => {
+    // Détection stricte : <script ... setup ...>
+    const vueSource = fs.readFileSync(vuePath, 'utf-8');
+    // Recherche tous les blocs <script ...>
+    const scriptBlockRegex = /<script([^>]*)>([\s\S]*?)<\/script>/gi;
+    let match;
+    let hasSetup = false;
+    let hasNonEmptySetup = false;
+    while ((match = scriptBlockRegex.exec(vueSource))) {
+      const attrs = match[1];
+      const content = match[2];
+      const isSetupBlock = /\bsetup\b/i.test(attrs || '');
+      if (isSetupBlock) {
+        hasSetup = true;
+        if (content && content.trim().length > 0) {
+          hasNonEmptySetup = true;
+        }
+      }
+    }
+    const isSetup = hasNonEmptySetup;
+    // On passe un chemin relatif au workspace à extractVueSfc/extractVueSfcSetup
+    const relVuePath = path.relative(process.cwd(), vuePath);
+    const doc = isSetup ? extractVueSfcSetup(relVuePath) : extractVueSfc(relVuePath);
+    return {
+      name: path.basename(vuePath, '.vue'),
+      path: relVuePath,
+      doc,
+    };
+  });
   // Ajoute l'index.ts comme premier item
-  const folder = path.basename(path.dirname(absPath));
-  // Chemin absolu commençant par config.globalPath
   const fullFile = absPath.startsWith(config.globalPath)
     ? absPath
     : path.join(config.globalPath, path.relative(config.globalPath, absPath));
@@ -43,36 +77,8 @@ export const extractFolder = (file: string) => {
   };
 };
 
-export const extractVueExportsFromTsFile = (
-  tsFilePath: string,
-  tsSource: string,
-  globalPath?: string
-) => {
-  // Chercher les exports de composants Vue
-  const vueExports = [];
-  let match;
-  while ((match = vueExportRegex.exec(tsSource))) {
-    vueExports.push({ name: match[1], path: match[2] });
-  }
-
-  // Pour chaque composant, détecter le type (setup ou non) et parser
-  return vueExports.map(({ name, path: vueRelPath }) => {
-    if (!vueRelPath) return { name, path: undefined, doc: undefined };
-    const vueAbsPath = vueRelPath.startsWith('/')
-      ? vueRelPath
-      : path.resolve(path.dirname(tsFilePath), vueRelPath);
-    if (!vueAbsPath) return { name, path: undefined, isSetup: false, doc: undefined };
-    const relFile = globalPath ? path.relative(globalPath, vueAbsPath) : vueAbsPath;
-    const vueSource = fs.readFileSync(vueAbsPath, 'utf-8');
-    // Heuristique : présence de <script setup>
-    const isSetup = scriptSetupRegex.test(vueSource);
-    const doc = isSetup ? extractVueSfcSetup(vueAbsPath) : extractVueSfc(vueAbsPath);
-    return { name, path: relFile, doc };
-  });
-};
-
 if (require.main === module) {
-  const tsFilePath = 'registry/new-york/components/button-foo/index.ts';
+  const tsFilePath = 'registry/new-york/components/input/index.ts';
   const result = extractFolder(tsFilePath);
   fs.writeFileSync('scripts/attempts/ts-comments.json', JSON.stringify(result, null, 2), 'utf-8');
   console.log('TS+Vue comments extraction result written to scripts/attempts/ts/ts-comments.json');

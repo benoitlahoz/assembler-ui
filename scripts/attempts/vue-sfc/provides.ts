@@ -1,9 +1,9 @@
 import ts from 'typescript';
 
 /**
- * Extrait les provides depuis l'objet export default d'un SFC classique (clé provide/provides)
- * @param scriptContent contenu du bloc <script>
- * @param absPath chemin absolu du fichier (pour TS)
+ * Extracts provides from the export default object of a classic SFC (key provide/provides)
+ * @param scriptContent content of the <script> block
+ * @param absPath absolute path of the file (for TS)
  */
 
 export const extractProvides = (scriptContent: string, absPath: string) => {
@@ -20,7 +20,7 @@ export const extractProvides = (scriptContent: string, absPath: string) => {
     if (ts.isExportAssignment(node) && ts.isObjectLiteralExpression(node.expression)) {
       const obj = node.expression;
       for (const prop of obj.properties) {
-        // Propriété provide/provides sous forme objet ou fonction
+        // Property provide/provides as object or function
         if (
           (ts.isPropertyAssignment(prop) &&
             ts.isIdentifier(prop.name) &&
@@ -29,7 +29,7 @@ export const extractProvides = (scriptContent: string, absPath: string) => {
             ts.isIdentifier(prop.name) &&
             (prop.name.text === 'provide' || prop.name.text === 'provides'))
         ) {
-          // Supporte provide: { ... }
+          // Supports provide: { ... }
           if (ts.isPropertyAssignment(prop) && ts.isObjectLiteralExpression(prop.initializer)) {
             for (const e of prop.initializer.properties) {
               if (ts.isPropertyAssignment(e)) {
@@ -49,7 +49,7 @@ export const extractProvides = (scriptContent: string, absPath: string) => {
                 else if (value === '[]') type = 'any[]';
                 else if (value === '{}') type = 'Record<string, any>';
                 else type = 'any';
-                // Récupère tous les commentaires juste au-dessus
+                // Retrieves all comments just above
                 let descParts: string[] = [];
                 const ranges = ts.getLeadingCommentRanges(scriptContent, e.pos) || [];
                 for (let i = ranges.length - 1; i >= 0; i--) {
@@ -84,7 +84,7 @@ export const extractProvides = (scriptContent: string, absPath: string) => {
               }
             }
           }
-          // Supporte provide: () { return { ... } } ou provide() { return { ... } }
+          // Supports provide: () { return { ... } } or provide() { return { ... } }
           else if (
             (ts.isPropertyAssignment(prop) && ts.isFunctionLike(prop.initializer)) ||
             ts.isMethodDeclaration(prop)
@@ -120,7 +120,7 @@ export const extractProvides = (scriptContent: string, absPath: string) => {
                       else if (value === '[]') type = 'any[]';
                       else if (value === '{}') type = 'Record<string, any>';
                       else type = 'any';
-                      // Récupère tous les commentaires juste au-dessus
+                      // Retrieves all comments just above
                       let descParts: string[] = [];
                       const ranges = ts.getLeadingCommentRanges(scriptContent, e.pos) || [];
                       for (let i = ranges.length - 1; i >= 0; i--) {
@@ -163,7 +163,7 @@ export const extractProvides = (scriptContent: string, absPath: string) => {
     }
     ts.forEachChild(node, visitExportDefault);
   }
-  // 2. Extraction via appels à provide() dans le code (Composition API)
+  // 2. Extraction via provide() calls in the code (Composition API)
   function visitProvideCalls(node: ts.Node) {
     if (
       ts.isCallExpression(node) &&
@@ -192,7 +192,7 @@ export const extractProvides = (scriptContent: string, absPath: string) => {
       if (arg1) {
         value = arg1.getText();
       }
-      // Cherche le commentaire immédiatement au-dessus (JSDoc ou //), ignore si ligne vide ou code entre les deux
+      // Looks for the comment immediately above (JSDoc or //), ignores if blank line or code between
       let desc = '';
       const ranges = ts.getLeadingCommentRanges(scriptContent, node.pos) || [];
       if (ranges.length > 0) {

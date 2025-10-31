@@ -1,4 +1,4 @@
-// Conversion HTML -> Pug (identique)
+// HTML to Pug conversion (robust, preserves comments, slots, etc)
 
 type Node = {
   type: 'element' | 'text' | 'comment';
@@ -124,8 +124,8 @@ const toPug = (nodes: Node[], indent = 0): string => {
 };
 
 /**
- * Convertit un template HTML de SFC en Pug (robuste, préserve les commentaires, slots, etc)
- * @param html HTML à convertir
+ * Converts a SFC HTML template to Pug (robust, preserves comments, slots, etc)
+ * @param html HTML to convert
  * @returns Pug string
  */
 export function convertHtmlToPug(html: string): string {

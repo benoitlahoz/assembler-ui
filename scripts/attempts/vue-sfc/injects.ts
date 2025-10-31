@@ -4,9 +4,9 @@ import { testNumber } from '../common/number.regex';
 import { testBoolean } from '../common/boolean.regex';
 
 /**
- * Extrait les injects depuis l'objet export default d'un SFC classique (clé inject)
- * @param scriptContent contenu du bloc <script>
- * @param absPath chemin absolu du fichier (pour TS)
+ * Extracts injects from the export default object of a classic SFC (key inject)
+ * @param scriptContent content of the <script> block
+ * @param absPath absolute path of the file (for TS)
  */
 
 export const extractInjects = (scriptContent: string, absPath: string) => {
@@ -28,7 +28,7 @@ export const extractInjects = (scriptContent: string, absPath: string) => {
           ts.isIdentifier(prop.name) &&
           prop.name.text === 'inject'
         ) {
-          // inject: ['foo', 'bar'] ou inject: { foo: ... }
+          // inject: ['foo', 'bar'] or inject: { foo: ... }
           if (ts.isArrayLiteralExpression(prop.initializer)) {
             for (const el of prop.initializer.elements) {
               if (ts.isStringLiteral(el)) {
@@ -51,7 +51,7 @@ export const extractInjects = (scriptContent: string, absPath: string) => {
                   else if (def === '{}') type = 'Record<string, any>';
                   else type = 'any';
                 }
-                // Cherche le commentaire immédiatement au-dessus (JSDoc ou //), ignore si ligne vide ou code entre les deux
+                // Looks for the comment immediately above (JSDoc or //), ignores if blank line or code between
                 const ranges = ts.getLeadingCommentRanges(scriptContent, e.pos) || [];
                 if (ranges.length > 0) {
                   const lastRange = ranges[ranges.length - 1];
@@ -79,7 +79,7 @@ export const extractInjects = (scriptContent: string, absPath: string) => {
     }
     ts.forEachChild(node, visitExportDefault);
   }
-  // 2. Extraction via appels à inject() dans le code (Composition API)
+  // 2. Extraction via inject() calls in the code (Composition API)
   function visitInjectCalls(node: ts.Node) {
     if (
       ts.isCallExpression(node) &&
@@ -91,7 +91,7 @@ export const extractInjects = (scriptContent: string, absPath: string) => {
       let def: any = undefined;
       let type: string | undefined = undefined;
       let description = '';
-      // clé (string, ident, ou expression)
+      // key (string, identifier, or expression)
       const arg0 = node.arguments[0];
       if (arg0) {
         if (ts.isStringLiteral(arg0)) {
@@ -105,11 +105,11 @@ export const extractInjects = (scriptContent: string, absPath: string) => {
           type = 'any';
         }
       }
-      // valeur par défaut
+      // default value
       if (node.arguments.length > 1 && node.arguments[1]) {
         def = node.arguments[1].getText();
       }
-      // Cherche le commentaire immédiatement au-dessus (JSDoc ou //), ignore si ligne vide ou code entre les deux
+      // Looks for the comment immediately above (JSDoc or //), ignores if blank line or code between
       let desc = '';
       const ranges = ts.getLeadingCommentRanges(scriptContent, node.pos) || [];
       if (ranges.length > 0) {

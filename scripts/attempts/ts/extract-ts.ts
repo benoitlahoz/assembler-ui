@@ -11,55 +11,51 @@ export interface TsFileExtract {
   author?: string;
 }
 
-/**
- * Extrait les imports, exports et types d'un fichier TypeScript via AST.
- * @param filePath Chemin absolu du fichier .ts à lire
- * @returns Un objet contenant les imports, exports et types
- */
-export function extractTs(filePath: string): TsFileExtract {
+const visit = (node: ts.Node, types: { name: string; type: string }[]) => {
+  if (ts.isInterfaceDeclaration(node)) {
+    types.push({ name: node.name.text, type: 'interface' });
+  }
+  if (ts.isTypeAliasDeclaration(node)) {
+    types.push({ name: node.name.text, type: 'type' });
+  }
+  if (ts.isEnumDeclaration(node)) {
+    types.push({ name: node.name.text, type: 'enum' });
+  }
+  ts.forEachChild(node, (child) => visit(child, types));
+};
+
+// Extracts types and top-of-file JSDoc info from a TypeScript file using the AST
+// @param filePath Absolute path to the .ts file to read
+// @returns An object containing types, description, category, and author
+export const extractTs = (filePath: string): TsFileExtract => {
   if (!filePath.endsWith('.ts')) {
-    throw new Error('Le fichier doit avoir une extension .ts');
+    throw new Error('File must have a .ts extension');
   }
   const content = fs.readFileSync(filePath, 'utf-8');
   const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true);
 
-  // Extraction du commentaire multiligne en haut du fichier
+  // Extract the top multiline comment (JSDoc) from the file
   let description: string | undefined;
   let category: string | undefined;
   let author: string | undefined;
   const match = matchCommentBlock(content);
   if (match && typeof match[1] === 'string') {
     const comment = match[1];
-    // Description = texte libre avant tout tag @
+    // Description = free text before any @ tag
     if (typeof comment === 'string' && comment) {
       const descMatch = (comment.split(/@/)[0] || '').replace(/^[\s\*]+/gm, '').trim();
       description = descMatch;
     }
-    // Recherche des tags @category, @author
+    // Look for @category and @author tags
     const catMatch = comment.match(/@category\s+([^@\n]*)/);
     const authorMatch = comment.match(/@author\s+([^@\n]*)/);
     if (catMatch && typeof catMatch[1] === 'string') category = catMatch[1].trim();
     if (authorMatch && typeof authorMatch[1] === 'string') author = authorMatch[1].trim();
   }
 
-  // const imports: string[] = [];
-  // const exports: string[] = [];
   const types: { name: string; type: string }[] = [];
 
-  function visit(node: ts.Node) {
-    if (ts.isInterfaceDeclaration(node)) {
-      types.push({ name: node.name.text, type: 'interface' });
-    }
-    if (ts.isTypeAliasDeclaration(node)) {
-      types.push({ name: node.name.text, type: 'type' });
-    }
-    if (ts.isEnumDeclaration(node)) {
-      types.push({ name: node.name.text, type: 'enum' });
-    }
-    ts.forEachChild(node, visit);
-  }
-
-  visit(sourceFile);
+  visit(sourceFile, types);
 
   return {
     fileName: path.basename(filePath),
@@ -68,8 +64,4 @@ export function extractTs(filePath: string): TsFileExtract {
     category,
     author,
   };
-}
-
-// Exemple d'utilisation :
-// const info = extractTsAstInfo('/chemin/vers/fichier.ts');
-// console.log(info);
+};
