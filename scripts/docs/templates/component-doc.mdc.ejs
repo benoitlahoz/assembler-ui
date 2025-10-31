@@ -15,44 +15,38 @@ description: <%= typeof description !== 'undefined' ? description : '' %>
   :::
 ::
 
+## Install with CLI 
 
-<% if (typeof install !== 'undefined' && install) { %>
-## Install with CLI
 :::code-group{.w-full}
+  ```bash [pnpm]
+  pnpm add @nuxt/ui
+  ```
   
   ```bash [yarn]
-  yarn dlx shadcn-vue@latest add "<%= install %>"
+  yarn add @nuxt/ui
   ```
   
   ```bash [npm]
-  npx shadcn-vue@latest add "<%= install %>"
-  ```
-
-  ```bash [pnpm]
-  pnpm dlx shadcn-vue@latest add "<%= install %>"
+  npm install @nuxt/ui
   ```
   
   ```bash [bun]
-  bunx shadcn-vue@latest add "<%= install %>"
+  bun add @nuxt/ui
   ```
 :::
-<% } %>
 
 
 ## Install Manually
 
-Copy and paste the following code
-::code-tree
-<% if (typeof codes !== 'undefined' && Array.isArray(codes) && codes.length) { %>
-<% codes.forEach(function(codeFile) { 
-  const validExts = ['vue','js','ts','json','html','css','scss','md'];
-  const ext = codeFile.filename.split('.').pop();
-  if (validExts.includes(ext)) { %>
-<%- '```' + codeFile.lang + ' [' + codeFile.filename + ']\n' + codeFile.code.replace(/```/g, '``\u200B`') + '\n```' %>
-<%  }
-}); %>
+:::code-tree
+<% if (typeof codes !== 'undefined' && Array.isArray(codes)) { %>
+<% codes.forEach(function(code) { %>
+```<%- code.lang %> [<%- code.filename %>]
+<%- code.code %>
+```
+<% }); %>
 <% } %>
-::
+:::
 
 <% if (typeof files !== 'undefined' && Array.isArray(files)) { %>
 <% files.forEach(function(file) { %>

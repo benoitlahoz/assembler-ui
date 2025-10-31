@@ -15,36 +15,46 @@ description: A simple composable that provides a description of the foo feature.
   :::
 ::
 
+## Install with CLI 
 
-
-## Install with CLI
 :::code-group{.w-full}
+  ```bash [pnpm]
+  pnpm add @nuxt/ui
+  ```
   
   ```bash [yarn]
-  yarn dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-foo.json"
+  yarn add @nuxt/ui
   ```
   
   ```bash [npm]
-  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-foo.json"
-  ```
-
-  ```bash [pnpm]
-  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-foo.json"
+  npm install @nuxt/ui
   ```
   
   ```bash [bun]
-  bunx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-foo.json"
+  bun add @nuxt/ui
   ```
 :::
 
 
-
 ## Install Manually
 
-Copy and paste the following code
-::code-tree
+:::code-tree
 
-::
+
+```ts [useFoo.ts]
+/**
+ * A simple composable that provides a description of the foo feature.
+ * @type registry:hook
+ */
+export const useFoo = () => {
+  const description = 'This is a foo composable used for demonstration purposes.';
+  return description;
+};
+
+```
+
+
+:::
 
 
 

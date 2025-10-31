@@ -15,35 +15,52 @@ description: Index file for input components
   :::
 ::
 
+## Install with CLI 
 
-
-## Install with CLI
 :::code-group{.w-full}
+  ```bash [pnpm]
+  pnpm add @nuxt/ui
+  ```
   
   ```bash [yarn]
-  yarn dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/simple-input.json"
+  yarn add @nuxt/ui
   ```
   
   ```bash [npm]
-  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/simple-input.json"
-  ```
-
-  ```bash [pnpm]
-  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/simple-input.json"
+  npm install @nuxt/ui
   ```
   
   ```bash [bun]
-  bunx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/simple-input.json"
+  bun add @nuxt/ui
   ```
 :::
 
 
-
 ## Install Manually
 
-Copy and paste the following code
-::code-tree
+:::code-tree
 
+
+```ts [index.ts]
+/**
+ * Index file for input components
+ * @author John Smith <john.smith@example.com>
+ * @type registry:ui
+ * @category inputs
+ */
+export { default as SimpleInput } from './SimpleInput.vue';
+export { default as SimpleInputSetup } from './SimpleInputSetup.vue';
+
+```
+
+```ts [something.ts]
+/**
+ * A something file
+ * @type registry:ui
+ */
+export const a = 42;
+
+```
 
 ```vue [SimpleInput.vue]
 <script lang="ts">
@@ -277,7 +294,7 @@ label {
 ```
 
 
-::
+:::
 
 
 
