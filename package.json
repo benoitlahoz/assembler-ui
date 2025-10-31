@@ -13,7 +13,7 @@
     "parse:component": "tsx scripts/create-description-files.ts",
     "create:registry": "tsx scripts/create-registry-file.ts",
     "build:registry": "yarn create:registry && shadcn-vue build",
-    "attempt": "tsx scripts/attempts/parse-registry.ts"
+    "attempt": "tsx scripts/crawl-registry.ts"
   },
   "repository": {
     "type": "git",

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import pathModule from 'path';
 import { parse } from '@vue/compiler-sfc';
-import { extractDescriptionAndAuthor } from './common/extract-description-and-author';
+import { extractDescriptionAndTags } from './common/extract-description-and-tags';
 import { extractEmits } from './vue-sfc-composition/emits';
 import { extractExposes } from './vue-sfc-composition/exposes';
 import { extractProps } from './vue-sfc-composition/props';
@@ -26,7 +26,7 @@ export const extractVueSfcComposition = (filePath: string, config: Record<string
   const { descriptor } = parse(vueSource);
   const script = descriptor.scriptSetup || descriptor.script;
   let description = '';
-  let author = '';
+  let tags: Record<string, any> = {};
   let props: Array<{ name: string; type: string; default?: any; description: string }> = [];
   let slots: any[] = [];
   let emits: Array<{ name: string; description: string }> = [];
@@ -37,9 +37,9 @@ export const extractVueSfcComposition = (filePath: string, config: Record<string
   let childComponents: string[] = [];
   let cssVars: { name: string; value: string; description: string }[] = [];
   if (script) {
-    const descAndAuthor = extractDescriptionAndAuthor(script.content);
+    const descAndAuthor = extractDescriptionAndTags(script.content);
     description = descAndAuthor.description;
-    author = descAndAuthor.author;
+    tags = descAndAuthor.tags;
     props = extractProps(script.content, absPath);
     emits = extractEmits(script.content, absPath);
     exposes = extractExposes(script.content, absPath);
@@ -59,7 +59,7 @@ export const extractVueSfcComposition = (filePath: string, config: Record<string
   return {
     path: relPath,
     description,
-    author,
+    tags,
     childComponents,
     props,
     slots,

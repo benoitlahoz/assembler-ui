@@ -5,7 +5,7 @@ import {
   runWithSpinner,
   displayGenerationSummary,
   showRemainingSpinner,
-} from './utils/terminal-display';
+} from '../utils/terminal-display';
 import type { RegistryItemType } from './types';
 import Config from '../assembler-ui.config';
 

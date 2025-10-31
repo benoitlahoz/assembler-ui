@@ -2,6 +2,7 @@
 /**
  * Un champ de saisie simple avec label et placeholder (API Composition)
  * @author Jane Doe <jane.doe@example.com>
+ * @type registry:ui
  */
 import { ref, inject, provide, defineExpose } from 'vue';
 

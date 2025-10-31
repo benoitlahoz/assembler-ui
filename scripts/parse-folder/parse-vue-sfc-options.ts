@@ -1,7 +1,7 @@
 import fs from 'fs';
 import pathModule from 'path';
 import { parse } from '@vue/compiler-sfc';
-import { extractDescriptionAndAuthor } from './common/extract-description-and-author';
+import { extractDescriptionAndTags } from './common/extract-description-and-tags';
 import { extractEmits } from './vue-sfc-options/emits';
 import { extractExposes } from './vue-sfc-options/exposes';
 import { extractProps } from './vue-sfc-options/props';
@@ -25,7 +25,7 @@ export const extractVueSfcOptions = (filePath: string, config: Record<string, an
   const { descriptor } = parse(vueSource);
   const script = descriptor.script;
   let description = '';
-  let author = '';
+  let tags: Record<string, any> = {};
   let props: Array<{ name: string; type: string; default?: any; description: string }> = [];
   let slots: any[] = [];
   let emits: Array<{ name: string; description: string }> = [];
@@ -38,9 +38,9 @@ export const extractVueSfcOptions = (filePath: string, config: Record<string, an
   if (script) {
     // Normalisation : supprime les espaces en début de ligne pour fiabiliser le parsing AST
     let normalizedScript = script.content.replace(/^ +/gm, '');
-    const descAndAuthor = extractDescriptionAndAuthor(normalizedScript);
+    const descAndAuthor = extractDescriptionAndTags(normalizedScript);
     description = descAndAuthor.description;
-    author = descAndAuthor.author;
+    tags = descAndAuthor.tags;
     const templateContent =
       descriptor.template && descriptor.template.content ? descriptor.template.content : undefined;
     const propsResult = extractProps(normalizedScript, absPath);
@@ -63,7 +63,7 @@ export const extractVueSfcOptions = (filePath: string, config: Record<string, an
   return {
     path: relPath,
     description,
-    author,
+    tags,
     childComponents,
     props,
     slots,

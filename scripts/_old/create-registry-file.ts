@@ -9,7 +9,7 @@ import {
   runWithSpinner,
   displayGenerationSummary,
   showRemainingSpinner,
-} from './utils/terminal-display';
+} from '../utils/terminal-display';
 
 // Read config info
 const REGISTRY_ROOT = resolve(process.cwd(), config.globalPath);

@@ -2,6 +2,7 @@
 /**
  * Un champ de saisie simple avec label et placeholder
  * @author Jane Doe <jane.doe@example.com>
+ * @type registry:ui
  */
 
 const symKey = Symbol('symKey');

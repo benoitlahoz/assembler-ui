@@ -8,11 +8,7 @@ export default {
   domain: 'https://benoitlahoz.github.io/assembler-ui/r',
   definitionFile: 'assemblerjs.json',
   globalPath: 'registry/new-york/',
-  paths: {
-    ui: 'components',
-    block: 'blocks',
-    hook: 'composables',
-  },
+  paths: ['components', 'blocks', 'composables'],
   dependencies: ['vue-sonner'],
   registryDependencies: ['button', 'separator'],
   doc: {
