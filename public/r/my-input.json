@@ -1,0 +1,34 @@
+{
+  "$schema": "https://shadcn-vue.com/schema/registry-item.json",
+  "name": "my-input",
+  "type": "registry:ui",
+  "title": "MyInput",
+  "description": "Index file for input components",
+  "files": [
+    {
+      "path": "registry/new-york/components/my-input/index.ts",
+      "content": "/**\n * Index file for input components\n * @author John Smith <john.smith@example.com>\n * @type registry:ui\n * @category inputs\n */\nexport { default as SimpleInput } from './SimpleInput.vue';\nexport { default as SimpleInputSetup } from './SimpleInputSetup.vue';\n",
+      "type": "registry:ui"
+    },
+    {
+      "path": "registry/new-york/components/my-input/my-input.d.ts",
+      "content": "/**\n * Type declarations for my-input component\n * @category registry:ui\n */\n\ndeclare module 'my-input' {\n  // Exported types\n  export const SimpleInput: any;\n  // Exported setup types\n  export const SimpleInputSetup: any;\n}\n",
+      "type": "registry:ui"
+    },
+    {
+      "path": "registry/new-york/components/my-input/something.ts",
+      "content": "/**\n * A something file\n * @type registry:ui\n */\nexport const a = 42;\n",
+      "type": "registry:ui"
+    },
+    {
+      "path": "registry/new-york/components/my-input/SimpleInput.vue",
+      "content": "<script lang=\"ts\">\n/**\n * Un champ de saisie simple avec label et placeholder\n * @author Jane Doe <jane.doe@example.com>\n * @type registry:ui\n */\n\nconst symKey = Symbol('symKey');\n\nexport default {\n  name: 'SimpleInput',\n  /**\n   * Propriétés du composant\n   */\n  props: {\n    /**\n     * Le label affiché au-dessus du champ\n     */\n    label: {\n      type: String,\n      required: false,\n      default: '',\n    },\n    /**\n     * Le placeholder du champ\n     */\n    placeholder: {\n      type: String,\n      required: false,\n      default: '',\n    },\n    /**\n     * Valeur du champ\n     */\n    modelValue: {\n      type: String,\n      required: false,\n      default: '',\n    },\n  },\n  emits: [\n    /**\n     * Émis à chaque modification de la valeur\n     */\n    'update:modelValue',\n  ],\n  inject: {\n    // Injects a value with key 'someKey'.\n    injected: 'someKey',\n    // Inject avec clé symbole\n    injectedSym: symKey,\n    // Inject avec spread\n    injectedSpread: 'spread',\n  },\n  provide() {\n    return {\n      // Provides a value with key 'someOtherKey'.\n      someOtherKey: 'providedValue',\n      // Provide avec clé symbole\n      symKey: 'valSym',\n      // Provide avec clé computed\n      computedKey: true,\n    };\n  },\n  methods: {\n    onInput(event: Event) {\n      this.$emit('update:modelValue', (event.target as HTMLInputElement).value);\n    },\n  },\n  /**\n   * Expose properties and methods like defineExpose in <script setup>\n   */\n  expose: [\n    /**\n     * An exposed string property\n     */\n    'exposed',\n    /**\n     * Another exposed string property\n     */\n    'other',\n    /**\n     * An exposed function that logs a message and returns 'foo'\n     */\n    'myFunc',\n  ],\n};\n</script>\n\n<template>\n  <label v-if=\"label\">{{ label }}</label>\n  <div>\n    <slot name=\"prefix\"></slot>\n    <slot name=\"useful\" :foo=\"bar\" />\n    <slot />\n  </div>\n  <MyComponent />\n  <input :placeholder=\"placeholder\" :value=\"modelValue\" @input=\"onInput\" type=\"text\" />\n</template>\n\n<style scoped>\n:root {\n  --input-border-color: #ccc;\n  --input-border-radius: 4px;\n  --input-padding: 0.5em 1em;\n  --input-font-size: 1em;\n}\n\ninput {\n  border: 1px solid #ccc;\n  border-radius: 4px;\n  padding: 0.5em 1em;\n  font-size: 1em;\n}\nlabel {\n  display: block;\n  margin-bottom: 0.25em;\n  font-weight: bold;\n}\n</style>\n",
+      "type": "registry:ui"
+    },
+    {
+      "path": "registry/new-york/components/my-input/SimpleInputSetup.vue",
+      "content": "<script setup lang=\"ts\">\n/**\n * Un champ de saisie simple avec label et placeholder (API Composition)\n * @author Jane Doe <jane.doe@example.com>\n * @type registry:ui\n */\nimport { ref, inject, provide, defineExpose } from 'vue';\n\nconst props = defineProps({\n  /**\n   * Le label affiché au-dessus du champ\n   */\n  label: {\n    type: String,\n    required: false,\n    default: '',\n  },\n  /**\n   * Le placeholder du champ\n   */\n  placeholder: {\n    type: String,\n    required: false,\n    default: '',\n  },\n  /**\n   * Valeur du champ\n   */\n  modelValue: {\n    type: String,\n    required: false,\n    default: '',\n  },\n});\n\nconst emit = defineEmits<{\n  /**\n   * Émis à chaque modification de la valeur\n   */\n  (e: 'update:modelValue', value: string): void;\n}>();\n\nconst symKey = Symbol('symKey');\n\n// Injection\nconst injected = inject('someKey');\nconst injectedSym = inject(symKey);\nconst injectedSpread = inject('spread');\n\n// Fourniture\nprovide('someOtherKey', 'providedValue');\nprovide(symKey, 'valSym');\nprovide('computedKey', true);\n\n// Variable bar pour le slot\nconst bar = ref('bar');\n\n// Méthodes\nfunction onInput(event: Event) {\n  emit('update:modelValue', (event.target as HTMLInputElement).value);\n}\n\n// Exposition\nconst exposed = ref('exposed');\nconst other = ref('other');\nfunction myFunc() {\n  console.log('myFunc called');\n  return 'foo';\n}\ndefineExpose({ exposed, other, myFunc });\n</script>\n\n<template>\n  <label v-if=\"props.label\">{{ props.label }}</label>\n  <div>\n    <slot name=\"prefix\"></slot>\n    <slot name=\"useful\" :foo=\"bar\" />\n    <slot />\n  </div>\n  <!-- <MyComponent /> -->\n  <input :placeholder=\"props.placeholder\" :value=\"props.modelValue\" @input=\"onInput\" type=\"text\" />\n</template>\n\n<style scoped>\n:root {\n  --input-border-color: #ccc;\n  --input-border-radius: 4px;\n  --input-padding: 0.5em 1em;\n  --input-font-size: 1em;\n}\n\ninput {\n  border: 1px solid #ccc;\n  border-radius: 4px;\n  padding: 0.5em 1em;\n  font-size: 1em;\n}\nlabel {\n  display: block;\n  margin-bottom: 0.25em;\n  font-weight: bold;\n}\n</style>\n",
+      "type": "registry:ui"
+    }
+  ]
+}

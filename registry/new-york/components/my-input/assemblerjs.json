@@ -26,7 +26,8 @@
           "module": "my-input",
           "source": "declare module 'my-input' {\n// Exported types\n  export const SimpleInput: any;\n  // Exported setup types\n  export const SimpleInputSetup: any;\n}"
         }
-      }
+      },
+      "type": "registry:ui"
     },
     {
       "name": "something",

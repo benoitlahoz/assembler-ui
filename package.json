@@ -10,10 +10,9 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "add:component": "npx shadcn-vue@latest add",
-    "parse:component": "tsx scripts/create-description-files.ts",
-    "create:registry": "tsx scripts/create-registry-file.ts",
-    "build:registry": "yarn create:registry && shadcn-vue build",
-    "attempt": "tsx scripts/crawl-registry.ts"
+    "generate:descriptions": "tsx scripts/generate-descriptions.ts",
+    "generate:registry": "tsx scripts/generate-registry-file.ts",
+    "build:registry": "yarn generate:descriptions && yarn generate:registry && shadcn-vue build .registry.json"
   },
   "repository": {
     "type": "git",

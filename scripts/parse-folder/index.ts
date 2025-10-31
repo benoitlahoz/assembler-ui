@@ -85,12 +85,15 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
     }
   }
 
+  const allItems = [...tsItems, ...vueItems];
+  const foundType = (allItems.find((item) => (item as any).type) as any)?.type;
   const result = {
     name: toKebabCase(folder),
     title: toPascalCase(folder),
-    description: [...tsItems, ...vueItems].find((item) => item.description)?.description || '',
-    type: ([...tsItems, ...vueItems].find((item) => (item as any).type) as any)?.type,
-    files: [...tsItems, ...vueItems],
+    description: allItems.find((item) => item.description)?.description || '',
+    // Can be undefined.
+    type: foundType,
+    files: allItems,
   };
 
   return result;

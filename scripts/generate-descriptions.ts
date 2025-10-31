@@ -5,17 +5,14 @@ import {
   displayGenerationSummary,
   showRemainingSpinner,
 } from './utils/terminal-display';
-import type { RegistryItemType } from './types';
 
 import config from '../assembler-ui.config.js';
 import { parseFolder } from './parse-folder';
 
+const DEBUG_JSON = true;
+
 const GlobalPath = config.globalPath || 'registry/new-york/';
-const Paths = config.paths || {
-  ui: 'components',
-  block: 'blocks',
-  hook: 'composables',
-};
+const Paths = config.paths || {};
 const OutputFilename = config.definitionFile || 'assemblerjs.json';
 
 const getDirectories = (source: string) => {
@@ -42,16 +39,26 @@ export const main = async () => {
       total++;
       const outputPath = join(process.cwd(), dir, OutputFilename);
       try {
-        let type = '';
         await runWithSpinner({
-          message: `Generating description ${dir}`,
+          message: `Generating description for '${name}'`,
           action: async () => {
             const result = parseFolder(join(dir), config) as any;
-            type = result.type || 'registry:ui';
             result.$schema = config.$schema;
-            result.type = type;
-            fs.writeFileSync(outputPath, JSON.stringify(result, null, 2), 'utf-8');
-            return { type };
+            // Toujours forcer le champ type : si absent, mettre registry:ui
+            result.type = typeof result.type !== 'undefined' ? result.type : 'registry:ui';
+            // Ajouter un type à chaque entrée de files si absent
+            if (Array.isArray(result.files)) {
+              result.files = result.files.map((f: any) => ({
+                ...f,
+                type: typeof f.type !== 'undefined' ? f.type : result.type,
+              }));
+            }
+            fs.writeFileSync(
+              outputPath,
+              DEBUG_JSON ? JSON.stringify(result, null, 2) : JSON.stringify(result),
+              'utf-8'
+            );
+            return { type: result.type };
           },
           successMessage: (res) =>
             `File generated for entry '${name}' of type '${res?.type ?? ''}'.`,
@@ -71,11 +78,5 @@ export const main = async () => {
   });
   console.log('');
 };
-/*
-  displayGenerationSummary(total, errors, {
-    successMessage: `✔ {count} file(s) generated successfully.`,
-  });
-  console.log('');
-  */
 
 main();

@@ -3,12 +3,11 @@
   "name": "knob",
   "type": "registry:ui",
   "title": "Knob",
-  "author": "Benoît Lahoz <info@benoitlahoz.io>",
-  "description": "A simple knob component that displays a button with \"Hello World\" text.",
+  "description": "",
   "files": [
     {
       "path": "registry/new-york/components/knob/index.ts",
-      "content": "export { default as Knob } from './Knob.vue';\n",
+      "content": "// @ajs-category controls\nexport { default as Knob } from './Knob.vue';\n",
       "type": "registry:ui"
     },
     {
