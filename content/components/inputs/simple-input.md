@@ -43,7 +43,7 @@ Un champ de saisie simple avec label et placeholder
   ### Events
 | Name | Description |
 |------|-------------|
-| `update:modelValue` | Valeur du champ |
+| `update:modelValue`{.primary .text-primary} | Valeur du champ |
 
 
 
@@ -52,9 +52,9 @@ Un champ de saisie simple avec label et placeholder
   ### Slots
 | Name | Description |
 |------|-------------|
-| `prefix` |  |
-| `useful` |  |
-| `default` |  |
+| `prefix`{.primary .text-primary} |  |
+| `useful`{.primary .text-primary} |  |
+| `default`{.primary .text-primary} |  |
 
 
 
@@ -63,37 +63,23 @@ Un champ de saisie simple avec label et placeholder
   ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-
-| `someOtherKey` | `&#39;providedValue&#39;` | `string` | Provides a value with key &#39;someOtherKey&#39;. |
-
-| `symKey` | `&#39;valSym&#39;` | `string` | Provide avec clé symbole |
-
-| `computedKey` | `true` | `boolean` | Provide avec clé computed |
-
-
+| `someOtherKey`{.primary .text-primary} | `&#39;providedValue&#39;` | `string` | Provides a value with key &#39;someOtherKey&#39;. || `symKey`{.primary .text-primary} | `&#39;valSym&#39;` | `string` | Provide avec clé symbole || `computedKey`{.primary .text-primary} | `true` | `boolean` | Provide avec clé computed |
 
 
 
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
-
-| `injected` | `&#39;someKey&#39;` | `string` | Injects a value with key &#39;someKey&#39;. |
-
-| `injectedSym` | `symKey` | `any` | Inject avec clé symbole |
-
-| `injectedSpread` | `&#39;spread&#39;` | `string` | Inject avec spread |
-
-
+| `injected`{.primary .text-primary} | `&#39;someKey&#39;` | `string` | Injects a value with key &#39;someKey&#39;. || `injectedSym`{.primary .text-primary} | `symKey` | `any` | Inject avec clé symbole || `injectedSpread`{.primary .text-primary} | `&#39;spread&#39;` | `string` | Inject avec spread |
 
 
 
   ### Expose
 | Name | Type | Description |
 |------|------|-------------|
-| `exposed` | `` | An exposed string property |
-| `other` | `` | Another exposed string property |
-| `myFunc` | `` | An exposed function that logs a message and returns &#39;foo&#39; |
+| `exposed`{.primary .text-primary} | `` | An exposed string property |
+| `other`{.primary .text-primary} | `` | Another exposed string property |
+| `myFunc`{.primary .text-primary} | `` | An exposed function that logs a message and returns &#39;foo&#39; |
 
 
 
@@ -102,10 +88,10 @@ Un champ de saisie simple avec label et placeholder
   ### CSS Variables
 | Name | Value | Description |
 |------|-------|-------------|
-| `--input-border-color` | `#ccc` |  |
-| `--input-border-radius` | `4px` |  |
-| `--input-padding` | `0.5em 1em` |  |
-| `--input-font-size` | `1em` |  |
+| `--input-border-color`{.primary .text-primary} | `#ccc` |  |
+| `--input-border-radius`{.primary .text-primary} | `4px` |  |
+| `--input-padding`{.primary .text-primary} | `0.5em 1em` |  |
+| `--input-font-size`{.primary .text-primary} | `1em` |  |
 
 
 
@@ -403,7 +389,7 @@ Un champ de saisie simple avec label et placeholder (API Composition)
   ### Events
 | Name | Description |
 |------|-------------|
-| `update:modelValue` | Émis à chaque modification de la valeur |
+| `update:modelValue`{.primary .text-primary} | Émis à chaque modification de la valeur |
 
 
 
@@ -412,9 +398,9 @@ Un champ de saisie simple avec label et placeholder (API Composition)
   ### Slots
 | Name | Description |
 |------|-------------|
-| `prefix` |  |
-| `useful` |  |
-| `default` |  |
+| `prefix`{.primary .text-primary} |  |
+| `useful`{.primary .text-primary} |  |
+| `default`{.primary .text-primary} |  |
 
 
 
@@ -423,37 +409,23 @@ Un champ de saisie simple avec label et placeholder (API Composition)
   ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-
-| `someOtherKey` | `&#39;providedValue&#39;` | `string` | Fourniture |
-
-| `symKey` | `&#39;valSym&#39;` | `string` |  |
-
-| `computedKey` | `true` | `boolean` |  |
-
-
+| `someOtherKey`{.primary .text-primary} | `&#39;providedValue&#39;` | `string` | Fourniture || `symKey`{.primary .text-primary} | `&#39;valSym&#39;` | `string` |  || `computedKey`{.primary .text-primary} | `true` | `boolean` |  |
 
 
 
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
-
-| `someKey` | <span style="color:#aaa">-</span> | - | Injection |
-
-| `symKey` | <span style="color:#aaa">-</span> | - |  |
-
-| `spread` | <span style="color:#aaa">-</span> | - |  |
-
-
+| `someKey`{.primary .text-primary} | <span style="color:#aaa">-</span> | - | Injection || `symKey`{.primary .text-primary} | <span style="color:#aaa">-</span> | - |  || `spread`{.primary .text-primary} | <span style="color:#aaa">-</span> | - |  |
 
 
 
   ### Expose
 | Name | Type | Description |
 |------|------|-------------|
-| `exposed` | `Ref&lt;any&gt;` |  |
-| `other` | `Ref&lt;any&gt;` |  |
-| `myFunc` | `() =&gt; string` |  |
+| `exposed`{.primary .text-primary} | `Ref&lt;any&gt;` |  |
+| `other`{.primary .text-primary} | `Ref&lt;any&gt;` |  |
+| `myFunc`{.primary .text-primary} | `() =&gt; string` |  |
 
 
 
@@ -462,10 +434,10 @@ Un champ de saisie simple avec label et placeholder (API Composition)
   ### CSS Variables
 | Name | Value | Description |
 |------|-------|-------------|
-| `--input-border-color` | `#ccc` |  |
-| `--input-border-radius` | `4px` |  |
-| `--input-padding` | `0.5em 1em` |  |
-| `--input-font-size` | `1em` |  |
+| `--input-border-color`{.primary .text-primary} | `#ccc` |  |
+| `--input-border-radius`{.primary .text-primary} | `4px` |  |
+| `--input-padding`{.primary .text-primary} | `0.5em 1em` |  |
+| `--input-font-size`{.primary .text-primary} | `1em` |  |
 
 
 

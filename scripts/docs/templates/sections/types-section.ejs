@@ -1,5 +1,5 @@
 ### Types
 | Name | Type | Description |
 |------|------|-------------|
-<% types.forEach(function(type) { %>| `<%= type.name %>` | <% if (type.type === 'string') { %>:badge{color="blue"}string:: <% } else if (type.type === 'number') { %>:badge{color="orange"}number:: <% } else if (type.type === 'boolean') { %>:badge{color="green"}boolean:: <% } else { %>`<%= type.type %>`<% } %> | <%= type.description %> |
+<% types.forEach(function(type) { %>| `<%= type.name %>`{.primary .text-primary} | <% if (type.type === 'string') { %>:badge{color="blue"}string:: <% } else if (type.type === 'number') { %>:badge{color="orange"}number:: <% } else if (type.type === 'boolean') { %>:badge{color="green"}boolean:: <% } else { %>`<%= type.type %>`<% } %> | <%= type.description %> |
 <% }); %>
