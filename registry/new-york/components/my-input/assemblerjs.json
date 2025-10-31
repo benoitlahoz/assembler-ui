@@ -1,11 +1,14 @@
 {
+  "$schema": "https://shadcn-vue.com/schema/registry-item.json",
   "name": "my-input",
   "title": "MyInput",
   "description": "Index file for input components",
+  "category": "inputs",
   "type": "registry:ui",
   "files": [
     {
       "name": "index",
+      "title": "index",
       "path": "registry/new-york/components/my-input/index.ts",
       "description": "Index file for input components",
       "author": "John Smith <john.smith@example.com>",
@@ -18,6 +21,7 @@
     },
     {
       "name": "my-input.d",
+      "title": "myInputd",
       "path": "registry/new-york/components/my-input/my-input.d.ts",
       "description": "Type declarations for my-input component",
       "category": "registry:ui",
@@ -31,6 +35,7 @@
     },
     {
       "name": "something",
+      "title": "something",
       "path": "registry/new-york/components/my-input/something.ts",
       "description": "A something file",
       "type": "registry:ui",
@@ -41,6 +46,7 @@
     },
     {
       "name": "SimpleInput",
+      "title": "SimpleInput",
       "path": "registry/new-york/components/my-input/SimpleInput.vue",
       "api": "options",
       "description": "Un champ de saisie simple avec label et placeholder",
@@ -180,6 +186,7 @@
     },
     {
       "name": "SimpleInputSetup",
+      "title": "SimpleInputSetup",
       "path": "registry/new-york/components/my-input/SimpleInputSetup.vue",
       "api": "composition",
       "description": "Un champ de saisie simple avec label et placeholder (API Composition)",
@@ -314,6 +321,5 @@
         }
       }
     }
-  ],
-  "$schema": "https://shadcn-vue.com/schema/registry-item.json"
+  ]
 }

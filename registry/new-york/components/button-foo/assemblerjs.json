@@ -1,11 +1,14 @@
 {
+  "$schema": "https://shadcn-vue.com/schema/registry-item.json",
   "name": "button-foo",
   "title": "ButtonFoo",
   "description": "A simple knob component that displays a button with \"Hello World\" text",
+  "category": "buttons",
   "type": "registry:ui",
   "files": [
     {
       "name": "index",
+      "title": "index",
       "path": "registry/new-york/components/button-foo/index.ts",
       "description": "A simple knob component that displays a button with \"Hello World\" text",
       "category": "buttons",
@@ -23,6 +26,7 @@
     },
     {
       "name": "ButtonFoo",
+      "title": "ButtonFoo",
       "path": "registry/new-york/components/button-foo/ButtonFoo.vue",
       "api": "composition",
       "description": "",
@@ -226,6 +230,7 @@
     },
     {
       "name": "ButtonFooBar",
+      "title": "ButtonFooBar",
       "path": "registry/new-york/components/button-foo/ButtonFooBar.vue",
       "api": "composition",
       "description": "",
@@ -275,6 +280,7 @@
     },
     {
       "name": "ButtonFooNoSetup",
+      "title": "ButtonFooNoSetup",
       "path": "registry/new-york/components/button-foo/ButtonFooNoSetup.vue",
       "api": "options",
       "description": "A simple knob component that displays a button with \"Hello World\" text",
@@ -426,6 +432,5 @@
       },
       "type": "registry:ui"
     }
-  ],
-  "$schema": "https://shadcn-vue.com/schema/registry-item.json"
+  ]
 }

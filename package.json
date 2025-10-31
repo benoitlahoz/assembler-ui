@@ -12,6 +12,7 @@
     "add:component": "npx shadcn-vue@latest add",
     "generate:descriptions": "tsx scripts/generate-descriptions.ts",
     "generate:registry": "tsx scripts/generate-registry-file.ts",
+    "generate:docs": "tsx scripts/docs/generate-docs.js",
     "build:registry": "yarn generate:descriptions && yarn generate:registry && shadcn-vue build .registry.json"
   },
   "repository": {

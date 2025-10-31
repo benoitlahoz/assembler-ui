@@ -1,14 +1,14 @@
 ---
-title: <%= title %>
-description: <%= description %>
+title: <%= typeof title !== 'undefined' ? title : '' %>
+description: <%= typeof description !== 'undefined' ? description : '' %>
 ---
 
-## <%= title %>
+## <%= typeof title !== 'undefined' ? title : '' %>
 
-<%= description %>
+<%= typeof description !== 'undefined' ? description : '' %>
 
 ### Author
-<%= author %>
+<%= typeof author !== 'undefined' ? author : '' %>
 
 ## Usage
 
@@ -18,27 +18,82 @@ description: <%= description %>
 ---
 class: "[&>div]:*:my-0 [&>div]:*:w-full"
 ---
-```vue [<%= mainFileName %>]
+```vue [<%= typeof mainFileName !== 'undefined' ? mainFileName : 'Component.vue' %>]
 <template>
-  <<%= componentName %> />
+  <<%= typeof componentName !== 'undefined' ? componentName : 'ComponentName' %> />
 </template>
 ```
 #code
 ````mdc
-```vue [<%= mainFileName %>]
+```vue [<%= typeof mainFileName !== 'undefined' ? mainFileName : 'Component.vue' %>]
 <template>
-  <<%= componentName %> />
+  <<%= typeof componentName !== 'undefined' ? componentName : 'ComponentName' %> />
 </template>
 ```
 ````
 ::
 
-<% if (props && props.length) { %>
+
+<% if (typeof props !== 'undefined' && props && props.length) { %>
 ## Props
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 <% props.forEach(function(prop) { %>| <%= prop.name %> | <%= prop.type %> | <%= prop.default %> | <%= prop.description %> |
+<% }); %>
+<% } %>
+
+<% if (typeof events !== 'undefined' && events && events.length) { %>
+## Events
+
+| Name | Description |
+|------|-------------|
+<% events.forEach(function(event) { %>| <%= event.name %> | <%= event.description %> |
+<% }); %>
+<% } %>
+
+<% if (typeof slots !== 'undefined' && slots && slots.length) { %>
+## Slots
+
+| Name | Description |
+|------|-------------|
+<% slots.forEach(function(slot) { %>| <%= slot.name %> | <%= slot.description %> |
+<% }); %>
+<% } %>
+
+<% if (typeof provide !== 'undefined' && provide && provide.length) { %>
+## Provide
+
+| Key | Value | Description |
+|-----|-------|-------------|
+<% provide.forEach(function(item) { %>| <%= item.key %> | <%= item.value %> | <%= item.description %> |
+<% }); %>
+<% } %>
+
+<% if (typeof inject !== 'undefined' && inject && inject.length) { %>
+## Inject
+
+| Key | Value | Description |
+|-----|-------|-------------|
+<% inject.forEach(function(item) { %>| <%= item.key %> | <%= item.value %> | <%= item.description %> |
+<% }); %>
+<% } %>
+
+<% if (typeof expose !== 'undefined' && expose && expose.length) { %>
+## Expose
+
+| Name | Description |
+|------|-------------|
+<% expose.forEach(function(item) { %>| <%= item.name %> | <%= item.description %> |
+<% }); %>
+<% } %>
+
+<% if (typeof cssVars !== 'undefined' && cssVars && cssVars.length) { %>
+## CSS Variables
+
+| Name | Description |
+|------|-------------|
+<% cssVars.forEach(function(cssVar) { %>| <%= cssVar.name %> | <%= cssVar.description %> |
 <% }); %>
 <% } %>
 

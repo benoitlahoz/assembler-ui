@@ -1,11 +1,13 @@
 {
+  "$schema": "https://shadcn-vue.com/schema/registry-item.json",
   "name": "knob",
   "title": "Knob",
-  "description": "",
+  "category": "miscellaneous",
   "type": "registry:ui",
   "files": [
     {
       "name": "index",
+      "title": "index",
       "path": "registry/new-york/components/knob/index.ts",
       "description": "",
       "doc": {
@@ -16,6 +18,7 @@
     },
     {
       "name": "Knob",
+      "title": "Knob",
       "path": "registry/new-york/components/knob/Knob.vue",
       "api": "composition",
       "description": "",
@@ -64,5 +67,5 @@
       "type": "registry:ui"
     }
   ],
-  "$schema": "https://shadcn-vue.com/schema/registry-item.json"
+  "description": ""
 }

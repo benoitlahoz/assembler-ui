@@ -1,6 +1,6 @@
 import { resolve, dirname, basename, join, relative } from 'path';
 import fs from 'fs';
-import { toKebabCase, toPascalCase } from '@assemblerjs/core';
+import { toKebabCase, toPascalCase, toCamelCase } from '@assemblerjs/core';
 import { isCompositionApi } from './common/is.composition-api';
 import { extractTs, extractDeclareModule } from './ts/extract-ts';
 import { extractVueSfcOptions } from './parse-vue-sfc-options';
@@ -25,8 +25,10 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
       ? extractVueSfcComposition(relVuePath, config)
       : extractVueSfcOptions(relVuePath, config);
     const { tags, ...docWithoutTags } = doc;
+    const name = basename(vuePath, '.vue');
     return {
-      name: basename(vuePath, '.vue'),
+      name,
+      title: toPascalCase(name),
       path: relVuePath,
       api: isComposition ? 'composition' : 'options',
       description: doc.description || '',
@@ -67,8 +69,10 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
     } else {
       relTsPath = join(config.globalPath, basename(absTsPath));
     }
+    const name = basename(absTsPath, '.ts');
     return {
-      name: basename(absTsPath, '.ts'),
+      name,
+      title: toCamelCase(name),
       path: relTsPath,
       description: description || '',
       ...tags,
@@ -87,9 +91,23 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
 
   const allItems = [...tsItems, ...vueItems];
   const foundType = (allItems.find((item) => (item as any).type) as any)?.type;
+
+  // Déterminer le titre global :
+  let title;
+  if (allItems.length > 0) {
+    // S'il y a au moins un fichier .vue, PascalCase, sinon camelCase
+    if (allItems.some((item) => item.path.endsWith('.vue'))) {
+      title = toPascalCase(folder);
+    } else {
+      title = toCamelCase(folder);
+    }
+  } else {
+    title = toPascalCase(folder);
+  }
+
   const result = {
     name: toKebabCase(folder),
-    title: toPascalCase(folder),
+    title,
     description: allItems.find((item) => item.description)?.description || '',
     // Can be undefined.
     type: foundType,

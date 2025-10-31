@@ -53,9 +53,42 @@ export const main = async () => {
                 type: typeof f.type !== 'undefined' ? f.type : result.type,
               }));
             }
+            // Déterminer la catégorie à reporter dans l'objet principal
+            if (typeof result.category === 'undefined') {
+              let mainCategory = undefined;
+              if (Array.isArray(result.files)) {
+                // Cherche d'abord un fichier nommé 'index' avec une catégorie
+                const indexFile = result.files.find((f: any) => f.name === 'index' && f.category);
+                if (indexFile && indexFile.category) {
+                  mainCategory = indexFile.category;
+                } else {
+                  // Sinon, prend la première catégorie trouvée
+                  const firstWithCategory = result.files.find((f: any) => f.category);
+                  if (firstWithCategory && firstWithCategory.category) {
+                    mainCategory = firstWithCategory.category;
+                  }
+                }
+              }
+              result.category = mainCategory || 'miscellaneous';
+            }
+            // Réorganiser les clés pour respecter l'ordre souhaité
+            const ordered: any = {};
+            if (result.$schema) ordered.$schema = result.$schema;
+            if (result.name) ordered.name = result.name;
+            if (result.title) ordered.title = result.title;
+            if (result.description) ordered.description = result.description;
+            if (result.category) ordered.category = result.category;
+            if (result.type) ordered.type = result.type;
+            if (result.files) ordered.files = result.files;
+            // Ajoute toutes les autres clés restantes
+            Object.keys(result).forEach((key) => {
+              if (!(key in ordered)) {
+                ordered[key] = result[key];
+              }
+            });
             fs.writeFileSync(
               outputPath,
-              DEBUG_JSON ? JSON.stringify(result, null, 2) : JSON.stringify(result),
+              DEBUG_JSON ? JSON.stringify(ordered, null, 2) : JSON.stringify(ordered),
               'utf-8'
             );
             return { type: result.type };
