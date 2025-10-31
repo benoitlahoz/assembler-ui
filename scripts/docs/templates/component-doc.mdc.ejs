@@ -48,6 +48,8 @@ description: <%= typeof description !== 'undefined' ? description : '' %>
 <% } %>
 :::
 
+--- 
+
 <% if (typeof files !== 'undefined' && Array.isArray(files)) { %>
 <% files.forEach(function(file) { %>
 
@@ -60,7 +62,6 @@ description: <%= typeof description !== 'undefined' ? description : '' %>
 <% if (file.author) { %>
 **Author**: <%= file.author %>
 <% } %>
-
 
 <% if (file.doc && file.doc.props && file.doc.props.length) { %>
   <%- include('sections/props-section.ejs', { props: file.doc.props }) %>
@@ -111,7 +112,7 @@ description: <%= typeof description !== 'undefined' ? description : '' %>
   <pre><code><%= file.doc.source.pug %></code></pre>
 </details>
 <% } %>
-
+---
 <% }); %>
 <% } %>
 

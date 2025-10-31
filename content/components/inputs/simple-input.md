@@ -239,6 +239,8 @@ label {
 
 :::
 
+--- 
+
 
 
 
@@ -250,7 +252,6 @@ Un champ de saisie simple avec label et placeholder
 
 
 **Author**: Jane Doe &lt;jane.doe@example.com&gt;
-
 
 
 
@@ -585,7 +586,7 @@ label {
 </code></pre>
 </details>
 
-
+---
 
 
 ## SimpleInputSetup
@@ -596,7 +597,6 @@ Un champ de saisie simple avec label et placeholder (API Composition)
 
 
 **Author**: Jane Doe &lt;jane.doe@example.com&gt;
-
 
 
 
@@ -897,7 +897,7 @@ label {
 </code></pre>
 </details>
 
-
+---
 
 
 
