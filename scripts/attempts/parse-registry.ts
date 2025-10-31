@@ -1,13 +1,12 @@
 import path from 'path';
 import fs from 'fs';
 import { toPascalCase } from '@assemblerjs/core';
+import { isCompositionApi } from './common/is.composition-api';
 import { extractTs } from './ts/extract-ts';
-import { extractVueSfc } from './parse-vue-sfc';
-import { extractVueSfcSetup } from './parse-vue-sfc-setup';
+import { extractVueSfcOptions } from './parse-vue-sfc-options';
+import { extractVueSfcComposition } from './parse-vue-sfc-composition';
 
 import config from '../../assembler-ui.config';
-import { vueExportRegex } from './common/vue-export.regex';
-import { scriptSetupRegex } from './common/script-setup.regex';
 
 export const extractFolder = (file: string) => {
   const absPath = file.startsWith('/') ? file : path.resolve(process.cwd(), file);
@@ -22,31 +21,18 @@ export const extractFolder = (file: string) => {
     .map((f) => path.join(folderDir, f));
   // Parse chaque .vue
   const vueItems = vueFiles.map((vuePath) => {
-    // Détection stricte : <script ... setup ...>
+    // Détection stricte : <script ... setup ...> non vide
     const vueSource = fs.readFileSync(vuePath, 'utf-8');
-    // Recherche tous les blocs <script ...>
-    const scriptBlockRegex = /<script([^>]*)>([\s\S]*?)<\/script>/gi;
-    let match;
-    let hasSetup = false;
-    let hasNonEmptySetup = false;
-    while ((match = scriptBlockRegex.exec(vueSource))) {
-      const attrs = match[1];
-      const content = match[2];
-      const isSetupBlock = /\bsetup\b/i.test(attrs || '');
-      if (isSetupBlock) {
-        hasSetup = true;
-        if (content && content.trim().length > 0) {
-          hasNonEmptySetup = true;
-        }
-      }
-    }
-    const isSetup = hasNonEmptySetup;
+    const isComposition = isCompositionApi(vueSource);
     // On passe un chemin relatif au workspace à extractVueSfc/extractVueSfcSetup
     const relVuePath = path.relative(process.cwd(), vuePath);
-    const doc = isSetup ? extractVueSfcSetup(relVuePath) : extractVueSfc(relVuePath);
+    const doc = isComposition
+      ? extractVueSfcComposition(relVuePath, config)
+      : extractVueSfcOptions(relVuePath, config);
     return {
       name: path.basename(vuePath, '.vue'),
       path: relVuePath,
+      api: isComposition ? 'composition' : 'options',
       doc,
     };
   });

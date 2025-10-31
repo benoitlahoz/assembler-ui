@@ -93,6 +93,7 @@ export default {
     <slot name="useful" :foo="bar" />
     <slot />
   </div>
+  <MyComponent />
   <input :placeholder="placeholder" :value="modelValue" @input="onInput" type="text" />
 </template>
 

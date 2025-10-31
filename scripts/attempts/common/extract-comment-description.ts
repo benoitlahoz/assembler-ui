@@ -1,14 +1,14 @@
 import * as ts from 'typescript';
 
-export function extractCommentDescription(
+export const extractCommentDescription = (
   scriptContent: string,
   lastRange: ts.CommentRange,
   el: ts.Expression
-): string {
+): string => {
   if (!lastRange) return '';
-  // On crée un faux SourceFile pour utiliser l'API TypeScript
+  // Create a fake SourceFile to use the TypeScript API
   const fakeSource = ts.createSourceFile('temp.ts', scriptContent, ts.ScriptTarget.Latest, true);
-  // On cherche le commentaire JSDoc qui couvre la position lastRange.pos
+  // Look for the JSDoc comment covering the lastRange.pos position
   let found = '';
   const jsdocNodes = ts.getJSDocCommentsAndTags ? ts.getJSDocCommentsAndTags(el) : [];
   if (jsdocNodes && jsdocNodes.length > 0) {
@@ -19,7 +19,7 @@ export function extractCommentDescription(
       }
     }
   }
-  // Fallback : si rien trouvé, on tente de parser le texte du commentaire comme avant
+  // Fallback: if nothing found, try to parse the comment text as before
   if (!found) {
     const cmt = scriptContent.slice(lastRange.pos, lastRange.end).trim();
     if (cmt.startsWith('/**')) {
@@ -35,4 +35,4 @@ export function extractCommentDescription(
     }
   }
   return found;
-}
+};
