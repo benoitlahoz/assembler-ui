@@ -22,7 +22,12 @@ const getDirectories = (source: string) => {
   return fs
     .readdirSync(source, { withFileTypes: true })
     .filter((dirent) => dirent.isDirectory())
-    .map((dirent) => join(dirent.parentPath, dirent.name));
+    .map((dirent) => {
+      return {
+        dir: join(dirent.parentPath, dirent.name),
+        name: dirent.name,
+      };
+    });
 };
 
 export const main = async () => {
@@ -33,17 +38,23 @@ export const main = async () => {
     const componentDirs = getDirectories(path);
 
     let remaining = componentDirs.length;
-    for (const dir of componentDirs) {
+    for (const { dir, name } of componentDirs) {
       total++;
       const outputPath = join(process.cwd(), dir, OutputFilename);
       try {
+        let type = '';
         await runWithSpinner({
           message: `Generating description ${dir}`,
           action: async () => {
-            const result = parseFolder(join(dir), config);
+            const result = parseFolder(join(dir), config) as any;
+            type = result.type || 'registry:ui';
+            result.$schema = config.$schema;
+            result.type = type;
             fs.writeFileSync(outputPath, JSON.stringify(result, null, 2), 'utf-8');
+            return { type };
           },
-          successMessage: `File generated: ${outputPath}`,
+          successMessage: (res) =>
+            `File generated for entry '${name}' of type '${res?.type ?? ''}'.`,
           failMessage: `Error while generating ${dir}`,
         });
       } catch (error) {
@@ -53,29 +64,12 @@ export const main = async () => {
       remaining--;
       showRemainingSpinner(remaining);
     }
-
-    /*
-    
-    for (const dir of componentDirs) {
-      total++;
-      const relComponentPath = join(path.replace(process.cwd() + '/', ''), dir);
-      const outputPath = join(path, dir, OutputFilename);
-      try {
-        await runWithSpinner({
-          message: `Generating component ${dir}`,
-          action: async () => {
-            const result = createRegistryItem(relComponentPath, type, Config);
-            fs.writeFileSync(outputPath, JSON.stringify(result, null, 2), 'utf-8');
-          },
-          successMessage: `File generated: ${outputPath}`,
-          failMessage: `Error while generating ${dir}`,
-        });
-      } catch (error) {
-        errors.push({ dir, error });
-      }
-      
-      */
   }
+
+  displayGenerationSummary(total, errors, {
+    successMessage: `✔ {count} file(s) generated successfully.`,
+  });
+  console.log('');
 };
 /*
   displayGenerationSummary(total, errors, {

@@ -1,6 +1,8 @@
 {
   "name": "my-input",
   "title": "MyInput",
+  "description": "Index file for input components",
+  "type": "registry:ui",
   "files": [
     {
       "name": "index",
@@ -311,5 +313,6 @@
         }
       }
     }
-  ]
+  ],
+  "$schema": "https://shadcn-vue.com/schema/registry-item.json"
 }

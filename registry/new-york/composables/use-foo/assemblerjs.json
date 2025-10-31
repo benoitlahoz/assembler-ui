@@ -1,6 +1,8 @@
 {
   "name": "use-foo",
   "title": "UseFoo",
+  "description": "A simple composable that provides a description of the foo feature.",
+  "type": "registry:hook",
   "files": [
     {
       "name": "useFoo",
@@ -12,5 +14,6 @@
         "source": "/**\n * A simple composable that provides a description of the foo feature.\n * @type registry:hook\n */\nexport const useFoo = () => {\n  const description = 'This is a foo composable used for demonstration purposes.';\n  return description;\n};\n"
       }
     }
-  ]
+  ],
+  "$schema": "https://shadcn-vue.com/schema/registry-item.json"
 }

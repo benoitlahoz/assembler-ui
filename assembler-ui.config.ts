@@ -1,6 +1,7 @@
 import pkg from './package.json' assert { type: 'json' };
 
 export default {
+  $schema: 'https://shadcn-vue.com/schema/registry-item.json',
   name: 'Assembler UI',
   homepage: 'https://benoitlahoz.github.io/assembler-ui',
   // Unless `// @ajs-author` is specified in a file, this author info will be used.

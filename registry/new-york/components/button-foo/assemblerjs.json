@@ -1,6 +1,8 @@
 {
   "name": "button-foo",
   "title": "ButtonFoo",
+  "description": "A simple knob component that displays a button with \"Hello World\" text",
+  "type": "registry:ui",
   "files": [
     {
       "name": "index",
@@ -420,5 +422,6 @@
         }
       }
     }
-  ]
+  ],
+  "$schema": "https://shadcn-vue.com/schema/registry-item.json"
 }

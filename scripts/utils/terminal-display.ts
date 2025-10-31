@@ -16,7 +16,7 @@ export const runWithSpinner = async ({
 }: {
   message: string;
   action: () => Promise<any>;
-  successMessage?: string;
+  successMessage?: string | ((result?: any) => string);
   failMessage?: string;
 }): Promise<any> => {
   const spinner = ora({
@@ -25,7 +25,13 @@ export const runWithSpinner = async ({
   }).start();
   try {
     const result = await action();
-    spinner.succeed(successMessage ? chalk.green(successMessage) : chalk.green('Success'));
+    let successMsg: string | undefined;
+    if (typeof successMessage === 'function') {
+      successMsg = successMessage(result);
+    } else {
+      successMsg = successMessage;
+    }
+    spinner.succeed(successMsg ? chalk.green(successMsg) : chalk.green('Success'));
     return result;
   } catch (err: any) {
     spinner.fail(
