@@ -45,7 +45,6 @@ export const generateDocs = () => {
 
     // Ajout de la gestion de la catégorie
     let category = assembler.category || null;
-    // Nettoyage du nom de catégorie (évite les caractères spéciaux)
     if (category) {
       category = String(category)
         .replace(/[^a-zA-Z0-9_-]/g, '-')
@@ -58,27 +57,25 @@ export const generateDocs = () => {
 
     const docFile = path.join(docFolder, `${assembler.name}.md`);
 
-    // Find main .vue file for usage example
-    const mainFile = (assembler.files || []).find((f) => f.path.endsWith('.vue'));
-    const mainFileName = mainFile
-      ? path.basename(mainFile.path)
-      : `${assembler.title || assembler.name}.vue`;
-    const props = (mainFile && mainFile.props) || [];
+    // Ordonner les files : celle qui porte le nom du dossier en premier
+    let files = Array.isArray(assembler.files) ? [...assembler.files] : [];
+    const mainIdx = files.findIndex(f => f.name === assembler.name || f.title === assembler.title);
+    if (mainIdx > 0) {
+      const [mainFile] = files.splice(mainIdx, 1);
+      files = [mainFile, ...files];
+    }
 
     const templateData = {
       title: assembler.title || assembler.name,
       description: assembler.description || '',
       author: assembler.author || '',
-      componentName: assembler.title || assembler.name,
-      mainFileName,
-      props,
+      files,
     };
 
     const template = fs.readFileSync(templatePath, 'utf-8');
     const rendered = ejs.render(template, templateData);
 
     fs.writeFileSync(docFile, rendered, 'utf-8');
-    // Optionnel : log
     console.log(`Doc générée : ${docFile}`);
   });
 };

@@ -3,99 +3,126 @@ title: <%= typeof title !== 'undefined' ? title : '' %>
 description: <%= typeof description !== 'undefined' ? description : '' %>
 ---
 
-## <%= typeof title !== 'undefined' ? title : '' %>
+
+
+# <%= typeof title !== 'undefined' ? title : '' %>
 
 <%= typeof description !== 'undefined' ? description : '' %>
 
-### Author
-<%= typeof author !== 'undefined' ? author : '' %>
+<% if (typeof author !== 'undefined' && author) { %>
+**Author**: <%= author %>
+<% } %>
 
-## Usage
+<% if (typeof files !== 'undefined' && Array.isArray(files)) { %>
+<% files.forEach(function(file) { %>
 
-### Basic Example
+## <%= file.title || file.name %>
 
-::code-preview
----
-class: "[&>div]:*:my-0 [&>div]:*:w-full"
----
-```vue [<%= typeof mainFileName !== 'undefined' ? mainFileName : 'Component.vue' %>]
-<template>
-  <<%= typeof componentName !== 'undefined' ? componentName : 'ComponentName' %> />
-</template>
-```
-#code
-````mdc
-```vue [<%= typeof mainFileName !== 'undefined' ? mainFileName : 'Component.vue' %>]
-<template>
-  <<%= typeof componentName !== 'undefined' ? componentName : 'ComponentName' %> />
-</template>
-```
-````
-::
+<%= file.description || '' %>
+<% if (file.api) { %>
+**API**: <%= file.api %>
+<% } %>
+<% if (file.author) { %>
+**Author**: <%= file.author %>
+<% } %>
 
-
-<% if (typeof props !== 'undefined' && props && props.length) { %>
-## Props
-
+<% if (file.doc && file.doc.props && file.doc.props.length) { %>
+### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-<% props.forEach(function(prop) { %>| <%= prop.name %> | <%= prop.type %> | <%= prop.default %> | <%= prop.description %> |
+<% file.doc.props.forEach(function(prop) { %>| <%= prop.name %> | <%= prop.type %> | <%= prop.default %> | <%= prop.description %> |
 <% }); %>
 <% } %>
 
-<% if (typeof events !== 'undefined' && events && events.length) { %>
-## Events
-
+<% if (file.doc && file.doc.emits && file.doc.emits.length) { %>
+### Events
 | Name | Description |
 |------|-------------|
-<% events.forEach(function(event) { %>| <%= event.name %> | <%= event.description %> |
+<% file.doc.emits.forEach(function(event) { %>| <%= event.name %> | <%= event.description %> |
 <% }); %>
 <% } %>
 
-<% if (typeof slots !== 'undefined' && slots && slots.length) { %>
-## Slots
-
+<% if (file.doc && file.doc.slots && file.doc.slots.length) { %>
+### Slots
 | Name | Description |
 |------|-------------|
-<% slots.forEach(function(slot) { %>| <%= slot.name %> | <%= slot.description %> |
+<% file.doc.slots.forEach(function(slot) { %>| <%= slot.name %> | <%= slot.description %> |
 <% }); %>
 <% } %>
 
-<% if (typeof provide !== 'undefined' && provide && provide.length) { %>
-## Provide
-
-| Key | Value | Description |
-|-----|-------|-------------|
-<% provide.forEach(function(item) { %>| <%= item.key %> | <%= item.value %> | <%= item.description %> |
+<% if (file.doc && file.doc.provides && file.doc.provides.length) { %>
+### Provide
+| Key | Value | Type | Description |
+|-----|-------|------|-------------|
+<% file.doc.provides.forEach(function(item) { %>| <%= item.key %> | <%= item.value %> | <%= item.type %> | <%= item.description %> |
 <% }); %>
 <% } %>
 
-<% if (typeof inject !== 'undefined' && inject && inject.length) { %>
-## Inject
-
-| Key | Value | Description |
-|-----|-------|-------------|
-<% inject.forEach(function(item) { %>| <%= item.key %> | <%= item.value %> | <%= item.description %> |
+<% if (file.doc && file.doc.injects && file.doc.injects.length) { %>
+### Inject
+| Key | Default | Type | Description |
+|-----|--------|------|-------------|
+<% file.doc.injects.forEach(function(item) { %>| <%= item.key %> | <%= item.default %> | <%= item.type %> | <%= item.description %> |
 <% }); %>
 <% } %>
 
-<% if (typeof expose !== 'undefined' && expose && expose.length) { %>
-## Expose
-
-| Name | Description |
-|------|-------------|
-<% expose.forEach(function(item) { %>| <%= item.name %> | <%= item.description %> |
+<% if (file.doc && file.doc.exposes && file.doc.exposes.length) { %>
+### Expose
+| Name | Type | Description |
+|------|------|-------------|
+<% file.doc.exposes.forEach(function(item) { %>| <%= item.name %> | <%= item.type || '' %> | <%= item.description %> |
 <% }); %>
 <% } %>
 
-<% if (typeof cssVars !== 'undefined' && cssVars && cssVars.length) { %>
-## CSS Variables
-
-| Name | Description |
-|------|-------------|
-<% cssVars.forEach(function(cssVar) { %>| <%= cssVar.name %> | <%= cssVar.description %> |
+<% if (file.doc && file.doc.cssVars && file.doc.cssVars.length) { %>
+### CSS Variables
+| Name | Value | Description |
+|------|-------|-------------|
+<% file.doc.cssVars.forEach(function(cssVar) { %>| <%= cssVar.name %> | <%= cssVar.value %> | <%= cssVar.description %> |
 <% }); %>
 <% } %>
+
+<% if (file.doc && file.doc.types && file.doc.types.length) { %>
+### Types
+| Name | Type | Description |
+|------|------|-------------|
+<% file.doc.types.forEach(function(type) { %>| <%= type.name %> | <%= type.type %> | <%= type.description %> |
+<% }); %>
+<% } %>
+
+<% if (file.doc && file.doc.childComponents && file.doc.childComponents.length) { %>
+### Child Components
+<ul>
+<% file.doc.childComponents.forEach(function(child) { %>
+  <li><%= child %></li>
+<% }); %>
+</ul>
+<% } %>
+
+<% if (file.doc && file.doc.source && file.doc.source.html) { %>
+<details>
+  <summary>Voir le code source HTML</summary>
+  <pre><code><%= file.doc.source.html %></code></pre>
+</details>
+<% } %>
+
+<% if (file.doc && file.doc.source && file.doc.source.pug) { %>
+<details>
+  <summary>Voir le code source Pug</summary>
+  <pre><code><%= file.doc.source.pug %></code></pre>
+</details>
+<% } %>
+
+<% }); %>
+<% } %>
+
+## Advanced Usage
+
+<!-- Add more code-preview/code-group/code-tree blocks as needed for advanced examples -->
+
+::tip
+You can copy and adapt this template for any component documentation.
+::
 
 ## Advanced Usage
 
