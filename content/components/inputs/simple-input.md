@@ -15,19 +15,23 @@ description: Index file for input components
   :::
 ::
 
-## Install with CLI 
+
+## Install with CLI
+---
+
+This will install the item in the path defined by your `components.json` file, thanks to shadcn-vue.
 
 :::code-group{.w-full}
-  ```bash [pnpm]
-  pnpm add @nuxt/ui
-  ```
-  
   ```bash [yarn]
   yarn add @nuxt/ui
   ```
   
   ```bash [npm]
   npm install @nuxt/ui
+  ```
+
+  ```bash [pnpm]
+  pnpm add @nuxt/ui
   ```
   
   ```bash [bun]
@@ -36,23 +40,27 @@ description: Index file for input components
 :::
 
 
+
 ## Install Manually
+---
 
-:::code-tree{default-value="src/components/ui/index.ts"}
+Copy and paste all the files below into your project.
+
+:::code-tree{default-value="src/components/ui/simple-input/index.ts"}
 
 
-```ts [src/components/ui/index.ts]
+```ts [src/components/ui/simple-input/index.ts]
 export { default as SimpleInput } from "./SimpleInput.vue";
 export { default as SimpleInputSetup } from "./SimpleInputSetup.vue";
 
 ```
 
-```ts [src/components/ui/something.ts]
+```ts [src/components/ui/simple-input/something.ts]
 export const a = 42;
 
 ```
 
-```vue [src/components/ui/SimpleInput.vue]
+```vue [src/components/ui/simple-input/SimpleInput.vue]
 <script lang="ts">
 const symKey = Symbol("symKey");
 
@@ -144,7 +152,7 @@ label {
 
 ```
 
-```vue [src/components/ui/SimpleInputSetup.vue]
+```vue [src/components/ui/simple-input/SimpleInputSetup.vue]
 <script setup lang="ts">
 import { ref, inject, provide, defineExpose } from "vue";
 
@@ -239,12 +247,12 @@ label {
 
 :::
 
---- 
 
 
 
 
 ## SimpleInput
+---
 
 Un champ de saisie simple avec label et placeholder
 
@@ -589,7 +597,9 @@ label {
 ---
 
 
+
 ## SimpleInputSetup
+---
 
 Un champ de saisie simple avec label et placeholder (API Composition)
 
@@ -901,7 +911,9 @@ label {
 
 
 
+
 ## Advanced Usage
+---
 
 <!-- Add more code-preview/code-group/code-tree blocks as needed for advanced examples -->
 

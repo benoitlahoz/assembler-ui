@@ -1,2 +1,12 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+
+/* Style shadcn-vue : séparateur markdown sans margin ni padding */
+hr {
+  border: none;
+  border-bottom: 1px solid var(--tw-prose-hr, theme(colors.gray.200));
+  margin: 0;
+  padding: 0;
+  height: 0;
+  background: none;
+}

@@ -135,10 +135,10 @@ export async function generateDocs(): Promise<void> {
       )
     ).filter(Boolean);
 
-    // Détermine le chemin de base pour le code-tree selon le type
-    let codeBasePath = 'src/components/ui';
-    if (normalizedType === 'block') codeBasePath = 'src/components/blocks';
-    else if (normalizedType === 'hook') codeBasePath = 'src/composables';
+    // Détermine le chemin de base pour le code-tree selon le type et le nom de l'item
+    let codeBasePath = `src/components/ui/${assembler.name}`;
+    if (normalizedType === 'block') codeBasePath = `src/components/blocks/${assembler.name}`;
+    else if (normalizedType === 'hook') codeBasePath = `src/composables/${assembler.name}`;
 
     // Définit le default-value pour le code-tree (premier fichier du tableau codes)
     let codeTreeDefaultValue = '';

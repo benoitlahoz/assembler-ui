@@ -15,7 +15,9 @@ description: A simple composable that provides a description of the foo feature.
   :::
 ::
 
-## Install with CLI 
+
+## Install with CLI
+---
 
 This will install the item in the path defined by your `components.json` file, thanks to shadcn-vue.
 
@@ -38,7 +40,9 @@ This will install the item in the path defined by your `components.json` file, t
 :::
 
 
+
 ## Install Manually
+---
 
 Copy and paste all the files below into your project.
 
@@ -57,13 +61,13 @@ export const useFoo = () => {
 
 :::
 
---- 
 
 
 
 
 
 ## Advanced Usage
+---
 
 <!-- Add more code-preview/code-group/code-tree blocks as needed for advanced examples -->
 
