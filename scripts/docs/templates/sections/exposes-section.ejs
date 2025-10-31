@@ -1,0 +1,5 @@
+### Expose
+| Name | Type | Description |
+|------|------|-------------|
+<% exposes.forEach(function(item) { %>| `<%= item.name %>` | <% if (item.type === 'string') { %>:badge{color="blue"}string:: <% } else if (item.type === 'number') { %>:badge{color="orange"}number:: <% } else if (item.type === 'boolean') { %>:badge{color="green"}boolean:: <% } else { %>`<%= item.type || '' %>`<% } %> | <%= item.description %> |
+<% }); %>

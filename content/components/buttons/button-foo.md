@@ -3,13 +3,17 @@ title: ButtonFoo
 description: A simple knob component that displays a button with &#34;Hello World&#34; text
 ---
 
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <button-foo />
+  :::
 
-
-# ButtonFoo
-
-A simple knob component that displays a button with &#34;Hello World&#34; text
-
-
+  :::tabs-item{icon="i-lucide-code" label="Code"}
+  ```vue
+  <ButtonFoo />
+  ```
+  :::
+::
 
 
 
@@ -25,89 +29,105 @@ A simple knob component that displays a button with &#34;Hello World&#34; text
 
 
 
-### Props
+
+  ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| foo | string | - | An optional string property named foo |
-| bar | number | 42 | A required number property named bar |
-| foo | string | - | An optional string property named foo |
-| bar | number | 42 | A required number property named bar |
+| `foo`{.primary .text-primary} | `string` | `-` | An optional string property named foo |
+| `bar`{.primary .text-primary} | `number` | `42` | A required number property named bar |
+| `foo`{.primary .text-primary} | `string` | `-` | An optional string property named foo |
+| `bar`{.primary .text-primary} | `number` | `42` | A required number property named bar |
 
 
 
 
-### Events
+  ### Events
 | Name | Description |
 |------|-------------|
-| click | Emitted when the button is clicked |
+| `click` | Emitted when the button is clicked |
 
 
 
 
-### Slots
+
+  ### Slots
 | Name | Description |
 |------|-------------|
-| default | Slot principal par défaut |
-| icon | Slot pour l&#39;icône à gauche |
-| static-named |  |
+| `default` | Slot principal par défaut |
+| `icon` | Slot pour l&#39;icône à gauche |
+| `static-named` |  |
 
 
 
 
-### Provide
+
+  ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-| symKey | &#39;valSym&#39; | string | Provide avec clé symbole |
-| objKey | 123 | number | Provide avec clé objet |
-| computedKey | true | boolean | Provide avec clé computed |
-| spread | { ...spreadObj } | any | Provide avec spread |
-| someOtherKey | &#39;providedValue&#39; | string | Provides a value with key &#39;someOtherKey&#39;. |
+
+| `symKey` | `&#39;valSym&#39;` | `string` | Provide avec clé symbole |
+
+| `objKey` | `123` | `number` | Provide avec clé objet |
+
+| `computedKey` | `true` | `boolean` | Provide avec clé computed |
+
+| `spread` | `{ ...spreadObj }` | `any` | Provide avec spread |
+
+| `someOtherKey` | `&#39;providedValue&#39;` | `string` | Provides a value with key &#39;someOtherKey&#39;. |
 
 
 
 
-### Inject
+
+  ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
-| symKey | &#39;defaultSym&#39; | string | Inject avec clé symbole |
-| spread | { ...spreadObj } | any | Inject avec spread |
-| someKey | &#39;defaultValue&#39; | string | Injects a value with key &#39;someKey&#39;. |
+
+| `symKey` | `&#39;defaultSym&#39;` | `string` | Inject avec clé symbole |
+
+| `spread` | `{ ...spreadObj }` | `any` | Inject avec spread |
+
+| `someKey` | `&#39;defaultValue&#39;` | `string` | Injects a value with key &#39;someKey&#39;. |
 
 
 
 
-### Expose
+
+  ### Expose
 | Name | Type | Description |
 |------|------|-------------|
-| exposed | Ref&lt;any&gt; | An exposed string property |
-| other | Ref&lt;string&gt; | Another exposed string property |
-| myFunc | () =&gt; FuncReturn | An exposed function that logs a message and returns &#39;foo&#39; |
+| `exposed` | `Ref&lt;any&gt;` | An exposed string property |
+| `other` | `Ref&lt;string&gt;` | Another exposed string property |
+| `myFunc` | `() =&gt; FuncReturn` | An exposed function that logs a message and returns &#39;foo&#39; |
 
 
 
 
-### CSS Variables
+
+  ### CSS Variables
 | Name | Value | Description |
 |------|-------|-------------|
-| --btn-radius | 4px | Rayon de bordure du bouton |
-| --btn-main-color | #ff0000 |  |
-| --btn-padding-x | 1.5em |  |
+| `--btn-radius` | `4px` | Rayon de bordure du bouton |
+| `--btn-main-color` | `#ff0000` |  |
+| `--btn-padding-x` | `1.5em` |  |
 
 
 
 
-### Types
+
+  ### Types
 | Name | Type | Description |
 |------|------|-------------|
-| ExportedType | { foo: string } | - |
-| ExportedInterface | interface | - |
-| FuncReturn | &#39;foo&#39; | &#39;bar&#39; | &#39;baz&#39; | Possible return types for myFunc. |
-| MyInterface | interface | An example interface with a sample property |
+| `ExportedType` | `{ foo: string }` | - |
+| `ExportedInterface` | `interface` | - |
+| `FuncReturn` | `&#39;foo&#39; | &#39;bar&#39; | &#39;baz&#39;` | Possible return types for myFunc. |
+| `MyInterface` | `interface` | An example interface with a sample property |
 
 
 
 
-### Child Components
+
+  ### Child Components
 <ul>
 
   <li>MyChild</li>
@@ -115,6 +135,7 @@ A simple knob component that displays a button with &#34;Hello World&#34; text
   <li>OtherChild</li>
 
 </ul>
+
 
 
 
@@ -479,44 +500,6 @@ Button(class=&#34;btn-main&#34; :class=&#34;[&#39;dynamic-class&#39;, { &#39;btn
 
 
 
-## index
-
-A simple knob component that displays a button with &#34;Hello World&#34; text
-
-
-**Author**: John Doe &lt;john.doe@example.com&gt;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-### Types
-| Name | Type | Description |
-|------|------|-------------|
-| ButtonFooProps | interface |  |
-
-
-
-
-
-
-
-
-
-
-
 ## ButtonFooBar
 
 
@@ -526,13 +509,14 @@ A simple knob component that displays a button with &#34;Hello World&#34; text
 
 
 
-### Props
+
+  ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| foo | string | - | @ajs-prop An optional string property named foo. |
-| ack | number | 1242 | @ajs-prop A required number property named ack. |
-| foo | string | - | @ajs-prop An optional string property named foo. |
-| ack | number | 1242 | @ajs-prop A required number property named ack. |
+| `foo`{.primary .text-primary} | `string` | `-` | @ajs-prop An optional string property named foo. |
+| `ack`{.primary .text-primary} | `number` | `1242` | @ajs-prop A required number property named ack. |
+| `foo`{.primary .text-primary} | `string` | `-` | @ajs-prop An optional string property named foo. |
+| `ack`{.primary .text-primary} | `number` | `1242` | @ajs-prop A required number property named ack. |
 
 
 
@@ -618,84 +602,99 @@ A simple knob component that displays a button with &#34;Hello World&#34; text
 
 
 
-### Props
+
+  ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| foo | String | - | An optional string property named foo |
-| bar | Number | 42 | A required number property named bar |
+| `foo`{.primary .text-primary} | `String` | `-` | An optional string property named foo |
+| `bar`{.primary .text-primary} | `Number` | `42` | A required number property named bar |
 
 
 
 
-### Events
+  ### Events
 | Name | Description |
 |------|-------------|
-| click | Définit les événements émis par le composant. |
+| `click` | Définit les événements émis par le composant. |
 
 
 
 
-### Slots
+
+  ### Slots
 | Name | Description |
 |------|-------------|
-| default |  |
-| icon |  |
-| static-named |  |
+| `default` |  |
+| `icon` |  |
+| `static-named` |  |
 
 
 
 
-### Provide
+
+  ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-| someOtherKey | &#39;providedValue&#39; | string | Provides a value with key &#39;someOtherKey&#39;. |
-| symKey | &#39;valSym&#39; | string | Provide avec clé symbole |
-| computedKey | true | boolean | Provide avec clé computed |
-| spread | { ...spreadObj } | any | Provide avec spread |
+
+| `someOtherKey` | `&#39;providedValue&#39;` | `string` | Provides a value with key &#39;someOtherKey&#39;. |
+
+| `symKey` | `&#39;valSym&#39;` | `string` | Provide avec clé symbole |
+
+| `computedKey` | `true` | `boolean` | Provide avec clé computed |
+
+| `spread` | `{ ...spreadObj }` | `any` | Provide avec spread |
 
 
 
 
-### Inject
+
+  ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
-| injected | &#39;someKey&#39; | string | Injects a value with key &#39;someKey&#39;. |
-| injectedSym | symKey | any | Inject avec clé symbole |
-| injectedSpread | &#39;spread&#39; | string | Inject avec spread |
+
+| `injected` | `&#39;someKey&#39;` | `string` | Injects a value with key &#39;someKey&#39;. |
+
+| `injectedSym` | `symKey` | `any` | Inject avec clé symbole |
+
+| `injectedSpread` | `&#39;spread&#39;` | `string` | Inject avec spread |
 
 
 
 
-### Expose
+
+  ### Expose
 | Name | Type | Description |
 |------|------|-------------|
-| exposed |  | An exposed string property |
-| other |  | Another exposed string property |
-| myFunc |  | An exposed function that logs a message and returns &#39;foo&#39; |
+| `exposed` | `` | An exposed string property |
+| `other` | `` | Another exposed string property |
+| `myFunc` | `` | An exposed function that logs a message and returns &#39;foo&#39; |
 
 
 
 
-### CSS Variables
+
+  ### CSS Variables
 | Name | Value | Description |
 |------|-------|-------------|
-| --btn-radius | 4px | Rayon de bordure du bouton |
-| --btn-main-color | #ff0000 |  |
-| --btn-padding-x | 1.5em |  |
+| `--btn-radius` | `4px` | Rayon de bordure du bouton |
+| `--btn-main-color` | `#ff0000` |  |
+| `--btn-padding-x` | `1.5em` |  |
 
 
 
 
-### Types
+
+  ### Types
 | Name | Type | Description |
 |------|------|-------------|
-| ExportedType | { foo: string } | Possible return types for myFunc. |
-| ExportedInterface | interface | An example interface with a sample property |
+| `ExportedType` | `{ foo: string }` | Possible return types for myFunc. |
+| `ExportedInterface` | `interface` | An example interface with a sample property |
 
 
 
 
-### Child Components
+
+  ### Child Components
 <ul>
 
   <li>MyChild</li>
@@ -703,6 +702,7 @@ A simple knob component that displays a button with &#34;Hello World&#34; text
   <li>OtherChild</li>
 
 </ul>
+
 
 
 
@@ -1101,14 +1101,6 @@ Button(class=&#34;btn-main&#34; :class=&#34;[&#39;dynamic-class&#39;, { &#39;btn
 
 
 
-
-## Advanced Usage
-
-<!-- Add more code-preview/code-group/code-tree blocks as needed for advanced examples -->
-
-::tip
-You can copy and adapt this template for any component documentation.
-::
 
 ## Advanced Usage
 

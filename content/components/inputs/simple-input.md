@@ -1,107 +1,19 @@
 ---
-title: MyInput
+title: SimpleInput
 description: Index file for input components
 ---
 
-
-
-# MyInput
-
-Index file for input components
-
-
-
-
-
-
-## index
-
-Index file for input components
-
-
-**Author**: John Smith &lt;john.smith@example.com&gt;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## myInputd
-
-Type declarations for my-input component
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## something
-
-A something file
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <simple-input />
+  :::
+
+  :::tabs-item{icon="i-lucide-code" label="Code"}
+  ```vue
+  <SimpleInput />
+  ```
+  :::
+::
 
 
 
@@ -117,83 +29,97 @@ Un champ de saisie simple avec label et placeholder
 
 
 
-### Props
+
+  ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| label | String |  | Le label affiché au-dessus du champ |
-| placeholder | String |  | Le placeholder du champ |
-| modelValue | String |  | Valeur du champ |
+| `label`{.primary .text-primary} | `String` | — | Le label affiché au-dessus du champ |
+| `placeholder`{.primary .text-primary} | `String` | — | Le placeholder du champ |
+| `modelValue`{.primary .text-primary} | `String` | — | Valeur du champ |
 
 
 
 
-### Events
+  ### Events
 | Name | Description |
 |------|-------------|
-| update:modelValue | Valeur du champ |
+| `update:modelValue` | Valeur du champ |
 
 
 
 
-### Slots
+
+  ### Slots
 | Name | Description |
 |------|-------------|
-| prefix |  |
-| useful |  |
-| default |  |
+| `prefix` |  |
+| `useful` |  |
+| `default` |  |
 
 
 
 
-### Provide
+
+  ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-| someOtherKey | &#39;providedValue&#39; | string | Provides a value with key &#39;someOtherKey&#39;. |
-| symKey | &#39;valSym&#39; | string | Provide avec clé symbole |
-| computedKey | true | boolean | Provide avec clé computed |
+
+| `someOtherKey` | `&#39;providedValue&#39;` | `string` | Provides a value with key &#39;someOtherKey&#39;. |
+
+| `symKey` | `&#39;valSym&#39;` | `string` | Provide avec clé symbole |
+
+| `computedKey` | `true` | `boolean` | Provide avec clé computed |
 
 
 
 
-### Inject
+
+  ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
-| injected | &#39;someKey&#39; | string | Injects a value with key &#39;someKey&#39;. |
-| injectedSym | symKey | any | Inject avec clé symbole |
-| injectedSpread | &#39;spread&#39; | string | Inject avec spread |
+
+| `injected` | `&#39;someKey&#39;` | `string` | Injects a value with key &#39;someKey&#39;. |
+
+| `injectedSym` | `symKey` | `any` | Inject avec clé symbole |
+
+| `injectedSpread` | `&#39;spread&#39;` | `string` | Inject avec spread |
 
 
 
 
-### Expose
+
+  ### Expose
 | Name | Type | Description |
 |------|------|-------------|
-| exposed |  | An exposed string property |
-| other |  | Another exposed string property |
-| myFunc |  | An exposed function that logs a message and returns &#39;foo&#39; |
+| `exposed` | `` | An exposed string property |
+| `other` | `` | Another exposed string property |
+| `myFunc` | `` | An exposed function that logs a message and returns &#39;foo&#39; |
 
 
 
 
-### CSS Variables
+
+  ### CSS Variables
 | Name | Value | Description |
 |------|-------|-------------|
-| --input-border-color | #ccc |  |
-| --input-border-radius | 4px |  |
-| --input-padding | 0.5em 1em |  |
-| --input-font-size | 1em |  |
+| `--input-border-color` | `#ccc` |  |
+| `--input-border-radius` | `4px` |  |
+| `--input-padding` | `0.5em 1em` |  |
+| `--input-font-size` | `1em` |  |
 
 
 
 
 
 
-### Child Components
+
+  ### Child Components
 <ul>
 
   <li>MyComponent</li>
 
 </ul>
+
 
 
 
@@ -463,83 +389,97 @@ Un champ de saisie simple avec label et placeholder (API Composition)
 
 
 
-### Props
+
+  ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| label | String | &#39;&#39; | Le label affiché au-dessus du champ |
-| placeholder | String | &#39;&#39; | Le placeholder du champ |
-| modelValue | String | &#39;&#39; | Valeur du champ |
+| `label`{.primary .text-primary} | `String` | `&#39;&#39;` | Le label affiché au-dessus du champ |
+| `placeholder`{.primary .text-primary} | `String` | `&#39;&#39;` | Le placeholder du champ |
+| `modelValue`{.primary .text-primary} | `String` | `&#39;&#39;` | Valeur du champ |
 
 
 
 
-### Events
+  ### Events
 | Name | Description |
 |------|-------------|
-| update:modelValue | Émis à chaque modification de la valeur |
+| `update:modelValue` | Émis à chaque modification de la valeur |
 
 
 
 
-### Slots
+
+  ### Slots
 | Name | Description |
 |------|-------------|
-| prefix |  |
-| useful |  |
-| default |  |
+| `prefix` |  |
+| `useful` |  |
+| `default` |  |
 
 
 
 
-### Provide
+
+  ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-| someOtherKey | &#39;providedValue&#39; | string | Fourniture |
-| symKey | &#39;valSym&#39; | string |  |
-| computedKey | true | boolean |  |
+
+| `someOtherKey` | `&#39;providedValue&#39;` | `string` | Fourniture |
+
+| `symKey` | `&#39;valSym&#39;` | `string` |  |
+
+| `computedKey` | `true` | `boolean` |  |
 
 
 
 
-### Inject
+
+  ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
-| someKey |  |  | Injection |
-| symKey |  |  |  |
-| spread |  |  |  |
+
+| `someKey` | <span style="color:#aaa">-</span> | - | Injection |
+
+| `symKey` | <span style="color:#aaa">-</span> | - |  |
+
+| `spread` | <span style="color:#aaa">-</span> | - |  |
 
 
 
 
-### Expose
+
+  ### Expose
 | Name | Type | Description |
 |------|------|-------------|
-| exposed | Ref&lt;any&gt; |  |
-| other | Ref&lt;any&gt; |  |
-| myFunc | () =&gt; string |  |
+| `exposed` | `Ref&lt;any&gt;` |  |
+| `other` | `Ref&lt;any&gt;` |  |
+| `myFunc` | `() =&gt; string` |  |
 
 
 
 
-### CSS Variables
+
+  ### CSS Variables
 | Name | Value | Description |
 |------|-------|-------------|
-| --input-border-color | #ccc |  |
-| --input-border-radius | 4px |  |
-| --input-padding | 0.5em 1em |  |
-| --input-font-size | 1em |  |
+| `--input-border-color` | `#ccc` |  |
+| `--input-border-radius` | `4px` |  |
+| `--input-padding` | `0.5em 1em` |  |
+| `--input-font-size` | `1em` |  |
 
 
 
 
 
 
-### Child Components
+
+  ### Child Components
 <ul>
 
   <li>MyComponent</li>
 
 </ul>
+
 
 
 
@@ -764,14 +704,6 @@ label {
 
 
 
-
-## Advanced Usage
-
-<!-- Add more code-preview/code-group/code-tree blocks as needed for advanced examples -->
-
-::tip
-You can copy and adapt this template for any component documentation.
-::
 
 ## Advanced Usage
 

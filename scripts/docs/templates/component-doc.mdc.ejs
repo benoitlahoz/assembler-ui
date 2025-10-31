@@ -3,15 +3,17 @@ title: <%= typeof title !== 'undefined' ? title : '' %>
 description: <%= typeof description !== 'undefined' ? description : '' %>
 ---
 
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <<%= name %> />
+  :::
 
-
-# <%= typeof title !== 'undefined' ? title : '' %>
-
-<%= typeof description !== 'undefined' ? description : '' %>
-
-<% if (typeof author !== 'undefined' && author) { %>
-**Author**: <%= author %>
-<% } %>
+  :::tabs-item{icon="i-lucide-code" label="Code"}
+  ```vue
+  <<%= title %> />
+  ```
+  :::
+::
 
 <% if (typeof files !== 'undefined' && Array.isArray(files)) { %>
 <% files.forEach(function(file) { %>
@@ -26,77 +28,41 @@ description: <%= typeof description !== 'undefined' ? description : '' %>
 **Author**: <%= file.author %>
 <% } %>
 
+
 <% if (file.doc && file.doc.props && file.doc.props.length) { %>
-### Props
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-<% file.doc.props.forEach(function(prop) { %>| <%= prop.name %> | <%= prop.type %> | <%= prop.default %> | <%= prop.description %> |
-<% }); %>
+  <%- include('sections/props-section.ejs', { props: file.doc.props }) %>
 <% } %>
 
 <% if (file.doc && file.doc.emits && file.doc.emits.length) { %>
-### Events
-| Name | Description |
-|------|-------------|
-<% file.doc.emits.forEach(function(event) { %>| <%= event.name %> | <%= event.description %> |
-<% }); %>
+  <%- include('sections/events-section.ejs', { events: file.doc.emits }) %>
 <% } %>
 
 <% if (file.doc && file.doc.slots && file.doc.slots.length) { %>
-### Slots
-| Name | Description |
-|------|-------------|
-<% file.doc.slots.forEach(function(slot) { %>| <%= slot.name %> | <%= slot.description %> |
-<% }); %>
+  <%- include('sections/slots-section.ejs', { slots: file.doc.slots }) %>
 <% } %>
 
 <% if (file.doc && file.doc.provides && file.doc.provides.length) { %>
-### Provide
-| Key | Value | Type | Description |
-|-----|-------|------|-------------|
-<% file.doc.provides.forEach(function(item) { %>| <%= item.key %> | <%= item.value %> | <%= item.type %> | <%= item.description %> |
-<% }); %>
+  <%- include('sections/provides-section.ejs', { provides: file.doc.provides }) %>
 <% } %>
 
 <% if (file.doc && file.doc.injects && file.doc.injects.length) { %>
-### Inject
-| Key | Default | Type | Description |
-|-----|--------|------|-------------|
-<% file.doc.injects.forEach(function(item) { %>| <%= item.key %> | <%= item.default %> | <%= item.type %> | <%= item.description %> |
-<% }); %>
+  <%- include('sections/injects-section.ejs', { injects: file.doc.injects }) %>
 <% } %>
 
 <% if (file.doc && file.doc.exposes && file.doc.exposes.length) { %>
-### Expose
-| Name | Type | Description |
-|------|------|-------------|
-<% file.doc.exposes.forEach(function(item) { %>| <%= item.name %> | <%= item.type || '' %> | <%= item.description %> |
-<% }); %>
+  <%- include('sections/exposes-section.ejs', { exposes: file.doc.exposes }) %>
 <% } %>
 
 <% if (file.doc && file.doc.cssVars && file.doc.cssVars.length) { %>
-### CSS Variables
-| Name | Value | Description |
-|------|-------|-------------|
-<% file.doc.cssVars.forEach(function(cssVar) { %>| <%= cssVar.name %> | <%= cssVar.value %> | <%= cssVar.description %> |
-<% }); %>
+  <%- include('sections/cssvars-section.ejs', { cssVars: file.doc.cssVars }) %>
 <% } %>
 
 <% if (file.doc && file.doc.types && file.doc.types.length) { %>
-### Types
-| Name | Type | Description |
-|------|------|-------------|
-<% file.doc.types.forEach(function(type) { %>| <%= type.name %> | <%= type.type %> | <%= type.description %> |
-<% }); %>
+  <%- include('sections/types-section.ejs', { types: file.doc.types }) %>
 <% } %>
 
 <% if (file.doc && file.doc.childComponents && file.doc.childComponents.length) { %>
-### Child Components
-<ul>
-<% file.doc.childComponents.forEach(function(child) { %>
-  <li><%= child %></li>
-<% }); %>
-</ul>
+  <%- include('sections/childcomponents-section.ejs', { childComponents: file.doc.childComponents }) %>
 <% } %>
 
 <% if (file.doc && file.doc.source && file.doc.source.html) { %>
@@ -115,14 +81,6 @@ description: <%= typeof description !== 'undefined' ? description : '' %>
 
 <% }); %>
 <% } %>
-
-## Advanced Usage
-
-<!-- Add more code-preview/code-group/code-tree blocks as needed for advanced examples -->
-
-::tip
-You can copy and adapt this template for any component documentation.
-::
 
 ## Advanced Usage
 

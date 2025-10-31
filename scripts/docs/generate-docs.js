@@ -59,13 +59,25 @@ export const generateDocs = () => {
 
     // Ordonner les files : celle qui porte le nom du dossier en premier
     let files = Array.isArray(assembler.files) ? [...assembler.files] : [];
-    const mainIdx = files.findIndex(f => f.name === assembler.name || f.title === assembler.title);
+    // Filtrer les fichiers 'index', ceux de type '.d', et les .ts pour registry:ui et registry:hook
+    files = files.filter((f) => {
+      const isIndex = f.name === 'index' || f.title === 'index';
+      const isDts =
+        f.path && (f.path.endsWith('.d.ts') || f.path.endsWith('.d.js') || f.path.endsWith('.d'));
+      const isTs = f.path && f.path.endsWith('.ts');
+      if ((type === 'registry:ui' || type === 'registry:hook') && isTs) return false;
+      return !isIndex && !isDts;
+    });
+    const mainIdx = files.findIndex(
+      (f) => f.name === assembler.name || f.title === assembler.title
+    );
     if (mainIdx > 0) {
       const [mainFile] = files.splice(mainIdx, 1);
       files = [mainFile, ...files];
     }
 
     const templateData = {
+      name: assembler.name,
       title: assembler.title || assembler.name,
       description: assembler.description || '',
       author: assembler.author || '',
@@ -73,7 +85,7 @@ export const generateDocs = () => {
     };
 
     const template = fs.readFileSync(templatePath, 'utf-8');
-    const rendered = ejs.render(template, templateData);
+    const rendered = ejs.render(template, templateData, { filename: templatePath });
 
     fs.writeFileSync(docFile, rendered, 'utf-8');
     console.log(`Doc générée : ${docFile}`);

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "author": "Benoît Lahoz <info@benoitlahoz.io>",
   "scripts": {
-    "dev": "nuxt dev --extends docus",
+    "dev": "yarn generate:docs && nuxt dev --extends docus",
     "build": "nuxt build --extends docus",
     "format": "prettier . --check",
     "format:fix": "prettier . --write",
@@ -12,7 +12,7 @@
     "add:component": "npx shadcn-vue@latest add",
     "generate:descriptions": "tsx scripts/generate-descriptions.ts",
     "generate:registry": "tsx scripts/generate-registry-file.ts",
-    "generate:docs": "tsx scripts/docs/generate-docs.js",
+    "generate:docs": "yarn generate:descriptions && tsx scripts/docs/generate-docs.js",
     "build:registry": "yarn generate:descriptions && yarn generate:registry && shadcn-vue build .registry.json"
   },
   "repository": {

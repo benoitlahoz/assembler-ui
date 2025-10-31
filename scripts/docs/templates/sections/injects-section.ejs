@@ -1,0 +1,6 @@
+### Inject
+| Key | Default | Type | Description |
+|-----|--------|------|-------------|
+<% injects.forEach(function(item) { %>
+| `<%= item.key %>` | <% if (typeof item.default === 'boolean' || typeof item.default === 'number') { %>`<%= item.default %>`<% } else if (item.default === '' || typeof item.default === 'undefined') { %><span style="color:#aaa">-</span><% } else { %>`<%= item.default %>`<% } %> | <% if (item.type === 'string' || item.type === 'number' || item.type === 'boolean') { %>`<%= item.type %>`<% } else if (!item.type || item.type === '') { %>-<% } else { %>`<%= item.type %>`<% } %> | <%= item.description %> |
+<% }); %>

@@ -3,13 +3,17 @@ title: Knob
 description: 
 ---
 
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <knob />
+  :::
 
-
-# Knob
-
-
-
-
+  :::tabs-item{icon="i-lucide-code" label="Code"}
+  ```vue
+  <Knob />
+  ```
+  :::
+::
 
 
 
@@ -23,13 +27,14 @@ description:
 
 
 
-### Props
+
+  ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| foo | string | - | @ajs-prop An optional string property named foo. |
-| bar | number | 42 | @ajs-prop A required number property named bar. |
-| foo | string | - | @ajs-prop An optional string property named foo. |
-| bar | number | 42 | @ajs-prop A required number property named bar. |
+| `foo`{.primary .text-primary} | `string` | `-` | @ajs-prop An optional string property named foo. |
+| `bar`{.primary .text-primary} | `number` | `42` | @ajs-prop A required number property named bar. |
+| `foo`{.primary .text-primary} | `string` | `-` | @ajs-prop An optional string property named foo. |
+| `bar`{.primary .text-primary} | `number` | `42` | @ajs-prop A required number property named bar. |
 
 
 
@@ -106,44 +111,6 @@ Button
 
 
 
-## index
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## Advanced Usage
-
-<!-- Add more code-preview/code-group/code-tree blocks as needed for advanced examples -->
-
-::tip
-You can copy and adapt this template for any component documentation.
-::
 
 ## Advanced Usage
 
