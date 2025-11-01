@@ -5,6 +5,8 @@
  * @category inputs
  *
  * @demo SimpleInputDemo
+ * -- Example
+ * -- A very simple example of SimpleInput usage.
  * @demo SimpleInputDemoBis
  */
 export { default as SimpleInput } from './SimpleInput.vue';

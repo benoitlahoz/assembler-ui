@@ -77,7 +77,6 @@ export default defineNuxtConfig({
     dirs: [
       { path: '~/components', pathPrefix: false, extensions: ['.vue'], ignore: ['**/index.ts'] },
       { path: '~/../registry', pathPrefix: false, extensions: ['.vue'], ignore: ['**/index.ts'] },
-      { path: '~/../examples', pathPrefix: false, extensions: ['.vue'], ignore: ['**/index.ts'] },
     ],
   },
 });

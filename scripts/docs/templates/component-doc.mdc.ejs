@@ -3,6 +3,11 @@ title: <%= typeof title !== 'undefined' ? title : '' %>
 description: <%= typeof description !== 'undefined' ? description : '' %>
 ---
 
+
+<% if (typeof mainExampleName !== 'undefined' && mainExampleName) { %>
+  <%- include('sections/example-section.ejs', { exampleName: mainExampleName }) %>
+<% } %>
+
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
     <<%= name %> />
@@ -60,7 +65,6 @@ Copy and paste these files into your project.
 
 <% if (typeof files !== 'undefined' && Array.isArray(files)) { %>
 <% files.forEach(function(file) { %>
-
 
 ## <%= file.title || file.name %>
 ::hr-underline

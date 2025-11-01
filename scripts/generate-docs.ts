@@ -5,6 +5,11 @@ import { decode } from 'entities';
 import { stripComments } from './docs/common/strip-comments';
 import { formatCode } from './docs/common/format-code';
 
+import config from '../assembler-ui.config';
+
+const GlobalComponentsPath = config.globalPath || 'registry/new-york/';
+const DescriptionFilename = config.definitionFile || 'assemblerjs.json';
+
 type AssemblerDoc = {
   install?: string;
   name: string;
@@ -32,7 +37,7 @@ function findAssemblerJsons(dir: string): string[] {
     const stat = fs.statSync(filePath);
     if (stat && stat.isDirectory()) {
       results = results.concat(findAssemblerJsons(filePath));
-    } else if (file === 'assemblerjs.json') {
+    } else if (file === DescriptionFilename) {
       results.push(filePath);
     }
   }
@@ -63,7 +68,7 @@ function getOutputDir(type: string, category?: string): string {
 }
 
 export async function generateDocs(): Promise<void> {
-  const baseDir = path.resolve(process.cwd(), 'registry/new-york');
+  const baseDir = path.resolve(process.cwd(), GlobalComponentsPath);
   const templatePath = path.resolve(process.cwd(), 'scripts/docs/templates/component-doc.mdc.ejs');
   const assemblerJsons = findAssemblerJsons(baseDir);
 
@@ -146,7 +151,7 @@ export async function generateDocs(): Promise<void> {
       codeTreeDefaultValue = `${codeBasePath}/${codes[0].filename}`;
     }
 
-    const templateData = {
+    const templateData: Record<string, any> = {
       install: assembler.install || '',
       name: assembler.name,
       title: assembler.title || assembler.name,
@@ -157,6 +162,10 @@ export async function generateDocs(): Promise<void> {
       codeBasePath,
       codeTreeDefaultValue,
     };
+    // Si demo existe et est un array non vide, passer le premier comme mainExampleName
+    if (Array.isArray(assembler.demo) && assembler.demo.length > 0) {
+      templateData.mainExampleName = assembler.demo[0];
+    }
 
     const template = fs.readFileSync(templatePath, 'utf-8');
     const rendered = ejs.render(template, templateData, { filename: templatePath });

@@ -35,3 +35,7 @@ logs
 #VSC
 .history
 .wrangler
+
+# Descriptions files
+assemblerjs.json
+.registry.json

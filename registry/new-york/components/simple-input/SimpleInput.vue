@@ -88,14 +88,15 @@ export default {
 </script>
 
 <template>
-  <label v-if="label">{{ label }}</label>
-  <div>
-    <slot name="prefix"></slot>
-    <slot name="useful" :foo="bar" />
-    <slot />
+  <div class="flex flex-col">
+    <label v-if="label">{{ label }}</label>
+    <div>
+      <slot name="prefix"></slot>
+      <slot name="useful" :foo="bar" />
+      <slot />
+    </div>
+    <input :placeholder="placeholder" :value="modelValue" @input="onInput" type="text" />
   </div>
-  <MyComponent />
-  <input :placeholder="placeholder" :value="modelValue" @input="onInput" type="text" />
 </template>
 
 <style scoped>

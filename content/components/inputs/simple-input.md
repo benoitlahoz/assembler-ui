@@ -3,6 +3,25 @@ title: SimpleInput
 description: Index file for input components
 ---
 
+
+
+  
+
+
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <simple-input-demo />
+  :::
+
+  :::tabs-item{icon="i-lucide-code" label="Code"}
+  ```vue
+  <SimpleInputDemo />
+  ```
+  :::
+::
+
+
+
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
     <simple-input />
@@ -116,19 +135,20 @@ export default {
 </script>
 
 <template>
-  <label v-if="label">{{ label }}</label>
-  <div>
-    <slot name="prefix"></slot>
-    <slot name="useful" :foo="bar" />
-    <slot />
+  <div class="flex flex-col">
+    <label v-if="label">{{ label }}</label>
+    <div>
+      <slot name="prefix"></slot>
+      <slot name="useful" :foo="bar" />
+      <slot />
+    </div>
+    <input
+      :placeholder="placeholder"
+      :value="modelValue"
+      @input="onInput"
+      type="text"
+    />
   </div>
-  <MyComponent />
-  <input
-    :placeholder="placeholder"
-    :value="modelValue"
-    @input="onInput"
-    type="text"
-  />
 </template>
 
 <style scoped>
@@ -252,7 +272,6 @@ label {
 
 
 
-
 ## SimpleInput
 ::hr-underline
 ::
@@ -333,14 +352,6 @@ Un champ de saisie simple avec label et placeholder
 
 
 
-
-
-  ### Child Components
-<ul>
-
-  <li>MyComponent</li>
-
-</ul>
 
 
 
@@ -437,14 +448,15 @@ export default {
 &lt;/script&gt;
 
 &lt;template&gt;
-  &lt;label v-if=&#34;label&#34;&gt;{{ label }}&lt;/label&gt;
-  &lt;div&gt;
-    &lt;slot name=&#34;prefix&#34;&gt;&lt;/slot&gt;
-    &lt;slot name=&#34;useful&#34; :foo=&#34;bar&#34; /&gt;
-    &lt;slot /&gt;
+  &lt;div class=&#34;flex flex-col&#34;&gt;
+    &lt;label v-if=&#34;label&#34;&gt;{{ label }}&lt;/label&gt;
+    &lt;div&gt;
+      &lt;slot name=&#34;prefix&#34;&gt;&lt;/slot&gt;
+      &lt;slot name=&#34;useful&#34; :foo=&#34;bar&#34; /&gt;
+      &lt;slot /&gt;
+    &lt;/div&gt;
+    &lt;input :placeholder=&#34;placeholder&#34; :value=&#34;modelValue&#34; @input=&#34;onInput&#34; type=&#34;text&#34; /&gt;
   &lt;/div&gt;
-  &lt;MyComponent /&gt;
-  &lt;input :placeholder=&#34;placeholder&#34; :value=&#34;modelValue&#34; @input=&#34;onInput&#34; type=&#34;text&#34; /&gt;
 &lt;/template&gt;
 
 &lt;style scoped&gt;
@@ -564,14 +576,14 @@ export default {
 &lt;/script&gt;
 
 &lt;template lang=&#34;pug&#34;&gt;
-label(v-if=&#34;label&#34;)
-  | {{ label }}
-div
-  slot(name=&#34;prefix&#34;)
-  slot(name=&#34;useful&#34; :foo=&#34;bar&#34;)
-  slot
-MyComponent
-input(:placeholder=&#34;placeholder&#34; :value=&#34;modelValue&#34; @input=&#34;onInput&#34; type=&#34;text&#34;)
+div(class=&#34;flex flex-col&#34;)
+  label(v-if=&#34;label&#34;)
+    | {{ label }}
+  div
+    slot(name=&#34;prefix&#34;)
+    slot(name=&#34;useful&#34; :foo=&#34;bar&#34;)
+    slot
+  input(:placeholder=&#34;placeholder&#34; :value=&#34;modelValue&#34; @input=&#34;onInput&#34; type=&#34;text&#34;)
 &lt;/template&gt;
 
 &lt;style scoped&gt;
@@ -598,7 +610,6 @@ label {
 </details>
 
 ---
-
 
 
 ## SimpleInputSetup

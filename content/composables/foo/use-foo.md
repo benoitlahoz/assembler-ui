@@ -3,6 +3,9 @@ title: useFoo
 description: A simple composable that provides a description of the foo feature.
 ---
 
+
+
+
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
     <use-foo />

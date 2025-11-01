@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { join } from 'path';
+import { parseFolder } from './parse-folder';
 import {
   runWithSpinner,
   displayGenerationSummary,
@@ -7,7 +8,6 @@ import {
 } from './utils/terminal-display';
 
 import config from '../assembler-ui.config.js';
-import { parseFolder } from './parse-folder';
 
 const DEBUG_JSON = true;
 
@@ -43,6 +43,7 @@ export const main = async () => {
           message: `Generating description for '${name}'`,
           action: async () => {
             const result = parseFolder(join(dir), config) as any;
+
             result.$schema = config.$schema;
             // Toujours forcer le champ type : si absent, mettre registry:ui
             result.type = typeof result.type !== 'undefined' ? result.type : 'registry:ui';
@@ -53,6 +54,22 @@ export const main = async () => {
                 type: typeof f.type !== 'undefined' ? f.type : result.type,
               }));
             }
+
+            // Récupérer toutes les entrées demo des files et les placer dans l'objet principal
+            if (Array.isArray(result.files)) {
+              const allDemos = result.files
+                .filter((f: any) => Array.isArray(f.demo) && f.demo.length > 0)
+                .flatMap((f: any) => f.demo);
+              if (allDemos.length > 0) {
+                result.demo = allDemos;
+              }
+              // Supprimer demo de chaque file
+              result.files = result.files.map((f: any) => {
+                const { demo, ...rest } = f;
+                return rest;
+              });
+            }
+
             // Déterminer la catégorie à reporter dans l'objet principal
             if (typeof result.category === 'undefined') {
               let mainCategory = undefined;
@@ -80,6 +97,7 @@ export const main = async () => {
             if (result.description) ordered.description = result.description;
             if (result.category) ordered.category = result.category;
             if (result.type) ordered.type = result.type;
+            if (result.demo) ordered.demo = result.demo;
             if (result.files) ordered.files = result.files;
             // Ajoute toutes les autres clés restantes
             Object.keys(result).forEach((key) => {

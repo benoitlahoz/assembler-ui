@@ -1,6 +1,8 @@
 import { resolve, dirname, basename, join, relative } from 'path';
 import fs from 'fs';
 import { toKebabCase, toPascalCase, toCamelCase } from '@assemblerjs/core';
+import { extractDemo } from './common/extract-demo';
+import { convertContent } from './common/convert-template-to-pug';
 import { isCompositionApi } from './common/is.composition-api';
 import { extractTs, extractDeclareModule } from './ts/extract-ts';
 import { extractVueSfcOptions } from './parse-vue-sfc-options';
@@ -92,7 +94,6 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
   const allItems = [...tsItems, ...vueItems];
   const foundType = (allItems.find((item) => (item as any).type) as any)?.type;
 
-  // Déterminer le titre global :
   let title;
   if (allItems.length > 0) {
     // S'il y a au moins un fichier .vue, PascalCase, sinon camelCase
@@ -105,7 +106,19 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
     title = toPascalCase(folder);
   }
 
-  const result = {
+  // Regroupe toutes les demos des files, cherche le code source, et les place à la racine
+  let demo: any[] = [];
+  if (Array.isArray(allItems)) {
+    demo = extractDemo(absDir, allItems);
+    // Supprime demo de chaque file
+    for (const file of allItems) {
+      if ((file as any).demo) {
+        delete (file as any).demo;
+      }
+    }
+  }
+
+  const result: any = {
     name: toKebabCase(folder),
     title,
     description: allItems.find((item) => item.description)?.description || '',
@@ -114,17 +127,9 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
     files: allItems,
   };
 
+  if (demo.length > 0) {
+    result.demo = demo;
+  }
+
   return result;
 };
-/*
-if (require.main === module) {
-  const tsFilePath = 'registry/new-york/components/my-input/index.ts';
-  const result = extractFolder(tsFilePath);
-  fs.writeFileSync(
-    'scripts/parse-folder/ts-comments.json',
-    JSON.stringify(result, null, 2),
-    'utf-8'
-  );
-  console.log('TS+Vue comments extraction result written to scripts/parse-folder/ts-comments.json');
-}
-*/
