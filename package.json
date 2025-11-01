@@ -28,7 +28,7 @@
   "dependencies": {
     "@anymud/nuxt-module-alias": "^0.1.6",
     "@assemblerjs/core": "^0.9.6",
-    "@nuxt/content": "3.7.1",
+    "@nuxt/content": "^3.8.0",
     "@nuxt/eslint": "1.10.0",
     "@nuxt/scripts": "0.13.0",
     "@nuxt/ui": "4.1.0",

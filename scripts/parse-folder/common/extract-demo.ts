@@ -1,6 +1,8 @@
-import { convertTemplateToPug } from './convert-template-to-pug';
 import fs from 'fs';
 import { join, resolve, basename } from 'path';
+import { toKebabCase } from '@assemblerjs/core';
+import { convertTemplateToPug } from './convert-template-to-pug';
+
 
 /**
  * Recherche récursive un fichier .vue du nom de la démo dans le dossier et ses sous-dossiers,
@@ -23,17 +25,15 @@ export function extractDemoCode(
       if (found) return found;
     } else if (stat.isFile() && file.endsWith('.vue') && basename(file, '.vue') === demoName) {
       const vueSource = fs.readFileSync(fullPath, 'utf-8');
-      // html = tout le code du fichier, sur une seule ligne
-      let html = vueSource.replace(/\r?\n|\s{2,}/g, ' ').trim();
-      // pug = tout le fichier mais avec le template converti en pug
+      // html = tout le code du fichier, préserve les sauts de ligne et l'indentation
+      let html = vueSource;
+      // pug = tout le fichier mais avec le template converti en pug, préserve aussi les sauts de ligne
       const templateMatch = vueSource.match(/<template[^>]*>([\s\S]*?)<\/template>/i);
-      const templateContent = templateMatch && templateMatch[1] ? templateMatch[1].trim() : '';
+      const templateContent = templateMatch && templateMatch[1] ? templateMatch[1] : '';
       const pug = templateContent
         ? convertTemplateToPug(vueSource, templateContent)
-            .replace(/\r?\n|\s{2,}/g, ' ')
-            .trim()
         : undefined;
-      return { name: demoName, html, pug };
+      return { name: toKebabCase(demoName), html, pug };
     }
   }
   return undefined;
@@ -52,7 +52,7 @@ export function extractDemo(absDir: string, allItems: any[]): any[] {
     if (typeof entry === 'string') {
       const demoObj = extractDemoCode(absDir, entry);
       demo.push({
-        name: entry,
+        name: toKebabCase(entry),
         definition: undefined,
         html: demoObj ? demoObj.html : undefined,
         pug: demoObj ? demoObj.pug : undefined,
@@ -62,7 +62,7 @@ export function extractDemo(absDir: string, allItems: any[]): any[] {
         if (typeof sub === 'string') {
           const demoObj = extractDemoCode(absDir, sub);
           demo.push({
-            name: sub,
+            name: toKebabCase(sub),
             definition: undefined,
             html: demoObj ? demoObj.html : undefined,
             pug: demoObj ? demoObj.pug : undefined,
@@ -70,7 +70,7 @@ export function extractDemo(absDir: string, allItems: any[]): any[] {
         } else if (typeof sub === 'object' && sub !== null) {
           const demoObj = extractDemoCode(absDir, sub.name);
           demo.push({
-            name: sub.name,
+            name: toKebabCase(sub.name),
             definition: sub.definition,
             html: demoObj ? demoObj.html : undefined,
             pug: demoObj ? demoObj.pug : undefined,
@@ -80,7 +80,7 @@ export function extractDemo(absDir: string, allItems: any[]): any[] {
     } else if (typeof entry === 'object' && entry !== null) {
       const demoObj = extractDemoCode(absDir, entry.name);
       demo.push({
-        name: entry.name,
+        name: toKebabCase(entry.name),
         definition: entry.definition,
         html: demoObj ? demoObj.html : undefined,
         pug: demoObj ? demoObj.pug : undefined,

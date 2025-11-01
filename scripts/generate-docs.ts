@@ -162,9 +162,33 @@ export async function generateDocs(): Promise<void> {
       codeBasePath,
       codeTreeDefaultValue,
     };
-    // Si demo existe et est un array non vide, passer le premier comme mainExampleName
+    // Si demo existe et est un array non vide, formater chaque entrée comme pour le code-tree et passer à templateData.demo
     if (Array.isArray(assembler.demo) && assembler.demo.length > 0) {
-      templateData.mainExampleName = assembler.demo[0];
+      const formattedDemo = await Promise.all(
+        assembler.demo.map(async (demo) => {
+          let html = demo.html || '';
+          let pug = demo.pug || '';
+          const vueFilename = (demo.name || 'demo') + '.vue';
+          const pugFilename = (demo.name || 'demo') + '.vue';
+
+          if (html) {
+            html = decode(html);
+            html = stripComments(html);
+            html = await formatCode(html, vueFilename);
+          }
+          if (pug) {
+            pug = decode(pug);
+            pug = stripComments(pug);
+            pug = await formatCode(pug, pugFilename);
+          }
+          return {
+            ...demo,
+            html,
+            pug,
+          };
+        })
+      );
+      templateData.demo = formattedDemo;
     }
 
     const template = fs.readFileSync(templatePath, 'utf-8');

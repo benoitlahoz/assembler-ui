@@ -72,12 +72,6 @@ defineExpose({ exposed, other, myFunc });
 
 <template>
   <label v-if="props.label">{{ props.label }}</label>
-  <div>
-    <slot name="prefix"></slot>
-    <slot name="useful" :foo="bar" />
-    <slot />
-  </div>
-  <!-- <MyComponent /> -->
   <input :placeholder="props.placeholder" :value="props.modelValue" @input="onInput" type="text" />
 </template>
 

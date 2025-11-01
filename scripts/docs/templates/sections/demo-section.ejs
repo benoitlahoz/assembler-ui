@@ -1,0 +1,35 @@
+<% /*
+  demo = {
+    name: string,
+    html: string,
+    pug: string,
+    definition?: string[]
+  }
+*/ %>
+<%
+function encodeBase64(str) {
+  return Buffer.from(str, 'utf-8').toString('base64');
+}
+%>
+<% if (demo) { %>
+<% if (demo.definition && demo.definition.length > 0) { %>
+## <%= demo.definition[0] %>
+::hr-underline
+::
+<% if (demo.definition[1]) { %>
+<%= demo.definition[1] %>
+<% } %>
+<% } %>
+
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <<%= demo.name %> />
+  :::
+
+  :::tabs-item{icon="i-lucide-code" label="Code"}
+  ```vue
+<%- demo.html %>
+  ```
+  :::
+::
+<% } %>

@@ -3,23 +3,9 @@ title: <%= typeof title !== 'undefined' ? title : '' %>
 description: <%= typeof description !== 'undefined' ? description : '' %>
 ---
 
-
-<% if (typeof mainExampleName !== 'undefined' && mainExampleName) { %>
-  <%- include('sections/example-section.ejs', { exampleName: mainExampleName }) %>
+<% if (typeof demo !== 'undefined' && Array.isArray(demo) && demo.length > 0) { %>
+  <%- include('sections/demo-section.ejs', { demo: demo[0] }) %>
 <% } %>
-
-::tabs
-  :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <<%= name %> />
-  :::
-
-  :::tabs-item{icon="i-lucide-code" label="Code"}
-  ```vue
-  <<%= title %> />
-  ```
-  :::
-::
-
 
 ## Install with CLI
 ::hr-underline
@@ -114,29 +100,21 @@ Copy and paste these files into your project.
   <%- include('sections/childcomponents-section.ejs', { childComponents: file.doc.childComponents }) %>
 <% } %>
 
-<% if (file.doc && file.doc.source && file.doc.source.html) { %>
-<details>
-  <summary>Voir le code source HTML</summary>
-  <pre><code><%= file.doc.source.html %></code></pre>
-</details>
-<% } %>
-
-<% if (file.doc && file.doc.source && file.doc.source.pug) { %>
-<details>
-  <summary>Voir le code source Pug</summary>
-  <pre><code><%= file.doc.source.pug %></code></pre>
-</details>
-<% } %>
 ---
 <% }); %>
 <% } %>
 
 
-## Advanced Usage
-::hr-underline
-::
 
-<!-- Add more code-preview/code-group/code-tree blocks as needed for advanced examples -->
+<% if (typeof demo !== 'undefined' && Array.isArray(demo) && demo.length > 1) { %>
+  ## Advanced Usage
+  ::hr-underline
+  ::
+
+  <% for (let i = 1; i < demo.length; i++) { %>
+    <%- include('sections/demo-section.ejs', { demo: demo[i] }) %>
+  <% } %>
+<% } %>
 
 ::tip
 You can copy and adapt this template for any component documentation.

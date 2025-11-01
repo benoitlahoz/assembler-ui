@@ -5,20 +5,6 @@ description: A simple composable that provides a description of the foo feature.
 
 
 
-
-::tabs
-  :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <use-foo />
-  :::
-
-  :::tabs-item{icon="i-lucide-code" label="Code"}
-  ```vue
-  <useFoo />
-  ```
-  :::
-::
-
-
 ## Install with CLI
 ::hr-underline
 ::
@@ -71,11 +57,8 @@ export const useFoo = () => {
 
 
 
-## Advanced Usage
-::hr-underline
-::
 
-<!-- Add more code-preview/code-group/code-tree blocks as needed for advanced examples -->
+
 
 ::tip
 You can copy and adapt this template for any component documentation.
