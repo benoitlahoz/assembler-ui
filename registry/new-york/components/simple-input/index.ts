@@ -3,6 +3,9 @@
  * @author John Smith <john.smith@example.com>
  * @type registry:ui
  * @category inputs
+ *
+ * @demo SimpleInputDemo
+ * @demo SimpleInputDemoBis
  */
 export { default as SimpleInput } from './SimpleInput.vue';
 export { default as SimpleInputSetup } from './SimpleInputSetup.vue';

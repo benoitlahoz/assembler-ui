@@ -2,12 +2,12 @@
   "$schema": "https://shadcn-vue.com/schema/registry-item.json",
   "name": "use-foo",
   "type": "registry:hook",
-  "title": "UseFoo",
+  "title": "useFoo",
   "description": "A simple composable that provides a description of the foo feature.",
   "files": [
     {
       "path": "registry/new-york/composables/use-foo/useFoo.ts",
-      "content": "/**\n * A simple composable that provides a description of the foo feature.\n * @type registry:hook\n */\nexport const useFoo = () => {\n  const description = 'This is a foo composable used for demonstration purposes.';\n  return description;\n};\n",
+      "content": "/**\n * A simple composable that provides a description of the foo feature.\n * @type registry:hook\n * @category foo\n */\nexport const useFoo = () => {\n  const description = 'This is a foo composable used for demonstration purposes.';\n  return description;\n};\n",
       "type": "registry:hook"
     }
   ]

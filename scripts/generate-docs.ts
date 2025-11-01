@@ -2,8 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import ejs from 'ejs';
 import { decode } from 'entities';
-import { stripComments } from './common/strip-comments';
-import { formatCode } from './common/format-code';
+import { stripComments } from './docs/common/strip-comments';
+import { formatCode } from './docs/common/format-code';
 
 type AssemblerDoc = {
   install?: string;

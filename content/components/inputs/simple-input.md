@@ -17,7 +17,8 @@ description: Index file for input components
 
 
 ## Install with CLI
----
+::hr-underline
+::
 
 This will install the item in the path defined by your `components.json` file, thanks to shadcn-vue.
 
@@ -42,9 +43,10 @@ This will install the item in the path defined by your `components.json` file, t
 
 
 ## Install Manually
----
+::hr-underline
+::
 
-Copy and paste all the files below into your project.
+Copy and paste these files into your project.
 
 :::code-tree{default-value="src/components/ui/simple-input/index.ts"}
 
@@ -252,7 +254,8 @@ label {
 
 
 ## SimpleInput
----
+::hr-underline
+::
 
 Un champ de saisie simple avec label et placeholder
 
@@ -599,7 +602,8 @@ label {
 
 
 ## SimpleInputSetup
----
+::hr-underline
+::
 
 Un champ de saisie simple avec label et placeholder (API Composition)
 
@@ -913,7 +917,8 @@ label {
 
 
 ## Advanced Usage
----
+::hr-underline
+::
 
 <!-- Add more code-preview/code-group/code-tree blocks as needed for advanced examples -->
 

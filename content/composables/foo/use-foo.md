@@ -17,7 +17,8 @@ description: A simple composable that provides a description of the foo feature.
 
 
 ## Install with CLI
----
+::hr-underline
+::
 
 This will install the item in the path defined by your `components.json` file, thanks to shadcn-vue.
 
@@ -42,9 +43,10 @@ This will install the item in the path defined by your `components.json` file, t
 
 
 ## Install Manually
----
+::hr-underline
+::
 
-Copy and paste all the files below into your project.
+Copy and paste these files into your project.
 
 :::code-tree{default-value="src/composables/use-foo/useFoo.ts"}
 
@@ -67,7 +69,8 @@ export const useFoo = () => {
 
 
 ## Advanced Usage
----
+::hr-underline
+::
 
 <!-- Add more code-preview/code-group/code-tree blocks as needed for advanced examples -->
 

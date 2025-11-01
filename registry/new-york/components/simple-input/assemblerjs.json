@@ -15,9 +15,13 @@
       "author": "John Smith <john.smith@example.com>",
       "type": "registry:ui",
       "category": "inputs",
+      "demo": [
+        "SimpleInputDemo",
+        "SimpleInputDemoBis"
+      ],
       "doc": {
         "types": [],
-        "source": "/**\n * Index file for input components\n * @author John Smith <john.smith@example.com>\n * @type registry:ui\n * @category inputs\n */\nexport { default as SimpleInput } from './SimpleInput.vue';\nexport { default as SimpleInputSetup } from './SimpleInputSetup.vue';\n"
+        "source": "/**\n * Index file for input components\n * @author John Smith <john.smith@example.com>\n * @type registry:ui\n * @category inputs\n *\n * @demo SimpleInputDemo\n * @demo SimpleInputDemoBis\n */\nexport { default as SimpleInput } from './SimpleInput.vue';\nexport { default as SimpleInputSetup } from './SimpleInputSetup.vue';\n"
       }
     },
     {
