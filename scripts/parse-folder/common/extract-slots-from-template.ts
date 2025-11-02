@@ -14,11 +14,12 @@ export interface SlotInfo {
 export const extractSlotsFromTemplate = (templateCode: string): SlotInfo[] => {
   // Extraction robuste : détecte tous les <slot ...> (auto-fermants, classiques, multilignes)
   const slotsMap: Record<string, SlotInfo> = {};
-  // 1. Regroupe tous les slots (auto-fermants ou non)
-  const slotRegex = /<slot([^>]*)\/?>(?:[\s\S]*?<\/slot>)?/gim;
+  // 1. Regroupe tous les slots (auto-fermants ou fermés explicitement)
+  const slotRegex = /<slot([^>]*)\/>|<slot([^>]*)>(?:[\s\S]*?)<\/slot>/gim;
   let match;
   while ((match = slotRegex.exec(templateCode))) {
-    const attrs = match[1] || '';
+    // match[1] = attrs pour slot auto-fermants, match[2] = attrs pour slot fermés explicitement
+    const attrs = (match[1] !== undefined ? match[1] : match[2]) || '';
     let name = 'default';
     // name="..."
     const nameAttr = attrs.match(/\bname\s*=\s*(["'`])([\s\S]*?)\1/);
@@ -62,14 +63,39 @@ export const extractSlotsFromTemplate = (templateCode: string): SlotInfo[] => {
         for (const k of keys) if (k && !isVueNativeAttr(k) && !k.startsWith('v-')) params.push(k);
       }
     }
+
+    // Recherche d'un commentaire HTML juste au-dessus du slot (ignore lignes vides/espaces)
+    let description = '';
+    const beforeSlot = templateCode.slice(0, match.index);
+    const lines = beforeSlot.split(/\r?\n/);
+    let foundComment = '';
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i];
+      if (line.trim() === '') continue;
+      // Accepte indentation avant le commentaire
+      const commentMatch = line.match(/<!--([\s\S]*?)-->/);
+      if (commentMatch) {
+        foundComment = commentMatch[1].replace(/^\s+|\s+$/g, '');
+        break;
+      } else {
+        // Si on trouve une ligne non vide et non commentaire, on arrête
+        break;
+      }
+    }
+    if (foundComment) {
+      description = foundComment;
+    }
+
+    // Toujours ajouter le slot, description vide si pas de commentaire
     if (!slotsMap[name]) {
       slotsMap[name] = {
         name,
         params: params.length ? params.join(', ') : '-',
-        description: '',
+        description: description,
       };
     }
   }
+
   return Object.values(slotsMap).map((slot) => ({
     name: slot.name,
     params: slot.params ?? '-',

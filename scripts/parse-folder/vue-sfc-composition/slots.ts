@@ -71,12 +71,17 @@ export const extractSlots = (
       if (!slotsMap[slot.name]) {
         slotsMap[slot.name] = {
           name: slot.name,
-          description: '',
+          description: slot.description || '',
           params: slot.params,
         };
-      } else if (slot.params) {
+      } else {
         const slotObj = slotsMap[slot.name];
-        if (slotObj && !slotObj.params) {
+        // Remplit la description si elle existe dans le template
+        if (slot.description && !slotObj.description) {
+          slotObj.description = slot.description;
+        }
+        // Remplit les params si besoin
+        if (slot.params && !slotObj.params) {
           slotObj.params = slot.params;
         }
       }

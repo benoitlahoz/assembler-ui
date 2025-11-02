@@ -247,7 +247,7 @@ const props = defineProps<ControlButtonLabelProps>();
   ### Slots
 | Name | Description |
 |------|-------------|
-| `default`{.primary .text-primary} | — |
+| `default`{.primary .text-primary} | Typically a ControlButtonLabel |
 
 
 

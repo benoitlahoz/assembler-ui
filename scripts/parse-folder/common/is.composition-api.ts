@@ -10,9 +10,8 @@ export function isCompositionApi(vueSource: string): boolean {
   let match;
   while ((match = scriptBlockRegex.exec(vueSource))) {
     const attrs = match[1];
-    const content = match[2];
     const isSetupBlock = /\bsetup\b/i.test(attrs || '');
-    if (isSetupBlock && content && content.trim().length > 0) {
+    if (isSetupBlock) {
       return true;
     }
   }
