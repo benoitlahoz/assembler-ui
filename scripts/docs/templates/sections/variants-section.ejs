@@ -1,0 +1,7 @@
+<% if (variants && Object.keys(variants).length) { %>
+### Variants
+<% Object.entries(variants).forEach(function([variantName, variantValues]) { %>**<%= variantName %>**
+| Name | Values |
+|------|--------|
+<% Object.entries(variantValues).forEach(function([name, values]) { %>|`<%= name %>`{.primary .text-primary} | <%= Array.isArray(values) ? values.join(', ') : values %> |
+<% }); }); %><% } %>

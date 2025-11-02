@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { PrimitiveProps } from 'reka-ui';
 import type { HTMLAttributes } from 'vue';
-import type { ButtonVariants } from '.';
+import type { ControlButtonVariants } from '.';
 import { Primitive } from 'reka-ui';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '.';
@@ -9,9 +9,9 @@ import { buttonVariants } from '.';
 import { Label } from '@/components/ui/label';
 
 export interface ControlButtonProps extends PrimitiveProps {
-  variant?: ButtonVariants['variant'];
-  size?: ButtonVariants['size'];
-  shape?: ButtonVariants['shape'];
+  variant?: ControlButtonVariants['variant'];
+  size?: ControlButtonVariants['size'];
+  shape?: ControlButtonVariants['shape'];
   class?: HTMLAttributes['class'];
 }
 

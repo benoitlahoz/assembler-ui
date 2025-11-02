@@ -20,15 +20,11 @@ export const buttonVariants = cva(
         outline:
           'border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
         secondary: 'bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80',
-        ghost: 'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
       },
       size: {
         default: 'size-9',
         sm: 'size-8',
         lg: 'size-10',
-        icon: 'size-9',
-        'icon-sm': 'size-8',
-        'icon-lg': 'size-10',
       },
       shape: {
         square: 'rounded-md',
@@ -38,9 +34,10 @@ export const buttonVariants = cva(
     defaultVariants: {
       variant: 'default',
       size: 'default',
+      shape: 'square',
     },
   }
 );
 
-export type ButtonVariants = VariantProps<typeof buttonVariants>;
+export type ControlButtonVariants = VariantProps<typeof buttonVariants>;
 export { type ControlButtonProps } from './ControlButton.vue';

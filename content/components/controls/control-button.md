@@ -90,16 +90,11 @@ export const buttonVariants = cva(
           "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
         secondary:
           "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80",
-        ghost:
-          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
       },
       size: {
         default: "size-9",
         sm: "size-8",
         lg: "size-10",
-        icon: "size-9",
-        "icon-sm": "size-8",
-        "icon-lg": "size-10",
       },
       shape: {
         square: "rounded-md",
@@ -109,11 +104,12 @@ export const buttonVariants = cva(
     defaultVariants: {
       variant: "default",
       size: "default",
+      shape: "square",
     },
   },
 );
 
-export type ButtonVariants = VariantProps<typeof buttonVariants>;
+export type ControlButtonVariants = VariantProps<typeof buttonVariants>;
 export { type ControlButtonProps } from "./ControlButton.vue";
 
 ```
@@ -122,18 +118,17 @@ export { type ControlButtonProps } from "./ControlButton.vue";
 <script setup lang="ts">
 import type { PrimitiveProps } from "reka-ui";
 import type { HTMLAttributes } from "vue";
-import type { ButtonVariants } from ".";
+import type { ControlButtonVariants } from ".";
 import { Primitive } from "reka-ui";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from ".";
 
 import { Label } from "@/components/ui/label";
-import { SimpleInput } from "@/components/ui/simple-input";
 
 export interface ControlButtonProps extends PrimitiveProps {
-  variant?: ButtonVariants["variant"];
-  size?: ButtonVariants["size"];
-  shape?: ButtonVariants["shape"];
+  variant?: ControlButtonVariants["variant"];
+  size?: ControlButtonVariants["size"];
+  shape?: ControlButtonVariants["shape"];
   class?: HTMLAttributes["class"];
 }
 
@@ -177,13 +172,25 @@ const props = withDefaults(defineProps<ControlButtonProps>(), {
 
 
 
+  
+### Variants
+**ControlButtonVariants**
+| Name | Values |
+|------|--------|
+|`variant`{.primary .text-primary} | default, destructive, outline, secondary |
+|`size`{.primary .text-primary} | default, sm, lg |
+|`shape`{.primary .text-primary} | square, circle |
+
+
+
+
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `variant`{.primary .text-primary} | `ButtonVariants[&#39;variant&#39;]` | `-` |  |
-| `size`{.primary .text-primary} | `ButtonVariants[&#39;size&#39;]` | `-` |  |
-| `shape`{.primary .text-primary} | `ButtonVariants[&#39;shape&#39;]` | `square` |  |
-| `class`{.primary .text-primary} | `HTMLAttributes[&#39;class&#39;]` | `-` |  |
+| `variant`{.primary .text-primary} | `ControlButtonVariants['variant']` | - |  |
+| `size`{.primary .text-primary} | `ControlButtonVariants['size']` | - |  |
+| `shape`{.primary .text-primary} | `ControlButtonVariants['shape']` | square |  |
+| `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
 
 

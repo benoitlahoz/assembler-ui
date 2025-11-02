@@ -268,6 +268,8 @@ Un champ de saisie simple avec label et placeholder
 
 
 
+
+
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
@@ -345,12 +347,14 @@ Un champ de saisie simple avec label et placeholder (API Composition)
 
 
 
+
+
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `label`{.primary .text-primary} | `String` | `''` | Le label affiché au-dessus du champ |
-| `placeholder`{.primary .text-primary} | `String` | `''` | Le placeholder du champ |
-| `modelValue`{.primary .text-primary} | `String` | `''` | Valeur du champ |
+| `label`{.primary .text-primary} | `String` | '' | Le label affiché au-dessus du champ |
+| `placeholder`{.primary .text-primary} | `String` | '' | Le placeholder du champ |
+| `modelValue`{.primary .text-primary} | `String` | '' | Valeur du champ |
 
 
 
