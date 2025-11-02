@@ -9,6 +9,12 @@ import config from '../assembler-ui.config';
 
 const GlobalComponentsPath = config.globalPath || 'registry/new-york/';
 const DescriptionFilename = config.definitionFile || 'assemblerjs.json';
+const InstallPaths = config.install || {
+  pnpm: 'pnpm dlx shadcn-vue@latest add',
+  npm: 'npx shadcn-vue@latest add',
+  yarn: 'npx shadcn-vue@latest add',
+  bun: 'bunx --bun shadcn-vue@latest add',
+};
 
 type AssemblerDoc = {
   install?: string;
@@ -153,9 +159,21 @@ export async function generateDocs(): Promise<void> {
     if (codes.length > 0 && codes[0] && codes[0].filename) {
       codeTreeDefaultValue = `${codeBasePath}/${codes[0].filename}`;
     }
-
+    // Lecture du champ install (toujours une string) et création d'un objet des chemins
+    // Crée les commandes d'installation finales à partir des templates InstallPaths et assembler.install
+    let installPaths: Record<string, string>;
+    if (assembler.install && typeof assembler.install === 'string') {
+      installPaths = {
+        pnpm: `${InstallPaths.pnpm} "${assembler.install}"`.trim(),
+        npm: `${InstallPaths.npm} "${assembler.install}"`.trim(),
+        yarn: `${InstallPaths.yarn} "${assembler.install}"`.trim(),
+        bun: `${InstallPaths.bun} "${assembler.install}"`.trim(),
+      };
+    } else {
+      installPaths = InstallPaths;
+    }
     const templateData: Record<string, any> = {
-      install: assembler.install || '',
+      install: installPaths,
       name: assembler.name,
       title: assembler.title || assembler.name,
       description: assembler.description || '',

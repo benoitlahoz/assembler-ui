@@ -13,4 +13,10 @@ export default {
   paths: ['components', 'blocks', 'composables'],
   dependencies: ['vue-sonner'],
   registryDependencies: ['button', 'separator'],
+  install: {
+    pnpm: 'pnpm dlx shadcn-vue@latest add',
+    npm: 'npx shadcn-vue@latest add',
+    yarn: 'npx shadcn-vue@latest add',
+    bun: 'bunx --bun shadcn-vue@latest add',
+  },
 };

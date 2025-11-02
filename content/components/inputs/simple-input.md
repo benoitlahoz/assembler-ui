@@ -44,19 +44,19 @@ This will install the item in the path defined by your `components.json` file, t
 
 :::code-group{.w-full}
   ```bash [yarn]
-  yarn add @nuxt/ui
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/simple-input.json"
   ```
-  
+
   ```bash [npm]
-  npm install @nuxt/ui
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/simple-input.json"
   ```
 
   ```bash [pnpm]
-  pnpm add @nuxt/ui
+  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/simple-input.json"
   ```
-  
+
   ```bash [bun]
-  bun add @nuxt/ui
+  bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/simple-input.json"
   ```
 :::
 

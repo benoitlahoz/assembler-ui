@@ -124,6 +124,7 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
       }
     }
     const { tags, ...docWithoutTags } = doc;
+
     const name = basename(vuePath, '.vue');
     return {
       name,
