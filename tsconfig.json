@@ -3,5 +3,5 @@
   "compilerOptions": {
     "types": ["@types/node", "@nuxt/types"]
   },
-  "include": ["registry/**/*", "scripts/**/*"]
+  "include": ["registry/**/*", "scripts/**/*", "**/*.vue"]
 }
