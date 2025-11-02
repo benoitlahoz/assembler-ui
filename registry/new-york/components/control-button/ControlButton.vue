@@ -6,7 +6,7 @@ import { Primitive } from 'reka-ui';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '.';
 
-import { Label } from '@/components/ui/label';
+import { ControlButtonLabel } from '~~/registry/new-york/components/control-button';
 
 export interface ControlButtonProps extends PrimitiveProps {
   variant?: ControlButtonVariants['variant'];
@@ -30,8 +30,7 @@ const props = withDefaults(defineProps<ControlButtonProps>(), {
       :class="cn(buttonVariants({ variant, size, shape }), props.class)"
     >
     </Primitive>
-    <Label>
-      <slot />
-    </Label>
+    <!-- Typically a ControlButtonLabel -->
+    <slot />
   </div>
 </template>

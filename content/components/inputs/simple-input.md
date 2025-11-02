@@ -4,6 +4,8 @@ description: Index file for input components
 ---
 
 
+
+
   
 
 
@@ -259,12 +261,18 @@ label {
 ::hr-underline
 ::
 
+
 Un champ de saisie simple avec label et placeholder
+
+
 
 **API**: options
 
 
+
+
 **Author**: Jane Doe &lt;jane.doe@example.com&gt;
+
 
 
 
@@ -338,12 +346,18 @@ Un champ de saisie simple avec label et placeholder
 ::hr-underline
 ::
 
+
 Un champ de saisie simple avec label et placeholder (API Composition)
+
+
 
 **API**: composition
 
 
+
+
 **Author**: Jane Doe &lt;jane.doe@example.com&gt;
+
 
 
 

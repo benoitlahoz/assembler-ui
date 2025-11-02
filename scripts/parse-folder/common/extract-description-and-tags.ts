@@ -8,13 +8,28 @@ export const extractDescriptionAndTags = (scriptContent: string) => {
   > = {};
   const multilineComment = scriptContent.match(/\/\*\*([\s\S]*?)\*\//);
   if (multilineComment && multilineComment[1]) {
-    const descBlock = multilineComment[1].replace(/^[*\s]+/gm, '').trim();
-    // Trouve la position du premier tag @
-    const tagIndex = descBlock.search(/@[a-zA-Z]+/);
-    if (tagIndex > -1) {
-      description = descBlock.slice(0, tagIndex).trim();
+    // Découpe le bloc en lignes et retire uniquement le préfixe * (et espaces), sans supprimer les lignes vides
+    const lines = multilineComment[1].split(/\r?\n/).map((line) => line.replace(/^\s*\* ?/, ''));
+    // Recherche du début des tags pour séparer description et tags sans toucher aux sauts de ligne
+    let tagStartIndex = -1;
+    for (let idx = 0; idx < lines.length; idx++) {
+      if (/^@[a-zA-Z0-9_-]+/.test(lines[idx])) {
+        tagStartIndex = idx;
+        break;
+      }
+    }
+    if (tagStartIndex === -1) {
+      description = lines.join('\n');
+    } else {
+      description = lines.slice(0, tagStartIndex).join('\n');
+    }
+    // Supprime le tout premier saut de ligne s'il existe, puis le saut de ligne de fin uniquement
+    description = description.replace(/^\n+/, '').replace(/\n+$/, '');
+
+    // Pour la suite, on utilise lines pour les tags
+    if (tagStartIndex > -1) {
       // Extraction de tous les tags @xxx
-      const tagLines = descBlock.slice(tagIndex).split(/\r?\n/);
+      const tagLines = lines.slice(tagStartIndex);
       let i = 0;
       while (i < tagLines.length) {
         const line = tagLines[i];
@@ -53,8 +68,6 @@ export const extractDescriptionAndTags = (scriptContent: string) => {
         }
         i++;
       }
-    } else {
-      description = descBlock;
     }
   }
 

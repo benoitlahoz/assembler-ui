@@ -4,6 +4,8 @@ description: A 1:1 aspect ratio button component.
 ---
 
 
+
+
   
 
 
@@ -17,23 +19,34 @@ description: A 1:1 aspect ratio button component.
   :::tabs-item{icon="i-lucide-code" label="Code"}
   ```vue
 <script setup lang="ts">
-import { ControlButton } from "@/components/ui/control-button";
+import {
+  ControlButton,
+  ControlButtonLabel,
+} from "@/components/ui/control-button";
+import { Separator } from "@/components/ui/separator";
 </script>
 
 <template>
   <div class="flex items-center justify-center h-128 gap-4">
     <ControlButton shape="square" size="sm">
-      <div class="text-sm font-bold pt-2">Click Me!</div>
+      <ControlButtonLabel class="text-sm font-bold pt-2"
+        ># 1</ControlButtonLabel
+      >
     </ControlButton>
     <ControlButton shape="square" size="default" variant="destructive">
-      <div class="text-sm font-bold pt-2">Click Me!</div>
+      <ControlButtonLabel class="text-sm font-bold pt-2"
+        ># 2</ControlButtonLabel
+      >
     </ControlButton>
     <ControlButton shape="circle" variant="secondary">
-      <div class="text-sm font-bold pt-2">Click Me!</div>
+      <ControlButtonLabel class="text-sm font-bold pt-2"
+        ># 3</ControlButtonLabel
+      >
     </ControlButton>
-    <ControlButton shape="square" variant="outline" size="lg">
-      <div class="text-sm font-bold pt-2">Click Me!</div>
-    </ControlButton>
+    <div class="h-24">
+      <Separator orientation="vertical" class="mx-4" />
+    </div>
+    <ControlButton shape="square" variant="outline" size="lg"> </ControlButton>
   </div>
 </template>
 
@@ -81,7 +94,9 @@ Copy and paste these files into your project.
 ```ts [src/components/ui/control-button/index.ts]
 import type { VariantProps } from "class-variance-authority";
 import { cva } from "class-variance-authority";
+
 export { default as ControlButton } from "./ControlButton.vue";
+export { default as ControlButtonLabel } from "./ControlButtonLabel.vue";
 
 export const buttonVariants = cva(
   "aspect-square w-auto h-auto min-w-0 min-h-0 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
@@ -117,6 +132,7 @@ export const buttonVariants = cva(
 
 export type ControlButtonVariants = VariantProps<typeof buttonVariants>;
 export { type ControlButtonProps } from "./ControlButton.vue";
+export { type ControlButtonLabelProps } from "./ControlButtonLabel.vue";
 
 ```
 
@@ -129,7 +145,7 @@ import { Primitive } from "reka-ui";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from ".";
 
-import { Label } from "@/components/ui/label";
+import { ControlButtonLabel } from "@/components/ui/control-button";
 
 export interface ControlButtonProps extends PrimitiveProps {
   variant?: ControlButtonVariants["variant"];
@@ -153,7 +169,30 @@ const props = withDefaults(defineProps<ControlButtonProps>(), {
       :class="cn(buttonVariants({ variant, size, shape }), props.class)"
     >
     </Primitive>
-    <Label>
+
+    <slot />
+  </div>
+</template>
+
+```
+
+```vue [src/components/ui/control-button/ControlButtonLabel.vue]
+<script setup lang="ts">
+import type { HTMLAttributes } from "vue";
+import { cn } from "@/lib/utils";
+
+import { Label } from "@/components/ui/label";
+
+export interface ControlButtonLabelProps {
+  class?: HTMLAttributes["class"];
+}
+
+const props = defineProps<ControlButtonLabelProps>();
+</script>
+
+<template>
+  <div class="flex flex-col items-center justify-center">
+    <Label :class="cn(props.class)">
       <slot />
     </Label>
   </div>
@@ -173,7 +212,9 @@ const props = withDefaults(defineProps<ControlButtonProps>(), {
 
 
 
+
 **API**: composition
+
 
 
 
@@ -232,6 +273,65 @@ const props = withDefaults(defineProps<ControlButtonProps>(), {
   ### Child Components
 
   `Primitive`{.primary .text-primary}
+
+
+
+
+---
+
+
+## ControlButtonLabel
+::hr-underline
+::
+
+
+
+
+**API**: composition
+
+
+
+
+
+
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
+
+
+
+
+
+
+  ### Slots
+| Name | Description |
+|------|-------------|
+| `default`{.primary .text-primary} | — |
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ### Types
+| Name | Type | Description |
+|------|------|-------------|
+| `ControlButtonLabelProps`{.primary .text-primary} | `interface` | - |
+
+
+
+
+
+  ### Child Components
 
   `Label`{.primary .text-primary}
 

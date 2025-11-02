@@ -86,4 +86,8 @@ export default defineNuxtConfig({
       { path: '~~/registry', pathPrefix: false, extensions: ['.vue'], ignore: ['**/index.ts'] },
     ],
   },
+  shadcn: {
+    prefix: '',
+    componentDir: '../registry/new-york/components',
+  },
 });
