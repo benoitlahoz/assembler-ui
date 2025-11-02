@@ -17,7 +17,7 @@ description: Index file for input components
   :::tabs-item{icon="i-lucide-code" label="Code"}
   ```vue
 <script setup lang="ts">
-import { SimpleInput } from "..";
+import { SimpleInput } from "@/components/ui/simple-input";
 </script>
 
 <template>
@@ -438,7 +438,7 @@ A very simple example of SimpleInput usage.
   :::tabs-item{icon="i-lucide-code" label="Code"}
   ```vue
 <script setup lang="ts">
-import { SimpleInput } from "..";
+import { SimpleInput } from "@/components/ui/simple-input";
 </script>
 
 <template>

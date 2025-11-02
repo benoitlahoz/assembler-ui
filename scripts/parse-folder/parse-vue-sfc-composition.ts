@@ -16,6 +16,8 @@ import { convertTemplateToPug } from './common/convert-template-to-pug';
 
 // Main exported function
 export const extractVueSfcComposition = (filePath: string, config: Record<string, any>) => {
+  const GlobalPath = config.globalPath || 'registry/new-york/';
+
   const absPath = filePath.startsWith('/') ? filePath : `${process.cwd()}/${filePath}`;
   // Chemin relatif à config.globalPath et toujours préfixé par config.globalPath
   let relPath = absPath.includes(config.globalPath)
@@ -23,8 +25,13 @@ export const extractVueSfcComposition = (filePath: string, config: Record<string
     : filePath;
   // Toujours préfixer par config.globalPath (et éviter les doubles slashs)
   relPath = pathModule.join(config.globalPath, relPath).replace(/\\/g, '/');
-  const vueSource = fs.readFileSync(absPath, 'utf-8');
+  let vueSource = fs.readFileSync(absPath, 'utf-8');
+
+  const searchString = `~~/${GlobalPath}components`;
+  vueSource = vueSource.replace(searchString, '@/components/ui');
+
   const { descriptor } = parse(vueSource);
+
   const script = descriptor.scriptSetup || descriptor.script;
   let description = '';
   let tags: Record<string, any> = {};

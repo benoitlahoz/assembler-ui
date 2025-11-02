@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ControlButton } from '@/../registry/new-york/components/control-button';
+import { ControlButton } from '~~/registry/new-york/components/control-button';
 </script>
 
 <template>

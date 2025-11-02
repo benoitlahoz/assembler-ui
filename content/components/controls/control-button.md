@@ -17,7 +17,7 @@ description: A 1:1 aspect ratio button component.
   :::tabs-item{icon="i-lucide-code" label="Code"}
   ```vue
 <script setup lang="ts">
-import { ControlButton } from "@/../registry/new-york/components/control-button";
+import { ControlButton } from "@/components/ui/control-button";
 </script>
 
 <template>
@@ -128,6 +128,7 @@ import { cn } from "@/lib/utils";
 import { buttonVariants } from ".";
 
 import { Label } from "@/components/ui/label";
+import { SimpleInput } from "@/components/ui/simple-input";
 
 export interface ControlButtonProps extends PrimitiveProps {
   variant?: ButtonVariants["variant"];

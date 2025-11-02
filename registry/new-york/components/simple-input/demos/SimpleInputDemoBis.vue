@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { SimpleInput } from '..';
+import { SimpleInput } from '~~/registry/new-york/components/simple-input';
 </script>
 
 <template>

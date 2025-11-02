@@ -154,7 +154,7 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
   // Regroupe toutes les demos des files, cherche le code source, et les place à la racine
   let demo: any[] = [];
   if (Array.isArray(allItems)) {
-    demo = extractDemo(absDir, allItems);
+    demo = extractDemo(absDir, allItems, config);
     // Supprime demo de chaque file
     for (const file of allItems) {
       if ((file as any).demo) {

@@ -1,9 +1,5 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  alias: {
-    '@/components/ui': '/app/components/ui',
-    'a/registry': '/registry',
-  },
   app: {
     baseURL: '/assembler-ui/',
     head: {
