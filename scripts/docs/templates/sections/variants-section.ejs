@@ -3,5 +3,5 @@
 <% Object.entries(variants).forEach(function([variantName, variantValues]) { %>**<%= variantName %>**
 | Name | Values |
 |------|--------|
-<% Object.entries(variantValues).forEach(function([name, values]) { %>|`<%= name %>`{.primary .text-primary} | <%= Array.isArray(values) ? values.join(', ') : values %> |
+<% Object.entries(variantValues).forEach(function([name, values]) { %>|`<%= name %>`{.primary .text-primary} | <%= Array.isArray(values) ? values.map(v => '`'+v+'`{.mr-2}').join(' ') : ('`'+values+'`{.mr-2}') %> |
 <% }); }); %><% } %>

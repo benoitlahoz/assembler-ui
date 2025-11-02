@@ -22,10 +22,16 @@ import { ControlButton } from "@/components/ui/control-button";
 
 <template>
   <div class="flex items-center justify-center h-128 gap-4">
-    <ControlButton shape="square">
+    <ControlButton shape="square" size="sm">
+      <div class="text-sm font-bold pt-2">Click Me!</div>
+    </ControlButton>
+    <ControlButton shape="square" size="default" variant="destructive">
       <div class="text-sm font-bold pt-2">Click Me!</div>
     </ControlButton>
     <ControlButton shape="circle" variant="secondary">
+      <div class="text-sm font-bold pt-2">Click Me!</div>
+    </ControlButton>
+    <ControlButton shape="square" variant="outline" size="lg">
       <div class="text-sm font-bold pt-2">Click Me!</div>
     </ControlButton>
   </div>
@@ -177,9 +183,9 @@ const props = withDefaults(defineProps<ControlButtonProps>(), {
 **ControlButtonVariants**
 | Name | Values |
 |------|--------|
-|`variant`{.primary .text-primary} | default, destructive, outline, secondary |
-|`size`{.primary .text-primary} | default, sm, lg |
-|`shape`{.primary .text-primary} | square, circle |
+|`variant`{.primary .text-primary} | `default`{.mr-2} `destructive`{.mr-2} `outline`{.mr-2} `secondary`{.mr-2} |
+|`size`{.primary .text-primary} | `default`{.mr-2} `sm`{.mr-2} `lg`{.mr-2} |
+|`shape`{.primary .text-primary} | `square`{.mr-2} `circle`{.mr-2} |
 
 
 

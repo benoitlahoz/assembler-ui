@@ -1,5 +1,9 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
+  site: {
+    name: 'Assembler UI',
+    description: 'Documentation for AssemblerUI components and features',
+  },
   app: {
     baseURL: '/assembler-ui/',
     head: {
@@ -13,6 +17,7 @@ export default defineNuxtConfig({
       ],
     },
   },
+  css: ['@/assets/css/main.css'],
   modules: [
     '@anymud/nuxt-module-alias',
     '@nuxt/content',
@@ -24,12 +29,6 @@ export default defineNuxtConfig({
   ],
   // @ts-expect-error nuxtjs/robots module is missing types?
   robots: {
-    /* Exemple de config :
-    rules: [
-      { UserAgent: '*', Disallow: '' }
-    ],
-    sitemap: 'https://benoitlahoz.github.io/assembler-ui/sitemap.xml',
-    */
     robotsTxt: false,
   },
   llms: {
@@ -84,7 +83,7 @@ export default defineNuxtConfig({
   components: {
     dirs: [
       { path: '~/components', pathPrefix: false, extensions: ['.vue'], ignore: ['**/index.ts'] },
-      { path: '~/../registry', pathPrefix: false, extensions: ['.vue'], ignore: ['**/index.ts'] },
+      { path: '~~/registry', pathPrefix: false, extensions: ['.vue'], ignore: ['**/index.ts'] },
     ],
   },
 });

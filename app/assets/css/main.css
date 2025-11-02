@@ -1,0 +1,8 @@
+@import 'tailwindcss';
+@import '@nuxt/ui';
+@iport 'tw-animate-css';
+@import './global.css';
+
+.primary {
+  @apply bg-primary/10;
+}
