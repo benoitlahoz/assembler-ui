@@ -16,6 +16,12 @@ export const extractChildComponents = (templateContent: string): string[] => {
   const found = new Set<string>();
   for (const match of matchComponentTags(templateContent)) {
     const tag = match[1];
+    // Si le tag commence par une majuscule, c'est toujours un composant Vue
+    if (tag && /^[A-Z]/.test(tag)) {
+      found.add(tag);
+      continue;
+    }
+    // Sinon, on vérifie qu'il n'est pas natif
     if (tag && !NativeTags.has(tag.toLowerCase())) {
       found.add(tag);
     }

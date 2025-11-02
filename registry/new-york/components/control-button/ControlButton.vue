@@ -1,0 +1,37 @@
+<script setup lang="ts">
+import type { PrimitiveProps } from 'reka-ui';
+import type { HTMLAttributes } from 'vue';
+import type { ButtonVariants } from '.';
+import { Primitive } from 'reka-ui';
+import { cn } from '@/lib/utils';
+import { buttonVariants } from '.';
+
+import { Label } from '@/components/ui/label';
+
+export interface ControlButtonProps extends PrimitiveProps {
+  variant?: ButtonVariants['variant'];
+  size?: ButtonVariants['size'];
+  shape?: ButtonVariants['shape'];
+  class?: HTMLAttributes['class'];
+}
+
+const props = withDefaults(defineProps<ControlButtonProps>(), {
+  as: 'button',
+  shape: 'square',
+});
+</script>
+
+<template>
+  <div class="flex flex-col items-center justify-center">
+    <Primitive
+      data-slot="button"
+      :as="as"
+      :as-child="asChild"
+      :class="cn(buttonVariants({ variant, size, shape }), props.class)"
+    >
+    </Primitive>
+    <Label>
+      <slot />
+    </Label>
+  </div>
+</template>

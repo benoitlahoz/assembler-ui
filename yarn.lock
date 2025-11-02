@@ -1735,7 +1735,7 @@
     unwasm "^0.3.11"
     vfile "^6.0.3"
 
-"@nuxtjs/robots@^5.5.5":
+"@nuxtjs/robots@^5.5.5", "@nuxtjs/robots@^5.5.6":
   version "5.5.6"
   resolved "https://registry.yarnpkg.com/@nuxtjs/robots/-/robots-5.5.6.tgz#08d3491d79d5feaf388b0920a3557121ffebf61f"
   integrity sha512-PFp0sSaQs2ceEubvkiUPrWQ0GYTTu5bDH0lGVmJlm0h/Dqmt/e9TziXNKahL8HUV3VG22YzRyuyjd7p8+BaNgw==

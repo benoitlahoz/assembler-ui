@@ -276,5 +276,14 @@ export const extractProps = (scriptContent: string, absPath: string) => {
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
-  return props;
+  // Déduplication des props par nom (garde la première occurrence)
+  const seen = new Set();
+  const dedupedProps = [];
+  for (const prop of props) {
+    if (!seen.has(prop.name)) {
+      dedupedProps.push(prop);
+      seen.add(prop.name);
+    }
+  }
+  return dedupedProps;
 };

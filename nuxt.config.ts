@@ -1,5 +1,9 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
+  alias: {
+    '@/components/ui': '/app/components/ui',
+    'a/registry': '/registry',
+  },
   app: {
     baseURL: '/assembler-ui/',
     head: {
@@ -19,9 +23,19 @@ export default defineNuxtConfig({
     '@nuxt/eslint',
     '@nuxt/scripts',
     '@nuxt/ui',
+    '@nuxtjs/robots',
     'shadcn-nuxt',
   ],
-  robots: { robotsTxt: false },
+  // @ts-expect-error nuxtjs/robots module is missing types?
+  robots: {
+    /* Exemple de config :
+    rules: [
+      { UserAgent: '*', Disallow: '' }
+    ],
+    sitemap: 'https://benoitlahoz.github.io/assembler-ui/sitemap.xml',
+    */
+    robotsTxt: false,
+  },
   llms: {
     domain: 'https://benoitlahoz.github.io/assembler-ui',
     title: 'Assembler UI',

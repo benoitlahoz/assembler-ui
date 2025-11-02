@@ -69,7 +69,10 @@ function getOutputDir(type: string, category?: string): string {
 
 export async function generateDocs(): Promise<void> {
   const baseDir = path.resolve(process.cwd(), GlobalComponentsPath);
-  const templatePath = path.resolve(process.cwd(), 'scripts/docs/templates/component-doc.mdc.ejs');
+  const templatePath = path.resolve(
+    process.cwd(),
+    'scripts/docs/templates/component-layout.mdc.ejs'
+  );
   const assemblerJsons = findAssemblerJsons(baseDir);
 
   for (const assemblerPath of assemblerJsons) {

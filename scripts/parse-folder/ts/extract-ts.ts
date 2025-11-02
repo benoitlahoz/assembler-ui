@@ -1,12 +1,19 @@
 import fs from 'fs';
 import * as ts from 'typescript';
+import { extractCvaVariants } from '../vue-sfc-composition/cva-variants';
 import { extractCommentBlock } from '../common/extract-comment-block';
 import { extractDescriptionAndTags } from '../common/extract-description-and-tags';
 
 export interface TsFileExtract {
-  types: { name: string; type: string }[];
+  types: Array<{ name: string; type: string }>;
   description?: string;
-  [tag: string]: any;
+  variants?: Record<string, Record<string, string[]>>;
+  // Les tags peuvent être string, objet ou tableau (pour compatibilité avec extractDescriptionAndTags)
+  [tag: string]:
+    | any
+    | string
+    | { name: string; definition: string[]; html?: string; pug?: string }
+    | (string | { name: string; definition: string[]; html?: string; pug?: string })[];
 }
 
 const visit = (node: ts.Node, types: { name: string; type: string }[]) => {
@@ -34,7 +41,7 @@ export const extractTs = (filePath: string): TsFileExtract => {
 
   // Extract the top multiline comment (JSDoc) from the file
   let description: string | undefined;
-  let tags: Record<string, string> = {};
+  let tags: Record<string, any> = {};
   const match = extractCommentBlock(content);
   if (match && typeof match[1] === 'string') {
     const comment = match[1];
@@ -47,9 +54,16 @@ export const extractTs = (filePath: string): TsFileExtract => {
 
   visit(sourceFile, types);
 
+  // Ajout de l'extraction des variants cva uniquement pour index.ts
+  let variants: Record<string, Record<string, string[]>> | undefined = undefined;
+  if (filePath.endsWith('index.ts')) {
+    variants = extractCvaVariants(content, filePath);
+  }
+
   return {
     types,
     description,
+    ...(variants ? { variants } : {}),
     ...tags,
   };
 };

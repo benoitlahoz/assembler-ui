@@ -5,6 +5,7 @@ import { extractDescriptionAndTags } from './common/extract-description-and-tags
 import { extractEmits } from './vue-sfc-composition/emits';
 import { extractExposes } from './vue-sfc-composition/exposes';
 import { extractProps } from './vue-sfc-composition/props';
+import { extractCvaVariants } from './vue-sfc-composition/cva-variants';
 import { extractInjects } from './vue-sfc-composition/injects';
 import { extractProvides } from './vue-sfc-composition/provides';
 import { extractSlots } from './vue-sfc-composition/slots';
@@ -36,6 +37,7 @@ export const extractVueSfcComposition = (filePath: string, config: Record<string
   let types: any[] = [];
   let childComponents: string[] = [];
   let cssVars: { name: string; value: string; description: string }[] = [];
+  let variants: Record<string, Record<string, string[]>> = {};
   if (script) {
     const descAndAuthor = extractDescriptionAndTags(script.content);
     description = descAndAuthor.description;
@@ -46,6 +48,34 @@ export const extractVueSfcComposition = (filePath: string, config: Record<string
     injects = extractInjects(script.content, absPath);
     provides = extractProvides(script.content, absPath);
     types = extractComponentTypes(script.content, absPath);
+
+    // Recherche d'un import de cva dans le dossier du composant (extraction de toutes les variantes cva)
+    const dir = pathModule.dirname(absPath);
+    const indexPath = pathModule.join(dir, 'index.ts');
+    if (fs.existsSync(indexPath)) {
+      const indexContent = fs.readFileSync(indexPath, 'utf-8');
+      if (indexContent.includes('cva(')) {
+        const allVariants = extractCvaVariants(indexContent, indexPath);
+        // On ne garde que les variantes dont le type est utilisé dans les props
+        // On collecte les couples type/clé utilisés dans les props
+        const usedTypeKeys: Array<{ type: string; key: string }> = props
+          .map((p) => {
+            if (typeof p.type === 'string') {
+              const match = p.type.match(/^(\w+)\['([\w-]+)'\]$/);
+              if (match) return { type: match[1], key: match[2] };
+            }
+            return undefined;
+          })
+          .filter(Boolean) as Array<{ type: string; key: string }>;
+        variants = {} as Record<string, Record<string, string[]>>;
+        for (const { type, key } of usedTypeKeys) {
+          if (type && key && allVariants[type] && allVariants[type][key]) {
+            if (!variants[type]) variants[type] = {};
+            variants[type][key] = allVariants[type][key];
+          }
+        }
+      }
+    }
   }
   if (descriptor.template && descriptor.template.content) {
     slots = extractSlots(script ? script.content : '', absPath, descriptor.template.content);
@@ -62,6 +92,7 @@ export const extractVueSfcComposition = (filePath: string, config: Record<string
     tags,
     childComponents,
     props,
+    variants,
     slots,
     emits,
     exposes,
