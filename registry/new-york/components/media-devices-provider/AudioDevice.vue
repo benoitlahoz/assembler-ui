@@ -5,8 +5,13 @@
  * start/stop functions to manage streams with device caching.
  */
 
-import { ref, watch, onMounted, onBeforeUnmount, computed, inject } from 'vue';
-import { MediaDevicesStartKey, MediaDevicesStopKey } from '.';
+import { ref, watch, onMounted, onBeforeUnmount, computed, inject, type Ref } from 'vue';
+import {
+  MediaDevicesStartKey,
+  MediaDevicesStopKey,
+  MediaDevicesLoadingKey,
+  MediaDevicesActiveStreamsKey,
+} from '.';
 import type { MediaDevicesStartFn, MediaDevicesStopFn } from '.';
 
 export interface AudioDeviceProps {
@@ -64,10 +69,16 @@ const emit = defineEmits<{
  */
 const providerStart = inject<MediaDevicesStartFn>(MediaDevicesStartKey);
 const providerStop = inject<MediaDevicesStopFn>(MediaDevicesStopKey);
+const providerIsLoading = inject<Ref<boolean>>(MediaDevicesLoadingKey, ref(false));
+const providerActiveStreams = inject<Readonly<Ref<ReadonlyMap<string, MediaStream>>>>(
+  MediaDevicesActiveStreamsKey,
+  computed(() => new Map() as ReadonlyMap<string, MediaStream>)
+);
 
 const stream = ref<MediaStream | null>(null);
 const error = ref<Error | null>(null);
 const isActive = ref(false);
+const isLoading = ref(false);
 const currentDeviceId = ref<string | undefined>(undefined);
 
 /**
@@ -110,11 +121,12 @@ const start = async () => {
     return;
   }
 
-  if (isActive.value) {
+  if (isActive.value || isLoading.value) {
     return;
   }
 
   try {
+    isLoading.value = true;
     error.value = null;
     const constraints = buildConstraints();
 
@@ -132,6 +144,8 @@ const start = async () => {
     const errorObj = err as Error;
     error.value = errorObj;
     emit('error', errorObj);
+  } finally {
+    isLoading.value = false;
   }
 };
 
@@ -223,12 +237,24 @@ defineExpose({
   stop,
   stream: computed(() => stream.value),
   isActive: computed(() => isActive.value),
+  isLoading: computed(() => isLoading.value),
+  providerIsLoading: computed(() => providerIsLoading.value),
+  providerActiveStreams: computed(() => providerActiveStreams.value),
   error: computed(() => error.value),
 });
 </script>
 
 <template>
-  <slot :stream="stream" :is-active="isActive" :error="error" :start="start" :stop="stop" />
+  <slot
+    :stream="stream"
+    :is-active="isActive"
+    :is-loading="isLoading"
+    :provider-is-loading="providerIsLoading"
+    :provider-active-streams="providerActiveStreams"
+    :error="error"
+    :start="start"
+    :stop="stop"
+  />
 </template>
 
 <style scoped></style>

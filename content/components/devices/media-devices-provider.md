@@ -144,6 +144,69 @@ export { type MediaDevicesProviderProps } from "./MediaDevicesProvider.vue";
 export { type VideoDeviceProps } from "./VideoDevice.vue";
 export { type AudioDeviceProps } from "./AudioDevice.vue";
 
+export type MediaDeviceType = "camera" | "microphone" | "all";
+
+export type MediaDeviceKind = "videoinput" | "audioinput" | "audiooutput";
+
+export interface FilteredDevices {
+  cameras: MediaDeviceInfo[];
+  microphones: MediaDeviceInfo[];
+  speakers: MediaDeviceInfo[];
+}
+
+export type CameraConstraints = MediaStreamConstraints & {
+  video: MediaTrackConstraints | boolean;
+  audio?: MediaTrackConstraints | boolean;
+};
+
+export type MicrophoneConstraints = MediaStreamConstraints & {
+  audio: MediaTrackConstraints | boolean;
+  video?: MediaTrackConstraints | boolean;
+};
+
+export type DeviceConstraints =
+  | CameraConstraints
+  | MicrophoneConstraints
+  | MediaStreamConstraints;
+
+export type MediaDeviceErrorName =
+  | "NotFoundError"
+  | "NotAllowedError"
+  | "NotReadableError"
+  | "OverconstrainedError"
+  | "TypeError"
+  | "AbortError"
+  | "SecurityError";
+
+export interface MediaDeviceError extends Error {
+  name: MediaDeviceErrorName;
+  constraint?: string;
+}
+
+export interface MediaDevicesProviderSlotProps {
+  devices: MediaDeviceInfo[];
+
+  cameras: MediaDeviceInfo[];
+
+  microphones: MediaDeviceInfo[];
+
+  speakers: MediaDeviceInfo[];
+
+  errors: Error[];
+
+  isLoading: boolean;
+
+  activeStreams: ReadonlyMap<string, MediaStream>;
+
+  start: MediaDevicesStartFn;
+
+  stop: MediaDevicesStopFn;
+
+  stopAll: MediaDevicesStopAllFn;
+
+  cachedStreamsCount: number;
+}
+
 export type MediaDevicesStartFn = (
   deviceId: string,
   constraints: MediaStreamConstraints,
@@ -159,6 +222,12 @@ export const MediaDevicesKey: InjectionKey<Ref<MediaDeviceInfo[]>> =
   Symbol("MediaDevices");
 export const MediaDevicesErrorsKey: InjectionKey<Ref<Error[]>> =
   Symbol("MediaDevicesErrors");
+export const MediaDevicesLoadingKey: InjectionKey<Ref<boolean>> = Symbol(
+  "MediaDevicesLoading",
+);
+export const MediaDevicesActiveStreamsKey: InjectionKey<
+  Readonly<Ref<ReadonlyMap<string, MediaStream>>>
+> = Symbol("MediaDevicesActiveStreams");
 export const MediaDevicesStartKey: InjectionKey<MediaDevicesStartFn> =
   Symbol("MediaDevicesStart");
 export const MediaDevicesStopKey: InjectionKey<MediaDevicesStopFn> =
@@ -186,16 +255,20 @@ import { useEventListener } from "@vueuse/core";
 import {
   MediaDevicesKey,
   MediaDevicesErrorsKey,
+  MediaDevicesLoadingKey,
+  MediaDevicesActiveStreamsKey,
   MediaDevicesStartKey,
   MediaDevicesStopKey,
   MediaDevicesStopAllKey,
   type MediaDevicesStartFn,
   type MediaDevicesStopFn,
   type MediaDevicesStopAllFn,
+  type MediaDeviceType,
+  type MediaDeviceKind,
 } from ".";
 
 export interface MediaDevicesProviderProps {
-  type?: "camera" | "microphone" | "all";
+  type?: MediaDeviceType;
 
   open?: boolean;
 }
@@ -215,17 +288,20 @@ const emit = defineEmits<{
 
 const devices = ref<MediaDeviceInfo[]>([]);
 const errors = ref<Error[]>([]);
+const isLoading = ref<boolean>(false);
 
 const activeStreams = ref<Map<string, MediaStream>>(new Map());
 
-const cameras = computed(() =>
-  devices.value.filter((d) => d.kind === "videoinput"),
-);
-const microphones = computed(() =>
-  devices.value.filter((d) => d.kind === "audioinput"),
-);
-const speakers = computed(() =>
-  devices.value.filter((d) => d.kind === "audiooutput"),
+const filterDevicesByKind = (kind: MediaDeviceKind): MediaDeviceInfo[] => {
+  return devices.value.filter((d) => d.kind === kind);
+};
+
+const cameras = computed(() => filterDevicesByKind("videoinput"));
+const microphones = computed(() => filterDevicesByKind("audioinput"));
+const speakers = computed(() => filterDevicesByKind("audiooutput"));
+
+const readonlyActiveStreams = computed(
+  () => activeStreams.value as ReadonlyMap<string, MediaStream>,
 );
 
 const startStream = async (
@@ -286,8 +362,14 @@ const updateAvailableDevices = async () => {
     devices.value = [];
     return;
   }
-  devices.value = await navigator.mediaDevices.enumerateDevices();
-  emit("devicesUpdated", devices.value);
+
+  isLoading.value = true;
+  try {
+    devices.value = await navigator.mediaDevices.enumerateDevices();
+    emit("devicesUpdated", devices.value);
+  } finally {
+    isLoading.value = false;
+  }
 };
 
 if (typeof navigator !== "undefined" && navigator.mediaDevices) {
@@ -325,6 +407,10 @@ const ensurePermissions = () =>
 provide<Ref<MediaDeviceInfo[]>>(MediaDevicesKey, devices);
 
 provide<Ref<Error[]>>(MediaDevicesErrorsKey, errors);
+
+provide<Ref<boolean>>(MediaDevicesLoadingKey, isLoading);
+
+provide(MediaDevicesActiveStreamsKey, readonlyActiveStreams);
 
 provide<MediaDevicesStartFn>(MediaDevicesStartKey, startStream);
 
@@ -368,6 +454,8 @@ onBeforeUnmount(() => {
   <slot
     :devices="devices"
     :errors="errors"
+    :is-loading="isLoading"
+    :active-streams="activeStreams"
     :cameras="cameras"
     :microphones="microphones"
     :speakers="speakers"
@@ -384,8 +472,21 @@ onBeforeUnmount(() => {
 
 ```vue [src/components/ui/media-devices-provider/AudioDevice.vue]
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount, computed, inject } from "vue";
-import { MediaDevicesStartKey, MediaDevicesStopKey } from ".";
+import {
+  ref,
+  watch,
+  onMounted,
+  onBeforeUnmount,
+  computed,
+  inject,
+  type Ref,
+} from "vue";
+import {
+  MediaDevicesStartKey,
+  MediaDevicesStopKey,
+  MediaDevicesLoadingKey,
+  MediaDevicesActiveStreamsKey,
+} from ".";
 import type { MediaDevicesStartFn, MediaDevicesStopFn } from ".";
 
 export interface AudioDeviceProps {
@@ -419,10 +520,21 @@ const emit = defineEmits<{
 
 const providerStart = inject<MediaDevicesStartFn>(MediaDevicesStartKey);
 const providerStop = inject<MediaDevicesStopFn>(MediaDevicesStopKey);
+const providerIsLoading = inject<Ref<boolean>>(
+  MediaDevicesLoadingKey,
+  ref(false),
+);
+const providerActiveStreams = inject<
+  Readonly<Ref<ReadonlyMap<string, MediaStream>>>
+>(
+  MediaDevicesActiveStreamsKey,
+  computed(() => new Map() as ReadonlyMap<string, MediaStream>),
+);
 
 const stream = ref<MediaStream | null>(null);
 const error = ref<Error | null>(null);
 const isActive = ref(false);
+const isLoading = ref(false);
 const currentDeviceId = ref<string | undefined>(undefined);
 
 const buildConstraints = (): MediaStreamConstraints => {
@@ -458,11 +570,12 @@ const start = async () => {
     return;
   }
 
-  if (isActive.value) {
+  if (isActive.value || isLoading.value) {
     return;
   }
 
   try {
+    isLoading.value = true;
     error.value = null;
     const constraints = buildConstraints();
 
@@ -480,6 +593,8 @@ const start = async () => {
     const errorObj = err as Error;
     error.value = errorObj;
     emit("error", errorObj);
+  } finally {
+    isLoading.value = false;
   }
 };
 
@@ -555,6 +670,9 @@ defineExpose({
   stop,
   stream: computed(() => stream.value),
   isActive: computed(() => isActive.value),
+  isLoading: computed(() => isLoading.value),
+  providerIsLoading: computed(() => providerIsLoading.value),
+  providerActiveStreams: computed(() => providerActiveStreams.value),
   error: computed(() => error.value),
 });
 </script>
@@ -563,6 +681,9 @@ defineExpose({
   <slot
     :stream="stream"
     :is-active="isActive"
+    :is-loading="isLoading"
+    :provider-is-loading="providerIsLoading"
+    :provider-active-streams="providerActiveStreams"
     :error="error"
     :start="start"
     :stop="stop"
@@ -575,8 +696,21 @@ defineExpose({
 
 ```vue [src/components/ui/media-devices-provider/VideoDevice.vue]
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount, computed, inject } from "vue";
-import { MediaDevicesStartKey, MediaDevicesStopKey } from ".";
+import {
+  ref,
+  watch,
+  onMounted,
+  onBeforeUnmount,
+  computed,
+  inject,
+  type Ref,
+} from "vue";
+import {
+  MediaDevicesStartKey,
+  MediaDevicesStopKey,
+  MediaDevicesLoadingKey,
+  MediaDevicesActiveStreamsKey,
+} from ".";
 import type { MediaDevicesStartFn, MediaDevicesStopFn } from ".";
 
 export interface VideoDeviceProps {
@@ -610,10 +744,21 @@ const emit = defineEmits<{
 
 const providerStart = inject<MediaDevicesStartFn>(MediaDevicesStartKey);
 const providerStop = inject<MediaDevicesStopFn>(MediaDevicesStopKey);
+const providerIsLoading = inject<Ref<boolean>>(
+  MediaDevicesLoadingKey,
+  ref(false),
+);
+const providerActiveStreams = inject<
+  Readonly<Ref<ReadonlyMap<string, MediaStream>>>
+>(
+  MediaDevicesActiveStreamsKey,
+  computed(() => new Map() as ReadonlyMap<string, MediaStream>),
+);
 
 const stream = ref<MediaStream | null>(null);
 const error = ref<Error | null>(null);
 const isActive = ref(false);
+const isLoading = ref(false);
 const currentDeviceId = ref<string | undefined>(undefined);
 
 const buildConstraints = (): MediaStreamConstraints => {
@@ -657,11 +802,12 @@ const start = async () => {
     return;
   }
 
-  if (isActive.value) {
+  if (isActive.value || isLoading.value) {
     return;
   }
 
   try {
+    isLoading.value = true;
     error.value = null;
     const constraints = buildConstraints();
 
@@ -679,6 +825,8 @@ const start = async () => {
     const errorObj = err as Error;
     error.value = errorObj;
     emit("error", errorObj);
+  } finally {
+    isLoading.value = false;
   }
 };
 
@@ -754,6 +902,9 @@ defineExpose({
   stop,
   stream: computed(() => stream.value),
   isActive: computed(() => isActive.value),
+  isLoading: computed(() => isLoading.value),
+  providerIsLoading: computed(() => providerIsLoading.value),
+  providerActiveStreams: computed(() => providerActiveStreams.value),
   error: computed(() => error.value),
 });
 </script>
@@ -762,6 +913,9 @@ defineExpose({
   <slot
     :stream="stream"
     :is-active="isActive"
+    :is-loading="isLoading"
+    :provider-is-loading="providerIsLoading"
+    :provider-active-streams="providerActiveStreams"
     :error="error"
     :start="start"
     :stop="stop"
@@ -924,7 +1078,7 @@ The MediaDevicesProvider component provides a list of available media devices
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `type`{.primary .text-primary} | `'camera' \| 'microphone' \| 'all'` | all | The type of media devices to request. |
+| `type`{.primary .text-primary} | `MediaDeviceType` | all | The type of media devices to request. |
 | `open`{.primary .text-primary} | `boolean` | false | Whether to automatically request media permissions and devices on mount. |
 
 
@@ -946,6 +1100,8 @@ The MediaDevicesProvider component provides a list of available media devices
 |-----|-------|------|-------------|
 | `MediaDevicesKey`{.primary .text-primary} | `devices` | `Ref<MediaDeviceInfo[]>` | Provide the list of available media devices to child components. |
 | `MediaDevicesErrorsKey`{.primary .text-primary} | `errors` | `Ref<Error[]>` | Provide the list of errors encountered during media operations to child components. |
+| `MediaDevicesLoadingKey`{.primary .text-primary} | `isLoading` | `Ref<boolean>` | Provide the loading state to child components. |
+| `MediaDevicesActiveStreamsKey`{.primary .text-primary} | `readonlyActiveStreams` | `any` | Provide the active streams map to child components (readonly to prevent external modifications). |
 | `MediaDevicesStartKey`{.primary .text-primary} | `startStream` | `MediaDevicesStartFn` | Provide the function to start a media stream for a specific device to child components. |
 | `MediaDevicesStopKey`{.primary .text-primary} | `stopStream` | `MediaDevicesStopFn` | Provide the function to stop a media stream for a specific device to child components. |
 | `MediaDevicesStopAllKey`{.primary .text-primary} | `stopAllStreams` | `MediaDevicesStopAllFn` | Provide the function to stop all active media streams to child components. |
@@ -1025,6 +1181,8 @@ start/stop functions to manage streams with device caching.
 |-----|--------|------|-------------|
 | `MediaDevicesStartKey`{.primary .text-primary} | — | — | Inject start and stop functions from MediaDevicesProvider. |
 | `MediaDevicesStopKey`{.primary .text-primary} | — | — | — |
+| `MediaDevicesLoadingKey`{.primary .text-primary} | `ref(false)` | `any` | — |
+| `MediaDevicesActiveStreamsKey`{.primary .text-primary} | `computed(() => new Map() as ReadonlyMap<string, MediaStream>)` | `any` | — |
 
 
 
@@ -1036,6 +1194,9 @@ start/stop functions to manage streams with device caching.
 | `stop`{.primary .text-primary} | `() => void` | — |
 | `stream`{.primary .text-primary} | — | — |
 | `isActive`{.primary .text-primary} | — | — |
+| `isLoading`{.primary .text-primary} | — | — |
+| `providerIsLoading`{.primary .text-primary} | — | — |
+| `providerActiveStreams`{.primary .text-primary} | — | — |
 | `error`{.primary .text-primary} | — | — |
 
 
@@ -1110,6 +1271,8 @@ start/stop functions to manage streams with device caching.
 |-----|--------|------|-------------|
 | `MediaDevicesStartKey`{.primary .text-primary} | — | — | Inject start and stop functions from MediaDevicesProvider. |
 | `MediaDevicesStopKey`{.primary .text-primary} | — | — | — |
+| `MediaDevicesLoadingKey`{.primary .text-primary} | `ref(false)` | `any` | — |
+| `MediaDevicesActiveStreamsKey`{.primary .text-primary} | `computed(() => new Map() as ReadonlyMap<string, MediaStream>)` | `any` | — |
 
 
 
@@ -1121,6 +1284,9 @@ start/stop functions to manage streams with device caching.
 | `stop`{.primary .text-primary} | `() => void` | — |
 | `stream`{.primary .text-primary} | — | — |
 | `isActive`{.primary .text-primary} | — | — |
+| `isLoading`{.primary .text-primary} | — | — |
+| `providerIsLoading`{.primary .text-primary} | — | — |
+| `providerActiveStreams`{.primary .text-primary} | — | — |
 | `error`{.primary .text-primary} | — | — |
 
 

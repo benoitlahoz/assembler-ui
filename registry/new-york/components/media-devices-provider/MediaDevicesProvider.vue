@@ -9,19 +9,23 @@ import { useEventListener } from '@vueuse/core';
 import {
   MediaDevicesKey,
   MediaDevicesErrorsKey,
+  MediaDevicesLoadingKey,
+  MediaDevicesActiveStreamsKey,
   MediaDevicesStartKey,
   MediaDevicesStopKey,
   MediaDevicesStopAllKey,
   type MediaDevicesStartFn,
   type MediaDevicesStopFn,
   type MediaDevicesStopAllFn,
+  type MediaDeviceType,
+  type MediaDeviceKind,
 } from '.';
 
 export interface MediaDevicesProviderProps {
   /**
    * The type of media devices to request.
    */
-  type?: 'camera' | 'microphone' | 'all';
+  type?: MediaDeviceType;
   /**
    * Whether to automatically request media permissions and devices on mount.
    */
@@ -43,6 +47,7 @@ const emit = defineEmits<{
 
 const devices = ref<MediaDeviceInfo[]>([]);
 const errors = ref<Error[]>([]);
+const isLoading = ref<boolean>(false);
 
 /**
  * Cache of active media streams indexed by deviceId.
@@ -50,11 +55,23 @@ const errors = ref<Error[]>([]);
 const activeStreams = ref<Map<string, MediaStream>>(new Map());
 
 /**
+ * Helper function to filter devices by kind with proper typing.
+ */
+const filterDevicesByKind = (kind: MediaDeviceKind): MediaDeviceInfo[] => {
+  return devices.value.filter((d) => d.kind === kind);
+};
+
+/**
  * Computed properties for filtered device lists.
  */
-const cameras = computed(() => devices.value.filter((d) => d.kind === 'videoinput'));
-const microphones = computed(() => devices.value.filter((d) => d.kind === 'audioinput'));
-const speakers = computed(() => devices.value.filter((d) => d.kind === 'audiooutput'));
+const cameras = computed(() => filterDevicesByKind('videoinput'));
+const microphones = computed(() => filterDevicesByKind('audioinput'));
+const speakers = computed(() => filterDevicesByKind('audiooutput'));
+
+/**
+ * Readonly version of active streams for safe exposure to child components.
+ */
+const readonlyActiveStreams = computed(() => activeStreams.value as ReadonlyMap<string, MediaStream>);
 
 /**
  * Start a media stream with the given deviceId and constraints.
@@ -125,8 +142,14 @@ const updateAvailableDevices = async () => {
     devices.value = [];
     return;
   }
-  devices.value = await navigator.mediaDevices.enumerateDevices();
-  emit('devicesUpdated', devices.value);
+  
+  isLoading.value = true;
+  try {
+    devices.value = await navigator.mediaDevices.enumerateDevices();
+    emit('devicesUpdated', devices.value);
+  } finally {
+    isLoading.value = false;
+  }
 };
 
 if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
@@ -170,6 +193,16 @@ provide<Ref<MediaDeviceInfo[]>>(MediaDevicesKey, devices);
  * Provide the list of errors encountered during media operations to child components.
  */
 provide<Ref<Error[]>>(MediaDevicesErrorsKey, errors);
+
+/**
+ * Provide the loading state to child components.
+ */
+provide<Ref<boolean>>(MediaDevicesLoadingKey, isLoading);
+
+/**
+ * Provide the active streams map to child components (readonly to prevent external modifications).
+ */
+provide(MediaDevicesActiveStreamsKey, readonlyActiveStreams);
 
 /**
  * Provide the function to start a media stream for a specific device to child components.
@@ -224,6 +257,8 @@ onBeforeUnmount(() => {
   <slot
     :devices="devices"
     :errors="errors"
+    :is-loading="isLoading"
+    :active-streams="activeStreams"
     :cameras="cameras"
     :microphones="microphones"
     :speakers="speakers"
