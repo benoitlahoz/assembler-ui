@@ -86,7 +86,7 @@ const formatPresetName = (name: string): string => {
       <template #default="{ devices, errors }">
         <div class="flex flex-col h-full overflow-hidden">
           <!-- Top controls section -->
-          <div class="p-4 space-y-4 border-b border-muted">
+          <div class="p-4 space-y-4">
             <!-- Device selector -->
             <div class="space-y-2">
               <Label class="text-sm font-bold mb-4">Available Cameras</Label>

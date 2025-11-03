@@ -1452,7 +1452,7 @@ const formatPresetName = (name: string): string => {
     <MediaDevicesProvider :open="true">
       <template #default="{ devices, errors }">
         <div class="flex flex-col h-full overflow-hidden">
-          <div class="p-4 space-y-4 border-b border-muted">
+          <div class="p-4 space-y-4">
             <div class="space-y-2">
               <Label class="text-sm font-bold mb-4">Available Cameras</Label>
               <div class="grid gap-2">
