@@ -78,7 +78,7 @@ const speakers = computed(() => filterDevicesByKind('audiooutput'));
 /**
  * Readonly version of active streams for safe exposure to child components.
  */
-const readonlyActiveStreams = computed(() => activeStreams.value as ReadonlyMap<string, MediaStream>);
+const roActiveStreams = computed(() => activeStreams.value as ReadonlyMap<string, MediaStream>);
 
 /**
  * Check permission state for a specific media type.
@@ -175,7 +175,7 @@ const updateAvailableDevices = async () => {
     devices.value = [];
     return;
   }
-  
+
   isLoading.value = true;
   try {
     devices.value = await navigator.mediaDevices.enumerateDevices();
@@ -209,13 +209,13 @@ const requestMediaIfNeeded = async () => {
     // Stop all tracks immediately as we only needed to trigger the permission
     // and ensure device labels are populated
     stream.getTracks().forEach((track) => track.stop());
-    
+
     // Update permissions after successful request
     await updatePermissions();
   } catch (error) {
     errors.value.push(error as Error);
     emit('error', error as Error);
-    
+
     // Update permissions even on error (to reflect denied state)
     await updatePermissions();
   }
@@ -223,44 +223,28 @@ const requestMediaIfNeeded = async () => {
 
 const ensurePermissions = () => (props.open ? requestMediaIfNeeded() : Promise.resolve());
 
-/**
- * Provide the list of available media devices to child components.
- */
+/** Available media devices. */
 provide<Ref<MediaDeviceInfo[]>>(MediaDevicesKey, devices);
 
-/**
- * Provide the list of errors encountered during media operations to child components.
- */
+/** Errors encountered during media operations. */
 provide<Ref<Error[]>>(MediaDevicesErrorsKey, errors);
 
-/**
- * Provide the loading state to child components.
- */
+/** Loading state. */
 provide<Ref<boolean>>(MediaDevicesLoadingKey, isLoading);
 
-/**
- * Provide the permissions state to child components.
- */
+/** Permissions state. */
 provide<Ref<MediaPermissions>>(MediaDevicesPermissionsKey, permissions);
 
-/**
- * Provide the active streams map to child components (readonly to prevent external modifications).
- */
-provide(MediaDevicesActiveStreamsKey, readonlyActiveStreams);
+/** Active streams (readonly). */
+provide(MediaDevicesActiveStreamsKey, roActiveStreams);
 
-/**
- * Provide the function to start a media stream for a specific device to child components.
- */
+/** Start a media stream for a specific device. */
 provide<MediaDevicesStartFn>(MediaDevicesStartKey, startStream);
 
-/**
- * Provide the function to stop a media stream for a specific device to child components.
- */
+/** Stop a media stream for a specific device. */
 provide<MediaDevicesStopFn>(MediaDevicesStopKey, stopStream);
 
-/**
- * Provide the function to stop all active media streams to child components.
- */
+/** Stop all active media streams. */
 provide<MediaDevicesStopAllFn>(MediaDevicesStopAllKey, stopAllStreams);
 
 watch(
@@ -284,7 +268,7 @@ watch(
 onMounted(async () => {
   // Check initial permissions state
   await updatePermissions();
-  
+
   if (props.open) {
     await ensurePermissions();
     // Wait a bit for Firefox to update device info after stopping tracks

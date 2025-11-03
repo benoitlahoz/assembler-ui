@@ -162,8 +162,9 @@ export const MediaDevicesErrorsKey: InjectionKey<Ref<Error[]>> = Symbol('MediaDe
 export const MediaDevicesLoadingKey: InjectionKey<Ref<boolean>> = Symbol('MediaDevicesLoading');
 export const MediaDevicesPermissionsKey: InjectionKey<Ref<MediaPermissions>> =
   Symbol('MediaDevicesPermissions');
-export const MediaDevicesActiveStreamsKey: InjectionKey<Readonly<Ref<ReadonlyMap<string, MediaStream>>>> =
-  Symbol('MediaDevicesActiveStreams');
+export const MediaDevicesActiveStreamsKey: InjectionKey<
+  Readonly<Ref<ReadonlyMap<string, MediaStream>>>
+> = Symbol('MediaDevicesActiveStreams');
 export const MediaDevicesStartKey: InjectionKey<MediaDevicesStartFn> = Symbol('MediaDevicesStart');
 export const MediaDevicesStopKey: InjectionKey<MediaDevicesStopFn> = Symbol('MediaDevicesStop');
 export const MediaDevicesStopAllKey: InjectionKey<MediaDevicesStopAllFn> =

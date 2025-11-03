@@ -318,7 +318,7 @@ const cameras = computed(() => filterDevicesByKind("videoinput"));
 const microphones = computed(() => filterDevicesByKind("audioinput"));
 const speakers = computed(() => filterDevicesByKind("audiooutput"));
 
-const readonlyActiveStreams = computed(
+const roActiveStreams = computed(
   () => activeStreams.value as ReadonlyMap<string, MediaStream>,
 );
 
@@ -457,7 +457,7 @@ provide<Ref<boolean>>(MediaDevicesLoadingKey, isLoading);
 
 provide<Ref<MediaPermissions>>(MediaDevicesPermissionsKey, permissions);
 
-provide(MediaDevicesActiveStreamsKey, readonlyActiveStreams);
+provide(MediaDevicesActiveStreamsKey, roActiveStreams);
 
 provide<MediaDevicesStartFn>(MediaDevicesStartKey, startStream);
 
@@ -1164,14 +1164,14 @@ The MediaDevicesProvider component provides a list of available media devices
   ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-| `MediaDevicesKey`{.primary .text-primary} | `devices` | `Ref<MediaDeviceInfo[]>` | Provide the list of available media devices to child components. |
-| `MediaDevicesErrorsKey`{.primary .text-primary} | `errors` | `Ref<Error[]>` | Provide the list of errors encountered during media operations to child components. |
-| `MediaDevicesLoadingKey`{.primary .text-primary} | `isLoading` | `Ref<boolean>` | Provide the loading state to child components. |
-| `MediaDevicesPermissionsKey`{.primary .text-primary} | `permissions` | `Ref<MediaPermissions>` | Provide the permissions state to child components. |
-| `MediaDevicesActiveStreamsKey`{.primary .text-primary} | `readonlyActiveStreams` | `any` | Provide the active streams map to child components (readonly to prevent external modifications). |
-| `MediaDevicesStartKey`{.primary .text-primary} | `startStream` | `MediaDevicesStartFn` | Provide the function to start a media stream for a specific device to child components. |
-| `MediaDevicesStopKey`{.primary .text-primary} | `stopStream` | `MediaDevicesStopFn` | Provide the function to stop a media stream for a specific device to child components. |
-| `MediaDevicesStopAllKey`{.primary .text-primary} | `stopAllStreams` | `MediaDevicesStopAllFn` | Provide the function to stop all active media streams to child components. |
+| `MediaDevicesKey`{.primary .text-primary} | `devices` | `Ref<MediaDeviceInfo[]>` | Available media devices. |
+| `MediaDevicesErrorsKey`{.primary .text-primary} | `errors` | `Ref<Error[]>` | Errors encountered during media operations. |
+| `MediaDevicesLoadingKey`{.primary .text-primary} | `isLoading` | `Ref<boolean>` | Loading state. |
+| `MediaDevicesPermissionsKey`{.primary .text-primary} | `permissions` | `Ref<MediaPermissions>` | Permissions state. |
+| `MediaDevicesActiveStreamsKey`{.primary .text-primary} | `roActiveStreams` | `any` | Active streams (readonly). |
+| `MediaDevicesStartKey`{.primary .text-primary} | `startStream` | `MediaDevicesStartFn` | Start a media stream for a specific device. |
+| `MediaDevicesStopKey`{.primary .text-primary} | `stopStream` | `MediaDevicesStopFn` | Stop a media stream for a specific device. |
+| `MediaDevicesStopAllKey`{.primary .text-primary} | `stopAllStreams` | `MediaDevicesStopAllFn` | Stop all active media streams. |
 
 
 
