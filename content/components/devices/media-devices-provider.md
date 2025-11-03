@@ -196,14 +196,11 @@ export interface MediaDevicesProviderProps {
   type?: "camera" | "microphone" | "all";
 
   open?: boolean;
-
-  debug?: boolean;
 }
 
 const props = withDefaults(defineProps<MediaDevicesProviderProps>(), {
   type: "all",
   open: false,
-  debug: true,
 });
 
 const emit = defineEmits<{
@@ -229,20 +226,12 @@ const speakers = computed(() =>
   devices.value.filter((d) => d.kind === "audiooutput"),
 );
 
-const log = (...args: any[]) => {
-  if (props.debug) console.log("[MediaDevicesProvider]", ...args);
-};
-
 const startStream = async (
   deviceId: string,
   constraints: MediaStreamConstraints,
 ): Promise<MediaStream> => {
-  log("startStream called for deviceId:", deviceId);
-  log("Constraints:", JSON.stringify(constraints, null, 2));
-
   const existingStream = activeStreams.value.get(deviceId);
   if (existingStream?.active) {
-    log("Returning cached stream for device:", deviceId);
     return existingStream;
   }
 
@@ -251,8 +240,6 @@ const startStream = async (
   }
 
   try {
-    log("Creating new stream...");
-
     if (typeof navigator === "undefined" || !navigator.mediaDevices) {
       throw new Error(
         "navigator.mediaDevices not available (SSR or unsupported browser)",
@@ -261,31 +248,10 @@ const startStream = async (
 
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
-    const tracks =
-      stream.getVideoTracks().length > 0
-        ? stream.getVideoTracks()
-        : stream.getAudioTracks();
-
-    if (tracks.length > 0 && tracks[0]) {
-      const settings = tracks[0].getSettings();
-      log("Stream settings:", settings);
-
-      if (settings.deviceId !== deviceId) {
-        log(
-          "WARNING: Got different device! Requested:",
-          deviceId,
-          "Got:",
-          settings.deviceId,
-        );
-      }
-    }
-
     activeStreams.value.set(deviceId, stream);
     emit("streamStarted", deviceId, stream);
-    log("Stream started successfully");
     return stream;
   } catch (error) {
-    log("Error starting stream:", error);
     errors.value.push(error as Error);
     emit("error", error as Error);
     throw error;
@@ -295,7 +261,6 @@ const startStream = async (
 const stopStream = (deviceId: string) => {
   const stream = activeStreams.value.get(deviceId);
   if (stream) {
-    log("Stopping stream for device:", deviceId);
     stream.getTracks().forEach((track) => track.stop());
     activeStreams.value.delete(deviceId);
     emit("streamStopped", deviceId);
@@ -303,7 +268,6 @@ const stopStream = (deviceId: string) => {
 };
 
 const stopAllStreams = () => {
-  log("Stopping all streams. Active count:", activeStreams.value.size);
   activeStreams.value.forEach((stream, deviceId) => {
     stream.getTracks().forEach((track) => track.stop());
   });
@@ -320,10 +284,8 @@ const updateAvailableDevices = async () => {
     devices.value = [];
     return;
   }
-  log("Updating available devices...");
   devices.value = await navigator.mediaDevices.enumerateDevices();
   emit("devicesUpdated", devices.value);
-  log("Devices updated. Total count:", devices.value.length);
 };
 
 if (typeof navigator !== "undefined" && navigator.mediaDevices) {
@@ -336,7 +298,6 @@ if (typeof navigator !== "undefined" && navigator.mediaDevices) {
 
 const requestMediaIfNeeded = async () => {
   if (typeof navigator === "undefined" || !navigator.mediaDevices) {
-    log("navigator.mediaDevices not available (SSR or unsupported browser)");
     return;
   }
 
@@ -344,17 +305,13 @@ const requestMediaIfNeeded = async () => {
   const needsAudio = props.type === "microphone" || props.type === "all";
 
   try {
-    log("Requesting media access...", { video: needsVideo, audio: needsAudio });
-
     const stream = await navigator.mediaDevices.getUserMedia({
       video: needsVideo,
       audio: needsAudio,
     });
 
     stream.getTracks().forEach((track) => track.stop());
-    log("Media access granted and temporary stream stopped");
   } catch (error) {
-    log("Error requesting media access:", error);
     errors.value.push(error as Error);
     emit("error", error as Error);
   }
@@ -376,13 +333,11 @@ watch(
     try {
       nextTick(async () => {
         if (props.open) {
-          log("Props changed, re-initializing...");
           await ensurePermissions();
           await updateAvailableDevices();
         }
       });
     } catch (error) {
-      log("Error in watch handler:", error);
       errors.value.push(error as Error);
       emit("error", error as Error);
     }
@@ -391,7 +346,6 @@ watch(
 );
 
 onMounted(async () => {
-  log("Component mounted");
   if (props.open) {
     await ensurePermissions();
 
@@ -401,8 +355,6 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  log("Component unmounting, stopping all streams");
-
   stopAllStreams();
 });
 </script>
@@ -417,6 +369,7 @@ onBeforeUnmount(() => {
     :start="startStream"
     :stop="stopStream"
     :stop-all="stopAllStreams"
+    :cached-streams-count="activeStreams.size"
   />
 </template>
 
@@ -473,7 +426,7 @@ const buildConstraints = (): MediaStreamConstraints => {
   }
 
   const audioConstraints: MediaTrackConstraints = {
-    deviceId: { ideal: props.deviceId },
+    deviceId: { exact: props.deviceId },
     echoCancellation: props.echoCancellation,
     noiseSuppression: props.noiseSuppression,
     autoGainControl: props.autoGainControl,
@@ -497,28 +450,16 @@ const buildConstraints = (): MediaStreamConstraints => {
 
 const start = async () => {
   if (typeof navigator === "undefined" || !navigator.mediaDevices) {
-    console.error(
-      "AudioDevice: navigator.mediaDevices not available (SSR or unsupported browser)",
-    );
     return;
   }
 
-  console.log(
-    "AudioDevice: Starting audio stream for deviceId:",
-    props.deviceId,
-  );
   if (isActive.value) {
-    console.log("AudioDevice: Already active, returning");
     return;
   }
 
   try {
     error.value = null;
     const constraints = buildConstraints();
-    console.log(
-      "AudioDevice: Built constraints:",
-      JSON.stringify(constraints, null, 2),
-    );
 
     if (providerStart) {
       stream.value = await providerStart(props.deviceId, constraints);
@@ -532,33 +473,15 @@ const start = async () => {
     emit("started");
   } catch (err) {
     const errorObj = err as Error;
-    console.error("AudioDevice: Error starting stream:", errorObj);
-
-    if (errorObj.name === "OverconstrainedError") {
-      const constraint = (errorObj as any).constraint;
-      console.error("AudioDevice: Overconstrained on:", constraint);
-      console.error(
-        "AudioDevice: Constraints used:",
-        JSON.stringify(buildConstraints(), null, 2),
-      );
-    }
-
     error.value = errorObj;
     emit("error", errorObj);
   }
 };
 
 const stop = () => {
-  console.log(
-    "AudioDevice: Stopping stream. isActive:",
-    isActive.value,
-    "currentDeviceId:",
-    currentDeviceId.value,
-  );
   if (!isActive.value) return;
 
   const deviceIdToStop = currentDeviceId.value;
-  console.log("AudioDevice: Stopping deviceId:", deviceIdToStop);
 
   if (deviceIdToStop && providerStop) {
     providerStop(deviceIdToStop);
@@ -574,15 +497,13 @@ const stop = () => {
 };
 
 const switchDevice = async () => {
-  console.log(
-    "AudioDevice: Switching device from",
-    currentDeviceId.value,
-    "to",
-    props.deviceId,
-  );
+  const previousDeviceId = currentDeviceId.value;
 
   stream.value = null;
   isActive.value = false;
+  currentDeviceId.value = undefined;
+
+  emit("stream", null);
 
   await start();
 };
@@ -598,14 +519,15 @@ watch(
     props.constraints,
   ],
   async (newVals, oldVals) => {
-    if (!isActive.value) return;
     const deviceIdChanged = newVals[0] !== oldVals?.[0];
 
     if (deviceIdChanged) {
-      console.log("AudioDevice: deviceId changed, switching device");
-      await switchDevice();
-    } else {
-      console.log("AudioDevice: Constraints changed, restarting stream");
+      if (isActive.value) {
+        await switchDevice();
+      } else if (props.autoStart) {
+        await start();
+      }
+    } else if (isActive.value) {
       stop();
       await new Promise((resolve) => setTimeout(resolve, 50));
       await start();
@@ -695,7 +617,7 @@ const buildConstraints = (): MediaStreamConstraints => {
   }
 
   const videoConstraints: MediaTrackConstraints = {
-    deviceId: { ideal: props.deviceId },
+    deviceId: { exact: props.deviceId },
     width: props.width
       ? typeof props.width === "number"
         ? { ideal: props.width }
@@ -727,28 +649,16 @@ const buildConstraints = (): MediaStreamConstraints => {
 
 const start = async () => {
   if (typeof navigator === "undefined" || !navigator.mediaDevices) {
-    console.error(
-      "VideoDevice: navigator.mediaDevices not available (SSR or unsupported browser)",
-    );
     return;
   }
 
-  console.log(
-    "VideoDevice: Starting video stream for deviceId:",
-    props.deviceId,
-  );
   if (isActive.value) {
-    console.log("VideoDevice: Already active, returning");
     return;
   }
 
   try {
     error.value = null;
     const constraints = buildConstraints();
-    console.log(
-      "VideoDevice: Built constraints:",
-      JSON.stringify(constraints, null, 2),
-    );
 
     if (providerStart) {
       stream.value = await providerStart(props.deviceId, constraints);
@@ -762,33 +672,15 @@ const start = async () => {
     emit("started");
   } catch (err) {
     const errorObj = err as Error;
-    console.error("VideoDevice: Error starting stream:", errorObj);
-
-    if (errorObj.name === "OverconstrainedError") {
-      const constraint = (errorObj as any).constraint;
-      console.error("VideoDevice: Overconstrained on:", constraint);
-      console.error(
-        "VideoDevice: Constraints used:",
-        JSON.stringify(buildConstraints(), null, 2),
-      );
-    }
-
     error.value = errorObj;
     emit("error", errorObj);
   }
 };
 
 const stop = () => {
-  console.log(
-    "VideoDevice: Stopping stream. isActive:",
-    isActive.value,
-    "currentDeviceId:",
-    currentDeviceId.value,
-  );
   if (!isActive.value) return;
 
   const deviceIdToStop = currentDeviceId.value;
-  console.log("VideoDevice: Stopping deviceId:", deviceIdToStop);
 
   if (deviceIdToStop && providerStop) {
     providerStop(deviceIdToStop);
@@ -804,15 +696,13 @@ const stop = () => {
 };
 
 const switchDevice = async () => {
-  console.log(
-    "VideoDevice: Switching device from",
-    currentDeviceId.value,
-    "to",
-    props.deviceId,
-  );
+  const previousDeviceId = currentDeviceId.value;
 
   stream.value = null;
   isActive.value = false;
+  currentDeviceId.value = undefined;
+
+  emit("stream", null);
 
   await start();
 };
@@ -828,14 +718,15 @@ watch(
     props.constraints,
   ],
   async (newVals, oldVals) => {
-    if (!isActive.value) return;
     const deviceIdChanged = newVals[0] !== oldVals?.[0];
 
     if (deviceIdChanged) {
-      console.log("VideoDevice: deviceId changed, switching device");
-      await switchDevice();
-    } else {
-      console.log("VideoDevice: Constraints changed, restarting stream");
+      if (isActive.value) {
+        await switchDevice();
+      } else if (props.autoStart) {
+        await start();
+      }
+    } else if (isActive.value) {
       stop();
       await new Promise((resolve) => setTimeout(resolve, 50));
       await start();
@@ -879,96 +770,96 @@ defineExpose({
 ```ts [src/components/ui/media-devices-provider/presets.ts]
 export const VideoPresets = {
   sd: {
-    videoWidth: 640,
-    videoHeight: 480,
-    videoFrameRate: 30,
+    width: 640,
+    height: 480,
+    frameRate: 30,
   },
 
   hd: {
-    videoWidth: 1280,
-    videoHeight: 720,
-    videoFrameRate: 30,
+    width: 1280,
+    height: 720,
+    frameRate: 30,
   },
 
   fullHd: {
-    videoWidth: 1920,
-    videoHeight: 1080,
-    videoFrameRate: 30,
+    width: 1920,
+    height: 1080,
+    frameRate: 30,
   },
 
   uhd4k: {
-    videoWidth: 3840,
-    videoHeight: 2160,
-    videoFrameRate: 30,
+    width: 3840,
+    height: 2160,
+    frameRate: 30,
   },
 
   adaptiveHd: {
-    videoWidth: { min: 640, ideal: 1920, max: 3840 },
-    videoHeight: { min: 480, ideal: 1080, max: 2160 },
-    videoFrameRate: { min: 24, ideal: 30, max: 60 },
+    width: { min: 640, ideal: 1920, max: 3840 },
+    height: { min: 480, ideal: 1080, max: 2160 },
+    frameRate: { min: 24, ideal: 30, max: 60 },
   },
 
   mobileFront: {
-    videoWidth: { ideal: 1280 },
-    videoHeight: { ideal: 720 },
-    videoFrameRate: { ideal: 30 },
-    videoFacingMode: "user" as const,
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+    frameRate: { ideal: 30 },
+    facingMode: "user" as const,
   },
 
   mobileBack: {
-    videoWidth: { ideal: 1920 },
-    videoHeight: { ideal: 1080 },
-    videoFrameRate: { ideal: 30 },
-    videoFacingMode: "environment" as const,
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+    frameRate: { ideal: 30 },
+    facingMode: "environment" as const,
   },
 
   conference: {
-    videoWidth: 1280,
-    videoHeight: 720,
-    videoFrameRate: 30,
-    videoAspectRatio: 1.777,
+    width: 1280,
+    height: 720,
+    frameRate: 30,
+    aspectRatio: 1.777,
   },
 
   screenRecording: {
-    videoWidth: { ideal: 1920 },
-    videoHeight: { ideal: 1080 },
-    videoFrameRate: { ideal: 60 },
-    videoAspectRatio: 1.777,
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+    frameRate: { ideal: 60 },
+    aspectRatio: 1.777,
   },
 } as const;
 
 export const AudioPresets = {
   default: {
-    audioEchoCancellation: true,
-    audioNoiseSuppression: true,
-    audioAutoGainControl: true,
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
   },
 
   highQuality: {
-    audioEchoCancellation: false,
-    audioNoiseSuppression: false,
-    audioAutoGainControl: false,
-    audioSampleRate: 48000,
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: false,
+    sampleRate: 48000,
   },
 
   voice: {
-    audioEchoCancellation: true,
-    audioNoiseSuppression: true,
-    audioAutoGainControl: true,
-    audioSampleRate: 48000,
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+    sampleRate: 48000,
   },
 
   conference: {
-    audioEchoCancellation: true,
-    audioNoiseSuppression: true,
-    audioAutoGainControl: true,
-    audioSampleRate: { ideal: 48000 },
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+    sampleRate: { ideal: 48000 },
   },
 
   raw: {
-    audioEchoCancellation: false,
-    audioNoiseSuppression: false,
-    audioAutoGainControl: false,
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: false,
   },
 } as const;
 
@@ -1030,7 +921,6 @@ The MediaDevicesProvider component provides a list of available media devices
 |------|------|---------|-------------|
 | `type`{.primary .text-primary} | `'camera' \| 'microphone' \| 'all'` | all | The type of media devices to request. |
 | `open`{.primary .text-primary} | `boolean` | false | Whether to automatically request media permissions and devices on mount. |
-| `debug`{.primary .text-primary} | `boolean` | true | Enable debug logging to console. |
 
 
 
@@ -1260,6 +1150,11 @@ start/stop functions to manage streams with device caching.
 
 
 
+## Simple demo with Video
+::hr-underline
+::
+
+
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
@@ -1269,7 +1164,7 @@ start/stop functions to manage streams with device caching.
   :::tabs-item{icon="i-lucide-code" label="Code"}
   ```vue
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch, nextTick } from "vue";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -1283,12 +1178,20 @@ const selectedDeviceId = ref<string>("");
 const handleStream = (stream: MediaStream | null) => {
   if (videoRef.value && stream) {
     videoRef.value.srcObject = stream;
+  } else if (videoRef.value && !stream) {
+    videoRef.value.srcObject = null;
   }
 };
 
 const selectDevice = (deviceId: string) => {
   selectedDeviceId.value = deviceId;
 };
+
+watch([videoRef, selectedDeviceId], async () => {
+  if (videoRef.value) {
+    videoRef.value.srcObject = null;
+  }
+});
 </script>
 
 <template>
@@ -1302,7 +1205,7 @@ const selectDevice = (deviceId: string) => {
     </p>
 
     <MediaDevicesProvider :open="true">
-      <template #default="{ devices, errors }">
+      <template #default="{ devices, errors, cachedStreamsCount }">
         <div class="space-y-4">
           <div class="space-y-2">
             <label class="text-sm font-medium">Available Cameras:</label>
@@ -1395,6 +1298,9 @@ const selectDevice = (deviceId: string) => {
                     Tracks: {{ stream.getTracks().length }} | Device ID:
                     {{ selectedDeviceId.substring(0, 20) }}...
                   </p>
+                  <p class="text-xs text-muted-foreground">
+                    Cached streams: {{ cachedStreamsCount }}
+                  </p>
                 </div>
 
                 <div
@@ -1451,6 +1357,11 @@ const selectDevice = (deviceId: string) => {
   
     
 
+
+
+## Presets
+::hr-underline
+::
 
 
 
@@ -1700,6 +1611,11 @@ const formatPresetName = (name: string): string => {
   
     
 
+
+
+## Device stream caching
+::hr-underline
+::
 
 
 

@@ -115,20 +115,16 @@ const buildConstraints = (): MediaStreamConstraints => {
  */
 const start = async () => {
   if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
-    console.error('VideoDevice: navigator.mediaDevices not available (SSR or unsupported browser)');
     return;
   }
 
-  console.log('VideoDevice: Starting video stream for deviceId:', props.deviceId);
   if (isActive.value) {
-    console.log('VideoDevice: Already active, returning');
     return;
   }
 
   try {
     error.value = null;
     const constraints = buildConstraints();
-    console.log('VideoDevice: Built constraints:', JSON.stringify(constraints, null, 2));
 
     if (providerStart) {
       stream.value = await providerStart(props.deviceId, constraints);
@@ -142,14 +138,6 @@ const start = async () => {
     emit('started');
   } catch (err) {
     const errorObj = err as Error;
-    console.error('VideoDevice: Error starting stream:', errorObj);
-
-    if (errorObj.name === 'OverconstrainedError') {
-      const constraint = (errorObj as any).constraint;
-      console.error('VideoDevice: Overconstrained on:', constraint);
-      console.error('VideoDevice: Constraints used:', JSON.stringify(buildConstraints(), null, 2));
-    }
-
     error.value = errorObj;
     emit('error', errorObj);
   }
@@ -159,16 +147,9 @@ const start = async () => {
  * Stop the video stream.
  */
 const stop = () => {
-  console.log(
-    'VideoDevice: Stopping stream. isActive:',
-    isActive.value,
-    'currentDeviceId:',
-    currentDeviceId.value
-  );
   if (!isActive.value) return;
 
   const deviceIdToStop = currentDeviceId.value;
-  console.log('VideoDevice: Stopping deviceId:', deviceIdToStop);
 
   if (deviceIdToStop && providerStop) {
     providerStop(deviceIdToStop);
@@ -187,11 +168,17 @@ const stop = () => {
  * Switch to a different device without stopping the current one (it stays in cache)
  */
 const switchDevice = async () => {
-  console.log('VideoDevice: Switching device from', currentDeviceId.value, 'to', props.deviceId);
+  const previousDeviceId = currentDeviceId.value;
 
+  // Reset state before switching
   stream.value = null;
   isActive.value = false;
+  currentDeviceId.value = undefined;
 
+  // Emit null stream to clear any video elements
+  emit('stream', null);
+
+  // Start the new device
   await start();
 };
 
@@ -209,14 +196,19 @@ watch(
     props.constraints,
   ],
   async (newVals, oldVals) => {
-    if (!isActive.value) return;
     const deviceIdChanged = newVals[0] !== oldVals?.[0];
 
     if (deviceIdChanged) {
-      console.log('VideoDevice: deviceId changed, switching device');
-      await switchDevice();
-    } else {
-      console.log('VideoDevice: Constraints changed, restarting stream');
+      // If device changed, switch to the new device
+      if (isActive.value) {
+        // If currently active, switch without stopping (keeps cache)
+        await switchDevice();
+      } else if (props.autoStart) {
+        // If not active but autoStart is enabled, start the new device
+        await start();
+      }
+    } else if (isActive.value) {
+      // If only constraints changed and stream is active, restart with new constraints
       stop();
       await new Promise((resolve) => setTimeout(resolve, 50));
       await start();

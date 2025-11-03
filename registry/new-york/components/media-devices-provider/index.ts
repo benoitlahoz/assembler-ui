@@ -9,8 +9,11 @@
  * @category devices
  * @demo MediaDevicesProviderDemoSimple
  * @demo MediaDeviceDemoSimple
+ * -- Simple demo with Video
  * @demo MediaDeviceDemoPresets
+ * -- Presets
  * @demo MediaDeviceDemoMultiple
+ * -- Device stream caching
  */
 import type { InjectionKey, Ref } from 'vue';
 

@@ -2,7 +2,7 @@
 /**
  * Simple demo of MediaDevice component with MediaDevicesProvider for stream caching.
  */
-import { ref } from 'vue';
+import { ref, watch, nextTick } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -16,12 +16,22 @@ const selectedDeviceId = ref<string>('');
 const handleStream = (stream: MediaStream | null) => {
   if (videoRef.value && stream) {
     videoRef.value.srcObject = stream;
+  } else if (videoRef.value && !stream) {
+    videoRef.value.srcObject = null;
   }
 };
 
 const selectDevice = (deviceId: string) => {
   selectedDeviceId.value = deviceId;
 };
+
+// Watch for changes to ensure video element is updated when switching devices
+watch([videoRef, selectedDeviceId], async () => {
+  // Reset video element when changing devices
+  if (videoRef.value) {
+    videoRef.value.srcObject = null;
+  }
+});
 </script>
 
 <template>
@@ -32,7 +42,7 @@ const selectDevice = (deviceId: string) => {
     </p>
 
     <MediaDevicesProvider :open="true">
-      <template #default="{ devices, errors }">
+      <template #default="{ devices, errors, cachedStreamsCount }">
         <div class="space-y-4">
           <!-- Device selector -->
           <div class="space-y-2">
@@ -112,6 +122,9 @@ const selectDevice = (deviceId: string) => {
                   <p v-if="stream" class="text-xs text-muted-foreground">
                     Tracks: {{ stream.getTracks().length }} | Device ID:
                     {{ selectedDeviceId.substring(0, 20) }}...
+                  </p>
+                  <p class="text-xs text-muted-foreground">
+                    Cached streams: {{ cachedStreamsCount }}
                   </p>
                 </div>
 
