@@ -1171,9 +1171,10 @@ Select a camera from the list. The provider caches streams to avoid reopening th
   :::tabs-item{icon="i-lucide-code" label="Code"}
   ```vue
 <script setup lang="ts">
-import { ref, watch, nextTick } from "vue";
+import { ref, watch } from "vue";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import {
   MediaDevicesProvider,
   VideoDevice,
@@ -1207,7 +1208,7 @@ watch([videoRef, selectedDeviceId], async () => {
       <template #default="{ devices, errors, cachedStreamsCount }">
         <div class="space-y-4">
           <div class="space-y-2">
-            <label class="text-sm font-medium">Available Cameras:</label>
+            <Label class="text-sm font-bold mb-4">Available Cameras</Label>
             <div class="grid gap-2">
               <Button
                 v-for="device in devices.filter((d) => d.kind === 'videoinput')"
@@ -1378,6 +1379,7 @@ import { ref, computed } from "vue";
 import { toPascalCase } from "@assemblerjs/core";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import {
   MediaDevicesProvider,
   VideoDevice,
@@ -1446,13 +1448,13 @@ const formatPresetName = (name: string): string => {
 </script>
 
 <template>
-  <div class="h-128 max-h-128 overflow-hidden flex flex-col">
+  <div class="flex flex-col">
     <MediaDevicesProvider :open="true">
       <template #default="{ devices, errors }">
         <div class="flex flex-col h-full overflow-hidden">
           <div class="p-4 space-y-4 border-b border-muted">
             <div class="space-y-2">
-              <label class="text-sm font-medium mb-4">Available Cameras:</label>
+              <Label class="text-sm font-bold mb-4">Available Cameras</Label>
               <div class="grid gap-2">
                 <Button
                   v-for="device in devices.filter(
@@ -1479,7 +1481,7 @@ const formatPresetName = (name: string): string => {
             </div>
 
             <div class="space-y-2">
-              <label class="text-sm font-medium">Video Quality:</label>
+              <Label class="text-sm font-bold mb-4">Video Quality</Label>
               <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <Button
                   v-for="(preset, name) in VideoPresets"

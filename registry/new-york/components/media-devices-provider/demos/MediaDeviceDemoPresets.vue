@@ -81,7 +81,7 @@ const formatPresetName = (name: string): string => {
 </script>
 
 <template>
-  <div class="h-128 max-h-128 overflow-hidden flex flex-col">
+  <div class="flex flex-col">
     <MediaDevicesProvider :open="true">
       <template #default="{ devices, errors }">
         <div class="flex flex-col h-full overflow-hidden">
