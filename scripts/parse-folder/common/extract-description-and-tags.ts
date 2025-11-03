@@ -13,7 +13,7 @@ export const extractDescriptionAndTags = (scriptContent: string) => {
     // Recherche du début des tags pour séparer description et tags sans toucher aux sauts de ligne
     let tagStartIndex = -1;
     for (let idx = 0; idx < lines.length; idx++) {
-      if (/^@[a-zA-Z0-9_-]+/.test(lines[idx])) {
+      if (/^@[a-zA-Z0-9_-]+/.test(lines[idx] ?? '')) {
         tagStartIndex = idx;
         break;
       }

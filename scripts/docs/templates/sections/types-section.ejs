@@ -1,5 +1,5 @@
 ### Types
 | Name | Type | Description |
 |------|------|-------------|
-<% types.forEach(function(type) { %>| `<%= type.name %>`{.primary .text-primary} | <% if (type.type === undefined || type.type === null || type.type === '') { %>—<% } else if (type.type === 'string') { %>:badge{color="blue"}string:: <% } else if (type.type === 'number') { %>:badge{color="orange"}number:: <% } else if (type.type === 'boolean') { %>:badge{color="green"}boolean:: <% } else { %>`<%= type.type %>`<% } %> | <% if (!type.description) { %>—<% } else { %><%= type.description %><% } %> |
+<% types.forEach(function(type) { %>| `<%= type.name %>`{.primary .text-primary} | <% if (type.type === undefined || type.type === null || type.type === '') { %>—<% } else if (type.type === 'string') { %>:badge{color="blue"}string:: <% } else if (type.type === 'number') { %>:badge{color="orange"}number:: <% } else if (type.type === 'boolean') { %>:badge{color="green"}boolean:: <% } else { %>`<%= typeof escapePipe === 'function' ? escapePipe(type.type) : type.type %>`<% } %> | <% if (!type.description) { %>—<% } else { %><%= type.description %><% } %> |
 <% }); %>

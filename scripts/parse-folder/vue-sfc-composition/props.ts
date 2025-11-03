@@ -35,8 +35,22 @@ export const extractProps = (scriptContent: string, absPath: string) => {
           for (const prop of defaultsArg.properties) {
             if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
               try {
-                // eslint-disable-next-line no-eval
-                defaultsObj[prop.name.text] = eval(prop.initializer.getText());
+                // Supporte les fonctions fléchées comme valeur par défaut
+                if (ts.isArrowFunction(prop.initializer) && prop.initializer.body) {
+                  if (ts.isParenthesizedExpression(prop.initializer.body)) {
+                    defaultsObj[prop.name.text] = eval(prop.initializer.body.expression.getText());
+                  } else if (
+                    ts.isObjectLiteralExpression(prop.initializer.body) ||
+                    ts.isArrayLiteralExpression(prop.initializer.body)
+                  ) {
+                    defaultsObj[prop.name.text] = eval(prop.initializer.body.getText());
+                  } else {
+                    defaultsObj[prop.name.text] = eval(prop.initializer.body.getText());
+                  }
+                } else {
+                  // Cas classique
+                  defaultsObj[prop.name.text] = eval(prop.initializer.getText());
+                }
               } catch {
                 defaultsObj[prop.name.text] = prop.initializer.getText();
               }
@@ -70,7 +84,12 @@ export const extractProps = (scriptContent: string, absPath: string) => {
                       description = cmt.replace(/^\/\//, '').trim();
                     }
                   }
-                  props.push({ name: propName, type, default: defaultValue, description });
+                  // Normalise la valeur par défaut sur une seule ligne
+                  let normalizedDefault =
+                    typeof defaultValue === 'string'
+                      ? defaultValue.replace(/\s+/g, ' ').trim()
+                      : defaultValue;
+                  props.push({ name: propName, type, default: normalizedDefault, description });
                 }
               }
             }

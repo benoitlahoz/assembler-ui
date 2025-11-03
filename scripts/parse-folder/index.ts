@@ -59,24 +59,30 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
     };
   });
 
-  // Place index.ts en premier si présent
-  const indexIdxArr = tsItemsArr.findIndex((item) => item.name === 'index');
+  // Sépare index.ts des autres fichiers TS
+  let indexItem: any = null;
+  let otherTsItems: any[] = [];
   let indexVariants: Record<string, Record<string, string[]>> = {};
-  if (indexIdxArr > 0) {
-    const [indexItem] = tsItemsArr.splice(indexIdxArr, 1);
-    if (indexItem) {
-      tsItemsArr = [indexItem, ...tsItemsArr];
-      if (indexItem.doc && indexItem.doc.variants) {
-        indexVariants = indexItem.doc.variants;
-      }
+
+  const indexIdx = tsItemsArr.findIndex((item) => item.name === 'index');
+  if (indexIdx >= 0) {
+    indexItem = tsItemsArr[indexIdx];
+    if (indexItem && indexItem.doc && indexItem.doc.variants) {
+      indexVariants = indexItem.doc.variants;
     }
-  } else if (
-    indexIdxArr === 0 &&
-    tsItemsArr[0] &&
-    tsItemsArr[0].doc &&
-    tsItemsArr[0].doc.variants
-  ) {
-    indexVariants = tsItemsArr[0].doc.variants;
+    otherTsItems = tsItemsArr.filter((item) => item.name !== 'index');
+  } else {
+    otherTsItems = [...tsItemsArr];
+  }
+
+  // Place le fichier TS portant le nom du dossier en première position des autres TS
+  const folderNameKebab = toKebabCase(folder);
+  const folderFileIdx = otherTsItems.findIndex((item) => item.name === folderNameKebab);
+  if (folderFileIdx > 0) {
+    const [folderItem] = otherTsItems.splice(folderFileIdx, 1);
+    if (folderItem) {
+      otherTsItems.unshift(folderItem);
+    }
   }
 
   // Cherche tous les fichiers .vue du dossier
@@ -137,7 +143,18 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
     };
   });
 
-  const allItems = [...tsItemsArr, ...vueItems];
+  // Place le fichier Vue portant le nom du dossier en première position
+  const folderNamePascal = toPascalCase(folder);
+  const vueFileIdx = vueItems.findIndex((item) => item.name === folderNamePascal);
+  if (vueFileIdx > 0) {
+    const [vueItem] = vueItems.splice(vueFileIdx, 1);
+    if (vueItem) {
+      vueItems.unshift(vueItem);
+    }
+  }
+
+  // Construction finale : index.ts, puis fichiers Vue, puis autres fichiers TS
+  const allItems = [...(indexItem ? [indexItem] : []), ...vueItems, ...otherTsItems];
   const foundType = (allItems.find((item) => (item as any).type) as any)?.type;
 
   let title;

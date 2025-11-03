@@ -27,7 +27,9 @@ export const extractProvides = (scriptContent: string, absPath: string) => {
       }
       let value = valueArg ? valueArg.getText() : '';
       let type: string | undefined = undefined;
-      if (/^['"].*['"]$/.test(value)) type = 'string';
+      if (node.typeArguments && node.typeArguments.length > 0) {
+        type = node.typeArguments.map((arg) => arg.getText()).join(', ');
+      } else if (/^['"].*['"]$/.test(value)) type = 'string';
       else if (/^\d+(\.\d+)?$/.test(value)) type = 'number';
       else if (/^(true|false)$/.test(value)) type = 'boolean';
       else if (value === '[]') type = 'any[]';

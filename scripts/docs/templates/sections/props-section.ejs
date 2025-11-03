@@ -1,5 +1,5 @@
 ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-<% props.forEach(function(prop) { %>| `<%= prop.name %>`{.primary .text-primary} | `<%- prop.type %>` | <% if (typeof prop.default !== 'undefined' && prop.default !== '') { %><%- prop.default %><% } else { %>—<% } %> | <%= prop.description %> |
+<% props.forEach(function(prop) { %>| `<%= prop.name %>`{.primary .text-primary} | `<%- typeof escapePipe === 'function' ? escapePipe(prop.type) : prop.type %>` | <% if (typeof prop.default !== 'undefined' && prop.default !== '') { %><%- prop.default %><% } else { %>—<% } %> | <%= prop.description %> |
 <% }); %>

@@ -1,0 +1,242 @@
+<script setup lang="ts">
+/**
+ * AudioDevice component - Manages an audio stream with constraints.
+ * This component builds audio constraints and uses the MediaDevicesProvider's
+ * start/stop functions to manage streams with device caching.
+ */
+
+import { ref, watch, onMounted, onBeforeUnmount, computed, inject } from 'vue';
+import { MediaDevicesStartKey, MediaDevicesStopKey } from '.';
+import type { MediaDevicesStartFn, MediaDevicesStopFn } from '.';
+
+export interface AudioDeviceProps {
+  /**
+   * Whether to automatically start the media stream on mount.
+   */
+  autoStart?: boolean;
+  /**
+   * The exact device ID to use for the audio stream (REQUIRED).
+   */
+  deviceId: string;
+
+  // Audio constraints
+
+  /**
+   * Enable echo cancellation for audio input.
+   */
+  echoCancellation?: boolean;
+  /**
+   * Enable noise suppression for audio input.
+   */
+  noiseSuppression?: boolean;
+  /**
+   * Enable automatic gain control for audio input.
+   */
+  autoGainControl?: boolean;
+  /**
+   * Audio sample rate (in Hz).
+   */
+  sampleRate?: number | { min?: number; max?: number; ideal?: number };
+  /**
+   * Audio sample size (in bits).
+   */
+  sampleSize?: number | { min?: number; max?: number; ideal?: number };
+
+  /**
+   * Custom MediaStreamConstraints to override simplified props.
+   */
+  constraints?: MediaStreamConstraints;
+}
+
+const props = withDefaults(defineProps<AudioDeviceProps>(), {
+  autoStart: false,
+});
+
+const emit = defineEmits<{
+  stream: [stream: MediaStream | null];
+  error: [error: Error];
+  started: [];
+  stopped: [];
+}>();
+
+/**
+ * Inject start and stop functions from MediaDevicesProvider.
+ */
+const providerStart = inject<MediaDevicesStartFn>(MediaDevicesStartKey);
+const providerStop = inject<MediaDevicesStopFn>(MediaDevicesStopKey);
+
+const stream = ref<MediaStream | null>(null);
+const error = ref<Error | null>(null);
+const isActive = ref(false);
+const currentDeviceId = ref<string | undefined>(undefined);
+
+/**
+ * Build the constraints object for getUserMedia.
+ */
+const buildConstraints = (): MediaStreamConstraints => {
+  // If custom constraints are provided, use them directly
+  if (props.constraints) {
+    return props.constraints;
+  }
+
+  const audioConstraints: MediaTrackConstraints = {
+    deviceId: { exact: props.deviceId },
+    echoCancellation: props.echoCancellation,
+    noiseSuppression: props.noiseSuppression,
+    autoGainControl: props.autoGainControl,
+    sampleRate: props.sampleRate
+      ? typeof props.sampleRate === 'number'
+        ? { ideal: props.sampleRate }
+        : props.sampleRate
+      : undefined,
+    sampleSize: props.sampleSize
+      ? typeof props.sampleSize === 'number'
+        ? { ideal: props.sampleSize }
+        : props.sampleSize
+      : undefined,
+  };
+
+  return {
+    video: false,
+    audio: audioConstraints,
+  };
+};
+
+/**
+ * Start the audio stream.
+ */
+const start = async () => {
+  if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
+    console.error('AudioDevice: navigator.mediaDevices not available (SSR or unsupported browser)');
+    return;
+  }
+
+  console.log('AudioDevice: Starting audio stream for deviceId:', props.deviceId);
+  if (isActive.value) {
+    console.log('AudioDevice: Already active, returning');
+    return;
+  }
+
+  try {
+    error.value = null;
+    const constraints = buildConstraints();
+    console.log('AudioDevice: Built constraints:', JSON.stringify(constraints, null, 2));
+
+    if (providerStart) {
+      stream.value = await providerStart(props.deviceId, constraints);
+    } else {
+      stream.value = await navigator.mediaDevices.getUserMedia(constraints);
+    }
+
+    currentDeviceId.value = props.deviceId;
+    isActive.value = true;
+    emit('stream', stream.value);
+    emit('started');
+  } catch (err) {
+    const errorObj = err as Error;
+    console.error('AudioDevice: Error starting stream:', errorObj);
+
+    if (errorObj.name === 'OverconstrainedError') {
+      const constraint = (errorObj as any).constraint;
+      console.error('AudioDevice: Overconstrained on:', constraint);
+      console.error('AudioDevice: Constraints used:', JSON.stringify(buildConstraints(), null, 2));
+    }
+
+    error.value = errorObj;
+    emit('error', errorObj);
+  }
+};
+
+/**
+ * Stop the audio stream.
+ */
+const stop = () => {
+  console.log(
+    'AudioDevice: Stopping stream. isActive:',
+    isActive.value,
+    'currentDeviceId:',
+    currentDeviceId.value
+  );
+  if (!isActive.value) return;
+
+  const deviceIdToStop = currentDeviceId.value;
+  console.log('AudioDevice: Stopping deviceId:', deviceIdToStop);
+
+  if (deviceIdToStop && providerStop) {
+    providerStop(deviceIdToStop);
+  } else if (stream.value) {
+    stream.value.getTracks().forEach((track) => track.stop());
+  }
+
+  stream.value = null;
+  isActive.value = false;
+  currentDeviceId.value = undefined;
+  emit('stream', null);
+  emit('stopped');
+};
+
+/**
+ * Switch to a different device without stopping the current one (it stays in cache)
+ */
+const switchDevice = async () => {
+  console.log('AudioDevice: Switching device from', currentDeviceId.value, 'to', props.deviceId);
+
+  stream.value = null;
+  isActive.value = false;
+
+  await start();
+};
+
+/**
+ * Watch for changes to deviceId or constraints and restart the stream
+ */
+watch(
+  () => [
+    props.deviceId,
+    props.echoCancellation,
+    props.noiseSuppression,
+    props.autoGainControl,
+    props.sampleRate,
+    props.sampleSize,
+    props.constraints,
+  ],
+  async (newVals, oldVals) => {
+    if (!isActive.value) return;
+    const deviceIdChanged = newVals[0] !== oldVals?.[0];
+
+    if (deviceIdChanged) {
+      console.log('AudioDevice: deviceId changed, switching device');
+      await switchDevice();
+    } else {
+      console.log('AudioDevice: Constraints changed, restarting stream');
+      stop();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      await start();
+    }
+  }
+);
+
+onMounted(() => {
+  if (props.autoStart) {
+    start();
+  }
+});
+
+onBeforeUnmount(() => {
+  stop();
+});
+
+defineExpose({
+  start,
+  stop,
+  stream: computed(() => stream.value),
+  isActive: computed(() => isActive.value),
+  error: computed(() => error.value),
+});
+</script>
+
+<template>
+  <slot :stream="stream" :is-active="isActive" :error="error" :start="start" :stop="stop" />
+</template>
+
+<style scoped></style>

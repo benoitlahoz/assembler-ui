@@ -302,14 +302,20 @@ Un champ de saisie simple avec label et placeholder
   ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-| `someOtherKey`{.primary .text-primary} | `'providedValue'` | `string` | Provides a value with key &#39;someOtherKey&#39;. || `symKey`{.primary .text-primary} | `'valSym'` | `string` | Provide avec clé symbole || `computedKey`{.primary .text-primary} | `true` | `boolean` | Provide avec clé computed |
+| `someOtherKey`{.primary .text-primary} | `'providedValue'` | `string` | Provides a value with key 'someOtherKey'. |
+| `symKey`{.primary .text-primary} | `'valSym'` | `string` | Provide avec clé symbole |
+| `computedKey`{.primary .text-primary} | `true` | `boolean` | Provide avec clé computed |
+
 
 
 
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
-| `injected`{.primary .text-primary} | `'someKey'` | `string` | Injects a value with key &#39;someKey&#39;. || `injectedSym`{.primary .text-primary} | `symKey` | `any` | Inject avec clé symbole || `injectedSpread`{.primary .text-primary} | `'spread'` | `string` | Inject avec spread |
+| `injected`{.primary .text-primary} | `'someKey'` | `string` | Injects a value with key 'someKey'. |
+| `injectedSym`{.primary .text-primary} | `symKey` | `any` | Inject avec clé symbole |
+| `injectedSpread`{.primary .text-primary} | `'spread'` | `string` | Inject avec spread |
+
 
 
 
@@ -387,23 +393,29 @@ Un champ de saisie simple avec label et placeholder (API Composition)
   ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-| `someOtherKey`{.primary .text-primary} | `'providedValue'` | `string` | Fourniture || `symKey`{.primary .text-primary} | `'valSym'` | `string` | — || `computedKey`{.primary .text-primary} | `true` | `boolean` | — |
+| `someOtherKey`{.primary .text-primary} | `'providedValue'` | `string` | Fourniture |
+| `symKey`{.primary .text-primary} | `'valSym'` | `string` | — |
+| `computedKey`{.primary .text-primary} | `true` | `boolean` | — |
+
 
 
 
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
-| `someKey`{.primary .text-primary} | — | — | Injection || `symKey`{.primary .text-primary} | — | — | — || `spread`{.primary .text-primary} | — | — | — |
+| `someKey`{.primary .text-primary} | — | — | Injection |
+| `symKey`{.primary .text-primary} | — | — | — |
+| `spread`{.primary .text-primary} | — | — | — |
+
 
 
 
   ### Expose
 | Name | Type | Description |
 |------|------|-------------|
-| `exposed`{.primary .text-primary} | `Ref&lt;any&gt;` | — |
-| `other`{.primary .text-primary} | `Ref&lt;any&gt;` | — |
-| `myFunc`{.primary .text-primary} | `() =&gt; string` | — |
+| `exposed`{.primary .text-primary} | `Ref<any>` | — |
+| `other`{.primary .text-primary} | `Ref<any>` | — |
+| `myFunc`{.primary .text-primary} | `() => string` | — |
 
 
 
