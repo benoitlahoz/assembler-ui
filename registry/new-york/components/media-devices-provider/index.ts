@@ -39,6 +39,19 @@ export type MediaDeviceType = 'camera' | 'microphone' | 'all';
 export type MediaDeviceKind = 'videoinput' | 'audioinput' | 'audiooutput';
 
 /**
+ * Permission states for media devices.
+ */
+export type MediaPermissionState = 'granted' | 'denied' | 'prompt' | 'unknown';
+
+/**
+ * Permission status for different media types.
+ */
+export interface MediaPermissions {
+  camera: MediaPermissionState;
+  microphone: MediaPermissionState;
+}
+
+/**
  * Filtered device lists by kind.
  */
 export interface FilteredDevices {
@@ -106,6 +119,8 @@ export interface MediaDevicesProviderSlotProps {
   errors: Error[];
   /** Indicates if device enumeration is in progress */
   isLoading: boolean;
+  /** Permission states for camera and microphone */
+  permissions: MediaPermissions;
   /** Map of active streams indexed by deviceId (readonly) */
   activeStreams: ReadonlyMap<string, MediaStream>;
   /** Function to start a media stream for a specific device */
@@ -145,6 +160,8 @@ export type MediaDevicesIsActiveStreamFn = (deviceId: string) => boolean;
 export const MediaDevicesKey: InjectionKey<Ref<MediaDeviceInfo[]>> = Symbol('MediaDevices');
 export const MediaDevicesErrorsKey: InjectionKey<Ref<Error[]>> = Symbol('MediaDevicesErrors');
 export const MediaDevicesLoadingKey: InjectionKey<Ref<boolean>> = Symbol('MediaDevicesLoading');
+export const MediaDevicesPermissionsKey: InjectionKey<Ref<MediaPermissions>> =
+  Symbol('MediaDevicesPermissions');
 export const MediaDevicesActiveStreamsKey: InjectionKey<Readonly<Ref<ReadonlyMap<string, MediaStream>>>> =
   Symbol('MediaDevicesActiveStreams');
 export const MediaDevicesStartKey: InjectionKey<MediaDevicesStartFn> = Symbol('MediaDevicesStart');

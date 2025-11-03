@@ -10,7 +10,9 @@ import {
   MediaDevicesStartKey,
   MediaDevicesStopKey,
   MediaDevicesLoadingKey,
+  MediaDevicesPermissionsKey,
   MediaDevicesActiveStreamsKey,
+  type MediaPermissions,
 } from '.';
 import type { MediaDevicesStartFn, MediaDevicesStopFn } from '.';
 
@@ -70,6 +72,10 @@ const emit = defineEmits<{
 const providerStart = inject<MediaDevicesStartFn>(MediaDevicesStartKey);
 const providerStop = inject<MediaDevicesStopFn>(MediaDevicesStopKey);
 const providerIsLoading = inject<Ref<boolean>>(MediaDevicesLoadingKey, ref(false));
+const providerPermissions = inject<Ref<MediaPermissions>>(
+  MediaDevicesPermissionsKey,
+  ref({ camera: 'unknown', microphone: 'unknown' })
+);
 const providerActiveStreams = inject<Readonly<Ref<ReadonlyMap<string, MediaStream>>>>(
   MediaDevicesActiveStreamsKey,
   computed(() => new Map() as ReadonlyMap<string, MediaStream>)
@@ -247,6 +253,7 @@ defineExpose({
   isActive: computed(() => isActive.value),
   isLoading: computed(() => isLoading.value),
   providerIsLoading: computed(() => providerIsLoading.value),
+  providerPermissions: computed(() => providerPermissions.value),
   providerActiveStreams: computed(() => providerActiveStreams.value),
   error: computed(() => error.value),
 });
@@ -258,6 +265,7 @@ defineExpose({
     :is-active="isActive"
     :is-loading="isLoading"
     :provider-is-loading="providerIsLoading"
+    :provider-permissions="providerPermissions"
     :provider-active-streams="providerActiveStreams"
     :error="error"
     :start="start"

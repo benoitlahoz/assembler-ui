@@ -10,6 +10,7 @@ import {
   MediaDevicesKey,
   MediaDevicesErrorsKey,
   MediaDevicesLoadingKey,
+  MediaDevicesPermissionsKey,
   MediaDevicesActiveStreamsKey,
   MediaDevicesStartKey,
   MediaDevicesStopKey,
@@ -19,6 +20,8 @@ import {
   type MediaDevicesStopAllFn,
   type MediaDeviceType,
   type MediaDeviceKind,
+  type MediaPermissions,
+  type MediaPermissionState,
 } from '.';
 
 export interface MediaDevicesProviderProps {
@@ -48,6 +51,10 @@ const emit = defineEmits<{
 const devices = ref<MediaDeviceInfo[]>([]);
 const errors = ref<Error[]>([]);
 const isLoading = ref<boolean>(false);
+const permissions = ref<MediaPermissions>({
+  camera: 'unknown',
+  microphone: 'unknown',
+});
 
 /**
  * Cache of active media streams indexed by deviceId.
@@ -72,6 +79,32 @@ const speakers = computed(() => filterDevicesByKind('audiooutput'));
  * Readonly version of active streams for safe exposure to child components.
  */
 const readonlyActiveStreams = computed(() => activeStreams.value as ReadonlyMap<string, MediaStream>);
+
+/**
+ * Check permission state for a specific media type.
+ */
+const checkPermission = async (name: 'camera' | 'microphone'): Promise<MediaPermissionState> => {
+  if (typeof navigator === 'undefined' || !navigator.permissions) {
+    return 'unknown';
+  }
+
+  try {
+    const permissionName = name === 'camera' ? 'camera' : 'microphone';
+    const result = await navigator.permissions.query({ name: permissionName as PermissionName });
+    return result.state as MediaPermissionState;
+  } catch (error) {
+    // Permissions API might not be supported or permission name not recognized
+    return 'unknown';
+  }
+};
+
+/**
+ * Update all permission states.
+ */
+const updatePermissions = async () => {
+  permissions.value.camera = await checkPermission('camera');
+  permissions.value.microphone = await checkPermission('microphone');
+};
 
 /**
  * Start a media stream with the given deviceId and constraints.
@@ -176,9 +209,15 @@ const requestMediaIfNeeded = async () => {
     // Stop all tracks immediately as we only needed to trigger the permission
     // and ensure device labels are populated
     stream.getTracks().forEach((track) => track.stop());
+    
+    // Update permissions after successful request
+    await updatePermissions();
   } catch (error) {
     errors.value.push(error as Error);
     emit('error', error as Error);
+    
+    // Update permissions even on error (to reflect denied state)
+    await updatePermissions();
   }
 };
 
@@ -198,6 +237,11 @@ provide<Ref<Error[]>>(MediaDevicesErrorsKey, errors);
  * Provide the loading state to child components.
  */
 provide<Ref<boolean>>(MediaDevicesLoadingKey, isLoading);
+
+/**
+ * Provide the permissions state to child components.
+ */
+provide<Ref<MediaPermissions>>(MediaDevicesPermissionsKey, permissions);
 
 /**
  * Provide the active streams map to child components (readonly to prevent external modifications).
@@ -238,6 +282,9 @@ watch(
 );
 
 onMounted(async () => {
+  // Check initial permissions state
+  await updatePermissions();
+  
   if (props.open) {
     await ensurePermissions();
     // Wait a bit for Firefox to update device info after stopping tracks
@@ -258,6 +305,7 @@ onBeforeUnmount(() => {
     :devices="devices"
     :errors="errors"
     :is-loading="isLoading"
+    :permissions="permissions"
     :active-streams="activeStreams"
     :cameras="cameras"
     :microphones="microphones"

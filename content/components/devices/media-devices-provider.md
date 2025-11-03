@@ -148,6 +148,13 @@ export type MediaDeviceType = "camera" | "microphone" | "all";
 
 export type MediaDeviceKind = "videoinput" | "audioinput" | "audiooutput";
 
+export type MediaPermissionState = "granted" | "denied" | "prompt" | "unknown";
+
+export interface MediaPermissions {
+  camera: MediaPermissionState;
+  microphone: MediaPermissionState;
+}
+
 export interface FilteredDevices {
   cameras: MediaDeviceInfo[];
   microphones: MediaDeviceInfo[];
@@ -196,6 +203,8 @@ export interface MediaDevicesProviderSlotProps {
 
   isLoading: boolean;
 
+  permissions: MediaPermissions;
+
   activeStreams: ReadonlyMap<string, MediaStream>;
 
   start: MediaDevicesStartFn;
@@ -225,6 +234,8 @@ export const MediaDevicesErrorsKey: InjectionKey<Ref<Error[]>> =
 export const MediaDevicesLoadingKey: InjectionKey<Ref<boolean>> = Symbol(
   "MediaDevicesLoading",
 );
+export const MediaDevicesPermissionsKey: InjectionKey<Ref<MediaPermissions>> =
+  Symbol("MediaDevicesPermissions");
 export const MediaDevicesActiveStreamsKey: InjectionKey<
   Readonly<Ref<ReadonlyMap<string, MediaStream>>>
 > = Symbol("MediaDevicesActiveStreams");
@@ -256,6 +267,7 @@ import {
   MediaDevicesKey,
   MediaDevicesErrorsKey,
   MediaDevicesLoadingKey,
+  MediaDevicesPermissionsKey,
   MediaDevicesActiveStreamsKey,
   MediaDevicesStartKey,
   MediaDevicesStopKey,
@@ -265,6 +277,8 @@ import {
   type MediaDevicesStopAllFn,
   type MediaDeviceType,
   type MediaDeviceKind,
+  type MediaPermissions,
+  type MediaPermissionState,
 } from ".";
 
 export interface MediaDevicesProviderProps {
@@ -289,6 +303,10 @@ const emit = defineEmits<{
 const devices = ref<MediaDeviceInfo[]>([]);
 const errors = ref<Error[]>([]);
 const isLoading = ref<boolean>(false);
+const permissions = ref<MediaPermissions>({
+  camera: "unknown",
+  microphone: "unknown",
+});
 
 const activeStreams = ref<Map<string, MediaStream>>(new Map());
 
@@ -303,6 +321,29 @@ const speakers = computed(() => filterDevicesByKind("audiooutput"));
 const readonlyActiveStreams = computed(
   () => activeStreams.value as ReadonlyMap<string, MediaStream>,
 );
+
+const checkPermission = async (
+  name: "camera" | "microphone",
+): Promise<MediaPermissionState> => {
+  if (typeof navigator === "undefined" || !navigator.permissions) {
+    return "unknown";
+  }
+
+  try {
+    const permissionName = name === "camera" ? "camera" : "microphone";
+    const result = await navigator.permissions.query({
+      name: permissionName as PermissionName,
+    });
+    return result.state as MediaPermissionState;
+  } catch (error) {
+    return "unknown";
+  }
+};
+
+const updatePermissions = async () => {
+  permissions.value.camera = await checkPermission("camera");
+  permissions.value.microphone = await checkPermission("microphone");
+};
 
 const startStream = async (
   deviceId: string,
@@ -395,9 +436,13 @@ const requestMediaIfNeeded = async () => {
     });
 
     stream.getTracks().forEach((track) => track.stop());
+
+    await updatePermissions();
   } catch (error) {
     errors.value.push(error as Error);
     emit("error", error as Error);
+
+    await updatePermissions();
   }
 };
 
@@ -409,6 +454,8 @@ provide<Ref<MediaDeviceInfo[]>>(MediaDevicesKey, devices);
 provide<Ref<Error[]>>(MediaDevicesErrorsKey, errors);
 
 provide<Ref<boolean>>(MediaDevicesLoadingKey, isLoading);
+
+provide<Ref<MediaPermissions>>(MediaDevicesPermissionsKey, permissions);
 
 provide(MediaDevicesActiveStreamsKey, readonlyActiveStreams);
 
@@ -437,6 +484,8 @@ watch(
 );
 
 onMounted(async () => {
+  await updatePermissions();
+
   if (props.open) {
     await ensurePermissions();
 
@@ -455,6 +504,7 @@ onBeforeUnmount(() => {
     :devices="devices"
     :errors="errors"
     :is-loading="isLoading"
+    :permissions="permissions"
     :active-streams="activeStreams"
     :cameras="cameras"
     :microphones="microphones"
@@ -485,7 +535,9 @@ import {
   MediaDevicesStartKey,
   MediaDevicesStopKey,
   MediaDevicesLoadingKey,
+  MediaDevicesPermissionsKey,
   MediaDevicesActiveStreamsKey,
+  type MediaPermissions,
 } from ".";
 import type { MediaDevicesStartFn, MediaDevicesStopFn } from ".";
 
@@ -523,6 +575,10 @@ const providerStop = inject<MediaDevicesStopFn>(MediaDevicesStopKey);
 const providerIsLoading = inject<Ref<boolean>>(
   MediaDevicesLoadingKey,
   ref(false),
+);
+const providerPermissions = inject<Ref<MediaPermissions>>(
+  MediaDevicesPermissionsKey,
+  ref({ camera: "unknown", microphone: "unknown" }),
 );
 const providerActiveStreams = inject<
   Readonly<Ref<ReadonlyMap<string, MediaStream>>>
@@ -672,6 +728,7 @@ defineExpose({
   isActive: computed(() => isActive.value),
   isLoading: computed(() => isLoading.value),
   providerIsLoading: computed(() => providerIsLoading.value),
+  providerPermissions: computed(() => providerPermissions.value),
   providerActiveStreams: computed(() => providerActiveStreams.value),
   error: computed(() => error.value),
 });
@@ -683,6 +740,7 @@ defineExpose({
     :is-active="isActive"
     :is-loading="isLoading"
     :provider-is-loading="providerIsLoading"
+    :provider-permissions="providerPermissions"
     :provider-active-streams="providerActiveStreams"
     :error="error"
     :start="start"
@@ -709,7 +767,9 @@ import {
   MediaDevicesStartKey,
   MediaDevicesStopKey,
   MediaDevicesLoadingKey,
+  MediaDevicesPermissionsKey,
   MediaDevicesActiveStreamsKey,
+  type MediaPermissions,
 } from ".";
 import type { MediaDevicesStartFn, MediaDevicesStopFn } from ".";
 
@@ -747,6 +807,10 @@ const providerStop = inject<MediaDevicesStopFn>(MediaDevicesStopKey);
 const providerIsLoading = inject<Ref<boolean>>(
   MediaDevicesLoadingKey,
   ref(false),
+);
+const providerPermissions = inject<Ref<MediaPermissions>>(
+  MediaDevicesPermissionsKey,
+  ref({ camera: "unknown", microphone: "unknown" }),
 );
 const providerActiveStreams = inject<
   Readonly<Ref<ReadonlyMap<string, MediaStream>>>
@@ -904,6 +968,7 @@ defineExpose({
   isActive: computed(() => isActive.value),
   isLoading: computed(() => isLoading.value),
   providerIsLoading: computed(() => providerIsLoading.value),
+  providerPermissions: computed(() => providerPermissions.value),
   providerActiveStreams: computed(() => providerActiveStreams.value),
   error: computed(() => error.value),
 });
@@ -915,6 +980,7 @@ defineExpose({
     :is-active="isActive"
     :is-loading="isLoading"
     :provider-is-loading="providerIsLoading"
+    :provider-permissions="providerPermissions"
     :provider-active-streams="providerActiveStreams"
     :error="error"
     :start="start"
@@ -1101,6 +1167,7 @@ The MediaDevicesProvider component provides a list of available media devices
 | `MediaDevicesKey`{.primary .text-primary} | `devices` | `Ref<MediaDeviceInfo[]>` | Provide the list of available media devices to child components. |
 | `MediaDevicesErrorsKey`{.primary .text-primary} | `errors` | `Ref<Error[]>` | Provide the list of errors encountered during media operations to child components. |
 | `MediaDevicesLoadingKey`{.primary .text-primary} | `isLoading` | `Ref<boolean>` | Provide the loading state to child components. |
+| `MediaDevicesPermissionsKey`{.primary .text-primary} | `permissions` | `Ref<MediaPermissions>` | Provide the permissions state to child components. |
 | `MediaDevicesActiveStreamsKey`{.primary .text-primary} | `readonlyActiveStreams` | `any` | Provide the active streams map to child components (readonly to prevent external modifications). |
 | `MediaDevicesStartKey`{.primary .text-primary} | `startStream` | `MediaDevicesStartFn` | Provide the function to start a media stream for a specific device to child components. |
 | `MediaDevicesStopKey`{.primary .text-primary} | `stopStream` | `MediaDevicesStopFn` | Provide the function to stop a media stream for a specific device to child components. |
@@ -1182,6 +1249,7 @@ start/stop functions to manage streams with device caching.
 | `MediaDevicesStartKey`{.primary .text-primary} | — | — | Inject start and stop functions from MediaDevicesProvider. |
 | `MediaDevicesStopKey`{.primary .text-primary} | — | — | — |
 | `MediaDevicesLoadingKey`{.primary .text-primary} | `ref(false)` | `any` | — |
+| `MediaDevicesPermissionsKey`{.primary .text-primary} | `ref({ camera: 'unknown', microphone: 'unknown' })` | `any` | — |
 | `MediaDevicesActiveStreamsKey`{.primary .text-primary} | `computed(() => new Map() as ReadonlyMap<string, MediaStream>)` | `any` | — |
 
 
@@ -1196,6 +1264,7 @@ start/stop functions to manage streams with device caching.
 | `isActive`{.primary .text-primary} | — | — |
 | `isLoading`{.primary .text-primary} | — | — |
 | `providerIsLoading`{.primary .text-primary} | — | — |
+| `providerPermissions`{.primary .text-primary} | — | — |
 | `providerActiveStreams`{.primary .text-primary} | — | — |
 | `error`{.primary .text-primary} | — | — |
 
@@ -1272,6 +1341,7 @@ start/stop functions to manage streams with device caching.
 | `MediaDevicesStartKey`{.primary .text-primary} | — | — | Inject start and stop functions from MediaDevicesProvider. |
 | `MediaDevicesStopKey`{.primary .text-primary} | — | — | — |
 | `MediaDevicesLoadingKey`{.primary .text-primary} | `ref(false)` | `any` | — |
+| `MediaDevicesPermissionsKey`{.primary .text-primary} | `ref({ camera: 'unknown', microphone: 'unknown' })` | `any` | — |
 | `MediaDevicesActiveStreamsKey`{.primary .text-primary} | `computed(() => new Map() as ReadonlyMap<string, MediaStream>)` | `any` | — |
 
 
@@ -1286,6 +1356,7 @@ start/stop functions to manage streams with device caching.
 | `isActive`{.primary .text-primary} | — | — |
 | `isLoading`{.primary .text-primary} | — | — |
 | `providerIsLoading`{.primary .text-primary} | — | — |
+| `providerPermissions`{.primary .text-primary} | — | — |
 | `providerActiveStreams`{.primary .text-primary} | — | — |
 | `error`{.primary .text-primary} | — | — |
 
