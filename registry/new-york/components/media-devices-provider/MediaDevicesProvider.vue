@@ -162,16 +162,28 @@ const requestMediaIfNeeded = async () => {
 const ensurePermissions = () => (props.open ? requestMediaIfNeeded() : Promise.resolve());
 
 /**
- * Provide the media devices and errors to child components.
+ * Provide the list of available media devices to child components.
  */
 provide<Ref<MediaDeviceInfo[]>>(MediaDevicesKey, devices);
+
+/**
+ * Provide the list of errors encountered during media operations to child components.
+ */
 provide<Ref<Error[]>>(MediaDevicesErrorsKey, errors);
 
 /**
- * Provide the start and stop functions to child components.
+ * Provide the function to start a media stream for a specific device to child components.
  */
 provide<MediaDevicesStartFn>(MediaDevicesStartKey, startStream);
+
+/**
+ * Provide the function to stop a media stream for a specific device to child components.
+ */
 provide<MediaDevicesStopFn>(MediaDevicesStopKey, stopStream);
+
+/**
+ * Provide the function to stop all active media streams to child components.
+ */
 provide<MediaDevicesStopAllFn>(MediaDevicesStopAllKey, stopAllStreams);
 
 watch(

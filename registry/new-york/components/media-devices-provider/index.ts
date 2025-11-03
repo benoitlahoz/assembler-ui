@@ -9,11 +9,14 @@
  * @category devices
  * @demo MediaDevicesProviderDemoSimple
  * @demo MediaDeviceDemoSimple
- * -- Simple demo with Video
+ * -- Stream Cache
+ * -- Select a camera from the list. The provider caches streams to avoid reopening the same device.
  * @demo MediaDeviceDemoPresets
  * -- Presets
+ * -- Select a camera and quality preset. The provider caches streams efficiently when switching presets.
  * @demo MediaDeviceDemoMultiple
- * -- Device stream caching
+ * -- Multiple Viewers
+ * -- Open two devices simultaneously. If you select the same device for both, the provider will reuse the cached stream instead of opening it twice.
  */
 import type { InjectionKey, Ref } from 'vue';
 

@@ -32,11 +32,6 @@ const handleStream2 = (stream: MediaStream | null) => {
 <template>
   <div class="space-y-6 p-6">
     <div>
-      <h3 class="text-lg font-semibold mb-2">Multiple VideoDevices with Stream Caching</h3>
-      <p class="text-sm text-muted-foreground">
-        Open two devices simultaneously. If you select the same device for both, the provider will
-        reuse the cached stream instead of opening it twice.
-      </p>
       <Badge variant="outline" class="mt-4 p-2">
         💡 Try selecting the same camera for both viewers!
       </Badge>

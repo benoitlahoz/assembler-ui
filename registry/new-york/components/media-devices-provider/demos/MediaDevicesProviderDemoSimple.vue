@@ -15,10 +15,10 @@ const open = ref(false);
           <thead
             class="sticky top-0 bg-default z-10 after:content-[''] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-border"
           >
-            <tr>
-              <th class="text-left p-2 bg-default">Type</th>
-              <th class="text-left p-2 bg-default">Label</th>
-              <th class="text-left p-2 bg-default">Device ID</th>
+            <tr class="text-sm">
+              <th class="text-left py-2 bg-default w-32 pl-4">Type</th>
+              <th class="text-left py-2 bg-default">Label</th>
+              <th class="text-left py-2 bg-default">Device ID</th>
             </tr>
           </thead>
           <tbody>
@@ -27,7 +27,7 @@ const open = ref(false);
               :key="device.deviceId"
               class="border-b border-muted hover:bg-accent"
             >
-              <td class="p-2">
+              <td class="py-2 w-32 pl-4">
                 <Badge
                   :variant="
                     device.kind === 'videoinput'
@@ -40,8 +40,8 @@ const open = ref(false);
                   {{ device.kind }}
                 </Badge>
               </td>
-              <td class="p-2">{{ device.label || 'Without label' }}</td>
-              <td class="p-2 font-mono text-xs text-gray-500">
+              <td class="py-2 text-sm">{{ device.label || 'Without label' }}</td>
+              <td class="py-2 font-mono text-xs text-gray-500">
                 {{ device.deviceId.substring(0, 20) }}...
               </td>
             </tr>

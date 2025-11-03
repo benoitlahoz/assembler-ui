@@ -2,9 +2,10 @@
 /**
  * Simple demo of MediaDevice component with MediaDevicesProvider for stream caching.
  */
-import { ref, watch, nextTick } from 'vue';
+import { ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import {
   MediaDevicesProvider,
   VideoDevice,
@@ -36,17 +37,12 @@ watch([videoRef, selectedDeviceId], async () => {
 
 <template>
   <div class="space-y-4">
-    <h3 class="text-lg font-semibold">MediaDevice with Provider - Stream Caching</h3>
-    <p class="text-sm text-muted-foreground">
-      Select a camera from the list. The provider caches streams to avoid reopening the same device.
-    </p>
-
     <MediaDevicesProvider :open="true">
       <template #default="{ devices, errors, cachedStreamsCount }">
         <div class="space-y-4">
           <!-- Device selector -->
           <div class="space-y-2">
-            <label class="text-sm font-medium">Available Cameras:</label>
+            <Label class="text-sm font-bold mb-4">Available Cameras</Label>
             <div class="grid gap-2">
               <Button
                 v-for="device in devices.filter((d) => d.kind === 'videoinput')"

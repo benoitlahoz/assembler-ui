@@ -452,7 +452,7 @@ Un champ de saisie simple avec label et placeholder (API Composition)
 
 
 
-## Example
+### Example
 ::hr-underline
 ::
 

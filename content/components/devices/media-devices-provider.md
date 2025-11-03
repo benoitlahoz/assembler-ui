@@ -42,10 +42,10 @@ const open = ref(false);
           <thead
             class="sticky top-0 bg-default z-10 after:content-[''] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-border"
           >
-            <tr>
-              <th class="text-left p-2 bg-default">Type</th>
-              <th class="text-left p-2 bg-default">Label</th>
-              <th class="text-left p-2 bg-default">Device ID</th>
+            <tr class="text-sm">
+              <th class="text-left py-2 bg-default w-32 pl-4">Type</th>
+              <th class="text-left py-2 bg-default">Label</th>
+              <th class="text-left py-2 bg-default">Device ID</th>
             </tr>
           </thead>
           <tbody>
@@ -54,7 +54,7 @@ const open = ref(false);
               :key="device.deviceId"
               class="border-b border-muted hover:bg-accent"
             >
-              <td class="p-2">
+              <td class="py-2 w-32 pl-4">
                 <Badge
                   :variant="
                     device.kind === 'videoinput'
@@ -67,8 +67,10 @@ const open = ref(false);
                   {{ device.kind }}
                 </Badge>
               </td>
-              <td class="p-2">{{ device.label || "Without label" }}</td>
-              <td class="p-2 font-mono text-xs text-gray-500">
+              <td class="py-2 text-sm">
+                {{ device.label || "Without label" }}
+              </td>
+              <td class="py-2 font-mono text-xs text-gray-500">
                 {{ device.deviceId.substring(0, 20) }}...
               </td>
             </tr>
@@ -321,10 +323,13 @@ const ensurePermissions = () =>
   props.open ? requestMediaIfNeeded() : Promise.resolve();
 
 provide<Ref<MediaDeviceInfo[]>>(MediaDevicesKey, devices);
+
 provide<Ref<Error[]>>(MediaDevicesErrorsKey, errors);
 
 provide<MediaDevicesStartFn>(MediaDevicesStartKey, startStream);
+
 provide<MediaDevicesStopFn>(MediaDevicesStopKey, stopStream);
+
 provide<MediaDevicesStopAllFn>(MediaDevicesStopAllKey, stopAllStreams);
 
 watch(
@@ -939,11 +944,11 @@ The MediaDevicesProvider component provides a list of available media devices
   ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-| `MediaDevicesKey`{.primary .text-primary} | `devices` | `Ref<MediaDeviceInfo[]>` | Provide the media devices and errors to child components. |
-| `MediaDevicesErrorsKey`{.primary .text-primary} | `errors` | `Ref<Error[]>` | — |
-| `MediaDevicesStartKey`{.primary .text-primary} | `startStream` | `MediaDevicesStartFn` | Provide the start and stop functions to child components. |
-| `MediaDevicesStopKey`{.primary .text-primary} | `stopStream` | `MediaDevicesStopFn` | — |
-| `MediaDevicesStopAllKey`{.primary .text-primary} | `stopAllStreams` | `MediaDevicesStopAllFn` | — |
+| `MediaDevicesKey`{.primary .text-primary} | `devices` | `Ref<MediaDeviceInfo[]>` | Provide the list of available media devices to child components. |
+| `MediaDevicesErrorsKey`{.primary .text-primary} | `errors` | `Ref<Error[]>` | Provide the list of errors encountered during media operations to child components. |
+| `MediaDevicesStartKey`{.primary .text-primary} | `startStream` | `MediaDevicesStartFn` | Provide the function to start a media stream for a specific device to child components. |
+| `MediaDevicesStopKey`{.primary .text-primary} | `stopStream` | `MediaDevicesStopFn` | Provide the function to stop a media stream for a specific device to child components. |
+| `MediaDevicesStopAllKey`{.primary .text-primary} | `stopAllStreams` | `MediaDevicesStopAllFn` | Provide the function to stop all active media streams to child components. |
 
 
 
@@ -1150,9 +1155,11 @@ start/stop functions to manage streams with device caching.
 
 
 
-## Simple demo with Video
+### Stream Cache
 ::hr-underline
 ::
+
+Select a camera from the list. The provider caches streams to avoid reopening the same device.
 
 
 
@@ -1196,14 +1203,6 @@ watch([videoRef, selectedDeviceId], async () => {
 
 <template>
   <div class="space-y-4">
-    <h3 class="text-lg font-semibold">
-      MediaDevice with Provider - Stream Caching
-    </h3>
-    <p class="text-sm text-muted-foreground">
-      Select a camera from the list. The provider caches streams to avoid
-      reopening the same device.
-    </p>
-
     <MediaDevicesProvider :open="true">
       <template #default="{ devices, errors, cachedStreamsCount }">
         <div class="space-y-4">
@@ -1359,9 +1358,11 @@ watch([videoRef, selectedDeviceId], async () => {
 
 
 
-## Presets
+### Presets
 ::hr-underline
 ::
+
+Select a camera and quality preset. The provider caches streams efficiently when switching presets.
 
 
 
@@ -1416,175 +1417,203 @@ const getActualResolution = () => {
 };
 
 const formatPresetName = (name: string): string => {
-  return toPascalCase(name)
+  const standardNames: Record<string, string> = {
+    sd: "SD",
+    hd: "HD",
+    fullhd: "Full HD",
+    "4k": "4K",
+    uhd: "UHD",
+    uhd4k: "UHD 4K",
+    qhd: "QHD",
+    vga: "VGA",
+    qvga: "QVGA",
+  };
+
+  const lowerName = name.toLowerCase();
+
+  if (standardNames[lowerName]) {
+    return standardNames[lowerName];
+  }
+
+  let formatted = toPascalCase(name)
     .replace(/([A-Z])/g, " $1")
     .trim();
+
+  formatted = formatted.replace(/\bHd\b/gi, "HD");
+
+  return formatted;
 };
 </script>
 
 <template>
-  <div class="space-y-6 p-6">
-    <div>
-      <h3 class="text-lg font-semibold mb-2">
-        VideoDevice with Presets & Stream Caching
-      </h3>
-      <p class="text-sm text-muted-foreground">
-        Select a camera and quality preset. The provider caches streams
-        efficiently when switching presets.
-      </p>
-    </div>
-
+  <div class="h-128 max-h-128 overflow-hidden flex flex-col">
     <MediaDevicesProvider :open="true">
       <template #default="{ devices, errors }">
-        <div class="space-y-4">
-          <div class="space-y-2">
-            <label class="text-sm font-medium">Camera:</label>
-            <div class="flex flex-wrap gap-2">
-              <Button
-                v-for="device in devices.filter((d) => d.kind === 'videoinput')"
-                :key="device.deviceId"
-                @click="selectDevice(device.deviceId)"
-                :variant="
-                  selectedDeviceId === device.deviceId ? 'default' : 'outline'
-                "
-                size="sm"
-              >
-                {{ device.label || "Camera" }}
-              </Button>
-            </div>
-          </div>
-
-          <div class="space-y-2">
-            <label class="text-sm font-medium">Video Quality:</label>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <Button
-                v-for="(preset, name) in VideoPresets"
-                :key="name"
-                @click="selectedPreset = name as PresetName"
-                :variant="selectedPreset === name ? 'default' : 'outline'"
-                size="sm"
-              >
-                {{ formatPresetName(name as string) }}
-              </Button>
-            </div>
-          </div>
-
-          <VideoDevice
-            v-if="selectedDeviceId"
-            :device-id="selectedDeviceId"
-            v-bind="currentPreset"
-            auto-start
-            @stream="handleStream"
-          >
-            <template #default="{ stream, isActive, error, start, stop }">
-              <div class="space-y-4">
-                <div
-                  class="relative bg-black rounded-lg overflow-hidden"
-                  style="aspect-ratio: 16/9"
+        <div class="flex flex-col h-full overflow-hidden">
+          <div class="p-4 space-y-4 border-b border-muted">
+            <div class="space-y-2">
+              <label class="text-sm font-medium mb-4">Available Cameras:</label>
+              <div class="grid gap-2">
+                <Button
+                  v-for="device in devices.filter(
+                    (d) => d.kind === 'videoinput',
+                  )"
+                  :key="device.deviceId"
+                  @click="selectDevice(device.deviceId)"
+                  :variant="
+                    selectedDeviceId === device.deviceId ? 'default' : 'outline'
+                  "
+                  size="sm"
+                  class="justify-start"
                 >
-                  <video
-                    ref="videoRef"
-                    autoplay
-                    playsinline
-                    muted
-                    class="w-full h-full object-cover"
-                  />
+                  <Badge
+                    v-if="selectedDeviceId === device.deviceId"
+                    class="mr-2"
+                    variant="secondary"
+                  >
+                    Active
+                  </Badge>
+                  {{ device.label || "Camera" }}
+                </Button>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <label class="text-sm font-medium">Video Quality:</label>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <Button
+                  v-for="(preset, name) in VideoPresets"
+                  :key="name"
+                  @click="selectedPreset = name as PresetName"
+                  :variant="selectedPreset === name ? 'default' : 'outline'"
+                  size="sm"
+                >
+                  {{ formatPresetName(name as string) }}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex-1 overflow-y-auto min-h-0">
+            <VideoDevice
+              v-if="selectedDeviceId"
+              :device-id="selectedDeviceId"
+              v-bind="currentPreset"
+              auto-start
+              @stream="handleStream"
+            >
+              <template #default="{ stream, isActive, error, start, stop }">
+                <div class="p-4 space-y-4">
                   <div
-                    v-if="!isActive"
-                    class="absolute inset-0 flex items-center justify-center bg-muted/50"
+                    class="relative bg-black rounded-lg overflow-hidden border border-muted"
+                    style="aspect-ratio: 16/9"
                   >
-                    <p class="text-muted-foreground">Camera not started</p>
-                  </div>
-
-                  <div
-                    v-if="isActive"
-                    class="absolute top-2 left-2 space-y-1 bg-black/70 text-white px-2 py-1 rounded text-xs font-mono"
-                  >
-                    <div>{{ formatPresetName(selectedPreset) }}</div>
-                    <div v-if="getActualResolution()">
-                      {{ getActualResolution()?.width }}x{{
-                        getActualResolution()?.height
-                      }}
-                      @ {{ getActualResolution()?.frameRate?.toFixed(0) }}fps
-                    </div>
-                  </div>
-                </div>
-
-                <div class="flex gap-2">
-                  <Button @click="start" :disabled="isActive">
-                    Start Camera
-                  </Button>
-                  <Button
-                    @click="stop"
-                    :disabled="!isActive"
-                    variant="destructive"
-                  >
-                    Stop Camera
-                  </Button>
-                </div>
-
-                <div class="grid md:grid-cols-2 gap-4">
-                  <div class="border rounded-lg p-4 bg-muted/30">
-                    <h4 class="font-medium mb-2 text-sm">
-                      Requested Constraints:
-                    </h4>
-                    <pre class="text-xs overflow-auto">{{ currentPreset }}</pre>
-                  </div>
-
-                  <div class="border rounded-lg p-4 bg-muted/30">
-                    <h4 class="font-medium mb-2 text-sm">Actual Settings:</h4>
+                    <video
+                      ref="videoRef"
+                      autoplay
+                      playsinline
+                      muted
+                      class="w-full h-full object-cover"
+                    />
                     <div
-                      v-if="isActive && stream"
-                      class="text-xs space-y-1 font-mono"
+                      v-if="!isActive"
+                      class="absolute inset-0 flex items-center justify-center bg-muted/50"
                     >
-                      <p v-if="getActualResolution()">
-                        Resolution: {{ getActualResolution()?.width }}x{{
+                      <p class="text-muted-foreground">Camera not started</p>
+                    </div>
+
+                    <div
+                      v-if="isActive"
+                      class="absolute top-2 left-2 space-y-1 bg-black/70 text-white px-2 py-1 rounded text-xs font-mono"
+                    >
+                      <div>{{ formatPresetName(selectedPreset) }}</div>
+                      <div v-if="getActualResolution()">
+                        {{ getActualResolution()?.width }}x{{
                           getActualResolution()?.height
                         }}
-                      </p>
-                      <p v-if="getActualResolution()?.frameRate">
-                        Frame Rate:
-                        {{ getActualResolution()?.frameRate?.toFixed(2) }} fps
-                      </p>
-                      <p>Tracks: {{ stream.getTracks().length }}</p>
-                      <p class="break-all">
-                        Device: {{ selectedDeviceId.substring(0, 30) }}...
+                        @ {{ getActualResolution()?.frameRate?.toFixed(0) }}fps
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="flex gap-2">
+                    <Button @click="start" :disabled="isActive">
+                      Start Camera
+                    </Button>
+                    <Button
+                      @click="stop"
+                      :disabled="!isActive"
+                      variant="destructive"
+                    >
+                      Stop Camera
+                    </Button>
+                  </div>
+
+                  <div class="grid md:grid-cols-2 gap-4">
+                    <div class="border rounded-lg p-4 bg-muted/30">
+                      <h4 class="font-medium mb-2 text-sm">
+                        Requested Constraints:
+                      </h4>
+                      <pre class="text-xs overflow-auto">{{
+                        currentPreset
+                      }}</pre>
+                    </div>
+
+                    <div class="border rounded-lg p-4 bg-muted/30">
+                      <h4 class="font-medium mb-2 text-sm">Actual Settings:</h4>
+                      <div
+                        v-if="isActive && stream"
+                        class="text-xs space-y-1 font-mono"
+                      >
+                        <p v-if="getActualResolution()">
+                          Resolution: {{ getActualResolution()?.width }}x{{
+                            getActualResolution()?.height
+                          }}
+                        </p>
+                        <p v-if="getActualResolution()?.frameRate">
+                          Frame Rate:
+                          {{ getActualResolution()?.frameRate?.toFixed(2) }} fps
+                        </p>
+                        <p>Tracks: {{ stream.getTracks().length }}</p>
+                        <p class="break-all">
+                          Device: {{ selectedDeviceId.substring(0, 30) }}...
+                        </p>
+                      </div>
+                      <p v-else class="text-xs text-muted-foreground">
+                        Start camera to see actual settings
                       </p>
                     </div>
-                    <p v-else class="text-xs text-muted-foreground">
-                      Start camera to see actual settings
+                  </div>
+
+                  <div
+                    v-if="error"
+                    class="p-4 rounded border border-destructive bg-destructive/10 text-destructive"
+                  >
+                    <p class="font-bold">Error:</p>
+                    <p class="text-sm mt-1">
+                      {{ error.message || error }}
+                      {{
+                        (error as any).constraint
+                          ? `(${(error as any).constraint})`
+                          : ""
+                      }}
                     </p>
                   </div>
                 </div>
+              </template>
+            </VideoDevice>
 
-                <div
-                  v-if="error"
-                  class="p-3 bg-red-50 border border-red-200 rounded"
-                >
-                  <p class="font-medium text-red-700 text-sm">Error:</p>
-                  <p class="text-red-600 text-xs">
-                    {{ error.message || error }}
-                    {{
-                      (error as any).constraint
-                        ? `(${(error as any).constraint})`
-                        : ""
-                    }}
-                  </p>
-                </div>
-              </div>
-            </template>
-          </VideoDevice>
-
-          <div
-            v-else
-            class="border-2 border-dashed rounded-lg p-8 text-center text-muted-foreground"
-          >
-            <p>Select a camera to start</p>
+            <div
+              v-else
+              class="m-4 border-2 border-dashed rounded-lg p-8 text-center text-muted-foreground"
+            >
+              <p>Select a camera to start</p>
+            </div>
           </div>
 
           <div
             v-if="errors && errors.length > 0"
-            class="p-4 rounded border border-destructive bg-destructive/10 text-destructive"
+            class="m-4 mt-0 p-4 rounded border border-destructive bg-destructive/10 text-destructive"
           >
             <p class="font-bold">Provider Errors:</p>
             <ul class="text-sm space-y-1 mt-2">
@@ -1613,9 +1642,11 @@ const formatPresetName = (name: string): string => {
 
 
 
-## Device stream caching
+### Multiple Viewers
 ::hr-underline
 ::
+
+Open two devices simultaneously. If you select the same device for both, the provider will reuse the cached stream instead of opening it twice.
 
 
 
@@ -1656,13 +1687,6 @@ const handleStream2 = (stream: MediaStream | null) => {
 <template>
   <div class="space-y-6 p-6">
     <div>
-      <h3 class="text-lg font-semibold mb-2">
-        Multiple VideoDevices with Stream Caching
-      </h3>
-      <p class="text-sm text-muted-foreground">
-        Open two devices simultaneously. If you select the same device for both,
-        the provider will reuse the cached stream instead of opening it twice.
-      </p>
       <Badge variant="outline" class="mt-4 p-2">
         💡 Try selecting the same camera for both viewers!
       </Badge>
