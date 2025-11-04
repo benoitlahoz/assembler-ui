@@ -1,3 +1,4 @@
+````mdc
 # Simplification du système de contrôles
 
 ## ✅ Changements effectués
@@ -49,6 +50,99 @@ const controlDefinitions: ControlDefinition[] = [
 ];
 ```
 
+## 🎨 Amélioration du Drag & Drop avec VueUse
+
+### Migration vers VueUse et @vueuse/motion
+
+Le système de drag and drop a été modernisé pour utiliser les composables VueUse :
+
+#### Composables utilisés
+- ✅ `useElementSize` : Taille réactive de la grille
+- ✅ `useElementBounding` : Bounds réactifs du conteneur (remplace `getBoundingClientRect()`)
+- ✅ `useMouse` : Position de la souris réactive
+- ✅ `useMotion` : Animations fluides avec spring physics
+
+#### Système d'intersection amélioré
+
+Au lieu de se baser uniquement sur la position de la souris, le système calcule maintenant l'intersection d'un **rectangle virtuel** avec les cellules de la grille :
+
+```typescript
+// Créer un rectangle virtuel centré sur la souris avec les dimensions de l'item
+const itemWidth = dragState.value.item.width * (props.cellSize + props.gap) - props.gap;
+const itemHeight = dragState.value.item.height * (props.cellSize + props.gap) - props.gap;
+
+const virtualBounds = {
+  left: event.clientX - itemWidth / 2,
+  top: event.clientY - itemHeight / 2,
+  right: event.clientX + itemWidth / 2,
+  bottom: event.clientY + itemHeight / 2,
+  width: itemWidth,
+  height: itemHeight,
+};
+
+// Calculer la cellule avec la plus grande intersection
+pos = getGridPositionByIntersection(virtualBounds);
+```
+
+#### Animations avec @vueuse/motion
+
+Les animations sont maintenant gérées par `@vueuse/motion` avec des variantes prédéfinies :
+
+```typescript
+const itemVariants = {
+  initial: { scale: 1, opacity: 1 },
+  placed: {
+    scale: [0.95, 1.05, 1],  // Animation de bounce
+    transition: {
+      type: 'spring',
+      stiffness: 300,
+      damping: 25,
+      duration: 400,
+    },
+  },
+  hover: {
+    scale: 1.02,
+    y: -2,
+    transition: { type: 'spring', stiffness: 400, damping: 30 },
+  },
+  dragging: {
+    scale: 1.05,
+    opacity: 0.7,
+    transition: { type: 'spring', stiffness: 300, damping: 20 },
+  },
+};
+```
+
+#### Template avec directives v-motion
+
+```vue
+<div
+  v-for="item in placedItems"
+  v-motion
+  :initial="itemVariants.initial"
+  @mouseenter="(e) => {
+    const motion = useMotion(e.currentTarget, itemVariants);
+    motion.apply('hover');
+  }"
+  @mouseleave="(e) => {
+    const motion = useMotion(e.currentTarget, itemVariants);
+    motion.apply('initial');
+  }"
+>
+```
+
+### Avantages de cette approche
+
+1. **Plus précis** : L'intersection de l'élément entier détermine la position, pas juste le curseur
+2. **Animations fluides** : Spring physics pour des mouvements naturels
+3. **Code plus propre** : Pas de manipulation DOM manuelle pour les éléments fantômes
+4. **Performances** : Bounds réactifs mis à jour automatiquement
+5. **UX améliorée** : 
+   - Animation de bounce quand un item est placé
+   - Hover avec élévation légère
+   - Preview animé lors du drag
+   - Feedback visuel pour placements invalides
+
 ### Avantages
 
 1. **Moins de fichiers** : Plus besoin d'un dossier `controls/` séparé
@@ -56,6 +150,8 @@ const controlDefinitions: ControlDefinition[] = [
 3. **Plus flexible** : Les wrappers sont créés à la volée selon les besoins
 4. **Moins de couches d'abstraction** : Moins de composants intermédiaires
 5. **Code plus localisé** : Tout est dans la démo qui l'utilise
+6. **Animations natives** : @vueuse/motion pour des transitions fluides
+7. **Drag & drop intelligent** : Basé sur l'intersection réelle des éléments
 
 ## 📝 Architecture finale
 
@@ -69,7 +165,7 @@ registry/new-york/
 │   │       ├── ControlButtonDemo.vue  # Wrapper avec template string
 │   │       └── PlaygroundDemo.vue
 │   └── controls-grid/
-│       ├── ControlsGrid.vue
+│       ├── ControlsGrid.vue           # Avec VueUse et @vueuse/motion
 │       ├── index.ts
 │       └── demos/
 │           ├── ControlRegistryDemo.vue  # Wrapper avec render function
@@ -99,3 +195,8 @@ Les deux approches sont valides et montrent différentes façons d'utiliser `Con
 - ✅ Système d'enregistrement toujours fonctionnel
 - ✅ Deux exemples différents de wrappers (template vs render)
 - ✅ Architecture simplifiée et plus claire
+- ✅ Drag & drop basé sur l'intersection d'éléments
+- ✅ Animations fluides avec spring physics
+- ✅ Utilisation optimale de VueUse et @vueuse/motion
+
+````

@@ -386,13 +386,23 @@ export const ControlGridGetRegisteredComponentsKey: InjectionKey<
 
 ```vue [src/components/ui/control-grid/ControlGrid.vue]
 <script setup lang="ts">
-import { provide, watch, onMounted, computed, ref, type Ref } from "vue";
+import {
+  provide,
+  watch,
+  onMounted,
+  computed,
+  ref,
+  nextTick,
+  type Ref,
+} from "vue";
 import {
   useElementSize,
   useElementBounding,
   useMouse,
+  useDraggable,
   useEventListener,
 } from "@vueuse/core";
+import { useMotion } from "@vueuse/motion";
 import {
   ControlGridItemsKey,
   ControlGridConfigKey,
@@ -457,13 +467,80 @@ const dragState = ref<DragState>({
   isValid: false,
 });
 const previewSize = ref<{ width: number; height: number } | null>(null);
-const draggedElement = ref<HTMLElement | null>(null);
+const isDragging = ref(false);
+
+const itemRefs = ref<Map<string, HTMLElement>>(new Map());
 
 const componentRegistry = ref<Map<string, any>>(new Map());
 
 const { width: gridWidth, height: gridHeight } = useElementSize(gridContainer);
 const gridBounds = useElementBounding(gridContainer);
 const { x: mouseX, y: mouseY } = useMouse();
+
+const previewRef = ref<HTMLElement | null>(null);
+
+const itemVariants = {
+  initial: {
+    scale: 1,
+    opacity: 1,
+  },
+  placed: {
+    scale: [0.95, 1.05, 1],
+    transition: {
+      type: "spring",
+      stiffness: 300,
+      damping: 25,
+      duration: 400,
+    },
+  },
+  hover: {
+    scale: 1.02,
+    y: -2,
+    transition: {
+      type: "spring",
+      stiffness: 400,
+      damping: 30,
+    },
+  },
+  dragging: {
+    scale: 1.05,
+    opacity: 0.7,
+    transition: {
+      type: "spring",
+      stiffness: 300,
+      damping: 20,
+    },
+  },
+};
+
+const previewVariants = {
+  initial: {
+    scale: 0.9,
+    opacity: 0,
+  },
+  enter: {
+    scale: 1,
+    opacity: 1,
+    transition: {
+      type: "spring",
+      stiffness: 400,
+      damping: 30,
+      duration: 150,
+    },
+  },
+  invalid: {
+    scale: [1, 0.95, 1],
+    borderColor: [
+      "rgba(239, 68, 68, 0.5)",
+      "rgba(239, 68, 68, 0.8)",
+      "rgba(239, 68, 68, 0.5)",
+    ],
+    transition: {
+      repeat: Infinity,
+      duration: 1000,
+    },
+  },
+};
 
 const gridConfig = computed<GridConfig>(() => {
   const cols = Math.floor(gridWidth.value / (props.cellSize + props.gap));
@@ -641,6 +718,15 @@ const addItem = (item: Omit<GridItem, "x" | "y">): GridItem | null => {
   if (position) {
     const newItem: GridItem = { ...item, ...position } as GridItem;
     placedItems.value.push(newItem);
+
+    nextTick(() => {
+      const el = itemRefs.value.get(newItem.id);
+      if (el) {
+        const motion = useMotion(el, itemVariants);
+        motion.apply("placed");
+      }
+    });
+
     emit("item-placed", newItem);
     emit("update:items", placedItems.value);
     return newItem;
@@ -709,8 +795,7 @@ const handleDragStart = (
   dragState.value.item = { ...item };
   dragState.value.fromGrid = fromGrid;
   previewSize.value = { width: item.width, height: item.height };
-
-  draggedElement.value = event.target as HTMLElement;
+  isDragging.value = true;
 
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = "move";
@@ -739,7 +824,7 @@ const handleDragOver = (event: DragEvent) => {
 
   let pos: { x: number; y: number } | null = null;
 
-  if (dragState.value.item && draggedElement.value) {
+  if (dragState.value.item) {
     const itemWidth =
       dragState.value.item.width * (props.cellSize + props.gap) - props.gap;
     const itemHeight =
@@ -819,7 +904,7 @@ const handleDragEnd = () => {
   dragState.value.hoverPosition = null;
   dragState.value.isValid = false;
   previewSize.value = null;
-  draggedElement.value = null;
+  isDragging.value = false;
 };
 
 const handleDrop = (event: DragEvent) => {
@@ -876,10 +961,28 @@ const handleDrop = (event: DragEvent) => {
     const index = placedItems.value.findIndex((item) => item.id === newItem.id);
     if (index !== -1) {
       placedItems.value[index] = newItem;
+
+      nextTick(() => {
+        const el = itemRefs.value.get(newItem.id);
+        if (el) {
+          const motion = useMotion(el, itemVariants);
+          motion.apply("placed");
+        }
+      });
+
       emit("item-moved", newItem);
     }
   } else {
     placedItems.value.push(newItem);
+
+    nextTick(() => {
+      const el = itemRefs.value.get(newItem.id);
+      if (el) {
+        const motion = useMotion(el, itemVariants);
+        motion.apply("placed");
+      }
+    });
+
     emit("item-placed", newItem);
   }
 
@@ -995,7 +1098,16 @@ defineExpose({
       >
         <div
           v-if="hoverCell && (dragState.item || previewSize)"
-          class="bg-primary/10 border-2 border-dashed border-primary rounded-lg pointer-events-none animate-pulse-subtle"
+          ref="previewRef"
+          v-motion
+          :initial="previewVariants.initial"
+          :enter="previewVariants.enter"
+          :class="[
+            'rounded-lg pointer-events-none',
+            dragState.isValid
+              ? 'bg-primary/10 border-2 border-dashed border-primary'
+              : 'bg-destructive/10 border-2 border-dashed border-destructive',
+          ]"
           :style="{
             gridColumn: `${hoverCell.x + 1} / span ${dragState.item?.width || previewSize?.width || 1}`,
             gridRow: `${hoverCell.y + 1} / span ${dragState.item?.height || previewSize?.height || 1}`,
@@ -1005,7 +1117,10 @@ defineExpose({
         <div
           v-for="item in placedItems"
           :key="item.id"
-          class="grid-item-wrapper relative cursor-move select-none transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:cursor-grabbing active:opacity-70"
+          :ref="(el) => el && itemRefs.set(item.id, el as HTMLElement)"
+          v-motion
+          :initial="itemVariants.initial"
+          class="grid-item-wrapper relative cursor-move select-none"
           :draggable="true"
           :style="{
             gridColumn: `${item.x + 1} / span ${item.width}`,
@@ -1013,6 +1128,24 @@ defineExpose({
           }"
           @dragstart.stop="handleDragStart($event, item, true)"
           @dragend.stop="handleDragEnd"
+          @mouseenter="
+            (e) => {
+              const motion = useMotion(
+                e.currentTarget as HTMLElement,
+                itemVariants,
+              );
+              motion.apply('hover');
+            }
+          "
+          @mouseleave="
+            (e) => {
+              const motion = useMotion(
+                e.currentTarget as HTMLElement,
+                itemVariants,
+              );
+              motion.apply('initial');
+            }
+          "
         >
           <div
             class="relative w-full h-full bg-card/50 border border-border rounded overflow-hidden flex flex-col"
@@ -1080,18 +1213,8 @@ defineExpose({
 </template>
 
 <style scoped>
-@keyframes pulse-subtle {
-  0%,
-  100% {
-    opacity: 0.5;
-  }
-  50% {
-    opacity: 0.8;
-  }
-}
-
-.animate-pulse-subtle {
-  animation: pulse-subtle 1.5s ease-in-out infinite;
+.grid-item-wrapper:active {
+  cursor: grabbing;
 }
 
 .grid-item-wrapper:hover .grid-item-remove {
