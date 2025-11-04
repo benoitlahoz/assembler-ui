@@ -3,9 +3,7 @@ title: ScreenShareProvider
 description: A renderless provider component that manages screen sharing functionality.
 ---
 
-
   <p class="text-pretty mt-4"><br>This component uses the getDisplayMedia API to enable screen, window, or tab sharing.<br>It manages the sharing state and provides reactive access to the screen stream.<br><br>Unlike MediaDevicesProvider, screen sharing doesn't enumerate available sources.<br>Instead, the browser displays a picker for the user to select what to share.</p>
-
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
@@ -13,7 +11,7 @@ description: A renderless provider component that manages screen sharing functio
   :::
 
   :::tabs-item{icon="i-lucide-code" label="Code"}
-  ```vue
+```vue
 <script setup lang="ts">
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -112,11 +110,9 @@ import { ScreenShareProvider, ScreenShareViewer } from "..";
     </ScreenShareProvider>
   </div>
 </template>
-
-  ```
+```
   :::
 ::
-
 
 ## Install with CLI
 ::hr-underline
@@ -125,23 +121,22 @@ import { ScreenShareProvider, ScreenShareViewer } from "..";
 This will install the component in the path defined by your `components.json` file, thanks to shadcn-vue.
 
 :::code-group{.w-full}
-  ```bash [yarn]
+```bash [yarn]
   npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/screen-share-provider.json"
   ```
 
-  ```bash [npm]
+```bash [npm]
   npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/screen-share-provider.json"
   ```
 
-  ```bash [pnpm]
+```bash [pnpm]
   pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/screen-share-provider.json"
   ```
 
-  ```bash [bun]
+```bash [bun]
   bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/screen-share-provider.json"
   ```
 :::
-
 
 ## Install Manually
 ::hr-underline
@@ -150,7 +145,6 @@ This will install the component in the path defined by your `components.json` fi
 Copy and paste these files into your project.
 
 :::code-tree{default-value="src/components/ui/screen-share-provider/index.ts"}
-
 
 ```ts [src/components/ui/screen-share-provider/index.ts]
 import type { InjectionKey, Ref } from "vue";
@@ -208,7 +202,6 @@ export const ScreenShareStartKey: InjectionKey<ScreenShareStartFn> =
 
 export const ScreenShareStopKey: InjectionKey<ScreenShareStopFn> =
   Symbol("ScreenShareStop");
-
 ```
 
 ```vue [src/components/ui/screen-share-provider/ScreenShareProvider.vue]
@@ -294,7 +287,6 @@ watch(
 </template>
 
 <style scoped></style>
-
 ```
 
 ```vue [src/components/ui/screen-share-provider/ScreenShareViewer.vue]
@@ -419,17 +411,12 @@ video {
   height: auto;
 }
 </style>
-
 ```
-
-
 :::
-
 
 ## index
 ::hr-underline
 ::
-
 
 A renderless provider component that manages screen sharing functionality.
 
@@ -439,22 +426,17 @@ It manages the sharing state and provides reactive access to the screen stream.
 Unlike MediaDevicesProvider, screen sharing doesn&#39;t enumerate available sources.
 Instead, the browser displays a picker for the user to select what to share.
 
-
 ---
-
 
 ## ScreenShareProvider
 ::hr-underline
 ::
 
-
 The ScreenShareProvider component manages screen sharing functionality
 and exposes the screen stream and control functions to its child components
 via scoped slots and provide/inject.
- 
 
 **API**: composition
-
 
   ### Props
 | Name | Type | Default | Description |
@@ -462,12 +444,10 @@ via scoped slots and provide/inject.
 | `autoStart`{.primary .text-primary} | `boolean` | false | Automatically start screen sharing on mount. |
 | `defaultOptions`{.primary .text-primary} | `ScreenShareOptions` | - | Default options to use when starting screen share. |
 
-
   ### Slots
 | Name | Description |
 |------|-------------|
 | `default`{.primary .text-primary} | Slot for child components to access screen sharing state and controls |
-
 
   ### Provide
 | Key | Value | Type | Description |
@@ -479,21 +459,16 @@ via scoped slots and provide/inject.
 | `ScreenShareStartKey`{.primary .text-primary} | `startScreenShare` | `ScreenShareStartFn` | — |
 | `ScreenShareStopKey`{.primary .text-primary} | `stopScreenShare` | `ScreenShareStopFn` | — |
 
-
 ---
-
 
 ## ScreenShareViewer
 ::hr-underline
 ::
 
-
 The ScreenShareViewer component displays the shared screen in a video element.
 It automatically connects to the screen stream provided by ScreenShareProvider.
- 
 
 **API**: composition
-
 
   ### Props
 | Name | Type | Default | Description |
@@ -506,7 +481,6 @@ It automatically connects to the screen stream provided by ScreenShareProvider.
 | `autoStart`{.primary .text-primary} | `boolean` | false | Whether to automatically start screen sharing when mounted.
 If true, will call startShare() on mount if not already sharing. |
 
-
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
@@ -515,19 +489,15 @@ If true, will call startShare() on mount if not already sharing. |
 | `ScreenShareStartKey`{.primary .text-primary} | — | — | — |
 | `ScreenShareStopKey`{.primary .text-primary} | — | — | — |
 
-
 ---
-
 
   ## Advanced Usage
   ::hr-underline
   ::
 
-  
 ### Advanced Options
 ::hr-underline
 ::
-
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
@@ -535,7 +505,7 @@ If true, will call startShare() on mount if not already sharing. |
   :::
 
   :::tabs-item{icon="i-lucide-code" label="Code"}
-  ```vue
+```vue
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { Badge } from "@/components/ui/badge";
@@ -732,12 +702,10 @@ const shareOptions = computed<ScreenShareOptions>(() => ({
     </ScreenShareProvider>
   </div>
 </template>
-
-  ```
+```
   :::
 ::
 
-  
 ::tip
 You can copy and adapt this template for any component documentation.
 ::

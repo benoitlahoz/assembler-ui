@@ -6,6 +6,7 @@ import { stripComments } from './docs/common/strip-comments';
 import { formatCode } from './docs/common/format-code';
 import { escapeMarkdownTableCell } from './docs/common/escape-markdown';
 import { normalizeLineBreaks } from './docs/common/normalize-line-breaks';
+import { sortFilesByMain, sortCodesByMain } from './docs/common/sort-files-by-main';
 import {
   runWithSpinner,
   displayGenerationSummary,
@@ -113,6 +114,8 @@ export async function generateDocs(): Promise<void> {
             files = allFiles.filter((f) => f.path.endsWith('.vue'));
           } else if (normalizedType === 'hook') {
             files = allFiles.filter((f) => f.path.endsWith('.ts') && !f.path.endsWith('.d.ts'));
+            // Pour les composables, trie les fichiers pour mettre le fichier principal en premier
+            files = sortFilesByMain(files, assembler.name);
           }
 
           // Pour le code-tree, on prend tous les fichiers (vue ou non)
@@ -179,6 +182,12 @@ export async function generateDocs(): Promise<void> {
             )
           ).filter(Boolean);
 
+          // Pour les composables, trie les codes pour mettre le fichier principal en premier
+          let sortedCodes = codes;
+          if (normalizedType === 'hook') {
+            sortedCodes = sortCodesByMain(codes, assembler.name);
+          }
+
           // Détermine le chemin de base pour le code-tree selon le type et le nom de l'item
           let codeBasePath = `src/components/ui/${assembler.name}`;
           if (normalizedType === 'block') codeBasePath = `src/components/blocks/${assembler.name}`;
@@ -186,8 +195,8 @@ export async function generateDocs(): Promise<void> {
 
           // Définit le default-value pour le code-tree (premier fichier du tableau codes)
           let codeTreeDefaultValue = '';
-          if (codes.length > 0 && codes[0] && codes[0].filename) {
-            codeTreeDefaultValue = `${codeBasePath}/${codes[0].filename}`;
+          if (sortedCodes.length > 0 && sortedCodes[0] && sortedCodes[0].filename) {
+            codeTreeDefaultValue = `${codeBasePath}/${sortedCodes[0].filename}`;
           }
           // Lecture du champ install (toujours une string) et création d'un objet des chemins
           // Crée les commandes d'installation finales à partir des templates InstallPaths et assembler.install
@@ -209,7 +218,7 @@ export async function generateDocs(): Promise<void> {
             description: assembler.description || '',
             author: assembler.author || '',
             files,
-            codes,
+            codes: sortedCodes,
             codeBasePath,
             codeTreeDefaultValue,
             // Helper function for escaping pipes in markdown tables

@@ -3,9 +3,7 @@ title: useScreenShare
 description: Composable for managing screen sharing functionality.
 ---
 
-
   <p class="text-pretty mt-4"><br>This composable provides reactive state and methods for screen sharing<br>using the getDisplayMedia API.</p>
-
 
 ## Install with CLI
 ::hr-underline
@@ -14,23 +12,22 @@ description: Composable for managing screen sharing functionality.
 This will install the composable in the path defined by your `components.json` file, thanks to shadcn-vue.
 
 :::code-group{.w-full}
-  ```bash [yarn]
+```bash [yarn]
   npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-screen-share.json"
   ```
 
-  ```bash [npm]
+```bash [npm]
   npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-screen-share.json"
   ```
 
-  ```bash [pnpm]
+```bash [pnpm]
   pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-screen-share.json"
   ```
 
-  ```bash [bun]
+```bash [bun]
   bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-screen-share.json"
   ```
 :::
-
 
 ## Install Manually
 ::hr-underline
@@ -39,7 +36,6 @@ This will install the composable in the path defined by your `components.json` f
 Copy and paste these files into your project.
 
 :::code-tree{default-value="src/composables/use-screen-share/useScreenShare.ts"}
-
 
 ```ts [src/composables/use-screen-share/useScreenShare.ts]
 import { ref, computed, onBeforeUnmount } from "vue";
@@ -218,35 +214,26 @@ export function useScreenShare(options: UseScreenShareOptions = {}) {
     stopScreenShare,
   };
 }
-
 ```
-
-
 :::
-
 
 ## useScreenShare
 ::hr-underline
 ::
-
 
 Composable for managing screen sharing functionality.
 
 This composable provides reactive state and methods for screen sharing
 using the getDisplayMedia API.
 
-
   ### Parameters
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `options`{.primary .text-primary} | `UseScreenShareOptions` | {} | — |
 
-
   ### Returns
 
-
 The reactive state and methods for screen sharing.
-
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -258,7 +245,6 @@ The reactive state and methods for screen sharing.
 | `startScreenShare`{.primary .text-primary} | `ScreenShareStartFn` | Function to start screen sharing. |
 | `stopScreenShare`{.primary .text-primary} | `ScreenShareStopFn` | Function to stop screen sharing. |
 
-
   ### Types
 | Name | Type | Description |
 |------|------|-------------|
@@ -269,9 +255,7 @@ The reactive state and methods for screen sharing.
 | `ScreenShareStopFn`{.primary .text-primary} | `type` | — |
 | `UseScreenShareOptions`{.primary .text-primary} | `interface` | — |
 
-
 ---
-
 
 ::tip
 You can copy and adapt this template for any composable documentation.

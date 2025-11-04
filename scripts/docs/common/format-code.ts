@@ -17,7 +17,8 @@ export async function formatVueSfcWithPug(code: string): Promise<string> {
   let formattedTemplate = '';
   if (templateMatch) {
     const templatePug = templateMatch[1] || '';
-    formattedTemplate = '<template lang="pug">\n' +
+    formattedTemplate =
+      '<template lang="pug">\n' +
       templatePug
         .split('\n')
         .map((line) => {
@@ -75,7 +76,9 @@ export async function formatCode(code: string, filename: string): Promise<string
   else if (filename.endsWith('.md')) parser = 'markdown';
   else if (filename.endsWith('.html')) parser = 'html';
   try {
-    return await prettier.format(code, { parser });
+    const formatted = await prettier.format(code, { parser });
+    // Supprime la ligne vide finale ajoutée par Prettier
+    return formatted.replace(/\n+$/, '\n');
   } catch (e) {
     return code; // Si erreur, retourne le code brut
   }

@@ -3,14 +3,13 @@ title: ControlButton
 description: A 1:1 aspect ratio button component.
 ---
 
-
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
     <control-button-demo />
   :::
 
   :::tabs-item{icon="i-lucide-code" label="Code"}
-  ```vue
+```vue
 <script setup lang="ts">
 import {
   ControlButton,
@@ -42,11 +41,9 @@ import { Separator } from "@/components/ui/separator";
     <ControlButton shape="square" variant="outline" size="lg"> </ControlButton>
   </div>
 </template>
-
-  ```
+```
   :::
 ::
-
 
 ## Install with CLI
 ::hr-underline
@@ -55,23 +52,22 @@ import { Separator } from "@/components/ui/separator";
 This will install the component in the path defined by your `components.json` file, thanks to shadcn-vue.
 
 :::code-group{.w-full}
-  ```bash [yarn]
+```bash [yarn]
   npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/control-button.json"
   ```
 
-  ```bash [npm]
+```bash [npm]
   npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/control-button.json"
   ```
 
-  ```bash [pnpm]
+```bash [pnpm]
   pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/control-button.json"
   ```
 
-  ```bash [bun]
+```bash [bun]
   bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/control-button.json"
   ```
 :::
-
 
 ## Install Manually
 ::hr-underline
@@ -80,7 +76,6 @@ This will install the component in the path defined by your `components.json` fi
 Copy and paste these files into your project.
 
 :::code-tree{default-value="src/components/ui/control-button/index.ts"}
-
 
 ```ts [src/components/ui/control-button/index.ts]
 import type { VariantProps } from "class-variance-authority";
@@ -124,7 +119,6 @@ export const buttonVariants = cva(
 export type ControlButtonVariants = VariantProps<typeof buttonVariants>;
 export { type ControlButtonProps } from "./ControlButton.vue";
 export { type ControlButtonLabelProps } from "./ControlButtonLabel.vue";
-
 ```
 
 ```vue [src/components/ui/control-button/ControlButton.vue]
@@ -164,7 +158,6 @@ const props = withDefaults(defineProps<ControlButtonProps>(), {
     <slot />
   </div>
 </template>
-
 ```
 
 ```vue [src/components/ui/control-button/ControlButtonLabel.vue]
@@ -188,20 +181,14 @@ const props = defineProps<ControlButtonLabelProps>();
     </Label>
   </div>
 </template>
-
 ```
-
-
 :::
-
 
 ## ControlButton
 ::hr-underline
 ::
 
-
 **API**: composition
-
 
 ### Variants
 **ControlButtonVariants**
@@ -211,7 +198,6 @@ const props = defineProps<ControlButtonLabelProps>();
 |`size`{.primary .text-primary} | `default`{.mr-2} `sm`{.mr-2} `lg`{.mr-2} |
 |`shape`{.primary .text-primary} | `square`{.mr-2} `circle`{.mr-2} |
 
-
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
@@ -220,48 +206,38 @@ const props = defineProps<ControlButtonLabelProps>();
 | `shape`{.primary .text-primary} | `ControlButtonVariants['shape']` | square |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
-
   ### Slots
 | Name | Description |
 |------|-------------|
 | `default`{.primary .text-primary} | Typically a ControlButtonLabel |
 
-
   ### Child Components
 
   `Primitive`{.primary .text-primary}
 
-
 ---
-
 
 ## ControlButtonLabel
 ::hr-underline
 ::
 
-
 **API**: composition
-
 
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
-
   ### Slots
 | Name | Description |
 |------|-------------|
 | `default`{.primary .text-primary} | — |
 
-
   ### Child Components
 
   `Label`{.primary .text-primary}
 
-
 ---
-
 
 ::tip
 You can copy and adapt this template for any component documentation.

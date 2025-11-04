@@ -45,13 +45,14 @@ This will install the component in the path defined by your `components.json` fi
 Copy and paste these files into your project.
 
 :::code-tree{default-value="<%- codeTreeDefaultValue %>"}
-<% if (typeof codes !== 'undefined' && Array.isArray(codes)) { %>
-<% codes.forEach(function(code) { %>
+<%_ if (typeof codes !== 'undefined' && Array.isArray(codes)) { _%>
+<%_ codes.forEach(function(code) { _%>
+
 ```<%- code.lang %> [<%- codeBasePath %>/<%- code.filename %>]
-<%- code.code %>
+<%- code.code -%>
 ```
-<% }); %>
-<% } %>
+<%_ }); _%>
+<%_ } _%>
 :::
 
 <% if (typeof files !== 'undefined' && Array.isArray(files)) { %>

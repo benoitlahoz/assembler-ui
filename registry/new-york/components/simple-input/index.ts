@@ -9,5 +9,6 @@
  * -- Example
  * -- A very simple example of SimpleInput usage.
  */
+
 export { default as SimpleInput } from './SimpleInput.vue';
 export { default as SimpleInputSetup } from './SimpleInputSetup.vue';
