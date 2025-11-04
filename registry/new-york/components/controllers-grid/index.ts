@@ -3,8 +3,10 @@
  *
  * @type registry:ui
  * @category controls
+ *
  * @demo SimpleExample
  * @demo AdvancedExample
+ * @demo ControlRegistryDemo
  */
 
 export { default as ControllersGrid } from './ControllersGrid.vue';

@@ -1,6 +1,6 @@
 ---
 title: ControlButton
-description: A 1:1 aspect ratio button component.
+description: A 1:1 aspect ratio button component for grid-based layouts.
 ---
 
 ::tabs
@@ -11,36 +11,242 @@ description: A 1:1 aspect ratio button component.
   :::tabs-item{icon="i-lucide-code" label="Code"}
 ```vue
 <script setup lang="ts">
-import {
-  ControlButton,
-  ControlButtonLabel,
-} from "@/components/ui/control-button";
-import { Separator } from "@/components/ui/separator";
+import { ref, shallowRef } from "vue";
+import { ControlButton } from "@/components/ui/control-button";
+import { ControllersGrid } from "~~/registry/new-york/components/controllers-grid";
+
+const GridControlButton = {
+  props: [
+    "id",
+    "width",
+    "height",
+    "color",
+    "variant",
+    "shape",
+    "icon",
+    "label",
+  ],
+  setup(props: any) {
+    const isActive = ref(false);
+
+    const toggle = () => {
+      isActive.value = !isActive.value;
+      console.log(
+        `Button ${props.label || props.id} ${isActive.value ? "activated" : "deactivated"}`,
+      );
+    };
+
+    return { isActive, toggle };
+  },
+  template: `
+    <ControlButton 
+      :color="color" 
+      :variant="variant || 'default'" 
+      :shape="shape || 'square'"
+      :class="{ 'ring-2 ring-offset-2': isActive }"
+      @click="toggle"
+    >
+      <span v-if="icon" class="text-lg">{{ icon }}</span>
+      <span v-else-if="label" class="text-xs font-bold">{{ label }}</span>
+    </ControlButton>
+  `,
+};
+
+const gridItems = ref([
+  {
+    id: "btn-1",
+    x: 0,
+    y: 0,
+    width: 1,
+    height: 1,
+    component: shallowRef(GridControlButton),
+    color: "#3b82f6",
+    variant: "default",
+    shape: "square",
+    icon: "▶",
+  },
+  {
+    id: "btn-2",
+    x: 1,
+    y: 0,
+    width: 1,
+    height: 1,
+    component: shallowRef(GridControlButton),
+    color: "#ef4444",
+    variant: "default",
+    shape: "square",
+    icon: "■",
+  },
+  {
+    id: "btn-3",
+    x: 2,
+    y: 0,
+    width: 1,
+    height: 1,
+    component: shallowRef(GridControlButton),
+    color: "#8b5cf6",
+    variant: "outline",
+    shape: "circle",
+    icon: "●",
+  },
+  {
+    id: "btn-4",
+    x: 0,
+    y: 1,
+    width: 2,
+    height: 1,
+    component: shallowRef(GridControlButton),
+    color: "#10b981",
+    variant: "default",
+    shape: "square",
+    label: "WIDE",
+  },
+]);
+
+const buttonPalette = ref([
+  {
+    id: "new-square",
+    width: 1,
+    height: 1,
+    component: shallowRef(GridControlButton),
+    color: "#f59e0b",
+    variant: "default",
+    shape: "square",
+    icon: "★",
+  },
+  {
+    id: "new-circle",
+    width: 1,
+    height: 1,
+    component: shallowRef(GridControlButton),
+    color: "#ec4899",
+    variant: "outline",
+    shape: "circle",
+    icon: "♥",
+  },
+  {
+    id: "new-tall",
+    width: 1,
+    height: 2,
+    component: shallowRef(GridControlButton),
+    color: "#06b6d4",
+    variant: "ghost",
+    shape: "square",
+    label: "TALL",
+  },
+  {
+    id: "new-big",
+    width: 2,
+    height: 2,
+    component: shallowRef(GridControlButton),
+    color: "#a855f7",
+    variant: "solid",
+    shape: "square",
+    icon: "✦",
+  },
+]);
+
+const handleItemPlaced = (item: any) => {
+  console.log("Item placed:", item);
+};
+
+const handleItemMoved = (item: any) => {
+  console.log("Item moved:", item);
+};
+
+const handleItemRemoved = (id: string) => {
+  console.log("Item removed:", id);
+};
 </script>
 
 <template>
-  <div class="flex items-center justify-center h-128 gap-4">
-    <ControlButton shape="square" size="sm">
-      <ControlButtonLabel class="text-sm font-bold pt-2"
-        ># 1</ControlButtonLabel
-      >
-    </ControlButton>
-    <ControlButton shape="square" size="default" variant="destructive">
-      <ControlButtonLabel class="text-sm font-bold pt-2"
-        ># 2</ControlButtonLabel
-      >
-    </ControlButton>
-    <ControlButton shape="circle" variant="secondary">
-      <ControlButtonLabel class="text-sm font-bold pt-2"
-        ># 3</ControlButtonLabel
-      >
-    </ControlButton>
-    <div class="h-24">
-      <Separator orientation="vertical" class="mx-4" />
+  <div class="flex flex-col gap-6 p-6">
+    <div class="space-y-2">
+      <h3 class="text-lg font-semibold">Control Buttons dans la grille</h3>
+      <p class="text-sm text-muted-foreground">
+        Glissez-déposez les boutons depuis la palette vers la grille, ou
+        déplacez-les dans la grille.
+      </p>
     </div>
-    <ControlButton shape="square" variant="outline" size="lg"> </ControlButton>
+
+    <div class="space-y-2">
+      <h4 class="text-sm font-medium">Palette de contrôles</h4>
+      <div class="flex gap-3 p-4 bg-muted/30 rounded-lg border border-border">
+        <div
+          v-for="btn in buttonPalette"
+          :key="btn.id"
+          class="control-palette-item cursor-grab active:cursor-grabbing"
+          :draggable="true"
+          :style="{
+            width: `${btn.width * 80 + (btn.width - 1) * 8}px`,
+            height: `${btn.height * 80 + (btn.height - 1) * 8}px`,
+          }"
+          @dragstart="
+            (e) => {
+              e.dataTransfer!.effectAllowed = 'copy';
+              e.dataTransfer!.setData(
+                'application/json',
+                JSON.stringify({
+                  ...btn,
+                  id: btn.id + '-' + Date.now(),
+                }),
+              );
+            }
+          "
+        >
+          <component
+            :is="btn.component"
+            v-bind="btn"
+            class="pointer-events-none"
+          />
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-2">
+      <h4 class="text-sm font-medium">Grille de contrôles</h4>
+      <ControllersGrid
+        v-model:items="gridItems"
+        :cell-size="80"
+        :gap="8"
+        :min-columns="4"
+        @item-placed="handleItemPlaced"
+        @item-moved="handleItemMoved"
+        @item-removed="handleItemRemoved"
+      />
+    </div>
+
+    <div class="text-xs text-muted-foreground space-y-1">
+      <p>• Cliquez sur un bouton pour l'activer/désactiver (ring visuel)</p>
+      <p>• Glissez depuis la palette pour ajouter de nouveaux contrôles</p>
+      <p>• Glissez dans la grille pour réorganiser</p>
+      <p>
+        • Survolez un bouton dans la grille et cliquez sur × pour le supprimer
+      </p>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.control-palette-item {
+  position: relative;
+  border-radius: 0.5rem;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+}
+
+.control-palette-item:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.control-palette-item:active {
+  transform: scale(0.95);
+}
+</style>
 ```
   :::
 ::
@@ -85,23 +291,15 @@ export { default as ControlButton } from "./ControlButton.vue";
 export { default as ControlButtonLabel } from "./ControlButtonLabel.vue";
 
 export const buttonVariants = cva(
-  "aspect-square w-auto h-auto min-w-0 min-h-0 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  "aspect-square w-auto h-auto min-w-0 min-h-0 inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
   {
     variants: {
       variant: {
-        default:
-          "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
-        destructive:
-          "bg-destructive text-white shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+        default: "shadow-xs hover:brightness-90",
         outline:
-          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
-        secondary:
-          "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80",
-      },
-      size: {
-        default: "size-9",
-        sm: "size-8",
-        lg: "size-10",
+          "border border-current/20 bg-transparent shadow-xs hover:bg-current/10 dark:border-current/30 dark:hover:bg-current/20",
+        ghost: "bg-transparent hover:bg-current/10",
+        solid: "shadow-xs hover:brightness-90",
       },
       shape: {
         square: "rounded-md",
@@ -110,7 +308,6 @@ export const buttonVariants = cva(
     },
     defaultVariants: {
       variant: "default",
-      size: "default",
       shape: "square",
     },
   },
@@ -129,34 +326,54 @@ import type { ControlButtonVariants } from ".";
 import { Primitive } from "reka-ui";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from ".";
-
-import { ControlButtonLabel } from "@/components/ui/control-button";
+import { computed } from "vue";
 
 export interface ControlButtonProps extends PrimitiveProps {
   variant?: ControlButtonVariants["variant"];
-  size?: ControlButtonVariants["size"];
   shape?: ControlButtonVariants["shape"];
+  color?: string;
   class?: HTMLAttributes["class"];
 }
 
 const props = withDefaults(defineProps<ControlButtonProps>(), {
   as: "button",
   shape: "square",
+  variant: "default",
+});
+
+const colorStyle = computed(() => {
+  if (!props.color) return {};
+
+  const isVariable = props.color.startsWith("--");
+  const colorValue = isVariable ? `var(${props.color})` : props.color;
+
+  return {
+    "--button-color": colorValue,
+    "background-color":
+      props.variant === "outline" || props.variant === "ghost"
+        ? "transparent"
+        : colorValue,
+    color:
+      props.variant === "outline" || props.variant === "ghost"
+        ? colorValue
+        : "white",
+    "border-color": props.variant === "outline" ? colorValue : undefined,
+  };
 });
 </script>
 
 <template>
-  <div class="flex flex-col items-center justify-center">
-    <Primitive
-      data-slot="button"
-      :as="as"
-      :as-child="asChild"
-      :class="cn(buttonVariants({ variant, size, shape }), props.class)"
-    >
-    </Primitive>
-
+  <Primitive
+    data-slot="button"
+    :as="as"
+    :as-child="asChild"
+    :class="
+      cn(buttonVariants({ variant, shape }), 'w-full h-full', props.class)
+    "
+    :style="colorStyle"
+  >
     <slot />
-  </div>
+  </Primitive>
 </template>
 ```
 
@@ -194,22 +411,21 @@ const props = defineProps<ControlButtonLabelProps>();
 **ControlButtonVariants**
 | Name | Values |
 |------|--------|
-|`variant`{.primary .text-primary} | `default`{.mr-2} `destructive`{.mr-2} `outline`{.mr-2} `secondary`{.mr-2} |
-|`size`{.primary .text-primary} | `default`{.mr-2} `sm`{.mr-2} `lg`{.mr-2} |
+|`variant`{.primary .text-primary} | `default`{.mr-2} `outline`{.mr-2} `ghost`{.mr-2} `solid`{.mr-2} |
 |`shape`{.primary .text-primary} | `square`{.mr-2} `circle`{.mr-2} |
 
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `variant`{.primary .text-primary} | `ControlButtonVariants['variant']` | - |  |
-| `size`{.primary .text-primary} | `ControlButtonVariants['size']` | - |  |
+| `variant`{.primary .text-primary} | `ControlButtonVariants['variant']` | default |  |
 | `shape`{.primary .text-primary} | `ControlButtonVariants['shape']` | square |  |
+| `color`{.primary .text-primary} | `string` | - |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
   ### Slots
 | Name | Description |
 |------|-------------|
-| `default`{.primary .text-primary} | Typically a ControlButtonLabel |
+| `default`{.primary .text-primary} | — |
 
   ### Child Components
 
