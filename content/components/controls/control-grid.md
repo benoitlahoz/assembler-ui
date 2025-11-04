@@ -387,7 +387,12 @@ export const ControlGridGetRegisteredComponentsKey: InjectionKey<
 ```vue [src/components/ui/control-grid/ControlGrid.vue]
 <script setup lang="ts">
 import { provide, watch, onMounted, computed, ref, type Ref } from "vue";
-import { useElementSize } from "@vueuse/core";
+import {
+  useElementSize,
+  useElementBounding,
+  useMouse,
+  useEventListener,
+} from "@vueuse/core";
 import {
   ControlGridItemsKey,
   ControlGridConfigKey,
@@ -452,10 +457,13 @@ const dragState = ref<DragState>({
   isValid: false,
 });
 const previewSize = ref<{ width: number; height: number } | null>(null);
+const draggedElement = ref<HTMLElement | null>(null);
 
 const componentRegistry = ref<Map<string, any>>(new Map());
 
 const { width: gridWidth, height: gridHeight } = useElementSize(gridContainer);
+const gridBounds = useElementBounding(gridContainer);
+const { x: mouseX, y: mouseY } = useMouse();
 
 const gridConfig = computed<GridConfig>(() => {
   const cols = Math.floor(gridWidth.value / (props.cellSize + props.gap));
@@ -534,15 +542,90 @@ const findAvailablePosition = (
   return null;
 };
 
+const getGridPositionByIntersection = (elementBounds: {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}): { x: number; y: number } | null => {
+  if (!gridContainer.value) return null;
+
+  let maxIntersectionArea = 0;
+  let bestPosition = { x: 0, y: 0 };
+
+  const startX = Math.max(
+    0,
+    Math.floor(
+      (elementBounds.left - gridBounds.left.value - props.gap) /
+        (props.cellSize + props.gap),
+    ),
+  );
+  const endX = Math.min(
+    columns.value - 1,
+    Math.ceil(
+      (elementBounds.right - gridBounds.left.value - props.gap) /
+        (props.cellSize + props.gap),
+    ),
+  );
+  const startY = Math.max(
+    0,
+    Math.floor(
+      (elementBounds.top - gridBounds.top.value - props.gap) /
+        (props.cellSize + props.gap),
+    ),
+  );
+  const endY = Math.min(
+    rows.value - 1,
+    Math.ceil(
+      (elementBounds.bottom - gridBounds.top.value - props.gap) /
+        (props.cellSize + props.gap),
+    ),
+  );
+
+  for (let y = startY; y <= endY; y++) {
+    for (let x = startX; x <= endX; x++) {
+      const cellLeft =
+        gridBounds.left.value + props.gap + x * (props.cellSize + props.gap);
+      const cellTop =
+        gridBounds.top.value + props.gap + y * (props.cellSize + props.gap);
+      const cellRight = cellLeft + props.cellSize;
+      const cellBottom = cellTop + props.cellSize;
+
+      const intersectionLeft = Math.max(elementBounds.left, cellLeft);
+      const intersectionTop = Math.max(elementBounds.top, cellTop);
+      const intersectionRight = Math.min(elementBounds.right, cellRight);
+      const intersectionBottom = Math.min(elementBounds.bottom, cellBottom);
+
+      const intersectionWidth = Math.max(
+        0,
+        intersectionRight - intersectionLeft,
+      );
+      const intersectionHeight = Math.max(
+        0,
+        intersectionBottom - intersectionTop,
+      );
+      const intersectionArea = intersectionWidth * intersectionHeight;
+
+      if (intersectionArea > maxIntersectionArea) {
+        maxIntersectionArea = intersectionArea;
+        bestPosition = { x, y };
+      }
+    }
+  }
+
+  return maxIntersectionArea > 0 ? bestPosition : null;
+};
+
 const getGridPosition = (
   clientX: number,
   clientY: number,
 ): { x: number; y: number } => {
   if (!gridContainer.value) return { x: 0, y: 0 };
 
-  const rect = gridContainer.value.getBoundingClientRect();
-  const relativeX = clientX - rect.left - props.gap;
-  const relativeY = clientY - rect.top - props.gap;
+  const relativeX = clientX - gridBounds.left.value - props.gap;
+  const relativeY = clientY - gridBounds.top.value - props.gap;
 
   const x = Math.floor(relativeX / (props.cellSize + props.gap));
   const y = Math.floor(relativeY / (props.cellSize + props.gap));
@@ -627,6 +710,8 @@ const handleDragStart = (
   dragState.value.fromGrid = fromGrid;
   previewSize.value = { width: item.width, height: item.height };
 
+  draggedElement.value = event.target as HTMLElement;
+
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("application/json", JSON.stringify(item));
@@ -652,7 +737,29 @@ const handleDragOver = (event: DragEvent) => {
     }
   }
 
-  const pos = getGridPosition(event.clientX, event.clientY);
+  let pos: { x: number; y: number } | null = null;
+
+  if (dragState.value.item && draggedElement.value) {
+    const itemWidth =
+      dragState.value.item.width * (props.cellSize + props.gap) - props.gap;
+    const itemHeight =
+      dragState.value.item.height * (props.cellSize + props.gap) - props.gap;
+
+    const virtualBounds = {
+      left: event.clientX - itemWidth / 2,
+      top: event.clientY - itemHeight / 2,
+      right: event.clientX + itemWidth / 2,
+      bottom: event.clientY + itemHeight / 2,
+      width: itemWidth,
+      height: itemHeight,
+    };
+
+    pos = getGridPositionByIntersection(virtualBounds);
+  }
+
+  if (!pos) {
+    pos = getGridPosition(event.clientX, event.clientY);
+  }
 
   if (dragState.value.item) {
     const excludeId = dragState.value.fromGrid
@@ -712,6 +819,7 @@ const handleDragEnd = () => {
   dragState.value.hoverPosition = null;
   dragState.value.isValid = false;
   previewSize.value = null;
+  draggedElement.value = null;
 };
 
 const handleDrop = (event: DragEvent) => {
