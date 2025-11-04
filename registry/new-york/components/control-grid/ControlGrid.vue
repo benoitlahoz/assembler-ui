@@ -33,6 +33,9 @@ import {
   GridUtils,
 } from '.';
 
+// Détection du côté client
+const isClient = typeof window !== 'undefined';
+
 export interface ControlGridProps {
   /**
    * Base size of a cell in pixels.
@@ -94,6 +97,9 @@ const dragState = ref<DragState>({
 });
 const previewSize = ref<{ width: number; height: number } | null>(null);
 const isDragging = ref(false);
+
+// Offset du clic initial pour un drag précis
+const dragOffset = ref<{ x: number; y: number } | null>(null);
 
 // Map pour stocker les refs des items
 const itemRefs = ref<Map<string, HTMLElement>>(new Map());
@@ -340,14 +346,16 @@ const addItem = (item: Omit<GridItem, 'x' | 'y'>): GridItem | null => {
     const newItem: GridItem = { ...item, ...position } as GridItem;
     placedItems.value.push(newItem);
 
-    // Déclencher l'animation de placement
-    nextTick(() => {
-      const el = itemRefs.value.get(newItem.id);
-      if (el) {
-        const motion = useMotion(el, itemVariants);
-        motion.apply('placed');
-      }
-    });
+    // Déclencher l'animation de placement (seulement côté client)
+    if (isClient) {
+      nextTick(() => {
+        const el = itemRefs.value.get(newItem.id);
+        if (el) {
+          const motion = useMotion(el, itemVariants);
+          motion.apply('placed');
+        }
+      });
+    }
 
     emit('item-placed', newItem);
     emit('update:items', placedItems.value);
@@ -411,10 +419,24 @@ const getRegisteredComponents = (): string[] => {
 
 // Drag and Drop handlers avec useDraggable
 const handleDragStart = (event: DragEvent, item: GridItem, fromGrid = false) => {
+  if (!dragState.value) return;
+
   dragState.value.item = { ...item };
   dragState.value.fromGrid = fromGrid;
   previewSize.value = { width: item.width, height: item.height };
   isDragging.value = true;
+
+  // Calculer l'offset du clic par rapport au coin supérieur gauche de l'élément
+  if (event.target instanceof HTMLElement && gridContainer.value) {
+    const targetRect = event.target.getBoundingClientRect();
+    const gridRect = gridContainer.value.getBoundingClientRect();
+
+    // Position du clic relative à l'élément
+    const offsetX = event.clientX - targetRect.left;
+    const offsetY = event.clientY - targetRect.top;
+
+    dragOffset.value = { x: offsetX, y: offsetY };
+  }
 
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = 'move';
@@ -424,6 +446,8 @@ const handleDragStart = (event: DragEvent, item: GridItem, fromGrid = false) => 
 
 const handleDragOver = (event: DragEvent) => {
   event.preventDefault();
+
+  if (!dragState.value) return;
 
   if (!dragState.value.item && event.dataTransfer) {
     const types = event.dataTransfer.types;
@@ -445,15 +469,19 @@ const handleDragOver = (event: DragEvent) => {
   let pos: { x: number; y: number } | null = null;
 
   if (dragState.value.item) {
-    // Créer un rectangle virtuel centré sur la souris avec les dimensions de l'item
+    // Créer un rectangle virtuel basé sur l'offset du clic initial
     const itemWidth = dragState.value.item.width * (props.cellSize + props.gap) - props.gap;
     const itemHeight = dragState.value.item.height * (props.cellSize + props.gap) - props.gap;
 
+    // Utiliser l'offset du clic ou centrer par défaut
+    const offsetX = dragOffset.value?.x ?? itemWidth / 2;
+    const offsetY = dragOffset.value?.y ?? itemHeight / 2;
+
     const virtualBounds = {
-      left: event.clientX - itemWidth / 2,
-      top: event.clientY - itemHeight / 2,
-      right: event.clientX + itemWidth / 2,
-      bottom: event.clientY + itemHeight / 2,
+      left: event.clientX - offsetX,
+      top: event.clientY - offsetY,
+      right: event.clientX - offsetX + itemWidth,
+      bottom: event.clientY - offsetY + itemHeight,
       width: itemWidth,
       height: itemHeight,
     };
@@ -497,6 +525,8 @@ const handleDragOver = (event: DragEvent) => {
 };
 
 const handleDragLeave = (event: DragEvent) => {
+  if (!dragState.value) return;
+
   const relatedTarget = event.relatedTarget as HTMLElement | null;
   if (!relatedTarget || !gridContainer.value?.contains(relatedTarget)) {
     hoverCell.value = null;
@@ -517,6 +547,8 @@ const handleDragEnter = (event: DragEvent) => {
 };
 
 const handleDragEnd = () => {
+  if (!dragState.value) return;
+
   dragState.value.item = null;
   hoverCell.value = null;
   dragState.value.fromGrid = false;
@@ -524,12 +556,18 @@ const handleDragEnd = () => {
   dragState.value.isValid = false;
   previewSize.value = null;
   isDragging.value = false;
+  dragOffset.value = null; // Réinitialiser l'offset
 };
 
 const handleDrop = (event: DragEvent) => {
   event.preventDefault();
 
-  let itemToDrop: GridItem | null = dragState.value.item;
+  if (!dragState.value) {
+    console.warn('dragState is not initialized');
+    return;
+  }
+
+  let itemToDrop: GridItem | null = dragState.value.item ?? null;
 
   if (!itemToDrop && event.dataTransfer) {
     try {
@@ -552,7 +590,7 @@ const handleDrop = (event: DragEvent) => {
     return;
   }
 
-  const excludeId = dragState.value.fromGrid ? itemToDrop.id : undefined;
+  const excludeId = dragState.value?.fromGrid ? itemToDrop.id : undefined;
   if (
     !isValidPlacement(
       hoverCell.value.x,
@@ -573,12 +611,29 @@ const handleDrop = (event: DragEvent) => {
     y: hoverCell.value.y,
   };
 
-  if (dragState.value.fromGrid) {
+  if (dragState.value?.fromGrid) {
     const index = placedItems.value.findIndex((item) => item.id === newItem.id);
     if (index !== -1) {
       placedItems.value[index] = newItem;
 
-      // Animation de déplacement
+      // Animation de déplacement (seulement côté client)
+      if (isClient) {
+        nextTick(() => {
+          const el = itemRefs.value.get(newItem.id);
+          if (el) {
+            const motion = useMotion(el, itemVariants);
+            motion.apply('placed');
+          }
+        });
+      }
+
+      emit('item-moved', newItem);
+    }
+  } else {
+    placedItems.value.push(newItem);
+
+    // Animation d'apparition (seulement côté client)
+    if (isClient) {
       nextTick(() => {
         const el = itemRefs.value.get(newItem.id);
         if (el) {
@@ -586,20 +641,7 @@ const handleDrop = (event: DragEvent) => {
           motion.apply('placed');
         }
       });
-
-      emit('item-moved', newItem);
     }
-  } else {
-    placedItems.value.push(newItem);
-
-    // Animation d'apparition
-    nextTick(() => {
-      const el = itemRefs.value.get(newItem.id);
-      if (el) {
-        const motion = useMotion(el, itemVariants);
-        motion.apply('placed');
-      }
-    });
 
     emit('item-placed', newItem);
   }
@@ -736,14 +778,11 @@ defineExpose({
         <div
           v-if="hoverCell && (dragState.item || previewSize)"
           ref="previewRef"
-          v-motion
-          :initial="previewVariants.initial"
-          :enter="previewVariants.enter"
           :class="[
-            'rounded-lg pointer-events-none',
+            'rounded-lg pointer-events-none transition-all duration-200',
             dragState.isValid
-              ? 'bg-primary/10 border-2 border-dashed border-primary'
-              : 'bg-destructive/10 border-2 border-dashed border-destructive',
+              ? 'bg-primary/10 border-2 border-dashed border-primary animate-fade-in'
+              : 'bg-destructive/10 border-2 border-dashed border-destructive animate-pulse',
           ]"
           :style="{
             gridColumn: `${hoverCell.x + 1} / span ${dragState.item?.width || previewSize?.width || 1}`,
@@ -755,9 +794,7 @@ defineExpose({
           v-for="item in placedItems"
           :key="item.id"
           :ref="(el) => el && itemRefs.set(item.id, el as HTMLElement)"
-          v-motion
-          :initial="itemVariants.initial"
-          class="grid-item-wrapper relative cursor-move select-none"
+          class="grid-item-wrapper relative cursor-move select-none transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg active:cursor-grabbing active:scale-105 active:opacity-70"
           :draggable="true"
           :style="{
             gridColumn: `${item.x + 1} / span ${item.width}`,
@@ -765,18 +802,6 @@ defineExpose({
           }"
           @dragstart.stop="handleDragStart($event, item, true)"
           @dragend.stop="handleDragEnd"
-          @mouseenter="
-            (e) => {
-              const motion = useMotion(e.currentTarget as HTMLElement, itemVariants);
-              motion.apply('hover');
-            }
-          "
-          @mouseleave="
-            (e) => {
-              const motion = useMotion(e.currentTarget as HTMLElement, itemVariants);
-              motion.apply('initial');
-            }
-          "
         >
           <div
             class="relative w-full h-full bg-card/50 border border-border rounded overflow-hidden flex flex-col"
@@ -837,6 +862,21 @@ defineExpose({
 </template>
 
 <style scoped>
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 200ms ease-out;
+}
+
 .grid-item-wrapper:active {
   cursor: grabbing;
 }
