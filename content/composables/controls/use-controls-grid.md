@@ -7,7 +7,7 @@ description: Composable pour gérer l&#39;état et les opérations d&#39;une gri
 ::hr-underline
 ::
 
-This will install the component in the path defined by your `components.json` file, thanks to shadcn-vue.
+This will install the composable in the path defined by your `components.json` file, thanks to shadcn-vue.
 
 :::code-group{.w-full}
 ```bash [yarn]
@@ -33,9 +33,9 @@ This will install the component in the path defined by your `components.json` fi
 
 Copy and paste these files into your project.
 
-:::code-tree{default-value="src/components/ui/use-controls-grid/useControlsGrid.ts"}
+:::code-tree{default-value="src/composables/use-controls-grid/useControlsGrid.ts"}
 
-```ts [src/components/ui/use-controls-grid/useControlsGrid.ts]
+```ts [src/composables/use-controls-grid/useControlsGrid.ts]
 import { ref, computed } from "vue";
 import type { GridItem } from "../../components/controls-grid";
 import { GridUtils } from "../../components/controls-grid";
@@ -227,14 +227,43 @@ export function useControlsGrid(initialItems: GridItem[] = []) {
 ```
 :::
 
-## useControlsGrid
+## API
 ::hr-underline
 ::
 
-Composable pour gérer l&#39;état et les opérations d&#39;une grille de contrôles
+  ### Parameters
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `initialItems`{.primary .text-primary} | `GridItem[]` | [] | — |
+
+  ### Returns
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `items`{.primary .text-primary} | `Ref<GridItem[]>` | État |
+| `selectedItemId`{.primary .text-primary} | `Ref<string \| null>` | — |
+| `selectedItem`{.primary .text-primary} | `ComputedRef<any>` | — |
+| `canUndo`{.primary .text-primary} | `ComputedRef<any>` | — |
+| `canRedo`{.primary .text-primary} | `ComputedRef<any>` | — |
+| `totalArea`{.primary .text-primary} | `ComputedRef<any>` | — |
+| `addItem`{.primary .text-primary} | `any` | Méthodes |
+| `removeItem`{.primary .text-primary} | `any` | — |
+| `updateItem`{.primary .text-primary} | `any` | — |
+| `clearItems`{.primary .text-primary} | `any` | — |
+| `selectItem`{.primary .text-primary} | `any` | — |
+| `duplicateItem`{.primary .text-primary} | `any` | — |
+| `undo`{.primary .text-primary} | `any` | — |
+| `redo`{.primary .text-primary} | `any` | — |
+| `exportConfig`{.primary .text-primary} | `any` | — |
+| `importConfig`{.primary .text-primary} | `any` | — |
+| `saveToLocalStorage`{.primary .text-primary} | `any` | — |
+| `loadFromLocalStorage`{.primary .text-primary} | `any` | — |
+| `sortItems`{.primary .text-primary} | `any` | — |
+| `getItemById`{.primary .text-primary} | `any` | — |
+| `getItemsAtPosition`{.primary .text-primary} | `any` | — |
 
 ---
 
 ::tip
-You can copy and adapt this template for any component documentation.
+You can copy and adapt this template for any composable documentation.
 ::

@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { stripComments } from './docs/common/strip-comments';
+import { stripComments } from '../../docs/common/strip-comments';
 
 /**
  * Structure d'un import groupé par dossier

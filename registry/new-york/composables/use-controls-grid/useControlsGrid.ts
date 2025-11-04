@@ -1,7 +1,7 @@
 /**
  * Composable pour gérer l'état et les opérations d'une grille de contrôles
  *
- * @type registry:composable
+ * @type registry:hook
  * @category controls
  */
 

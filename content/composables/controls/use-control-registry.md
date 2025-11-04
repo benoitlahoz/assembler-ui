@@ -1,16 +1,48 @@
-/**
- * Control Registry Composable
- *
- * Gère l'enregistrement et la récupération de composants de contrôle
- * pour être utilisés dans ControlsGrid. Fusionne les fonctionnalités
- * de useControlRegistry et useComponentPalette.
- *
- * @type registry:hook
- * @category controls
- */
+---
+title: useControlRegistry
+description: Control Registry Composable
+---
 
-import { ref, shallowRef, type Component } from 'vue';
-import type { GridItem, GridItemTemplate } from '../../components/controls-grid';
+  <p class="text-pretty mt-4"><br>Gère l'enregistrement et la récupération de composants de contrôle<br>pour être utilisés dans ControlsGrid. Fusionne les fonctionnalités<br>de useControlRegistry et useComponentPalette.</p>
+
+## Install with CLI
+::hr-underline
+::
+
+This will install the composable in the path defined by your `components.json` file, thanks to shadcn-vue.
+
+:::code-group{.w-full}
+```bash [yarn]
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-control-registry.json"
+  ```
+
+```bash [npm]
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-control-registry.json"
+  ```
+
+```bash [pnpm]
+  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-control-registry.json"
+  ```
+
+```bash [bun]
+  bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-control-registry.json"
+  ```
+:::
+
+## Install Manually
+::hr-underline
+::
+
+Copy and paste these files into your project.
+
+:::code-tree{default-value="src/composables/use-control-registry/useControlRegistry.ts"}
+
+```ts [src/composables/use-control-registry/useControlRegistry.ts]
+import { ref, shallowRef, type Component } from "vue";
+import type {
+  GridItem,
+  GridItemTemplate,
+} from "../../components/controls-grid";
 
 export interface ControlDefinition {
   id: string;
@@ -25,7 +57,7 @@ export interface ControlDefinition {
   category?: string;
   icon?: string;
   color?: string;
-  /** Label affiché dans la palette */
+
   label?: string;
 }
 
@@ -45,20 +77,20 @@ const registeredControls = ref<Map<string, ControlDefinition>>(new Map());
 const itemCounter = ref(0);
 
 export function useControlRegistry() {
-  /**
-   * Enregistre un nouveau contrôle dans le registre
-   * Accepte soit une définition complète, soit un composant brut
-   */
   const registerControl = (
     definition: ControlDefinition | Component,
-    options?: Partial<Omit<ControlDefinition, 'component'>>
+    options?: Partial<Omit<ControlDefinition, "component">>,
   ) => {
     let controlDef: ControlDefinition;
 
-    // Si c'est un composant brut, créer une définition à partir des options
-    if ((typeof definition === 'object' && 'setup' in definition) || 'render' in definition) {
+    if (
+      (typeof definition === "object" && "setup" in definition) ||
+      "render" in definition
+    ) {
       if (!options?.id) {
-        console.error("Un ID est requis lors de l'enregistrement d'un composant brut");
+        console.error(
+          "Un ID est requis lors de l'enregistrement d'un composant brut",
+        );
         return;
       }
 
@@ -75,12 +107,13 @@ export function useControlRegistry() {
         label: options.label || options.name || options.id,
       };
     } else {
-      // C'est une définition complète
       controlDef = definition as ControlDefinition;
     }
 
     if (registeredControls.value.has(controlDef.id)) {
-      console.warn(`Control with id "${controlDef.id}" is already registered. Overwriting.`);
+      console.warn(
+        `Control with id "${controlDef.id}" is already registered. Overwriting.`,
+      );
     }
 
     registeredControls.value.set(controlDef.id, {
@@ -90,32 +123,24 @@ export function useControlRegistry() {
     });
   };
 
-  /**
-   * Enregistre plusieurs contrôles à la fois
-   */
   const registerControls = (definitions: (ControlDefinition | Component)[]) => {
     definitions.forEach((def) => {
-      if ('id' in def) {
+      if ("id" in def) {
         registerControl(def);
       } else {
         console.warn(
-          "Impossible d'enregistrer un composant brut sans options. Utilisez registerControl avec options."
+          "Impossible d'enregistrer un composant brut sans options. Utilisez registerControl avec options.",
         );
       }
     });
   };
 
-  /**
-   * Enregistre un contrôle à partir d'un fichier de composant
-   * Charge dynamiquement le composant et l'enregistre
-   */
   const registerControlFromFile = async (
     filePath: string,
-    options: Partial<Omit<ControlDefinition, 'component'>> & { id: string }
+    options: Partial<Omit<ControlDefinition, "component">> & { id: string },
   ): Promise<boolean> => {
     try {
-      // Import dynamique du composant
-      const module = await import(/* @vite-ignore */ filePath);
+      const module = await import(filePath);
       const component = module.default || module;
 
       if (!component) {
@@ -126,39 +151,30 @@ export function useControlRegistry() {
       registerControl(component, options);
       return true;
     } catch (error) {
-      console.error(`Erreur lors du chargement du composant depuis ${filePath}:`, error);
+      console.error(
+        `Erreur lors du chargement du composant depuis ${filePath}:`,
+        error,
+      );
       return false;
     }
   };
 
-  /**
-   * Récupère un contrôle par son ID
-   */
   const getControl = (id: string): ControlDefinition | undefined => {
     return registeredControls.value.get(id);
   };
 
-  /**
-   * Récupère tous les contrôles enregistrés
-   */
   const getAllControls = (): ControlDefinition[] => {
     return Array.from(registeredControls.value.values());
   };
 
-  /**
-   * Récupère les contrôles par catégorie
-   */
   const getControlsByCategory = (category: string): ControlDefinition[] => {
     return getAllControls().filter((control) => control.category === category);
   };
 
-  /**
-   * Crée une instance d'un contrôle pour la grille
-   */
   const createControlInstance = (
     controlId: string,
     position?: { x: number; y: number },
-    customProps?: Record<string, any>
+    customProps?: Record<string, any>,
   ): Partial<ControlInstance> | null => {
     const control = getControl(controlId);
     if (!control) {
@@ -186,11 +202,9 @@ export function useControlRegistry() {
     };
   };
 
-  /**
-   * Crée un item de grille à partir d'un template de contrôle
-   * Similaire à createItemFromTemplate de useComponentPalette
-   */
-  const createItemFromControl = (controlId: string): Omit<GridItem, 'x' | 'y'> | null => {
+  const createItemFromControl = (
+    controlId: string,
+  ): Omit<GridItem, "x" | "y"> | null => {
     const control = getControl(controlId);
     if (!control) {
       console.error(`Control with id "${controlId}" not found in registry`);
@@ -210,9 +224,6 @@ export function useControlRegistry() {
     };
   };
 
-  /**
-   * Convertit un contrôle en template de grille pour la palette
-   */
   const controlToTemplate = (controlId: string): GridItemTemplate | null => {
     const control = getControl(controlId);
     if (!control) {
@@ -232,9 +243,6 @@ export function useControlRegistry() {
     };
   };
 
-  /**
-   * Récupère tous les contrôles sous forme de templates pour la palette
-   */
   const getAllTemplates = (): GridItemTemplate[] => {
     return getAllControls().map((control) => ({
       id: control.id,
@@ -248,59 +256,82 @@ export function useControlRegistry() {
     }));
   };
 
-  /**
-   * Filtre les templates par taille maximale
-   */
-  const filterTemplatesBySize = (maxWidth: number, maxHeight: number): GridItemTemplate[] => {
+  const filterTemplatesBySize = (
+    maxWidth: number,
+    maxHeight: number,
+  ): GridItemTemplate[] => {
     return getAllTemplates().filter(
-      (template) => template.width <= maxWidth && template.height <= maxHeight
+      (template) => template.width <= maxWidth && template.height <= maxHeight,
     );
   };
 
-  /**
-   * Supprime un contrôle du registre
-   */
   const unregisterControl = (id: string): boolean => {
     return registeredControls.value.delete(id);
   };
 
-  /**
-   * Vide le registre
-   */
   const clearRegistry = () => {
     registeredControls.value.clear();
   };
 
-  /**
-   * Vérifie si un contrôle est enregistré
-   */
   const hasControl = (id: string): boolean => {
     return registeredControls.value.has(id);
   };
 
   return {
-    // Enregistrement de contrôles
     registerControl,
     registerControls,
     registerControlFromFile,
 
-    // Récupération de contrôles
     getControl,
     getAllControls,
     getControlsByCategory,
     hasControl,
 
-    // Création d'instances et items
     createControlInstance,
     createItemFromControl,
 
-    // Gestion de templates (palette)
     controlToTemplate,
     getAllTemplates,
     filterTemplatesBySize,
 
-    // Gestion du registre
     unregisterControl,
     clearRegistry,
   };
 }
+```
+:::
+
+## API
+::hr-underline
+::
+
+  ### Returns
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `registerControl`{.primary .text-primary} | `any` | Enregistrement de contrôles |
+| `registerControls`{.primary .text-primary} | `any` | — |
+| `registerControlFromFile`{.primary .text-primary} | `any` | — |
+| `getControl`{.primary .text-primary} | `any` | Récupération de contrôles |
+| `getAllControls`{.primary .text-primary} | `any` | — |
+| `getControlsByCategory`{.primary .text-primary} | `any` | — |
+| `hasControl`{.primary .text-primary} | `any` | — |
+| `createControlInstance`{.primary .text-primary} | `any` | Création d&#39;instances et items |
+| `createItemFromControl`{.primary .text-primary} | `any` | — |
+| `controlToTemplate`{.primary .text-primary} | `any` | Gestion de templates (palette) |
+| `getAllTemplates`{.primary .text-primary} | `any` | — |
+| `filterTemplatesBySize`{.primary .text-primary} | `any` | — |
+| `unregisterControl`{.primary .text-primary} | `any` | Gestion du registre |
+| `clearRegistry`{.primary .text-primary} | `any` | — |
+
+  ### Types
+| Name | Type | Description |
+|------|------|-------------|
+| `ControlDefinition`{.primary .text-primary} | `interface` | — |
+| `ControlInstance`{.primary .text-primary} | `interface` | — |
+
+---
+
+::tip
+You can copy and adapt this template for any composable documentation.
+::

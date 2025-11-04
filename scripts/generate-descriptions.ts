@@ -7,7 +7,7 @@ import {
   showRemainingSpinner,
 } from './utils/terminal-display';
 import config from '../assembler-ui.config.js';
-import type { DependencyMap } from './create-dependency-map';
+import type { DependencyMap } from './parse-folder/common/create-dependency-map';
 
 const DEBUG_JSON = true;
 const GlobalPath = config.globalPath || 'registry/new-york/';

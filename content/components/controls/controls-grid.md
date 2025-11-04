@@ -444,6 +444,9 @@ import type { Component } from "vue";
 export { default as ControlsGrid } from "./ControlsGrid.vue";
 export { default as ControlsToolbar } from "./ControlsToolbar.vue";
 
+export { useControlsGrid } from "../../composables/use-controls-grid/useControlsGrid";
+export { useControlRegistry } from "../../composables/use-control-registry/useControlRegistry";
+
 export interface ComponentToRegister {
   name: string;
 
