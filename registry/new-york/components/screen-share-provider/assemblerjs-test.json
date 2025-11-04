@@ -1,0 +1,271 @@
+{
+  "$schema": "https://shadcn-vue.com/schema/registry-item.json",
+  "install": "https://benoitlahoz.github.io/assembler-ui/r/screen-share-provider.json",
+  "name": "screen-share-provider",
+  "title": "ScreenShareProvider",
+  "description": "A renderless provider component that manages screen sharing functionality.\n\nThis component uses the getDisplayMedia API to enable screen, window, or tab sharing.\nIt manages the sharing state and provides reactive access to the screen stream.\n\nUnlike MediaDevicesProvider, screen sharing doesn't enumerate available sources.\nInstead, the browser displays a picker for the user to select what to share.",
+  "category": "devices",
+  "type": "registry:ui",
+  "dependencies": {
+    "dependsOn": [
+      {
+        "path": "composables/use-screen-share",
+        "name": "use-screen-share"
+      }
+    ],
+    "usedBy": []
+  },
+  "demo": [
+    {
+      "name": "screen-share-provider-demo-simple",
+      "html": "<script setup lang=\"ts\">\n/**\n * Simple demo of ScreenShareProvider showing basic usage.\n */\nimport { Badge } from '@/components/ui/badge';\nimport { Button } from '@/components/ui/button';\nimport { ScreenShareProvider, ScreenShareViewer } from '..';\n</script>\n\n<template>\n  <div class=\"space-y-4\">\n    <ScreenShareProvider>\n      <template #default=\"{ startShare, stopShare, isSharing, shareState, shareType, errors }\">\n        <div class=\"space-y-4\">\n          <!-- Controls -->\n          <div class=\"flex gap-2\">\n            <Button @click=\"startShare()\" :disabled=\"isSharing\">\n              {{ isSharing ? 'Sharing...' : 'Start Screen Share' }}\n            </Button>\n\n            <Button @click=\"stopShare()\" :disabled=\"!isSharing\" variant=\"destructive\">\n              Stop Sharing\n            </Button>\n          </div>\n\n          <!-- Status info -->\n          <div class=\"border rounded-lg p-4 bg-muted/30 space-y-2 text-sm\">\n            <div class=\"flex items-center gap-2\">\n              <span class=\"font-medium\">Status:</span>\n              <Badge\n                :variant=\"\n                  shareState === 'active'\n                    ? 'default'\n                    : shareState === 'error'\n                      ? 'destructive'\n                      : 'secondary'\n                \"\n              >\n                {{ shareState }}\n              </Badge>\n            </div>\n            <div v-if=\"shareType\" class=\"flex items-center gap-2\">\n              <span class=\"font-medium\">Share Type:</span>\n              <Badge variant=\"outline\">{{ shareType }}</Badge>\n            </div>\n          </div>\n\n          <!-- Video preview -->\n          <div\n            class=\"relative bg-black rounded-lg overflow-hidden border border-muted\"\n            style=\"aspect-ratio: 16/9\"\n          >\n            <ScreenShareViewer\n              v-if=\"isSharing\"\n              :auto-play=\"true\"\n              :muted=\"true\"\n              class=\"w-full h-full object-contain\"\n            />\n            <div v-else class=\"absolute inset-0 flex items-center justify-center bg-muted/50\">\n              <p class=\"text-muted-foreground\">Click \"Start Screen Share\" to begin</p>\n            </div>\n\n            <!-- Status overlay -->\n            <div\n              v-if=\"isSharing\"\n              class=\"absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs\"\n            >\n              Screen Sharing Active\n            </div>\n          </div>\n\n          <!-- Errors -->\n          <div\n            v-if=\"errors && errors.length > 0\"\n            class=\"p-4 rounded border border-destructive bg-destructive/10 text-destructive\"\n          >\n            <p class=\"font-bold\">Errors:</p>\n            <ul class=\"text-sm space-y-1 mt-2\">\n              <li v-for=\"(error, index) in errors\" :key=\"index\">\n                {{ error.message }}\n              </li>\n            </ul>\n          </div>\n        </div>\n      </template>\n    </ScreenShareProvider>\n  </div>\n</template>\n",
+      "pug": "<script setup lang=\"ts\">\n/**\n * Simple demo of ScreenShareProvider showing basic usage.\n */\nimport { Badge } from '@/components/ui/badge';\nimport { Button } from '@/components/ui/button';\nimport { ScreenShareProvider, ScreenShareViewer } from '..';\n</script>\n\n<template lang=\"pug\">\n<!-- Controls -->\n<!-- Status info -->\n<!-- Video preview -->\n<!-- Status overlay -->\n<!-- Errors -->\ndiv(class=\"space-y-4\")\n  ScreenShareProvider\n    template(#default=\"{ startShare, stopShare, isSharing, shareState, shareType, errors }\")\n      div(class=\"space-y-4\")\n        div(class=\"flex gap-2\")\n          Button(@click=\"startShare()\" :disabled=\"isSharing\")\n            | {{ isSharing ? 'Sharing...' : 'Start Screen Share' }}\n          Button(@click=\"stopShare()\" :disabled=\"!isSharing\" variant=\"destructive\")\n            | Stop Sharing\n        div(class=\"border rounded-lg p-4 bg-muted/30 space-y-2 text-sm\")\n          div(class=\"flex items-center gap-2\")\n            span(class=\"font-medium\")\n              | Status:\n            Badge(:variant=\" shareState === 'active' ? 'default' : shareState === 'error' ? 'destructive' : 'secondary' \")\n              | {{ shareState }}\n          div(v-if=\"shareType\" class=\"flex items-center gap-2\")\n            span(class=\"font-medium\")\n              | Share Type:\n            Badge(variant=\"outline\")\n              | {{ shareType }}\n        div(class=\"relative bg-black rounded-lg overflow-hidden border border-muted\" style=\"aspect-ratio: 16/9\")\n          ScreenShareViewer(v-if=\"isSharing\" :auto-play=\"true\" :muted=\"true\" class=\"w-full h-full object-contain\")\n          div(v-else class=\"absolute inset-0 flex items-center justify-center bg-muted/50\")\n            p(class=\"text-muted-foreground\")\n              | Click \"Start Screen Share\" to begin\n          div(v-if=\"isSharing\" class=\"absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs\")\n            | Screen Sharing Active\n        div(v-if=\"errors && errors.length)\n          | 0\"\n          | class=\"p-4 rounded border border-destructive bg-destructive/10 text-destructive\"\n          | >\n          p(class=\"font-bold\")\n            | Errors:\n          ul(class=\"text-sm space-y-1 mt-2\")\n            li(v-for=\"(error, index) in errors\" :key=\"index\")\n              | {{ error.message }}\n</template>\n    </ScreenShareProvider>\n  </div>\n</template>\n"
+    },
+    {
+      "name": "screen-share-provider-demo-advanced",
+      "definition": [
+        "Advanced Options"
+      ],
+      "html": "<script setup lang=\"ts\">\n/**\n * Advanced demo of ScreenShareProvider showing various configuration options.\n */\nimport { ref, computed } from 'vue';\nimport { Badge } from '@/components/ui/badge';\nimport { Button } from '@/components/ui/button';\nimport { Label } from '@/components/ui/label';\nimport { ScreenShareProvider, ScreenShareViewer, type ScreenShareOptions } from '..';\n\nconst includeAudio = ref(false);\nconst preferCurrentTab = ref(false);\nconst surfaceSwitching = ref<'include' | 'exclude'>('include');\nconst systemAudio = ref<'include' | 'exclude'>('exclude');\n\nconst shareOptions = computed<ScreenShareOptions>(() => ({\n  video: true,\n  audio: includeAudio.value,\n  preferCurrentTab: preferCurrentTab.value,\n  surfaceSwitching: surfaceSwitching.value,\n  systemAudio: systemAudio.value,\n}));\n</script>\n\n<template>\n  <div class=\"space-y-4\">\n    <ScreenShareProvider>\n      <template\n        #default=\"{ startShare, stopShare, isSharing, shareState, shareType, screenStream }\"\n      >\n        <div class=\"space-y-4\">\n          <!-- Options panel -->\n          <div class=\"border rounded-lg p-4 bg-muted/30 space-y-4\">\n            <Label class=\"text-sm font-bold\">Screen Share Options</Label>\n\n            <div class=\"grid md:grid-cols-2 gap-4\">\n              <!-- Audio options -->\n              <div class=\"space-y-3\">\n                <div class=\"flex items-center space-x-2\">\n                  <input\n                    type=\"checkbox\"\n                    id=\"includeAudio\"\n                    v-model=\"includeAudio\"\n                    :disabled=\"isSharing\"\n                    class=\"h-4 w-4 rounded border-gray-300\"\n                  />\n                  <label for=\"includeAudio\" class=\"text-sm font-medium leading-none\">\n                    Include system audio\n                  </label>\n                </div>\n\n                <div class=\"space-y-2\">\n                  <Label for=\"systemAudio\" class=\"text-sm\">System audio option:</Label>\n                  <select\n                    id=\"systemAudio\"\n                    v-model=\"systemAudio\"\n                    :disabled=\"isSharing\"\n                    class=\"w-full px-3 py-2 text-sm rounded-md border border-input bg-background\"\n                  >\n                    <option value=\"include\">Include</option>\n                    <option value=\"exclude\">Exclude</option>\n                  </select>\n                </div>\n              </div>\n\n              <!-- Browser options -->\n              <div class=\"space-y-3\">\n                <div class=\"flex items-center space-x-2\">\n                  <input\n                    type=\"checkbox\"\n                    id=\"preferCurrentTab\"\n                    v-model=\"preferCurrentTab\"\n                    :disabled=\"isSharing\"\n                    class=\"h-4 w-4 rounded border-gray-300\"\n                  />\n                  <label for=\"preferCurrentTab\" class=\"text-sm font-medium leading-none\">\n                    Prefer current tab (Chrome/Edge)\n                  </label>\n                </div>\n\n                <div class=\"space-y-2\">\n                  <Label for=\"surfaceSwitching\" class=\"text-sm\">Surface switching:</Label>\n                  <select\n                    id=\"surfaceSwitching\"\n                    v-model=\"surfaceSwitching\"\n                    :disabled=\"isSharing\"\n                    class=\"w-full px-3 py-2 text-sm rounded-md border border-input bg-background\"\n                  >\n                    <option value=\"include\">Include</option>\n                    <option value=\"exclude\">Exclude</option>\n                  </select>\n                </div>\n              </div>\n            </div>\n          </div>\n\n          <!-- Controls -->\n          <div class=\"flex gap-2\">\n            <Button @click=\"() => startShare(shareOptions)\" :disabled=\"isSharing\">\n              {{ isSharing ? 'Sharing...' : 'Start Screen Share' }}\n            </Button>\n\n            <Button @click=\"stopShare()\" :disabled=\"!isSharing\" variant=\"destructive\">\n              Stop Sharing\n            </Button>\n          </div>\n\n          <!-- Status and tracks info -->\n          <div class=\"grid md:grid-cols-2 gap-4\">\n            <!-- Status -->\n            <div class=\"border rounded-lg p-4 bg-muted/30 space-y-2\">\n              <h4 class=\"font-medium text-sm\">Status:</h4>\n              <div class=\"space-y-2 text-sm\">\n                <div class=\"flex items-center gap-2\">\n                  <span>State:</span>\n                  <Badge\n                    :variant=\"\n                      shareState === 'active'\n                        ? 'default'\n                        : shareState === 'error'\n                          ? 'destructive'\n                          : 'secondary'\n                    \"\n                  >\n                    {{ shareState }}\n                  </Badge>\n                </div>\n                <div v-if=\"shareType\" class=\"flex items-center gap-2\">\n                  <span>Share Type:</span>\n                  <Badge variant=\"outline\">{{ shareType }}</Badge>\n                </div>\n              </div>\n            </div>\n\n            <!-- Track info -->\n            <div class=\"border rounded-lg p-4 bg-muted/30\">\n              <h4 class=\"font-medium mb-2 text-sm\">Stream Info:</h4>\n              <div v-if=\"screenStream\" class=\"text-xs space-y-1 font-mono\">\n                <p>Video tracks: {{ screenStream.getVideoTracks().length }}</p>\n                <p>Audio tracks: {{ screenStream.getAudioTracks().length }}</p>\n                <p>Total tracks: {{ screenStream.getTracks().length }}</p>\n                <p v-if=\"screenStream.getVideoTracks().length > 0\">\n                  Active:\n                  {{ screenStream.getVideoTracks()[0]?.enabled ? 'Yes' : 'No' }}\n                </p>\n              </div>\n              <p v-else class=\"text-xs text-muted-foreground\">Start sharing to see stream info</p>\n            </div>\n          </div>\n\n          <!-- Video preview -->\n          <div\n            class=\"relative bg-black rounded-lg overflow-hidden border border-muted\"\n            style=\"aspect-ratio: 16/9\"\n          >\n            <ScreenShareViewer\n              v-if=\"isSharing\"\n              :auto-play=\"true\"\n              :muted=\"!includeAudio\"\n              :controls=\"includeAudio\"\n              class=\"w-full h-full object-contain\"\n            />\n            <div v-else class=\"absolute inset-0 flex items-center justify-center bg-muted/50\">\n              <p class=\"text-muted-foreground\">Configure options and click \"Start Screen Share\"</p>\n            </div>\n\n            <!-- Status overlay -->\n            <div\n              v-if=\"isSharing && shareType\"\n              class=\"absolute top-2 left-2 space-y-1 bg-black/70 text-white px-2 py-1 rounded text-xs\"\n            >\n              <div>Sharing: {{ shareType }}</div>\n              <div v-if=\"includeAudio && screenStream?.getAudioTracks().length\">\n                🎵 Audio enabled\n              </div>\n            </div>\n          </div>\n        </div>\n      </template>\n    </ScreenShareProvider>\n  </div>\n</template>\n",
+      "pug": "<script setup lang=\"ts\">\n/**\n * Advanced demo of ScreenShareProvider showing various configuration options.\n */\nimport { ref, computed } from 'vue';\nimport { Badge } from '@/components/ui/badge';\nimport { Button } from '@/components/ui/button';\nimport { Label } from '@/components/ui/label';\nimport { ScreenShareProvider, ScreenShareViewer, type ScreenShareOptions } from '..';\n\nconst includeAudio = ref(false);\nconst preferCurrentTab = ref(false);\nconst surfaceSwitching = ref<'include' | 'exclude'>('include');\nconst systemAudio = ref<'include' | 'exclude'>('exclude');\n\nconst shareOptions = computed<ScreenShareOptions>(() => ({\n  video: true,\n  audio: includeAudio.value,\n  preferCurrentTab: preferCurrentTab.value,\n  surfaceSwitching: surfaceSwitching.value,\n  systemAudio: systemAudio.value,\n}));\n</script>\n\n<template lang=\"pug\">\n<!-- Options panel -->\n<!-- Audio options -->\n<!-- Browser options -->\n<!-- Controls -->\n<!-- Status and tracks info -->\n<!-- Status -->\n<!-- Track info -->\n<!-- Video preview -->\n<!-- Status overlay -->\ndiv(class=\"space-y-4\")\n  ScreenShareProvider\n    template(#default=\"{ startShare, stopShare, isSharing, shareState, shareType, screenStream }\")\n      div(class=\"space-y-4\")\n        div(class=\"border rounded-lg p-4 bg-muted/30 space-y-4\")\n          Label(class=\"text-sm font-bold\")\n            | Screen Share Options\n          div(class=\"grid md:grid-cols-2 gap-4\")\n            div(class=\"space-y-3\")\n              div(class=\"flex items-center space-x-2\")\n                input(type=\"checkbox\" id=\"includeAudio\" v-model=\"includeAudio\" :disabled=\"isSharing\" class=\"h-4 w-4 rounded border-gray-300\")\n                label(for=\"includeAudio\" class=\"text-sm font-medium leading-none\")\n                  | Include system audio\n              div(class=\"space-y-2\")\n                Label(for=\"systemAudio\" class=\"text-sm\")\n                  | System audio option:\n                select(id=\"systemAudio\" v-model=\"systemAudio\" :disabled=\"isSharing\" class=\"w-full px-3 py-2 text-sm rounded-md border border-input bg-background\")\n                  option(value=\"include\")\n                    | Include\n                  option(value=\"exclude\")\n                    | Exclude\n            div(class=\"space-y-3\")\n              div(class=\"flex items-center space-x-2\")\n                input(type=\"checkbox\" id=\"preferCurrentTab\" v-model=\"preferCurrentTab\" :disabled=\"isSharing\" class=\"h-4 w-4 rounded border-gray-300\")\n                label(for=\"preferCurrentTab\" class=\"text-sm font-medium leading-none\")\n                  | Prefer current tab (Chrome/Edge)\n              div(class=\"space-y-2\")\n                Label(for=\"surfaceSwitching\" class=\"text-sm\")\n                  | Surface switching:\n                select(id=\"surfaceSwitching\" v-model=\"surfaceSwitching\" :disabled=\"isSharing\" class=\"w-full px-3 py-2 text-sm rounded-md border border-input bg-background\")\n                  option(value=\"include\")\n                    | Include\n                  option(value=\"exclude\")\n                    | Exclude\n        div(class=\"flex gap-2\")\n          Button(@click=\"() =)\n            | startShare(shareOptions)\" :disabled=\"isSharing\">\n            | {{ isSharing ? 'Sharing...' : 'Start Screen Share' }}\n          Button(@click=\"stopShare()\" :disabled=\"!isSharing\" variant=\"destructive\")\n            | Stop Sharing\n        div(class=\"grid md:grid-cols-2 gap-4\")\n          div(class=\"border rounded-lg p-4 bg-muted/30 space-y-2\")\n            h4(class=\"font-medium text-sm\")\n              | Status:\n            div(class=\"space-y-2 text-sm\")\n              div(class=\"flex items-center gap-2\")\n                span\n                  | State:\n                Badge(:variant=\" shareState === 'active' ? 'default' : shareState === 'error' ? 'destructive' : 'secondary' \")\n                  | {{ shareState }}\n              div(v-if=\"shareType\" class=\"flex items-center gap-2\")\n                span\n                  | Share Type:\n                Badge(variant=\"outline\")\n                  | {{ shareType }}\n          div(class=\"border rounded-lg p-4 bg-muted/30\")\n            h4(class=\"font-medium mb-2 text-sm\")\n              | Stream Info:\n            div(v-if=\"screenStream\" class=\"text-xs space-y-1 font-mono\")\n              p\n                | Video tracks: {{ screenStream.getVideoTracks().length }}\n              p\n                | Audio tracks: {{ screenStream.getAudioTracks().length }}\n              p\n                | Total tracks: {{ screenStream.getTracks().length }}\n              p(v-if=\"screenStream.getVideoTracks().length)\n                | 0\">\n                | Active:\n                | {{ screenStream.getVideoTracks()[0]?.enabled ? 'Yes' : 'No' }}\n            p(v-else class=\"text-xs text-muted-foreground\")\n              | Start sharing to see stream info\n        div(class=\"relative bg-black rounded-lg overflow-hidden border border-muted\" style=\"aspect-ratio: 16/9\")\n          ScreenShareViewer(v-if=\"isSharing\" :auto-play=\"true\" :muted=\"!includeAudio\" :controls=\"includeAudio\" class=\"w-full h-full object-contain\")\n          div(v-else class=\"absolute inset-0 flex items-center justify-center bg-muted/50\")\n            p(class=\"text-muted-foreground\")\n              | Configure options and click \"Start Screen Share\"\n          div(v-if=\"isSharing && shareType\" class=\"absolute top-2 left-2 space-y-1 bg-black/70 text-white px-2 py-1 rounded text-xs\")\n            div\n              | Sharing: {{ shareType }}\n            div(v-if=\"includeAudio && screenStream?.getAudioTracks().length\")\n              | 🎵 Audio enabled\n</template>\n    </ScreenShareProvider>\n  </div>\n</template>\n"
+    }
+  ],
+  "files": [
+    {
+      "name": "index",
+      "title": "index",
+      "path": "registry/new-york/components/screen-share-provider/index.ts",
+      "description": "A renderless provider component that manages screen sharing functionality.\n\nThis component uses the getDisplayMedia API to enable screen, window, or tab sharing.\nIt manages the sharing state and provides reactive access to the screen stream.\n\nUnlike MediaDevicesProvider, screen sharing doesn't enumerate available sources.\nInstead, the browser displays a picker for the user to select what to share.",
+      "type": "registry:ui",
+      "category": "devices",
+      "doc": {
+        "types": [
+          {
+            "name": "ScreenShareProviderSlotProps",
+            "type": "interface"
+          }
+        ],
+        "source": "/**\n * A renderless provider component that manages screen sharing functionality.\n *\n * This component uses the getDisplayMedia API to enable screen, window, or tab sharing.\n * It manages the sharing state and provides reactive access to the screen stream.\n *\n * Unlike MediaDevicesProvider, screen sharing doesn't enumerate available sources.\n * Instead, the browser displays a picker for the user to select what to share.\n *\n * @type registry:ui\n * @category devices\n * @demo ScreenShareProviderDemoSimple\n * @demo ScreenShareProviderDemoAdvanced\n * -- Advanced Options\n */\nimport type { InjectionKey, Ref } from 'vue';\nimport type {\n  ScreenShareType,\n  ScreenShareState,\n  ScreenShareStartFn,\n  ScreenShareStopFn,\n} from '~~/registry/new-york/composables/use-screen-share/useScreenShare';\n\nexport { default as ScreenShareProvider } from './ScreenShareProvider.vue';\nexport { default as ScreenShareViewer } from './ScreenShareViewer.vue';\n\nexport { type ScreenShareProviderProps } from './ScreenShareProvider.vue';\nexport { type ScreenShareViewerProps } from './ScreenShareViewer.vue';\n\n// Re-export types from the composable\nexport type {\n  ScreenShareType,\n  ScreenShareState,\n  ScreenShareOptions,\n  ScreenShareStartFn,\n  ScreenShareStopFn,\n} from '~~/registry/new-york/composables/use-screen-share/useScreenShare';\n\n/**\n * Slot props exposed by ScreenShareProvider to child components.\n */\nexport interface ScreenShareProviderSlotProps {\n  /** The active screen sharing stream, or null if not sharing */\n  screenStream: MediaStream | null;\n  /** Current state of screen sharing */\n  shareState: ScreenShareState;\n  /** Type of surface being shared (if detectable) */\n  shareType: ScreenShareType | null;\n  /** List of errors encountered during screen sharing operations */\n  errors: Error[];\n  /** Whether screen sharing is currently active */\n  isSharing: boolean;\n  /** Function to start screen sharing */\n  startShare: ScreenShareStartFn;\n  /** Function to stop screen sharing */\n  stopShare: ScreenShareStopFn;\n}\n\n/**\n * Injection keys for providing/injecting screen share functionality.\n */\nexport const ScreenShareStreamKey: InjectionKey<Ref<MediaStream | null>> =\n  Symbol('ScreenShareStream');\n\nexport const ScreenShareStateKey: InjectionKey<Ref<ScreenShareState>> = Symbol('ScreenShareState');\n\nexport const ScreenShareTypeKey: InjectionKey<Ref<ScreenShareType | null>> =\n  Symbol('ScreenShareType');\n\nexport const ScreenShareErrorsKey: InjectionKey<Ref<Error[]>> = Symbol('ScreenShareErrors');\n\nexport const ScreenShareStartKey: InjectionKey<ScreenShareStartFn> = Symbol('ScreenShareStart');\n\nexport const ScreenShareStopKey: InjectionKey<ScreenShareStopFn> = Symbol('ScreenShareStop');\n",
+        "variants": {}
+      }
+    },
+    {
+      "name": "ScreenShareProvider",
+      "title": "ScreenShareProvider",
+      "path": "registry/new-york/components/screen-share-provider/ScreenShareProvider.vue",
+      "api": "composition",
+      "description": "The ScreenShareProvider component manages screen sharing functionality\nand exposes the screen stream and control functions to its child components\nvia scoped slots and provide/inject.\n ",
+      "doc": {
+        "path": "registry/new-york/components/screen-share-provider/ScreenShareProvider.vue",
+        "description": "The ScreenShareProvider component manages screen sharing functionality\nand exposes the screen stream and control functions to its child components\nvia scoped slots and provide/inject.\n ",
+        "childComponents": [],
+        "props": [
+          {
+            "name": "autoStart",
+            "type": "boolean",
+            "default": false,
+            "description": "Automatically start screen sharing on mount."
+          },
+          {
+            "name": "defaultOptions",
+            "type": "ScreenShareOptions",
+            "default": "-",
+            "description": "Default options to use when starting screen share."
+          }
+        ],
+        "variants": {},
+        "slots": [
+          {
+            "name": "default",
+            "description": "Slot for child components to access screen sharing state and controls",
+            "params": "screen-stream, share-state, share-type, errors, is-sharing, start-share, stop-share"
+          }
+        ],
+        "emits": [],
+        "exposes": [],
+        "injects": [],
+        "provides": [
+          {
+            "key": "ScreenShareStreamKey",
+            "value": "screenStream",
+            "type": "Ref<MediaStream | null>",
+            "description": "Provide screen sharing state and controls to child components."
+          },
+          {
+            "key": "ScreenShareStateKey",
+            "value": "shareState",
+            "type": "Ref<ScreenShareState>",
+            "description": ""
+          },
+          {
+            "key": "ScreenShareTypeKey",
+            "value": "shareType",
+            "type": "Ref<ScreenShareType | null>",
+            "description": ""
+          },
+          {
+            "key": "ScreenShareErrorsKey",
+            "value": "errors",
+            "type": "Ref<Error[]>",
+            "description": ""
+          },
+          {
+            "key": "ScreenShareStartKey",
+            "value": "startScreenShare",
+            "type": "ScreenShareStartFn",
+            "description": ""
+          },
+          {
+            "key": "ScreenShareStopKey",
+            "value": "stopScreenShare",
+            "type": "ScreenShareStopFn",
+            "description": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "ScreenShareProviderProps",
+            "type": "interface",
+            "description": "-",
+            "properties": [
+              {
+                "name": "autoStart",
+                "type": "boolean",
+                "description": "Automatically start screen sharing on mount."
+              },
+              {
+                "name": "defaultOptions",
+                "type": "ScreenShareOptions",
+                "description": "Default options to use when starting screen share."
+              }
+            ]
+          }
+        ],
+        "cssVars": [],
+        "source": {
+          "html": "<script setup lang=\"ts\">\n/**\n * The ScreenShareProvider component manages screen sharing functionality\n * and exposes the screen stream and control functions to its child components\n * via scoped slots and provide/inject.\n */\n\nimport { provide, watch, nextTick, type Ref } from 'vue';\nimport { useScreenShare } from '~~/registry/new-york/composables/use-screen-share/useScreenShare';\nimport {\n  ScreenShareStreamKey,\n  ScreenShareStateKey,\n  ScreenShareTypeKey,\n  ScreenShareErrorsKey,\n  ScreenShareStartKey,\n  ScreenShareStopKey,\n  type ScreenShareOptions,\n  type ScreenShareState,\n  type ScreenShareType,\n  type ScreenShareStartFn,\n  type ScreenShareStopFn,\n} from '.';\n\nexport interface ScreenShareProviderProps {\n  /**\n   * Automatically start screen sharing on mount.\n   */\n  autoStart?: boolean;\n  /**\n   * Default options to use when starting screen share.\n   */\n  defaultOptions?: ScreenShareOptions;\n}\n\nconst props = withDefaults(defineProps<ScreenShareProviderProps>(), {\n  autoStart: false,\n});\n\nconst emit = defineEmits<{\n  shareStarted: [stream: MediaStream];\n  shareStopped: [];\n  error: [error: Error];\n}>();\n\n/**\n * Use the screen share composable with event handlers.\n */\nconst {\n  screenStream,\n  shareState,\n  shareType,\n  errors,\n  isSharing,\n  startScreenShare,\n  stopScreenShare,\n} = useScreenShare({\n  defaultOptions: props.defaultOptions,\n  onShareStarted: (stream) => emit('shareStarted', stream),\n  onShareStopped: () => emit('shareStopped'),\n  onError: (error) => emit('error', error),\n});\n\n/**\n * Provide screen sharing state and controls to child components.\n */\nprovide<Ref<MediaStream | null>>(ScreenShareStreamKey, screenStream);\nprovide<Ref<ScreenShareState>>(ScreenShareStateKey, shareState);\nprovide<Ref<ScreenShareType | null>>(ScreenShareTypeKey, shareType);\nprovide<Ref<Error[]>>(ScreenShareErrorsKey, errors);\nprovide<ScreenShareStartFn>(ScreenShareStartKey, startScreenShare);\nprovide<ScreenShareStopFn>(ScreenShareStopKey, stopScreenShare);\n\n/**\n * Auto-start screen sharing if enabled.\n */\nwatch(\n  () => props.autoStart,\n  async (autoStart) => {\n    if (autoStart) {\n      await nextTick();\n      try {\n        await startScreenShare(props.defaultOptions);\n      } catch (error) {\n        // Error already handled in useScreenShare\n      }\n    }\n  },\n  { immediate: true }\n);\n</script>\n\n<template>\n  <!-- Slot for child components to access screen sharing state and controls -->\n  <slot\n    :screen-stream=\"screenStream\"\n    :share-state=\"shareState\"\n    :share-type=\"shareType\"\n    :errors=\"errors\"\n    :is-sharing=\"isSharing\"\n    :start-share=\"startScreenShare\"\n    :stop-share=\"stopScreenShare\"\n  />\n</template>\n\n<style scoped></style>\n",
+          "pug": "<script setup lang=\"ts\">\n/**\n * The ScreenShareProvider component manages screen sharing functionality\n * and exposes the screen stream and control functions to its child components\n * via scoped slots and provide/inject.\n */\n\nimport { provide, watch, nextTick, type Ref } from 'vue';\nimport { useScreenShare } from '~~/registry/new-york/composables/use-screen-share/useScreenShare';\nimport {\n  ScreenShareStreamKey,\n  ScreenShareStateKey,\n  ScreenShareTypeKey,\n  ScreenShareErrorsKey,\n  ScreenShareStartKey,\n  ScreenShareStopKey,\n  type ScreenShareOptions,\n  type ScreenShareState,\n  type ScreenShareType,\n  type ScreenShareStartFn,\n  type ScreenShareStopFn,\n} from '.';\n\nexport interface ScreenShareProviderProps {\n  /**\n   * Automatically start screen sharing on mount.\n   */\n  autoStart?: boolean;\n  /**\n   * Default options to use when starting screen share.\n   */\n  defaultOptions?: ScreenShareOptions;\n}\n\nconst props = withDefaults(defineProps<ScreenShareProviderProps>(), {\n  autoStart: false,\n});\n\nconst emit = defineEmits<{\n  shareStarted: [stream: MediaStream];\n  shareStopped: [];\n  error: [error: Error];\n}>();\n\n/**\n * Use the screen share composable with event handlers.\n */\nconst {\n  screenStream,\n  shareState,\n  shareType,\n  errors,\n  isSharing,\n  startScreenShare,\n  stopScreenShare,\n} = useScreenShare({\n  defaultOptions: props.defaultOptions,\n  onShareStarted: (stream) => emit('shareStarted', stream),\n  onShareStopped: () => emit('shareStopped'),\n  onError: (error) => emit('error', error),\n});\n\n/**\n * Provide screen sharing state and controls to child components.\n */\nprovide<Ref<MediaStream | null>>(ScreenShareStreamKey, screenStream);\nprovide<Ref<ScreenShareState>>(ScreenShareStateKey, shareState);\nprovide<Ref<ScreenShareType | null>>(ScreenShareTypeKey, shareType);\nprovide<Ref<Error[]>>(ScreenShareErrorsKey, errors);\nprovide<ScreenShareStartFn>(ScreenShareStartKey, startScreenShare);\nprovide<ScreenShareStopFn>(ScreenShareStopKey, stopScreenShare);\n\n/**\n * Auto-start screen sharing if enabled.\n */\nwatch(\n  () => props.autoStart,\n  async (autoStart) => {\n    if (autoStart) {\n      await nextTick();\n      try {\n        await startScreenShare(props.defaultOptions);\n      } catch (error) {\n        // Error already handled in useScreenShare\n      }\n    }\n  },\n  { immediate: true }\n);\n</script>\n\n<template lang=\"pug\">\n<!-- Slot for child components to access screen sharing state and controls -->\nslot(:screen-stream=\"screenStream\" :share-state=\"shareState\" :share-type=\"shareType\" :errors=\"errors\" :is-sharing=\"isSharing\" :start-share=\"startScreenShare\" :stop-share=\"stopScreenShare\")\n</template>\n\n<style scoped></style>\n"
+        }
+      },
+      "type": "registry:ui"
+    },
+    {
+      "name": "ScreenShareViewer",
+      "title": "ScreenShareViewer",
+      "path": "registry/new-york/components/screen-share-provider/ScreenShareViewer.vue",
+      "api": "composition",
+      "description": "The ScreenShareViewer component displays the shared screen in a video element.\nIt automatically connects to the screen stream provided by ScreenShareProvider.\n ",
+      "doc": {
+        "path": "registry/new-york/components/screen-share-provider/ScreenShareViewer.vue",
+        "description": "The ScreenShareViewer component displays the shared screen in a video element.\nIt automatically connects to the screen stream provided by ScreenShareProvider.\n ",
+        "childComponents": [],
+        "props": [
+          {
+            "name": "options",
+            "type": "ScreenShareOptions",
+            "default": "-",
+            "description": "Options to pass when starting screen share."
+          },
+          {
+            "name": "autoPlay",
+            "type": "boolean",
+            "default": true,
+            "description": "Whether the video should start playing automatically."
+          },
+          {
+            "name": "muted",
+            "type": "boolean",
+            "default": true,
+            "description": "Whether the video should be muted."
+          },
+          {
+            "name": "controls",
+            "type": "boolean",
+            "default": false,
+            "description": "Whether to show video controls."
+          },
+          {
+            "name": "class",
+            "type": "string",
+            "default": "-",
+            "description": "CSS class to apply to the video element."
+          },
+          {
+            "name": "autoStart",
+            "type": "boolean",
+            "default": false,
+            "description": "Whether to automatically start screen sharing when mounted.\nIf true, will call startShare() on mount if not already sharing."
+          }
+        ],
+        "variants": {},
+        "slots": [],
+        "emits": [],
+        "exposes": [],
+        "injects": [
+          {
+            "key": "ScreenShareStreamKey",
+            "description": "Inject screen sharing state and controls from parent ScreenShareProvider."
+          },
+          {
+            "key": "ScreenShareStateKey",
+            "description": ""
+          },
+          {
+            "key": "ScreenShareStartKey",
+            "description": ""
+          },
+          {
+            "key": "ScreenShareStopKey",
+            "description": ""
+          }
+        ],
+        "provides": [],
+        "types": [
+          {
+            "name": "ScreenShareViewerProps",
+            "type": "interface",
+            "description": "-",
+            "properties": [
+              {
+                "name": "options",
+                "type": "ScreenShareOptions",
+                "description": "Options to pass when starting screen share."
+              },
+              {
+                "name": "autoPlay",
+                "type": "boolean",
+                "description": "Whether the video should start playing automatically."
+              },
+              {
+                "name": "muted",
+                "type": "boolean",
+                "description": "Whether the video should be muted."
+              },
+              {
+                "name": "controls",
+                "type": "boolean",
+                "description": "Whether to show video controls."
+              },
+              {
+                "name": "class",
+                "type": "string",
+                "description": "CSS class to apply to the video element."
+              },
+              {
+                "name": "autoStart",
+                "type": "boolean",
+                "description": "Whether to automatically start screen sharing when mounted.\nIf true, will call startShare() on mount if not already sharing."
+              }
+            ]
+          }
+        ],
+        "cssVars": [],
+        "source": {
+          "html": "<script setup lang=\"ts\">\n/**\n * The ScreenShareViewer component displays the shared screen in a video element.\n * It automatically connects to the screen stream provided by ScreenShareProvider.\n */\n\nimport { inject, ref, watch, onBeforeUnmount, computed } from 'vue';\nimport {\n  ScreenShareStreamKey,\n  ScreenShareStateKey,\n  ScreenShareStartKey,\n  ScreenShareStopKey,\n  type ScreenShareOptions,\n} from '.';\n\nexport interface ScreenShareViewerProps {\n  /**\n   * Options to pass when starting screen share.\n   */\n  options?: ScreenShareOptions;\n  /**\n   * Whether the video should start playing automatically.\n   */\n  autoPlay?: boolean;\n  /**\n   * Whether the video should be muted.\n   */\n  muted?: boolean;\n  /**\n   * Whether to show video controls.\n   */\n  controls?: boolean;\n  /**\n   * CSS class to apply to the video element.\n   */\n  class?: string;\n  /**\n   * Whether to automatically start screen sharing when mounted.\n   * If true, will call startShare() on mount if not already sharing.\n   */\n  autoStart?: boolean;\n}\n\nconst props = withDefaults(defineProps<ScreenShareViewerProps>(), {\n  autoPlay: true,\n  muted: true,\n  controls: false,\n  autoStart: false,\n});\n\nconst emit = defineEmits<{\n  playing: [];\n  paused: [];\n  error: [error: Event];\n}>();\n\n/**\n * Inject screen sharing state and controls from parent ScreenShareProvider.\n */\nconst screenStream = inject(ScreenShareStreamKey);\nconst shareState = inject(ScreenShareStateKey);\nconst startShare = inject(ScreenShareStartKey);\nconst stopShare = inject(ScreenShareStopKey);\n\n/**\n * Reference to the video element.\n */\nconst videoRef = ref<HTMLVideoElement | null>(null);\n\n/**\n * Whether the video is currently playing.\n */\nconst isPlaying = ref(false);\n\n/**\n * Computed property to check if screen sharing is active.\n */\nconst isSharing = computed(() => shareState?.value === 'active');\n\n/**\n * Update the video element's srcObject when the stream changes.\n */\nwatch(\n  [screenStream, videoRef],\n  () => {\n    if (videoRef.value && screenStream?.value) {\n      videoRef.value.srcObject = screenStream.value;\n\n      // Play the video if autoPlay is enabled\n      if (props.autoPlay) {\n        videoRef.value.play().catch((error) => {\n          console.warn('Auto-play failed:', error);\n        });\n      }\n    } else if (videoRef.value) {\n      videoRef.value.srcObject = null;\n    }\n  },\n  { immediate: true }\n);\n\n/**\n * Auto-start screen sharing if enabled and not already sharing.\n */\nwatch(\n  [() => props.autoStart, isSharing],\n  async ([autoStart, sharing]) => {\n    if (autoStart && !sharing && startShare) {\n      try {\n        await startShare(props.options);\n      } catch (error) {\n        // Error already handled in provider\n      }\n    }\n  },\n  { immediate: true }\n);\n\n/**\n * Handle video play event.\n */\nconst handlePlay = () => {\n  isPlaying.value = true;\n  emit('playing');\n};\n\n/**\n * Handle video pause event.\n */\nconst handlePause = () => {\n  isPlaying.value = false;\n  emit('paused');\n};\n\n/**\n * Handle video error event.\n */\nconst handleError = (event: Event) => {\n  emit('error', event);\n};\n\n/**\n * Clean up on unmount.\n */\nonBeforeUnmount(() => {\n  if (videoRef.value) {\n    videoRef.value.srcObject = null;\n  }\n});\n</script>\n\n<template>\n  <video\n    ref=\"videoRef\"\n    :class=\"class\"\n    :autoplay=\"autoPlay\"\n    :muted=\"muted\"\n    :controls=\"controls\"\n    playsinline\n    @play=\"handlePlay\"\n    @pause=\"handlePause\"\n    @error=\"handleError\"\n  >\n    Your browser does not support the video element.\n  </video>\n</template>\n\n<style scoped>\nvideo {\n  max-width: 100%;\n  height: auto;\n}\n</style>\n",
+          "pug": "<script setup lang=\"ts\">\n/**\n * The ScreenShareViewer component displays the shared screen in a video element.\n * It automatically connects to the screen stream provided by ScreenShareProvider.\n */\n\nimport { inject, ref, watch, onBeforeUnmount, computed } from 'vue';\nimport {\n  ScreenShareStreamKey,\n  ScreenShareStateKey,\n  ScreenShareStartKey,\n  ScreenShareStopKey,\n  type ScreenShareOptions,\n} from '.';\n\nexport interface ScreenShareViewerProps {\n  /**\n   * Options to pass when starting screen share.\n   */\n  options?: ScreenShareOptions;\n  /**\n   * Whether the video should start playing automatically.\n   */\n  autoPlay?: boolean;\n  /**\n   * Whether the video should be muted.\n   */\n  muted?: boolean;\n  /**\n   * Whether to show video controls.\n   */\n  controls?: boolean;\n  /**\n   * CSS class to apply to the video element.\n   */\n  class?: string;\n  /**\n   * Whether to automatically start screen sharing when mounted.\n   * If true, will call startShare() on mount if not already sharing.\n   */\n  autoStart?: boolean;\n}\n\nconst props = withDefaults(defineProps<ScreenShareViewerProps>(), {\n  autoPlay: true,\n  muted: true,\n  controls: false,\n  autoStart: false,\n});\n\nconst emit = defineEmits<{\n  playing: [];\n  paused: [];\n  error: [error: Event];\n}>();\n\n/**\n * Inject screen sharing state and controls from parent ScreenShareProvider.\n */\nconst screenStream = inject(ScreenShareStreamKey);\nconst shareState = inject(ScreenShareStateKey);\nconst startShare = inject(ScreenShareStartKey);\nconst stopShare = inject(ScreenShareStopKey);\n\n/**\n * Reference to the video element.\n */\nconst videoRef = ref<HTMLVideoElement | null>(null);\n\n/**\n * Whether the video is currently playing.\n */\nconst isPlaying = ref(false);\n\n/**\n * Computed property to check if screen sharing is active.\n */\nconst isSharing = computed(() => shareState?.value === 'active');\n\n/**\n * Update the video element's srcObject when the stream changes.\n */\nwatch(\n  [screenStream, videoRef],\n  () => {\n    if (videoRef.value && screenStream?.value) {\n      videoRef.value.srcObject = screenStream.value;\n\n      // Play the video if autoPlay is enabled\n      if (props.autoPlay) {\n        videoRef.value.play().catch((error) => {\n          console.warn('Auto-play failed:', error);\n        });\n      }\n    } else if (videoRef.value) {\n      videoRef.value.srcObject = null;\n    }\n  },\n  { immediate: true }\n);\n\n/**\n * Auto-start screen sharing if enabled and not already sharing.\n */\nwatch(\n  [() => props.autoStart, isSharing],\n  async ([autoStart, sharing]) => {\n    if (autoStart && !sharing && startShare) {\n      try {\n        await startShare(props.options);\n      } catch (error) {\n        // Error already handled in provider\n      }\n    }\n  },\n  { immediate: true }\n);\n\n/**\n * Handle video play event.\n */\nconst handlePlay = () => {\n  isPlaying.value = true;\n  emit('playing');\n};\n\n/**\n * Handle video pause event.\n */\nconst handlePause = () => {\n  isPlaying.value = false;\n  emit('paused');\n};\n\n/**\n * Handle video error event.\n */\nconst handleError = (event: Event) => {\n  emit('error', event);\n};\n\n/**\n * Clean up on unmount.\n */\nonBeforeUnmount(() => {\n  if (videoRef.value) {\n    videoRef.value.srcObject = null;\n  }\n});\n</script>\n\n<template lang=\"pug\">\nvideo(ref=\"videoRef\" :class=\"class\" :autoplay=\"autoPlay\" :muted=\"muted\" :controls=\"controls\" playsinline @play=\"handlePlay\" @pause=\"handlePause\" @error=\"handleError\")\n  | Your browser does not support the video element.\n</template>\n\n<style scoped>\nvideo {\n  max-width: 100%;\n  height: auto;\n}\n</style>\n"
+        }
+      },
+      "type": "registry:ui"
+    }
+  ]
+}

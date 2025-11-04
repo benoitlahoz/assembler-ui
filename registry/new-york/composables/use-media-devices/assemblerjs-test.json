@@ -1,0 +1,167 @@
+{
+  "$schema": "https://shadcn-vue.com/schema/registry-item.json",
+  "install": "https://benoitlahoz.github.io/assembler-ui/r/use-media-devices.json",
+  "name": "use-media-devices",
+  "title": "useMediaDevices",
+  "description": "Composable for managing media devices (cameras, microphones, speakers).\n\nThis composable provides reactive state and methods for accessing and managing\nmedia devices using the MediaDevices API. It handles permissions, device enumeration,\nand stream management with caching.",
+  "category": "devices",
+  "type": "registry:hook",
+  "dependencies": {
+    "dependsOn": [
+      {
+        "path": "composables/use-media-devices",
+        "name": "use-media-devices"
+      }
+    ],
+    "usedBy": [
+      "media-devices-provider",
+      "use-media-devices"
+    ]
+  },
+  "files": [
+    {
+      "name": "useMediaDevices",
+      "title": "useMediaDevices",
+      "path": "registry/new-york/composables/use-media-devices/useMediaDevices.ts",
+      "description": "Composable for managing media devices (cameras, microphones, speakers).\n\nThis composable provides reactive state and methods for accessing and managing\nmedia devices using the MediaDevices API. It handles permissions, device enumeration,\nand stream management with caching.",
+      "type": "registry:hook",
+      "category": {
+        "name": "devices",
+        "definition": [
+          "Media Devices Hook"
+        ]
+      },
+      "doc": {
+        "path": "registry/new-york/composables/use-media-devices/useMediaDevices.ts",
+        "description": "Composable for managing media devices (cameras, microphones, speakers).\n\nThis composable provides reactive state and methods for accessing and managing\nmedia devices using the MediaDevices API. It handles permissions, device enumeration,\nand stream management with caching.",
+        "params": [
+          {
+            "name": "options",
+            "type": "UseMediaDevicesOptions",
+            "default": "{}",
+            "description": ""
+          }
+        ],
+        "returns": {
+          "type": "{ devices, cameras, microphones, speakers, errors, isLoading, permissions, activeStreams, startStream, stopStream, stopAllStreams, updateAvailableDevices, ensurePermissions, initialize }",
+          "description": "The reactive state and methods for media devices.",
+          "properties": [
+            {
+              "name": "devices",
+              "type": "Ref<MediaDeviceInfo[]>",
+              "description": "List of available media devices."
+            },
+            {
+              "name": "cameras",
+              "type": "ComputedRef<any>",
+              "description": "Filtered list of video input devices (cameras)."
+            },
+            {
+              "name": "microphones",
+              "type": "ComputedRef<any>",
+              "description": "Filtered list of audio input devices (microphones)."
+            },
+            {
+              "name": "speakers",
+              "type": "ComputedRef<any>",
+              "description": "Filtered list of audio output devices (speakers)."
+            },
+            {
+              "name": "errors",
+              "type": "Ref<Error[]>",
+              "description": "List of errors encountered during media operations."
+            },
+            {
+              "name": "isLoading",
+              "type": "Ref<boolean>",
+              "description": "Indicates if device enumeration is in progress."
+            },
+            {
+              "name": "permissions",
+              "type": "Ref<MediaPermissions>",
+              "description": "Permission states for camera and microphone."
+            },
+            {
+              "name": "activeStreams",
+              "type": "Ref<Map<string, MediaStream>>",
+              "description": "Map of active streams indexed by deviceId (readonly)."
+            },
+            {
+              "name": "startStream",
+              "type": "MediaDevicesStartFn",
+              "description": "Function to start a media stream for a specific device."
+            },
+            {
+              "name": "stopStream",
+              "type": "MediaDevicesStopFn",
+              "description": "Function to stop a media stream for a specific device."
+            },
+            {
+              "name": "stopAllStreams",
+              "type": "MediaDevicesStopAllFn",
+              "description": "Function to stop all active media streams."
+            },
+            {
+              "name": "updateAvailableDevices",
+              "description": "Function to update the list of available devices."
+            },
+            {
+              "name": "ensurePermissions",
+              "description": "Function to ensure permissions are requested."
+            },
+            {
+              "name": "initialize",
+              "description": "Function to initialize the composable (call this on mount)."
+            }
+          ]
+        },
+        "types": [
+          {
+            "name": "MediaDeviceType",
+            "type": "type"
+          },
+          {
+            "name": "MediaDeviceKind",
+            "type": "type"
+          },
+          {
+            "name": "MediaPermissionState",
+            "type": "type"
+          },
+          {
+            "name": "MediaPermissions",
+            "type": "interface"
+          },
+          {
+            "name": "MediaDevicesStartFn",
+            "type": "type"
+          },
+          {
+            "name": "MediaDevicesStopFn",
+            "type": "type"
+          },
+          {
+            "name": "MediaDevicesStopAllFn",
+            "type": "type"
+          },
+          {
+            "name": "UseMediaDevicesOptions",
+            "type": "interface"
+          }
+        ],
+        "source": "/**\n * Composable for managing media devices (cameras, microphones, speakers).\n *\n * This composable provides reactive state and methods for accessing and managing\n * media devices using the MediaDevices API. It handles permissions, device enumeration,\n * and stream management with caching.\n *\n * @type registry:hook\n * @category devices\n * -- Media Devices Hook\n */\n\nimport { ref, computed, onBeforeUnmount } from 'vue';\nimport { useEventListener } from '@vueuse/core';\n\n// TEST\nimport { foo } from './foo';\nimport { bar } from './bar';\n\n/**\n * Supported media device types.\n */\nexport type MediaDeviceType = 'camera' | 'microphone' | 'all';\n\n/**\n * Media device kinds as defined by the MediaDevices API.\n */\nexport type MediaDeviceKind = 'videoinput' | 'audioinput' | 'audiooutput';\n\n/**\n * Permission states for media devices.\n */\nexport type MediaPermissionState = 'granted' | 'denied' | 'prompt' | 'unknown';\n\n/**\n * Permission status for different media types.\n */\nexport interface MediaPermissions {\n  camera: MediaPermissionState;\n  microphone: MediaPermissionState;\n}\n\n/**\n * Function to start a media stream with given deviceId and constraints.\n */\nexport type MediaDevicesStartFn = (\n  deviceId: string,\n  constraints: MediaStreamConstraints\n) => Promise<MediaStream>;\n\n/**\n * Function to stop a media stream for a given deviceId.\n */\nexport type MediaDevicesStopFn = (deviceId: string) => void;\n\n/**\n * Function to stop all active media streams.\n */\nexport type MediaDevicesStopAllFn = () => void;\n\n/**\n * Options for configuring media devices.\n */\nexport interface UseMediaDevicesOptions {\n  /**\n   * The type of media devices to request.\n   * @default 'all'\n   */\n  type?: MediaDeviceType;\n  /**\n   * Whether to automatically request media permissions and devices on initialization.\n   * @default false\n   */\n  open?: boolean;\n  /**\n   * Callback when a stream is started successfully.\n   */\n  onStreamStarted?: (deviceId: string, stream: MediaStream) => void;\n  /**\n   * Callback when a stream is stopped.\n   */\n  onStreamStopped?: (deviceId: string) => void;\n  /**\n   * Callback when all streams are stopped.\n   */\n  onAllStreamsStopped?: () => void;\n  /**\n   * Callback when devices list is updated.\n   */\n  onDevicesUpdated?: (devices: MediaDeviceInfo[]) => void;\n  /**\n   * Callback when an error occurs.\n   */\n  onError?: (error: Error) => void;\n}\n\nexport function useMediaDevices(options: UseMediaDevicesOptions = {}) {\n  const {\n    type = 'all',\n    open = false,\n    onStreamStarted,\n    onStreamStopped,\n    onAllStreamsStopped,\n    onDevicesUpdated,\n    onError,\n  } = options;\n\n  /**\n   * List of available media devices.\n   */\n  const devices = ref<MediaDeviceInfo[]>([]);\n\n  /**\n   * Array of errors encountered during media operations.\n   */\n  const errors = ref<Error[]>([]);\n\n  /**\n   * Indicates if device enumeration is in progress.\n   */\n  const isLoading = ref<boolean>(false);\n\n  /**\n   * Permission states for camera and microphone.\n   */\n  const permissions = ref<MediaPermissions>({\n    camera: 'unknown',\n    microphone: 'unknown',\n  });\n\n  /**\n   * Cache of active media streams indexed by deviceId.\n   */\n  const activeStreams = ref<Map<string, MediaStream>>(new Map());\n\n  /**\n   * Helper function to filter devices by kind with proper typing.\n   */\n  const filterDevicesByKind = (kind: MediaDeviceKind): MediaDeviceInfo[] => {\n    return devices.value.filter((d) => d.kind === kind);\n  };\n\n  /**\n   * Computed properties for filtered device lists.\n   */\n  const cameras = computed(() => filterDevicesByKind('videoinput'));\n  const microphones = computed(() => filterDevicesByKind('audioinput'));\n  const speakers = computed(() => filterDevicesByKind('audiooutput'));\n\n  /**\n   * Readonly version of active streams for safe exposure.\n   */\n  const roActiveStreams = computed(() => activeStreams.value as ReadonlyMap<string, MediaStream>);\n\n  /**\n   * Check permission state for a specific media type.\n   */\n  const checkPermission = async (name: 'camera' | 'microphone'): Promise<MediaPermissionState> => {\n    if (typeof navigator === 'undefined' || !navigator.permissions) {\n      return 'unknown';\n    }\n\n    try {\n      const permissionName = name === 'camera' ? 'camera' : 'microphone';\n      const result = await navigator.permissions.query({ name: permissionName as PermissionName });\n      return result.state as MediaPermissionState;\n    } catch (error) {\n      // Permissions API might not be supported or permission name not recognized\n      return 'unknown';\n    }\n  };\n\n  /**\n   * Update all permission states.\n   */\n  const updatePermissions = async () => {\n    permissions.value.camera = await checkPermission('camera');\n    permissions.value.microphone = await checkPermission('microphone');\n  };\n\n  /**\n   * Start a media stream with the given deviceId and constraints.\n   * Returns the cached stream if already active, or creates a new one.\n   */\n  const startStream: MediaDevicesStartFn = async (\n    deviceId: string,\n    constraints: MediaStreamConstraints\n  ): Promise<MediaStream> => {\n    // Check if we already have an active stream for this device\n    const existingStream = activeStreams.value.get(deviceId);\n    if (existingStream?.active) {\n      return existingStream;\n    }\n\n    // Remove inactive stream from cache\n    if (existingStream) {\n      activeStreams.value.delete(deviceId);\n    }\n\n    try {\n      // Check if we're in browser environment\n      if (typeof navigator === 'undefined' || !navigator.mediaDevices) {\n        throw new Error('navigator.mediaDevices not available (SSR or unsupported browser)');\n      }\n\n      const stream = await navigator.mediaDevices.getUserMedia(constraints);\n\n      activeStreams.value.set(deviceId, stream);\n      onStreamStarted?.(deviceId, stream);\n      return stream;\n    } catch (error) {\n      const err = error as Error;\n      errors.value.push(err);\n      onError?.(err);\n      throw error;\n    }\n  };\n\n  /**\n   * Stop a media stream for the given deviceId.\n   */\n  const stopStream: MediaDevicesStopFn = (deviceId: string) => {\n    const stream = activeStreams.value.get(deviceId);\n    if (stream) {\n      stream.getTracks().forEach((track) => track.stop());\n      activeStreams.value.delete(deviceId);\n      onStreamStopped?.(deviceId);\n    }\n  };\n\n  /**\n   * Stop all active media streams.\n   */\n  const stopAllStreams: MediaDevicesStopAllFn = () => {\n    activeStreams.value.forEach((stream, _deviceId) => {\n      stream.getTracks().forEach((track) => track.stop());\n    });\n    activeStreams.value.clear();\n    onAllStreamsStopped?.();\n  };\n\n  /**\n   * Update the list of available media devices.\n   */\n  const updateAvailableDevices = async () => {\n    if (\n      typeof navigator === 'undefined' ||\n      !navigator.mediaDevices ||\n      !navigator.mediaDevices.enumerateDevices\n    ) {\n      devices.value = [];\n      return;\n    }\n\n    isLoading.value = true;\n    try {\n      devices.value = await navigator.mediaDevices.enumerateDevices();\n      onDevicesUpdated?.(devices.value);\n    } catch (error) {\n      const err = error as Error;\n      errors.value.push(err);\n      onError?.(err);\n    } finally {\n      isLoading.value = false;\n    }\n  };\n\n  /**\n   * Request media permissions based on the configured type.\n   * This ensures device labels are available, especially in Firefox.\n   */\n  const requestMediaIfNeeded = async () => {\n    // Check if we're in browser environment\n    if (typeof navigator === 'undefined' || !navigator.mediaDevices) {\n      return;\n    }\n\n    const needsVideo = type === 'camera' || type === 'all';\n    const needsAudio = type === 'microphone' || type === 'all';\n\n    try {\n      // Always request getUserMedia to ensure device labels are available\n      // This is especially important for Firefox which doesn't populate labels\n      // without an active media stream, even if permission was previously granted\n      const stream = await navigator.mediaDevices.getUserMedia({\n        video: needsVideo,\n        audio: needsAudio,\n      });\n      // Stop all tracks immediately as we only needed to trigger the permission\n      // and ensure device labels are populated\n      stream.getTracks().forEach((track) => track.stop());\n\n      // Update permissions after successful request\n      await updatePermissions();\n    } catch (error) {\n      const err = error as Error;\n      errors.value.push(err);\n      onError?.(err);\n\n      // Update permissions even on error (to reflect denied state)\n      await updatePermissions();\n    }\n  };\n\n  /**\n   * Ensure permissions are requested if open is true.\n   */\n  const ensurePermissions = async () => {\n    if (open) {\n      await requestMediaIfNeeded();\n    }\n  };\n\n  /**\n   * Initialize the composable.\n   */\n  const initialize = async () => {\n    // Check initial permissions state\n    await updatePermissions();\n\n    if (open) {\n      await ensurePermissions();\n      // Wait a bit for Firefox to update device info after stopping tracks\n      await new Promise((resolve) => setTimeout(resolve, 100));\n      await updateAvailableDevices();\n    }\n  };\n\n  /**\n   * Listen for device changes if in browser environment.\n   */\n  if (typeof navigator !== 'undefined' && navigator.mediaDevices) {\n    useEventListener(navigator.mediaDevices, 'devicechange', updateAvailableDevices);\n  }\n\n  /**\n   * Clean up on unmount: stop all active streams.\n   */\n  onBeforeUnmount(() => {\n    stopAllStreams();\n  });\n\n  /**\n   * The reactive state and methods for media devices.\n   */\n  return {\n    /** List of available media devices. */\n    devices,\n    /** Filtered list of video input devices (cameras). */\n    cameras,\n    /** Filtered list of audio input devices (microphones). */\n    microphones,\n    /** Filtered list of audio output devices (speakers). */\n    speakers,\n    /** List of errors encountered during media operations. */\n    errors,\n    /** Indicates if device enumeration is in progress. */\n    isLoading,\n    /** Permission states for camera and microphone. */\n    permissions,\n    /** Map of active streams indexed by deviceId (readonly). */\n    activeStreams: roActiveStreams,\n    /** Function to start a media stream for a specific device. */\n    startStream,\n    /** Function to stop a media stream for a specific device. */\n    stopStream,\n    /** Function to stop all active media streams. */\n    stopAllStreams,\n    /** Function to update the list of available devices. */\n    updateAvailableDevices,\n    /** Function to ensure permissions are requested. */\n    ensurePermissions,\n    /** Function to initialize the composable (call this on mount). */\n    initialize,\n  };\n}\n"
+      }
+    },
+    {
+      "name": "foo",
+      "title": "foo",
+      "path": "registry/new-york/composables/use-media-devices/foo.ts",
+      "description": "",
+      "doc": {
+        "types": [],
+        "source": "import { bar } from './bar';\n\nexport const foo = 'bar';\n"
+      },
+      "type": "registry:hook"
+    }
+  ]
+}
