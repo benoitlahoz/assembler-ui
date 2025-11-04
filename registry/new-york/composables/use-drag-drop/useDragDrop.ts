@@ -57,6 +57,11 @@ export interface DragDropState<T = any> {
 
 export interface UseDragDropOptions {
   /**
+   * Référence vers l'élément conteneur pour le drag and drop.
+   * Si fourni, useElementBounding sera utilisé automatiquement.
+   */
+  containerRef?: Ref<HTMLElement | null>;
+  /**
    * Taille de l'unité de base (ex: taille d'une cellule en pixels).
    * Si non fourni, utilise les dimensions de l'item draggé (mode adaptatif)
    */
@@ -84,6 +89,8 @@ export interface UseDragDropReturn<T = any> {
   dragState: Ref<DragDropState<T>>;
   /** Offset du clic initial */
   dragOffset: Ref<{ x: number; y: number } | null>;
+  /** Bounds du conteneur (si containerRef fourni) */
+  containerBounds?: ReturnType<typeof useElementBounding>;
   /** Démarre le drag */
   startDrag: (event: DragEvent, item: DragDropItem<T>, fromContainer?: boolean) => void;
   /** Gère le survol */
@@ -91,6 +98,17 @@ export interface UseDragDropReturn<T = any> {
     event: DragEvent,
     containerBounds: DragDropBounds,
     getPosition: (bounds: DragDropBounds) => DragDropPosition | null
+  ) => DragDropPosition | null;
+  /** 
+   * Gère le survol (version simplifiée utilisant containerRef).
+   * Disponible uniquement si containerRef est fourni dans les options.
+   */
+  handleDragOverSimple?: (
+    event: DragEvent,
+    getPosition: (
+      virtualBounds: DragDropBounds,
+      containerBounds: DragDropBounds
+    ) => DragDropPosition | null
   ) => DragDropPosition | null;
   /** Termine le drag */
   endDrag: () => void;
@@ -104,7 +122,7 @@ export interface UseDragDropReturn<T = any> {
  * Composable pour gérer le drag and drop avec intersection précise
  */
 export function useDragDrop<T = any>(options: UseDragDropOptions): UseDragDropReturn<T> {
-  const { unitSize, gap = 0, allowCollision = false, validatePlacement } = options;
+  const { containerRef, unitSize, gap = 0, allowCollision = false, validatePlacement } = options;
 
   // État du drag
   const dragState = ref<DragDropState<T>>({
@@ -117,6 +135,9 @@ export function useDragDrop<T = any>(options: UseDragDropOptions): UseDragDropRe
 
   // Offset du clic initial pour un drag précis
   const dragOffset = ref<{ x: number; y: number } | null>(null);
+
+  // Bounds du conteneur si containerRef est fourni
+  const containerBounds = containerRef ? useElementBounding(containerRef) : undefined;
 
   /**
    * Démarre le drag d'un item
@@ -264,7 +285,32 @@ export function useDragDrop<T = any>(options: UseDragDropOptions): UseDragDropRe
     dragOffset.value = null;
   };
 
-  return {
+  /**
+   * Version simplifiée de handleDragOver utilisant containerBounds automatiquement
+   */
+  const handleDragOverSimple = containerBounds
+    ? (
+        event: DragEvent,
+        getPosition: (
+          virtualBounds: DragDropBounds,
+          containerBounds: DragDropBounds
+        ) => DragDropPosition | null
+      ): DragDropPosition | null => {
+        const bounds: DragDropBounds = {
+          left: containerBounds.left.value,
+          top: containerBounds.top.value,
+          right: containerBounds.right.value,
+          bottom: containerBounds.bottom.value,
+          width: containerBounds.width.value,
+          height: containerBounds.height.value,
+        };
+        return handleDragOver(event, bounds, (virtualBounds) =>
+          getPosition(virtualBounds, bounds)
+        );
+      }
+    : undefined;
+
+  const returnValue: UseDragDropReturn<T> = {
     dragState,
     dragOffset,
     startDrag,
@@ -273,6 +319,14 @@ export function useDragDrop<T = any>(options: UseDragDropOptions): UseDragDropRe
     getVirtualBounds,
     getItemFromDataTransfer,
   };
+
+  // Ajouter containerBounds et handleDragOverSimple si containerRef est fourni
+  if (containerBounds) {
+    returnValue.containerBounds = containerBounds;
+    returnValue.handleDragOverSimple = handleDragOverSimple;
+  }
+
+  return returnValue;
 }
 
 /**

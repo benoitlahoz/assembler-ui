@@ -4,7 +4,6 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useElementBounding } from '@vueuse/core';
 import { useDragDrop } from '../useDragDrop';
 
 interface Card {
@@ -19,7 +18,6 @@ interface Card {
 }
 
 const workspace = ref<HTMLElement | null>(null);
-const workspaceBounds = useElementBounding(workspace);
 
 const cards = ref<Card[]>([
   {
@@ -55,7 +53,8 @@ const cards = ref<Card[]>([
 ]);
 
 // Mode adaptatif : pas de unitSize !
-const { dragState, startDrag, handleDragOver, endDrag } = useDragDrop({
+const { dragState, startDrag, handleDragOverSimple, endDrag } = useDragDrop({
+  containerRef: workspace,
   gap: 0, // Pas d'espacement en mode adaptatif
 });
 
@@ -73,20 +72,11 @@ const onDragStart = (event: DragEvent, card: Card) => {
 };
 
 const onDragOver = (event: DragEvent) => {
-  const bounds = {
-    left: workspaceBounds.left.value,
-    top: workspaceBounds.top.value,
-    right: workspaceBounds.right.value,
-    bottom: workspaceBounds.bottom.value,
-    width: workspaceBounds.width.value,
-    height: workspaceBounds.height.value,
-  };
-
-  handleDragOver(event, bounds, (virtualBounds) => {
+  handleDragOverSimple?.(event, (virtualBounds, containerBounds) => {
     // En mode adaptatif, retourner directement les pixels
     return {
-      x: Math.round(virtualBounds.left - bounds.left),
-      y: Math.round(virtualBounds.top - bounds.top),
+      x: Math.round(virtualBounds.left - containerBounds.left),
+      y: Math.round(virtualBounds.top - containerBounds.top),
     };
   });
 };

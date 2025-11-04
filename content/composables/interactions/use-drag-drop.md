@@ -300,6 +300,8 @@ export interface DragDropState<T = any> {
 }
 
 export interface UseDragDropOptions {
+  containerRef?: Ref<HTMLElement | null>;
+
   unitSize?: number;
 
   gap?: number;
@@ -320,6 +322,8 @@ export interface UseDragDropReturn<T = any> {
 
   dragOffset: Ref<{ x: number; y: number } | null>;
 
+  containerBounds?: ReturnType<typeof useElementBounding>;
+
   startDrag: (
     event: DragEvent,
     item: DragDropItem<T>,
@@ -330,6 +334,14 @@ export interface UseDragDropReturn<T = any> {
     event: DragEvent,
     containerBounds: DragDropBounds,
     getPosition: (bounds: DragDropBounds) => DragDropPosition | null,
+  ) => DragDropPosition | null;
+
+  handleDragOverSimple?: (
+    event: DragEvent,
+    getPosition: (
+      virtualBounds: DragDropBounds,
+      containerBounds: DragDropBounds,
+    ) => DragDropPosition | null,
   ) => DragDropPosition | null;
 
   endDrag: () => void;
@@ -345,6 +357,7 @@ export function useDragDrop<T = any>(
   options: UseDragDropOptions,
 ): UseDragDropReturn<T> {
   const {
+    containerRef,
     unitSize,
     gap = 0,
     allowCollision = false,
@@ -360,6 +373,10 @@ export function useDragDrop<T = any>(
   }) as Ref<DragDropState<T>>;
 
   const dragOffset = ref<{ x: number; y: number } | null>(null);
+
+  const containerBounds = containerRef
+    ? useElementBounding(containerRef)
+    : undefined;
 
   const startDrag = (
     event: DragEvent,
@@ -494,7 +511,29 @@ export function useDragDrop<T = any>(
     dragOffset.value = null;
   };
 
-  return {
+  const handleDragOverSimple = containerBounds
+    ? (
+        event: DragEvent,
+        getPosition: (
+          virtualBounds: DragDropBounds,
+          containerBounds: DragDropBounds,
+        ) => DragDropPosition | null,
+      ): DragDropPosition | null => {
+        const bounds: DragDropBounds = {
+          left: containerBounds.left.value,
+          top: containerBounds.top.value,
+          right: containerBounds.right.value,
+          bottom: containerBounds.bottom.value,
+          width: containerBounds.width.value,
+          height: containerBounds.height.value,
+        };
+        return handleDragOver(event, bounds, (virtualBounds) =>
+          getPosition(virtualBounds, bounds),
+        );
+      }
+    : undefined;
+
+  const returnValue: UseDragDropReturn<T> = {
     dragState,
     dragOffset,
     startDrag,
@@ -503,6 +542,13 @@ export function useDragDrop<T = any>(
     getVirtualBounds,
     getItemFromDataTransfer,
   };
+
+  if (containerBounds) {
+    returnValue.containerBounds = containerBounds;
+    returnValue.handleDragOverSimple = handleDragOverSimple;
+  }
+
+  return returnValue;
 }
 
 export class DragDropUtils {
@@ -635,7 +681,6 @@ export class DragDropUtils {
 ```vue
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { useElementBounding } from "@vueuse/core";
 import { useDragDrop } from "../useDragDrop";
 
 interface Event {
@@ -648,7 +693,6 @@ interface Event {
 }
 
 const timeline = ref<HTMLElement | null>(null);
-const timelineBounds = useElementBounding(timeline);
 
 const events = ref<Event[]>([
   {
@@ -699,7 +743,8 @@ const END_HOUR = 22;
 const WORK_START = 8;
 const WORK_END = 18;
 
-const { dragState, startDrag, handleDragOver, endDrag } = useDragDrop({
+const { dragState, startDrag, handleDragOverSimple, endDrag } = useDragDrop({
+  containerRef: timeline,
   unitSize: HOUR_HEIGHT,
   gap: 0,
   allowCollision: true,
@@ -724,17 +769,8 @@ const onDragStart = (event: DragEvent, evt: Event) => {
 };
 
 const onDragOver = (event: DragEvent) => {
-  const bounds = {
-    left: timelineBounds.left.value,
-    top: timelineBounds.top.value,
-    right: timelineBounds.right.value,
-    bottom: timelineBounds.bottom.value,
-    width: timelineBounds.width.value,
-    height: timelineBounds.height.value,
-  };
-
-  handleDragOver(event, bounds, (virtualBounds) => {
-    const relativeY = virtualBounds.top - bounds.top;
+  handleDragOverSimple?.(event, (virtualBounds, containerBounds) => {
+    const relativeY = virtualBounds.top - containerBounds.top;
     const hour = START_HOUR + relativeY / HOUR_HEIGHT;
 
     const roundedHour = Math.round(hour * 4) / 4;
@@ -1167,7 +1203,6 @@ const columnConfig = {
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";
-import { useElementBounding } from "@vueuse/core";
 import { useDragDrop } from "../useDragDrop";
 
 interface PaletteItem {
@@ -1234,7 +1269,6 @@ const palette: PaletteItem[] = [
 ];
 
 const canvas = ref<HTMLElement | null>(null);
-const canvasBounds = useElementBounding(canvas);
 
 const placedItems = ref<PlacedItem[]>([
   {
@@ -1248,7 +1282,8 @@ const placedItems = ref<PlacedItem[]>([
   },
 ]);
 
-const { dragState, startDrag, handleDragOver, endDrag } = useDragDrop({
+const { dragState, startDrag, handleDragOverSimple, endDrag } = useDragDrop({
+  containerRef: canvas,
   unitSize: 80,
   gap: 0,
 });
@@ -1280,18 +1315,9 @@ const onDragFromCanvas = (event: DragEvent, item: PlacedItem) => {
 };
 
 const onCanvasDragOver = (event: DragEvent) => {
-  const bounds = {
-    left: canvasBounds.left.value,
-    top: canvasBounds.top.value,
-    right: canvasBounds.right.value,
-    bottom: canvasBounds.bottom.value,
-    width: canvasBounds.width.value,
-    height: canvasBounds.height.value,
-  };
-
-  handleDragOver(event, bounds, (virtualBounds) => ({
-    x: Math.max(0, Math.round(virtualBounds.left - bounds.left)),
-    y: Math.max(0, Math.round(virtualBounds.top - bounds.top)),
+  handleDragOverSimple?.(event, (virtualBounds, containerBounds) => ({
+    x: Math.max(0, Math.round(virtualBounds.left - containerBounds.left)),
+    y: Math.max(0, Math.round(virtualBounds.top - containerBounds.top)),
   }));
 };
 
@@ -1486,7 +1512,6 @@ const selectedItem = ref<string | null>(null);
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";
-import { useElementBounding } from "@vueuse/core";
 import { useDragDrop } from "../useDragDrop";
 
 interface Widget {
@@ -1501,7 +1526,6 @@ interface Widget {
 }
 
 const canvas = ref<HTMLElement | null>(null);
-const canvasBounds = useElementBounding(canvas);
 
 const widgets = ref<Widget[]>([
   {
@@ -1538,10 +1562,16 @@ const widgets = ref<Widget[]>([
 
 const selectedWidget = ref<string | null>(null);
 
-const { dragState, startDrag, handleDragOver, endDrag, getVirtualBounds } =
-  useDragDrop({
-    gap: 0,
-  });
+const {
+  dragState,
+  startDrag,
+  handleDragOverSimple,
+  endDrag,
+  getVirtualBounds,
+} = useDragDrop({
+  containerRef: canvas,
+  gap: 0,
+});
 
 const onDragStart = (event: DragEvent, widget: Widget) => {
   selectedWidget.value = widget.id;
@@ -1559,19 +1589,10 @@ const onDragStart = (event: DragEvent, widget: Widget) => {
 };
 
 const onDragOver = (event: DragEvent) => {
-  const bounds = {
-    left: canvasBounds.left.value,
-    top: canvasBounds.top.value,
-    right: canvasBounds.right.value,
-    bottom: canvasBounds.bottom.value,
-    width: canvasBounds.width.value,
-    height: canvasBounds.height.value,
-  };
-
-  handleDragOver(event, bounds, (virtualBounds) => {
+  handleDragOverSimple?.(event, (virtualBounds, containerBounds) => {
     return {
-      x: Math.round(virtualBounds.left - bounds.left),
-      y: Math.round(virtualBounds.top - bounds.top),
+      x: Math.round(virtualBounds.left - containerBounds.left),
+      y: Math.round(virtualBounds.top - containerBounds.top),
     };
   });
 };
@@ -1747,7 +1768,6 @@ const addWidget = (type: Widget["type"]) => {
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useElementBounding } from '@vueuse/core';
 import { useDragDrop } from '../useDragDrop';
 
 interface Card {
@@ -1762,7 +1782,6 @@ interface Card {
 }
 
 const workspace = ref<HTMLElement | null>(null);
-const workspaceBounds = useElementBounding(workspace);
 
 const cards = ref<Card[]>([
   {
@@ -1798,7 +1817,8 @@ const cards = ref<Card[]>([
 ]);
 
 
-const { dragState, startDrag, handleDragOver, endDrag } = useDragDrop({
+const { dragState, startDrag, handleDragOverSimple, endDrag } = useDragDrop({
+  containerRef: workspace,
   gap: 0, 
 });
 
@@ -1816,20 +1836,11 @@ const onDragStart = (event: DragEvent, card: Card) => {
 };
 
 const onDragOver = (event: DragEvent) => {
-  const bounds = {
-    left: workspaceBounds.left.value,
-    top: workspaceBounds.top.value,
-    right: workspaceBounds.right.value,
-    bottom: workspaceBounds.bottom.value,
-    width: workspaceBounds.width.value,
-    height: workspaceBounds.height.value,
-  };
-
-  handleDragOver(event, bounds, (virtualBounds) => {
+  handleDragOverSimple?.(event, (virtualBounds, containerBounds) => {
     
     return {
-      x: Math.round(virtualBounds.left - bounds.left),
-      y: Math.round(virtualBounds.top - bounds.top),
+      x: Math.round(virtualBounds.left - containerBounds.left),
+      y: Math.round(virtualBounds.top - containerBounds.top),
     };
   });
 };

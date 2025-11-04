@@ -4,7 +4,6 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useElementBounding } from '@vueuse/core';
 import { useDragDrop } from '../useDragDrop';
 
 interface PaletteItem {
@@ -65,7 +64,6 @@ const palette: PaletteItem[] = [
 ];
 
 const canvas = ref<HTMLElement | null>(null);
-const canvasBounds = useElementBounding(canvas);
 
 const placedItems = ref<PlacedItem[]>([
   {
@@ -79,7 +77,8 @@ const placedItems = ref<PlacedItem[]>([
   },
 ]);
 
-const { dragState, startDrag, handleDragOver, endDrag } = useDragDrop({
+const { dragState, startDrag, handleDragOverSimple, endDrag } = useDragDrop({
+  containerRef: canvas,
   unitSize: 80,
   gap: 0,
 });
@@ -111,18 +110,9 @@ const onDragFromCanvas = (event: DragEvent, item: PlacedItem) => {
 };
 
 const onCanvasDragOver = (event: DragEvent) => {
-  const bounds = {
-    left: canvasBounds.left.value,
-    top: canvasBounds.top.value,
-    right: canvasBounds.right.value,
-    bottom: canvasBounds.bottom.value,
-    width: canvasBounds.width.value,
-    height: canvasBounds.height.value,
-  };
-
-  handleDragOver(event, bounds, (virtualBounds) => ({
-    x: Math.max(0, Math.round(virtualBounds.left - bounds.left)),
-    y: Math.max(0, Math.round(virtualBounds.top - bounds.top)),
+  handleDragOverSimple?.(event, (virtualBounds, containerBounds) => ({
+    x: Math.max(0, Math.round(virtualBounds.left - containerBounds.left)),
+    y: Math.max(0, Math.round(virtualBounds.top - containerBounds.top)),
   }));
 };
 

@@ -4,7 +4,6 @@
 -->
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { useElementBounding } from '@vueuse/core';
 import { useDragDrop } from '../useDragDrop';
 
 interface Event {
@@ -17,7 +16,6 @@ interface Event {
 }
 
 const timeline = ref<HTMLElement | null>(null);
-const timelineBounds = useElementBounding(timeline);
 
 const events = ref<Event[]>([
   {
@@ -68,7 +66,8 @@ const END_HOUR = 22;
 const WORK_START = 8;
 const WORK_END = 18;
 
-const { dragState, startDrag, handleDragOver, endDrag } = useDragDrop({
+const { dragState, startDrag, handleDragOverSimple, endDrag } = useDragDrop({
+  containerRef: timeline,
   unitSize: HOUR_HEIGHT,
   gap: 0,
   allowCollision: true, // Les événements peuvent se chevaucher dans une timeline
@@ -93,18 +92,9 @@ const onDragStart = (event: DragEvent, evt: Event) => {
 };
 
 const onDragOver = (event: DragEvent) => {
-  const bounds = {
-    left: timelineBounds.left.value,
-    top: timelineBounds.top.value,
-    right: timelineBounds.right.value,
-    bottom: timelineBounds.bottom.value,
-    width: timelineBounds.width.value,
-    height: timelineBounds.height.value,
-  };
-
-  handleDragOver(event, bounds, (virtualBounds) => {
+  handleDragOverSimple?.(event, (virtualBounds, containerBounds) => {
     // Calculer l'heure basée sur la position Y
-    const relativeY = virtualBounds.top - bounds.top;
+    const relativeY = virtualBounds.top - containerBounds.top;
     const hour = START_HOUR + relativeY / HOUR_HEIGHT;
 
     // Arrondir à 15 minutes (0.25h)

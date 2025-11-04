@@ -4,7 +4,6 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useElementBounding } from '@vueuse/core';
 import { useDragDrop } from '../useDragDrop';
 
 interface Widget {
@@ -19,7 +18,6 @@ interface Widget {
 }
 
 const canvas = ref<HTMLElement | null>(null);
-const canvasBounds = useElementBounding(canvas);
 
 const widgets = ref<Widget[]>([
   {
@@ -56,7 +54,8 @@ const widgets = ref<Widget[]>([
 
 const selectedWidget = ref<string | null>(null);
 
-const { dragState, startDrag, handleDragOver, endDrag, getVirtualBounds } = useDragDrop({
+const { dragState, startDrag, handleDragOverSimple, endDrag, getVirtualBounds } = useDragDrop({
+  containerRef: canvas,
   gap: 0,
   // Mode adaptatif : unitSize non défini
   // width et height seront en pixels directement
@@ -78,20 +77,11 @@ const onDragStart = (event: DragEvent, widget: Widget) => {
 };
 
 const onDragOver = (event: DragEvent) => {
-  const bounds = {
-    left: canvasBounds.left.value,
-    top: canvasBounds.top.value,
-    right: canvasBounds.right.value,
-    bottom: canvasBounds.bottom.value,
-    width: canvasBounds.width.value,
-    height: canvasBounds.height.value,
-  };
-
-  handleDragOver(event, bounds, (virtualBounds) => {
+  handleDragOverSimple?.(event, (virtualBounds, containerBounds) => {
     // Retourner la position en pixels relative au canvas
     return {
-      x: Math.round(virtualBounds.left - bounds.left),
-      y: Math.round(virtualBounds.top - bounds.top),
+      x: Math.round(virtualBounds.left - containerBounds.left),
+      y: Math.round(virtualBounds.top - containerBounds.top),
     };
   });
 };
