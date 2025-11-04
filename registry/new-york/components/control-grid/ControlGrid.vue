@@ -5,14 +5,13 @@
  */
 
 import { provide, watch, onMounted, computed, ref, nextTick, type Ref } from 'vue';
-import {
-  useElementSize,
-  useElementBounding,
-  useMouse,
-  useDraggable,
-  useEventListener,
-} from '@vueuse/core';
+import { useElementSize, useElementBounding, useMouse, useEventListener } from '@vueuse/core';
 import { useMotion } from '@vueuse/motion';
+import {
+  useDragDrop,
+  DragDropUtils,
+  type DragDropItem,
+} from '../../composables/use-drag-drop/useDragDrop';
 import {
   ControlGridItemsKey,
   ControlGridConfigKey,
@@ -89,17 +88,7 @@ const emit = defineEmits<{
 const gridContainer = ref<HTMLElement | null>(null);
 const placedItems = ref<GridItem[]>([...props.items]);
 const hoverCell = ref<GridPosition | null>(null);
-const dragState = ref<DragState>({
-  item: null,
-  fromGrid: false,
-  hoverPosition: null,
-  isValid: false,
-});
 const previewSize = ref<{ width: number; height: number } | null>(null);
-const isDragging = ref(false);
-
-// Offset du clic initial pour un drag précis
-const dragOffset = ref<{ x: number; y: number } | null>(null);
 
 // Map pour stocker les refs des items
 const itemRefs = ref<Map<string, HTMLElement>>(new Map());
@@ -111,6 +100,45 @@ const componentRegistry = ref<Map<string, any>>(new Map());
 const { width: gridWidth, height: gridHeight } = useElementSize(gridContainer);
 const gridBounds = useElementBounding(gridContainer);
 const { x: mouseX, y: mouseY } = useMouse();
+
+// Utiliser le composable de drag and drop
+const {
+  dragState: internalDragState,
+  dragOffset,
+  startDrag,
+  handleDragOver: handleDragOverComposable,
+  endDrag,
+  getVirtualBounds,
+  getItemFromDataTransfer,
+} = useDragDrop<any>({
+  unitSize: props.cellSize,
+  gap: props.gap,
+  validatePlacement: (x, y, width, height, excludeId) => {
+    return isValidPlacement(x, y, width, height, excludeId);
+  },
+});
+
+// Adapter le dragState pour la compatibilité avec GridItem
+const dragState = ref<DragState>({
+  item: null,
+  fromGrid: false,
+  hoverPosition: null,
+  isValid: false,
+});
+
+// Synchroniser les états
+watch(
+  internalDragState,
+  (newState) => {
+    dragState.value = {
+      item: newState.item as GridItem | null,
+      fromGrid: newState.fromContainer,
+      hoverPosition: newState.hoverPosition,
+      isValid: newState.isValid,
+    };
+  },
+  { deep: true }
+);
 
 // Motion pour l'aperçu de placement
 const previewRef = ref<HTMLElement | null>(null);
@@ -417,110 +445,43 @@ const getRegisteredComponents = (): string[] => {
   return Array.from(componentRegistry.value.keys());
 };
 
-// Drag and Drop handlers avec useDraggable
+// Drag and Drop handlers utilisant le composable
 const handleDragStart = (event: DragEvent, item: GridItem, fromGrid = false) => {
-  if (!dragState.value) return;
-
-  dragState.value.item = { ...item };
-  dragState.value.fromGrid = fromGrid;
   previewSize.value = { width: item.width, height: item.height };
-  isDragging.value = true;
-
-  // Calculer l'offset du clic par rapport au coin supérieur gauche de l'élément
-  if (event.target instanceof HTMLElement && gridContainer.value) {
-    const targetRect = event.target.getBoundingClientRect();
-    const gridRect = gridContainer.value.getBoundingClientRect();
-
-    // Position du clic relative à l'élément
-    const offsetX = event.clientX - targetRect.left;
-    const offsetY = event.clientY - targetRect.top;
-
-    dragOffset.value = { x: offsetX, y: offsetY };
-  }
-
-  if (event.dataTransfer) {
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('application/json', JSON.stringify(item));
-  }
+  startDrag(event, item, fromGrid);
 };
 
 const handleDragOver = (event: DragEvent) => {
-  event.preventDefault();
+  // Utiliser le composable pour gérer le drag over
+  const containerBounds = {
+    left: gridBounds.left.value,
+    top: gridBounds.top.value,
+    right: gridBounds.right.value,
+    bottom: gridBounds.bottom.value,
+    width: gridBounds.width.value,
+    height: gridBounds.height.value,
+  };
 
-  if (!dragState.value) return;
+  const pos = handleDragOverComposable(event, containerBounds, (virtualBounds) => {
+    return DragDropUtils.getPositionByIntersection(
+      virtualBounds,
+      containerBounds,
+      props.cellSize,
+      props.gap,
+      columns.value,
+      rows.value
+    );
+  });
 
+  // Mettre à jour hoverCell avec la position calculée
+  hoverCell.value = pos;
+
+  // Gérer previewSize pour les items externes
   if (!dragState.value.item && event.dataTransfer) {
     const types = event.dataTransfer.types;
     if (types.includes('application/json')) {
       previewSize.value = { width: 1, height: 1 };
     }
-  }
-
-  if (event.dataTransfer) {
-    const effect = event.dataTransfer.effectAllowed;
-    if (effect === 'copy' || effect === 'copyMove') {
-      event.dataTransfer.dropEffect = 'copy';
-    } else {
-      event.dataTransfer.dropEffect = 'move';
-    }
-  }
-
-  // Calculer la position basée sur l'intersection avec un rectangle virtuel
-  let pos: { x: number; y: number } | null = null;
-
-  if (dragState.value.item) {
-    // Créer un rectangle virtuel basé sur l'offset du clic initial
-    const itemWidth = dragState.value.item.width * (props.cellSize + props.gap) - props.gap;
-    const itemHeight = dragState.value.item.height * (props.cellSize + props.gap) - props.gap;
-
-    // Utiliser l'offset du clic ou centrer par défaut
-    const offsetX = dragOffset.value?.x ?? itemWidth / 2;
-    const offsetY = dragOffset.value?.y ?? itemHeight / 2;
-
-    const virtualBounds = {
-      left: event.clientX - offsetX,
-      top: event.clientY - offsetY,
-      right: event.clientX - offsetX + itemWidth,
-      bottom: event.clientY - offsetY + itemHeight,
-      width: itemWidth,
-      height: itemHeight,
-    };
-
-    // Calculer la position basée sur l'intersection
-    pos = getGridPositionByIntersection(virtualBounds);
-  }
-
-  // Fallback sur la position de la souris si pas d'intersection trouvée
-  if (!pos) {
-    pos = getGridPosition(event.clientX, event.clientY);
-  }
-
-  if (dragState.value.item) {
-    const excludeId = dragState.value.fromGrid ? dragState.value.item.id : undefined;
-
-    if (
-      isValidPlacement(
-        pos.x,
-        pos.y,
-        dragState.value.item.width,
-        dragState.value.item.height,
-        excludeId
-      )
-    ) {
-      hoverCell.value = pos;
-      dragState.value.hoverPosition = pos;
-      dragState.value.isValid = true;
-    } else {
-      hoverCell.value = null;
-      dragState.value.hoverPosition = null;
-      dragState.value.isValid = false;
-      if (event.dataTransfer) {
-        event.dataTransfer.dropEffect = 'none';
-      }
-    }
-  } else if (previewSize.value) {
-    hoverCell.value = pos;
-    dragState.value.hoverPosition = pos;
   }
 };
 
@@ -547,16 +508,9 @@ const handleDragEnter = (event: DragEvent) => {
 };
 
 const handleDragEnd = () => {
-  if (!dragState.value) return;
-
-  dragState.value.item = null;
   hoverCell.value = null;
-  dragState.value.fromGrid = false;
-  dragState.value.hoverPosition = null;
-  dragState.value.isValid = false;
   previewSize.value = null;
-  isDragging.value = false;
-  dragOffset.value = null; // Réinitialiser l'offset
+  endDrag();
 };
 
 const handleDrop = (event: DragEvent) => {
