@@ -15,6 +15,7 @@ import { useEventListener } from '@vueuse/core';
 
 // TEST
 import { foo } from './foo';
+import { bar } from './bar';
 
 /**
  * Supported media device types.

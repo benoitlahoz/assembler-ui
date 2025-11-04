@@ -7,6 +7,12 @@ import {
   groupImportsByFolder,
   type ImportInfo,
 } from './parse-folder/common/extract-imports';
+import {
+  createDependencyMap,
+  saveDependencyMap,
+  displayDependencyMapStats,
+  type FolderAnalysisResult,
+} from './create-dependency-map';
 import config from '../assembler-ui.config';
 
 /**
@@ -15,6 +21,7 @@ import config from '../assembler-ui.config';
  * Usage:
  *   yarn tsx scripts/test-extract-imports.ts           # Affichage formaté
  *   yarn tsx scripts/test-extract-imports.ts --json    # Sortie JSON
+ *   yarn tsx scripts/test-extract-imports.ts --map     # Génère une carte de dépendances
  */
 
 // Construire les dossiers de test à partir de la config
@@ -41,8 +48,10 @@ config.paths.forEach((subPath: string) => {
 });
 
 const isJsonMode = process.argv.includes('--json');
+const isMapMode = process.argv.includes('--map');
+const shouldGenerateJson = isJsonMode || isMapMode; // Générer JSON pour les deux modes
 
-if (!isJsonMode) {
+if (!shouldGenerateJson) {
   console.log("🧪 Test de l'extraction des imports\n");
   console.log('='.repeat(80));
 }
@@ -57,7 +66,7 @@ const resolveConfig = {
 };
 
 // Résultats pour mode JSON
-const jsonResults: any[] = [];
+const jsonResults: FolderAnalysisResult[] = [];
 
 /**
  * Récupère tous les fichiers .vue, .ts, .js d'un dossier
@@ -124,7 +133,7 @@ testFolders.forEach((folderPath) => {
   const grouped = groupImportsByFolder(uniqueImports, config.paths);
 
   // Stocker pour mode JSON - format pour code-tree
-  if (isJsonMode) {
+  if (shouldGenerateJson) {
     // Créer la structure pour le code-tree
     const imports = Object.entries(grouped)
       .map(([folderType, imports]) => {
@@ -202,6 +211,14 @@ if (isJsonMode) {
   const outputPath = path.resolve(__dirname, 'test-extract-imports.json');
   fs.writeFileSync(outputPath, JSON.stringify(jsonResults, null, 2), 'utf-8');
   console.log(`✅ Résultats écrits dans: ${outputPath}`);
+} else if (isMapMode) {
+  // Générer une carte de dépendances globale
+  const dependencyMap = createDependencyMap(jsonResults, config.globalPath);
+
+  const mapOutputPath = path.resolve(__dirname, 'dependency-map.json');
+  saveDependencyMap(dependencyMap, mapOutputPath);
+  console.log(`✅ Carte de dépendances écrite dans: ${mapOutputPath}`);
+  displayDependencyMapStats(dependencyMap);
 } else {
   console.log('\n✅ Test terminé\n');
 }
