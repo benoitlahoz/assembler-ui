@@ -70,11 +70,11 @@ function getFilesFromAssembler(assemblerPath: string): FileEntry[] {
 function getOutputDir(type: string, category?: string): string {
   // Normalise le type (ex: 'registry:ui' => 'ui')
   const normalizedType = (type || '').split(':').pop() || '';
-  // Utilise le mapping de la configuration si disponible, sinon 'misc'
+  // Utilise le mapping de la configuration si disponible, sinon 'miscellaneous'
   const typeMapping = config.typeMapping as Record<string, string> | undefined;
-  const base = typeMapping?.[normalizedType] || 'misc';
+  const base = typeMapping?.[normalizedType] || 'miscellaneous';
   // Ajoute la catégorie si présente
-  if (category && base !== 'misc') {
+  if (category && base !== 'miscellaneous') {
     return path.resolve(process.cwd(), `content/${base}/${category}`);
   }
   return path.resolve(process.cwd(), `content/${base}`);
