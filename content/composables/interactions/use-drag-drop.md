@@ -259,7 +259,7 @@ Copy and paste these files into your project.
 :::code-tree{default-value="src/composables/use-drag-drop/useDragDrop.ts"}
 
 ```ts [src/composables/use-drag-drop/useDragDrop.ts]
-import { ref, computed, type Ref } from "vue";
+import { ref, computed, type Ref, onMounted } from "vue";
 import { useElementBounding } from "@vueuse/core";
 
 export interface DragDropItem<T = any> {

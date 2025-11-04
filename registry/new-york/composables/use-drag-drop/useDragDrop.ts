@@ -12,7 +12,7 @@
  * @demo AdaptiveModeDemo
  */
 
-import { ref, computed, type Ref } from 'vue';
+import { ref, computed, type Ref, onMounted } from 'vue';
 import { useElementBounding } from '@vueuse/core';
 
 export interface DragDropItem<T = any> {
@@ -99,7 +99,7 @@ export interface UseDragDropReturn<T = any> {
     containerBounds: DragDropBounds,
     getPosition: (bounds: DragDropBounds) => DragDropPosition | null
   ) => DragDropPosition | null;
-  /** 
+  /**
    * Gère le survol (version simplifiée utilisant containerRef).
    * Disponible uniquement si containerRef est fourni dans les options.
    */
@@ -137,6 +137,7 @@ export function useDragDrop<T = any>(options: UseDragDropOptions): UseDragDropRe
   const dragOffset = ref<{ x: number; y: number } | null>(null);
 
   // Bounds du conteneur si containerRef est fourni
+  // useElementBounding de VueUse gère déjà le SSR (retourne des valeurs par défaut côté serveur)
   const containerBounds = containerRef ? useElementBounding(containerRef) : undefined;
 
   /**
@@ -304,9 +305,7 @@ export function useDragDrop<T = any>(options: UseDragDropOptions): UseDragDropRe
           width: containerBounds.width.value,
           height: containerBounds.height.value,
         };
-        return handleDragOver(event, bounds, (virtualBounds) =>
-          getPosition(virtualBounds, bounds)
-        );
+        return handleDragOver(event, bounds, (virtualBounds) => getPosition(virtualBounds, bounds));
       }
     : undefined;
 
