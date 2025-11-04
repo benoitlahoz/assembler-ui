@@ -16,12 +16,7 @@ import {
 import config from '../assembler-ui.config';
 
 /**
- * Script de test pour générer des documentations MDC à partir des assemblerjs-test.json enrichis
- *
- * Différences avec generate-docs.ts :
- * 1. Utilise assemblerjs-test.json au lieu de assemblerjs.json
- * 2. Utilise les templates de tests/ qui incluent les dépendances dans le code-tree
- * 3. Génère dans les dossiers content/ avec le suffixe -test.md
+ * Script to generate MDC documentation from enriched assemblerjs.json files
  *
  * Usage:
  *   yarn tsx scripts/generate-docs.ts
@@ -84,12 +79,12 @@ function getFilesFromAssembler(assemblerPath: string): FileEntry[] {
 }
 
 function getOutputDir(type: string, category?: string): string {
-  // Normalise le type (ex: 'registry:ui' => 'ui')
+  // Normalize the type (e.g., 'registry:ui' => 'ui')
   const normalizedType = (type || '').split(':').pop() || '';
-  // Utilise le mapping de la configuration si disponible, sinon 'miscellaneous'
+  // Use the type mapping from config if available, otherwise 'miscellaneous'
   const typeMapping = config.typeMapping as Record<string, string> | undefined;
   const base = typeMapping?.[normalizedType] || 'miscellaneous';
-  // Génère dans les dossiers content/ usuels
+  // Generate in the usual content/ folders
   if (category && base !== 'miscellaneous') {
     return path.resolve(process.cwd(), `content/${base}/${category}`);
   }
@@ -138,14 +133,14 @@ export async function generateDocs(): Promise<void> {
                 let code = '';
                 let lang = '';
 
-                // Calculer le filename relatif au dossier du composable
-                // Ex: "registry/new-york/composables/use-media-devices/bar/index.ts"
-                // -> chercher "use-media-devices/" et prendre ce qui suit
+                // Calculate the filename relative to the composable folder
+                // E.g., "registry/new-york/composables/use-media-devices/bar/index.ts"
+                // -> search for "use-media-devices/" and take what follows
                 let filename = path.basename(file.path);
                 const componentFolderName = `${assembler.name}/`;
                 const componentFolderIndex = file.path.indexOf(componentFolderName);
                 if (componentFolderIndex !== -1) {
-                  // Extraire le chemin relatif après le nom du composable
+                  // Extract the relative path after the composable name
                   filename = file.path.substring(componentFolderIndex + componentFolderName.length);
                 }
 
@@ -221,7 +216,7 @@ export async function generateDocs(): Promise<void> {
             codeTreeDefaultValue = `${codeBasePath}/${sortedCodes[0].filename}`;
           }
 
-          // AJOUT: Charger les codes des dépendances
+          // Load dependency codes
           let dependencyCodes: any[] = [];
           if (assembler.dependencies && assembler.dependencies.dependsOn.length > 0) {
             for (const dep of assembler.dependencies.dependsOn) {
@@ -364,7 +359,7 @@ export async function generateDocs(): Promise<void> {
             escapePipe: escapeMarkdownTableCell,
           };
 
-          // Compter les composants avec dépendances
+          // Count components with dependencies
           if (assembler.dependencies) {
             const hasDepends = assembler.dependencies.dependsOn.length > 0;
             const hasUsedBy = assembler.dependencies.usedBy.length > 0;
@@ -424,8 +419,8 @@ export async function generateDocs(): Promise<void> {
           };
         },
         successMessage: (res) =>
-          `Test doc generated for '${res?.name}' (type: ${res?.type})${res?.hasDeps ? ' with dependencies' : ''}.`,
-        failMessage: `Error while generating test doc for '${assembler.name}'`,
+          `Doc generated for '${res?.name}' (type: ${res?.type})${res?.hasDeps ? ' with dependencies' : ''}.`,
+        failMessage: `Error while generating doc for '${assembler.name}'`,
       });
     } catch (error) {
       errors.push({ dir: assembler.name, error });
@@ -436,7 +431,7 @@ export async function generateDocs(): Promise<void> {
   }
 
   displayGenerationSummary(total, errors, {
-    successMessage: `✔ {count} test doc(s) generated successfully.`,
+    successMessage: `✔ {count} doc(s) generated successfully.`,
   });
 
   if (withDependencies > 0) {
@@ -445,7 +440,7 @@ export async function generateDocs(): Promise<void> {
   console.log('');
 }
 
-// Exécution directe si appelé en CLI
+// Direct execution if called as CLI
 if (require.main === module) {
   generateDocs();
 }

@@ -10,7 +10,7 @@ import { extractVueSfcComposition } from './parse-vue-sfc-composition';
 import { extractComposable } from './parse-composable';
 
 export const parseFolder = (path: string, config: Record<string, any>) => {
-  // path est maintenant un dossier
+  // path is now a folder
   const absDir = path.startsWith('/') ? path : resolve(process.cwd(), path);
   const folder = basename(absDir);
 
@@ -68,7 +68,7 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
       ? extractVueSfcComposition(relVuePath, { ...config, indexVariants })
       : extractVueSfcOptions(relVuePath, { ...config, indexVariants });
 
-    // Remplacement des types ButtonVariants['variant'] dans les props par les valeurs extraites
+    // Replace ButtonVariants['variant'] types in props with extracted values
     if (doc.props && indexVariants) {
       for (const prop of doc.props) {
         const match = typeof prop.type === 'string' && prop.type.match(/^(\w+)\['([\w-]+)'\]$/);
@@ -112,7 +112,7 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
     };
   });
 
-  // Place le fichier Vue portant le nom du dossier en première position
+  // Place the Vue file with the folder name in first position
   const folderNamePascal = toPascalCase(folder);
   const vueFileIdx = vueItems.findIndex((item) => item.name === folderNamePascal);
   if (vueFileIdx > 0) {
@@ -122,7 +122,7 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
     }
   }
 
-  // ===== 3. PARSE COMPOSABLES (fichiers .ts sauf index.ts) =====
+  // ===== 3. PARSE COMPOSABLES (files .ts except index.ts) =====
   const tsFiles = fs
     .readdirSync(absDir)
     .filter((f) => f.endsWith('.ts') && f !== 'index.ts' && !f.endsWith('.d.ts'))
@@ -130,7 +130,7 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
 
   const composableItems = tsFiles
     .filter((tsPath) => {
-      // Ne traiter que les fichiers qui commencent par "use" (convention des composables)
+      // Only process files that start with "use" (composable convention)
       const fileName = basename(tsPath, '.ts');
       return fileName.startsWith('use');
     })
@@ -150,11 +150,11 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
       };
     });
 
-  // ===== 4. PARSE AUTRES FICHIERS TS (utilitaires, types, etc.) =====
+  // ===== 4. PARSE OTHER TS FILES (utilities, types, etc.) =====
   const otherTsItems = tsFiles
     .filter((tsPath) => {
       const fileName = basename(tsPath, '.ts');
-      return !fileName.startsWith('use'); // Tout sauf les composables
+      return !fileName.startsWith('use'); // Everything except composables
     })
     .map((tsPath) => {
       const absGlobalPath = config.globalPath.startsWith('/')
@@ -194,7 +194,7 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
       };
     });
 
-  // Place le fichier TS portant le nom du dossier en première position des autres TS
+  // Place the TS file with the folder name in first position among other TS files
   const folderNameKebab = toKebabCase(folder);
   const folderFileIdx = otherTsItems.findIndex((item) => item.name === folderNameKebab);
   if (folderFileIdx > 0) {
@@ -204,8 +204,8 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
     }
   }
 
-  // ===== 5. CONSTRUCTION FINALE =====
-  // Ordre : index.ts, composants Vue, composables, autres fichiers TS
+  // ===== 5. FINAL CONSTRUCTION =====
+  // Order: index.ts, Vue components, composables, other TS files
   const allItems = [
     ...(indexItem ? [indexItem] : []),
     ...vueItems,
@@ -217,7 +217,7 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
 
   let title;
   if (allItems.length > 0) {
-    // S'il y a au moins un fichier .vue, PascalCase, sinon camelCase
+    // If there is at least one .vue file, use PascalCase, otherwise camelCase
     if (allItems.some((item) => item.path.endsWith('.vue'))) {
       title = toPascalCase(folder);
     } else {
@@ -227,11 +227,11 @@ export const parseFolder = (path: string, config: Record<string, any>) => {
     title = toPascalCase(folder);
   }
 
-  // Regroupe toutes les demos des files, cherche le code source, et les place à la racine
+  // Group all demos from files, search for source code, and place them at the root
   let demo: any[] = [];
   if (Array.isArray(allItems)) {
     demo = extractDemo(absDir, allItems, config);
-    // Supprime demo de chaque file
+    // Remove demo from each file
     for (const file of allItems) {
       if ((file as any).demo) {
         delete (file as any).demo;

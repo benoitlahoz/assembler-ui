@@ -1,9 +1,9 @@
-// Détection stricte d'un bloc <script ... setup ...> non vide dans un SFC Vue
+// Strict detection of a non-empty <script ... setup ...> block in a Vue SFC
 
 /**
- * Détecte si un SFC contient un bloc <script ... setup ...> non vide.
- * @param vueSource Le code source du SFC
- * @returns true si un bloc <script setup> non vide est présent
+ * Detects if an SFC contains a non-empty <script ... setup ...> block.
+ * @param vueSource The SFC source code
+ * @returns true if a non-empty <script setup> block is present
  */
 export function isCompositionApi(vueSource: string): boolean {
   const scriptBlockRegex = /<script([^>]*)>([\s\S]*?)<\/script>/gi;

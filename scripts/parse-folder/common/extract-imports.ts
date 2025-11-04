@@ -4,50 +4,50 @@ import fs from 'fs';
 import { formatAliasesForExtractImports } from './resolve-tsconfig-paths';
 
 /**
- * Interface pour représenter un import détecté
+ * Interface to represent a detected import
  */
 export interface ImportInfo {
-  /** Nom du module importé (ex: 'useMediaDevices') */
+  /** Name of the imported module (e.g., 'useMediaDevices') */
   name: string;
-  /** Chemin source de l'import tel qu'écrit dans le code */
+  /** Source path of the import as written in the code */
   importPath: string;
-  /** Chemin absolu résolu du fichier importé (si trouvé) */
+  /** Resolved absolute path of the imported file (if found) */
   resolvedPath?: string;
-  /** Chemin relatif depuis globalPath (ex: 'composables/use-media-devices/useMediaDevices.ts') */
+  /** Relative path from globalPath (e.g., 'composables/use-media-devices/useMediaDevices.ts') */
   relativePath?: string;
-  /** Type d'import détecté */
+  /** Type of detected import */
   type: 'local' | 'internal' | 'external';
-  /** Spécificateurs importés (ex: ['useMediaDevices', 'MediaDevicesKey']) */
+  /** Imported specifiers (e.g., ['useMediaDevices', 'MediaDevicesKey']) */
   specifiers: string[];
 }
 
 /**
- * Configuration pour la résolution des chemins
+ * Configuration for path resolution
  */
 interface ResolveConfig {
-  /** Chemin absolu du fichier source */
+  /** Absolute path of the source file */
   sourceFilePath: string;
-  /** Chemin global du projet (ex: 'registry/new-york/') */
+  /** Global project path (e.g., 'registry/new-york/') */
   globalPath: string;
-  /** Dossiers à scanner dans globalPath */
+  /** Folders to scan in globalPath */
   paths: string[];
   /**
-   * Alias de chemins (ex: {'~~': 'registry/new-york', '@': 'app'})
-   * Si non fourni, sera automatiquement résolu depuis tsconfig.json
+   * Path aliases (e.g., {'~~': 'registry/new-york', '@': 'app'})
+   * If not provided, will be automatically resolved from tsconfig.json
    */
   aliases?: Record<string, string>;
-  /** Racine du projet pour la résolution des alias (par défaut: process.cwd()) */
+  /** Project root for alias resolution (default: process.cwd()) */
   root?: string;
-  /** Chemin vers le tsconfig.json (par défaut: 'tsconfig.json') */
+  /** Path to tsconfig.json (default: 'tsconfig.json') */
   tsconfigPath?: string;
 }
 
 /**
- * Extrait tous les imports d'un fichier TypeScript ou Vue
- * @param content Contenu du fichier
- * @param filePath Chemin absolu du fichier
+ * Extracts all imports from a TypeScript or Vue file
+ * @param content File content
+ * @param filePath Absolute path of the file
  * @param config Configuration
- * @returns Liste des imports détectés
+ * @returns List of detected imports
  */
 export const extractImports = (
   content: string,
@@ -240,15 +240,15 @@ const resolveAlias = (
 };
 
 /**
- * Trouve un fichier en testant différentes extensions
+ * Finds a file by trying different extensions
  */
 const findFileWithExtensions = (basePath: string): string | undefined => {
   const extensions = ['', '.ts', '.js', '.vue', '.d.ts', '/index.ts', '/index.js', '/index.vue'];
 
   for (const ext of extensions) {
-    const testPath = basePath + ext;
-    if (fs.existsSync(testPath)) {
-      return testPath;
+    const fileTestPath = basePath + ext;
+    if (fs.existsSync(fileTestPath)) {
+      return fileTestPath;
     }
   }
 
@@ -256,17 +256,17 @@ const findFileWithExtensions = (basePath: string): string | undefined => {
 };
 
 /**
- * Filtre les imports pour ne garder que ceux qui sont internes (dans globalPath)
+ * Filters imports to keep only those that are internal (in globalPath)
  */
 export const filterInternalImports = (imports: ImportInfo[]): ImportInfo[] => {
   return imports.filter((imp) => imp.type === 'internal');
 };
 
 /**
- * Filtre les imports pour ne garder que ceux qui sont internes ET en dehors du dossier du fichier source
- * @param imports Liste des imports
- * @param sourceFilePath Chemin absolu du fichier source
- * @returns Imports internes externes au dossier du fichier source
+ * Filters imports to keep only those that are internal AND outside the source file's folder
+ * @param imports List of imports
+ * @param sourceFilePath Absolute path of the source file
+ * @returns Internal imports external to the source file's folder
  */
 export const filterExternalInternalImports = (
   imports: ImportInfo[],
@@ -278,11 +278,11 @@ export const filterExternalInternalImports = (
     if (imp.type !== 'internal') return false;
     if (!imp.resolvedPath) return false;
 
-    // Le resolvedPath peut pointer vers un fichier ou un dossier
-    // Si c'est un dossier, on le normalise pour la comparaison
+    // The resolvedPath can point to a file or folder
+    // If it's a folder, normalize it for comparison
     let importDir = imp.resolvedPath;
 
-    // Si le resolvedPath est un fichier, prendre son dossier parent
+    // If the resolvedPath is a file, take its parent folder
     if (fs.existsSync(imp.resolvedPath)) {
       const stats = fs.statSync(imp.resolvedPath);
       if (stats.isFile()) {

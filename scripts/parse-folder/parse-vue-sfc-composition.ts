@@ -19,11 +19,11 @@ export const extractVueSfcComposition = (filePath: string, config: Record<string
   const GlobalPath = config.globalPath || 'registry/new-york/';
 
   const absPath = filePath.startsWith('/') ? filePath : `${process.cwd()}/${filePath}`;
-  // Chemin relatif à config.globalPath et toujours préfixé par config.globalPath
+  // Relative path to config.globalPath and always prefixed by config.globalPath
   let relPath = absPath.includes(config.globalPath)
     ? pathModule.relative(config.globalPath, absPath)
     : filePath;
-  // Toujours préfixer par config.globalPath (et éviter les doubles slashs)
+  // Always prefix by config.globalPath (and avoid double slashes)
   relPath = pathModule.join(config.globalPath, relPath).replace(/\\/g, '/');
   let vueSource = fs.readFileSync(absPath, 'utf-8');
 
@@ -56,15 +56,15 @@ export const extractVueSfcComposition = (filePath: string, config: Record<string
     provides = extractProvides(script.content, absPath);
     types = extractComponentTypes(script.content, absPath);
 
-    // Recherche d'un import de cva dans le dossier du composant (extraction de toutes les variantes cva)
+    // Search for a cva import in the component folder (extraction of all cva variants)
     const dir = pathModule.dirname(absPath);
     const indexPath = pathModule.join(dir, 'index.ts');
     if (fs.existsSync(indexPath)) {
       const indexContent = fs.readFileSync(indexPath, 'utf-8');
       if (indexContent.includes('cva(')) {
         const allVariants = extractCvaVariants(indexContent, indexPath);
-        // On ne garde que les variantes dont le type est utilisé dans les props
-        // On collecte les couples type/clé utilisés dans les props
+        // Keep only variants whose type is used in the props
+        // Collect the type/key pairs used in the props
         const usedTypeKeys: Array<{ type: string; key: string }> = props
           .map((p) => {
             if (typeof p.type === 'string') {

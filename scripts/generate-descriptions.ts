@@ -30,19 +30,19 @@ interface EnrichedResult {
 }
 
 /**
- * Charge la carte de dépendances
+ * Loads the dependency map
  */
 const loadDependencyMap = (): DependencyMap => {
   const mapPath = path.resolve(__dirname, 'dependency-map.json');
   if (!fs.existsSync(mapPath)) {
-    console.warn('⚠️  Carte de dépendances non trouvée. Génération sans optimisation.');
+    console.warn('⚠️  Dependency map not found. Generating without optimization.');
     return {};
   }
   return JSON.parse(fs.readFileSync(mapPath, 'utf-8'));
 };
 
 /**
- * Enrichit le résultat de parseFolder avec les informations de dépendances
+ * Enriches the parseFolder result with dependency information
  */
 const enrichWithDependencies = (
   result: any,
@@ -51,7 +51,7 @@ const enrichWithDependencies = (
 ): EnrichedResult => {
   const enriched = { ...result };
 
-  // Ajouter les informations de dépendances si disponibles
+  // Add dependency information if available
   if (dependencyMap[folderName]) {
     const { dependsOn, usedBy } = dependencyMap[folderName];
 
@@ -68,7 +68,7 @@ const enrichWithDependencies = (
 };
 
 /**
- * Trie les dossiers par ordre topologique (dépendances d'abord)
+ * Sorts folders in topological order (dependencies first)
  */
 const topologicalSort = (folders: string[], dependencyMap: DependencyMap): string[] => {
   const sorted: string[] = [];
@@ -78,8 +78,8 @@ const topologicalSort = (folders: string[], dependencyMap: DependencyMap): strin
   const visit = (folder: string) => {
     if (visited.has(folder)) return;
     if (visiting.has(folder)) {
-      // Cycle détecté, on ignore
-      console.warn(`⚠️  Cycle de dépendances détecté pour: ${folder}`);
+      // Cycle detected, ignoring
+      console.warn(`⚠️  Dependency cycle detected for: ${folder}`);
       return;
     }
 
@@ -103,12 +103,12 @@ const topologicalSort = (folders: string[], dependencyMap: DependencyMap): strin
 };
 
 export const main = async () => {
-  console.log('🚀 Génération de descriptions avec carte de dépendances\n');
+  console.log('🚀 Generating descriptions with dependency map\n');
 
-  // 1. Charger la carte de dépendances
+  // 1. Load the dependency map
   const dependencyMap = loadDependencyMap();
 
-  // 2. Obtenir tous les dossiers à traiter
+  // 2. Get all folders to process
   const allFolders: string[] = [];
   config.paths.forEach((subPath: string) => {
     const fullPath = path.resolve(process.cwd(), GlobalPath, subPath);
@@ -122,21 +122,21 @@ export const main = async () => {
     allFolders.push(...folders);
   });
 
-  // 3. Trier les dossiers par ordre topologique
+  // 3. Sort folders in topological order
   const sortedFolders = topologicalSort(allFolders, dependencyMap);
 
-  // 4. Générer les descriptions
+  // 4. Generate descriptions
   const errors: { dir: string; error: any }[] = [];
   let total = 0;
   let remaining = sortedFolders.length;
 
   for (const folderName of sortedFolders) {
-    // Trouver le chemin complet du dossier
+    // Find the full path of the folder
     let folderPath: string | null = null;
     for (const subPath of config.paths) {
-      const testPath = path.join(GlobalPath, subPath, folderName);
-      if (fs.existsSync(testPath)) {
-        folderPath = testPath;
+      const folderTestPath = path.join(GlobalPath, subPath, folderName);
+      if (fs.existsSync(folderTestPath)) {
+        folderPath = folderTestPath;
         break;
       }
     }
@@ -146,7 +146,7 @@ export const main = async () => {
       continue;
     }
 
-    // Vérifier si le dossier doit être ignoré
+    // Check if the folder should be ignored
     if (config.skipSubfolders && config.skipSubfolders.includes(folderName)) {
       remaining--;
       continue;
@@ -159,13 +159,13 @@ export const main = async () => {
       await runWithSpinner({
         message: `Generating description for '${folderName}'`,
         action: async () => {
-          // Parser le dossier
+          // Parse the folder
           const result = parseFolder(path.join(process.cwd(), folderPath!), config) as any;
 
-          // Enrichir avec les dépendances
+          // Enrich with dependencies
           const enriched = enrichWithDependencies(result, folderName, dependencyMap);
 
-          // Ajouter les fichiers manquants depuis dependency-map
+          // Add missing files from dependency-map
           if (dependencyMap[folderName] && Array.isArray(dependencyMap[folderName].files)) {
             const existingPaths = new Set((enriched.files || []).map((f: any) => f.path));
 
@@ -184,18 +184,18 @@ export const main = async () => {
             });
           }
 
-          // Ajouter les métadonnées standards
+          // Add standard metadata
           enriched.$schema = config.$schema;
           enriched.type = typeof enriched.type !== 'undefined' ? enriched.type : 'registry:ui';
 
-          // Traitement des files
+          // Process files
           if (Array.isArray(enriched.files)) {
             enriched.files = enriched.files.map((f: any) => ({
               ...f,
               type: typeof f.type !== 'undefined' ? f.type : enriched.type,
             }));
 
-            // Extraire les demos des files
+            // Extract demos from files
             const allDemos = enriched.files
               .filter((f: any) => Array.isArray(f.demo) && f.demo.length > 0)
               .flatMap((f: any) => f.demo);
@@ -203,14 +203,14 @@ export const main = async () => {
               enriched.demo = allDemos;
             }
 
-            // Supprimer demo de chaque file
+            // Remove demo from each file
             enriched.files = enriched.files.map((f: any) => {
               const { demo, ...rest } = f;
               return rest;
             });
           }
 
-          // Déterminer la catégorie
+          // Determine the category
           if (typeof enriched.category === 'undefined') {
             let mainCategory = undefined;
             if (Array.isArray(enriched.files)) {
@@ -227,7 +227,7 @@ export const main = async () => {
             enriched.category = mainCategory || 'miscellaneous';
           }
 
-          // Normaliser la catégorie
+          // Normalize the category
           if (
             typeof enriched.category === 'object' &&
             enriched.category !== null &&
@@ -236,7 +236,7 @@ export const main = async () => {
             enriched.category = (enriched.category as any).name;
           }
 
-          // Réorganiser les clés
+          // Reorganize keys
           const ordered: any = {};
           if (enriched.$schema) ordered.$schema = enriched.$schema;
           ordered.install = `${config.homepage}/r/${enriched.name}.json`;
@@ -249,14 +249,14 @@ export const main = async () => {
           if (enriched.demo) ordered.demo = enriched.demo;
           if (enriched.files) ordered.files = enriched.files;
 
-          // Ajouter toutes les autres clés
+          // Add all other keys
           Object.keys(enriched).forEach((key) => {
             if (!(key in ordered)) {
               ordered[key] = (enriched as any)[key];
             }
           });
 
-          // Écrire le fichier
+          // Write the file
           fs.writeFileSync(
             outputPath,
             DEBUG_JSON ? JSON.stringify(ordered, null, 2) : JSON.stringify(ordered),

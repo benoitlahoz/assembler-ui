@@ -13,7 +13,7 @@ const RegistryPath = config.registryPath || 'registry.json';
 export async function buildRegistryObject(files: string[]) {
   const items = files.map((filePath) => {
     const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    // Supprimer la propriété install si elle existe
+    // Remove the install property if it exists
     if ('install' in content) {
       delete content.install;
     }
@@ -54,7 +54,7 @@ function findAssemblerJsonFiles(dir: string): string[] {
   return results;
 }
 
-// Point d'entrée principal pour générer registry.json
+// Main entry point to generate registry.json
 async function main() {
   const baseDir = path.join(process.cwd(), 'registry', 'new-york');
   let errors: { dir: string; error: any }[] = [];

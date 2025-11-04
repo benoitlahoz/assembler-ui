@@ -4,10 +4,10 @@ import { toKebabCase } from '@assemblerjs/core';
 import { convertTemplateToPug } from './convert-template-to-pug';
 
 /**
- * Recherche récursive un fichier .vue du nom de la démo dans le dossier et ses sous-dossiers,
- * et retourne { name, html, pug } ou undefined si non trouvé.
- * @param folderPath Chemin absolu ou relatif du dossier de recherche
- * @param demoName Nom de la démo (sans extension)
+ * Recursively searches for a .vue file with the demo name in the folder and its subfolders,
+ * and returns { name, html, pug } or undefined if not found.
+ * @param folderPath Absolute or relative path of the search folder
+ * @param demoName Name of the demo (without extension)
  * @returns {{ name: string, html: string, pug: string } | undefined}
  */
 const extractDemoCode = (
@@ -25,11 +25,10 @@ const extractDemoCode = (
       if (found) return found;
     } else if (stat.isFile() && file.endsWith('.vue') && basename(file, '.vue') === demoName) {
       const vueSource = fs.readFileSync(fullPath, 'utf-8');
-      // html = tout le code du fichier, préserve les sauts de ligne et l'indentation
+      // html = all file code, preserves line breaks and indentation
       const searchString = `~~/${GlobalPath}components`;
       let html = vueSource.replace(searchString, '@/components/ui');
-      // console.log(html);
-      // pug = tout le fichier mais avec le template converti en pug, préserve aussi les sauts de ligne
+      // pug = whole file but with template converted to pug, also preserves line breaks
       const templateMatch = vueSource.match(/<template[^>]*>([\s\S]*?)<\/template>/i);
       const templateContent = templateMatch && templateMatch[1] ? templateMatch[1] : '';
       const pug = templateContent
