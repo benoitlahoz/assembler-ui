@@ -126,8 +126,8 @@ const getGridPosition = (clientX: number, clientY: number): { x: number; y: numb
   if (!gridContainer.value) return { x: 0, y: 0 };
 
   const rect = gridContainer.value.getBoundingClientRect();
-  const relativeX = clientX - rect.left;
-  const relativeY = clientY - rect.top;
+  const relativeX = clientX - rect.left - props.gap; // Soustraire le gap/padding sur le côté gauche
+  const relativeY = clientY - rect.top - props.gap; // Soustraire le gap/padding sur le côté haut
 
   const x = Math.floor(relativeX / (props.cellSize + props.gap));
   const y = Math.floor(relativeY / (props.cellSize + props.gap));
@@ -359,8 +359,7 @@ defineExpose({
 <template>
   <div
     ref="gridContainer"
-    class="controllers-grid"
-    :class="{ 'show-grid': showGrid }"
+    class="relative w-full h-full min-h-[400px] overflow-auto bg-transparent border border-border rounded"
     :style="{
       '--cell-size': `${cellSize}px`,
       '--gap-size': `${gap}px`,
@@ -370,38 +369,33 @@ defineExpose({
     @dragleave="handleDragLeave"
     @drop="handleDrop"
   >
-    <!-- Grille de fond -->
-    <div class="grid-background">
-      <!-- Aperçu du placement lors du drag -->
-      <div
-        v-if="hoverCell && (draggedItem || previewSize)"
-        class="grid-item-preview"
-        v-motion
-        :initial="{ opacity: 0, scale: 0.95 }"
-        :enter="{ opacity: 1, scale: 1, transition: { duration: 150 } }"
-        :style="{
-          position: 'absolute',
-          left: `calc(var(--spacing, 1rem) + ${hoverCell.x} * (var(--cell-size) + var(--gap-size)))`,
-          top: `calc(var(--spacing, 1rem) + ${hoverCell.y} * (var(--cell-size) + var(--gap-size)))`,
-          width: `calc(${draggedItem?.width || previewSize?.width || 1} * var(--cell-size) + ${(draggedItem?.width || previewSize?.width || 1) - 1} * var(--gap-size))`,
-          height: `calc(${draggedItem?.height || previewSize?.height || 1} * var(--cell-size) + ${(draggedItem?.height || previewSize?.height || 1) - 1} * var(--gap-size))`,
-        }"
-      />
-    </div>
-
     <!-- Items placés -->
     <div
-      class="grid-items"
+      class="relative grid z-1"
       :style="{
         gridTemplateColumns,
         gridTemplateRows,
         gap: `${gap}px`,
+        padding: `${gap}px`,
       }"
     >
+      <!-- Aperçu du placement lors du drag -->
+      <div
+        v-if="hoverCell && (draggedItem || previewSize)"
+        class="bg-primary/10 border-2 border-dashed border-primary rounded-lg pointer-events-none animate-pulse-subtle"
+        v-motion
+        :initial="{ opacity: 0, scale: 0.95 }"
+        :enter="{ opacity: 1, scale: 1, transition: { duration: 150 } }"
+        :style="{
+          gridColumn: `${hoverCell.x + 1} / span ${draggedItem?.width || previewSize?.width || 1}`,
+          gridRow: `${hoverCell.y + 1} / span ${draggedItem?.height || previewSize?.height || 1}`,
+        }"
+      />
+
       <div
         v-for="item in placedItems"
         :key="item.id"
-        class="grid-item"
+        class="grid-item-wrapper relative cursor-move select-none transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:cursor-grabbing active:opacity-70"
         :draggable="true"
         :style="{
           gridColumn: `${item.x + 1} / span ${item.width}`,
@@ -418,13 +412,14 @@ defineExpose({
         @dragend.stop="handleDragEnd"
       >
         <div
-          class="grid-item-content"
+          class="relative w-full h-full bg-card/50 border border-border rounded overflow-hidden flex flex-col"
           draggable="false"
-          :style="{
-            backgroundColor: item.color || 'hsl(var(--card))',
-          }"
         >
-          <button class="grid-item-remove" @click.stop="removeItem(item.id)" aria-label="Supprimer">
+          <button
+            class="grid-item-remove absolute top-1 right-1 z-10 flex items-center justify-center w-6 h-6 bg-destructive text-destructive-foreground border-none rounded cursor-pointer opacity-0 transition-all duration-200 scale-75 hover:bg-destructive/90 hover:scale-110 active:scale-95"
+            @click.stop="removeItem(item.id)"
+            aria-label="Supprimer"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="16"
@@ -441,13 +436,14 @@ defineExpose({
             </svg>
           </button>
 
-          <div class="grid-item-body">
+          <div class="flex-1 p-2 flex items-center justify-center overflow-hidden">
             <component v-if="item.component" :is="item.component" v-bind="item" />
-            <div v-else class="grid-item-placeholder">
-              <span class="text-sm text-muted-foreground">{{ item.id }}</span>
-              <span class="text-xs text-muted-foreground">
-                {{ item.width }}x{{ item.height }}
-              </span>
+            <div
+              v-else
+              class="flex flex-col items-center justify-center gap-2 w-full h-full text-muted-foreground"
+            >
+              <span class="text-sm">{{ item.id }}</span>
+              <span class="text-xs"> {{ item.width }}x{{ item.height }} </span>
             </div>
           </div>
         </div>
@@ -460,43 +456,7 @@ defineExpose({
 </template>
 
 <style scoped>
-.controllers-grid {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  min-height: 400px;
-  overflow: auto;
-  background-color: hsl(var(--background));
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-}
-
-.grid-background {
-  position: absolute;
-  inset: 0;
-  padding: var(--spacing, 1rem);
-  pointer-events: none;
-}
-
-.show-grid .grid-background {
-  background-image: radial-gradient(circle, hsl(var(--border) / 0.5) 2px, transparent 2px);
-  background-size: calc(var(--cell-size) + var(--gap-size)) calc(var(--cell-size) + var(--gap-size));
-  background-position: var(--spacing, 1rem) var(--spacing, 1rem);
-}
-
-.grid-cell {
-  display: none;
-}
-
-.grid-item-preview {
-  background-color: hsl(var(--primary) / 0.1);
-  border: 2px dashed hsl(var(--primary));
-  border-radius: 8px;
-  pointer-events: none;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
+@keyframes pulse-subtle {
   0%,
   100% {
     opacity: 0.5;
@@ -506,101 +466,13 @@ defineExpose({
   }
 }
 
-.grid-items {
-  position: relative;
-  display: grid;
-  padding: var(--spacing, 1rem);
-  z-index: 1;
+.animate-pulse-subtle {
+  animation: pulse-subtle 1.5s ease-in-out infinite;
 }
 
-.grid-item {
-  position: relative;
-  cursor: move;
-  user-select: none;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.grid-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px hsl(var(--foreground) / 0.1);
-}
-
-.grid-item:active {
-  cursor: grabbing;
-  opacity: 0.7;
-}
-
-.grid-item-content {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  background-color: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.grid-item-remove {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  background-color: hsl(var(--destructive));
-  color: hsl(var(--destructive-foreground));
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  opacity: 0;
-  transition: all 0.2s ease;
-  transform: scale(0.8);
-}
-
-.grid-item:hover .grid-item-remove {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.grid-item-remove:hover {
-  background-color: hsl(var(--destructive) / 0.9);
-  transform: scale(1.1);
-}
-
-.grid-item-remove:active {
-  transform: scale(0.95);
-}
-
-.grid-item-body {
-  flex: 1;
-  padding: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.grid-item-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  width: 100%;
-  height: 100%;
-  color: hsl(var(--muted-foreground));
-}
-
-/* États de drag */
-.controllers-grid.drag-over {
-  border-color: hsl(var(--primary));
-  background-color: hsl(var(--primary) / 0.05);
+/* Hover state pour le bouton remove au niveau du parent */
+.grid-item-wrapper:hover .grid-item-remove {
+  opacity: 1 !important;
+  transform: scale(1) !important;
 }
 </style>

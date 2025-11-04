@@ -2,6 +2,7 @@
  * ControllersGrid - Composant de grille drag-and-drop
  *
  * @type registry:ui
+ * @category controls
  * @demo SimpleExample
  * @demo AdvancedExample
  */
