@@ -268,13 +268,13 @@ The reactive state and methods for screen sharing.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `screenStream`{.primary .text-primary} | `any` | The stream being shared, or null if not sharing. |
-| `shareState`{.primary .text-primary} | `any` | Current state of screen sharing. |
-| `shareType`{.primary .text-primary} | `any` | Type of surface being shared (if detectable). |
-| `errors`{.primary .text-primary} | `any` | List of errors encountered during screen sharing operations. |
-| `isSharing`{.primary .text-primary} | `any` | Whether screen sharing is currently active. |
-| `startScreenShare`{.primary .text-primary} | `any` | Function to start screen sharing. |
-| `stopScreenShare`{.primary .text-primary} | `any` | Function to stop screen sharing. |
+| `screenStream`{.primary .text-primary} | `Ref<MediaStream \| null>` | The stream being shared, or null if not sharing. |
+| `shareState`{.primary .text-primary} | `Ref<ScreenShareState>` | Current state of screen sharing. |
+| `shareType`{.primary .text-primary} | `Ref<ScreenShareType \| null>` | Type of surface being shared (if detectable). |
+| `errors`{.primary .text-primary} | `Ref<Error[]>` | List of errors encountered during screen sharing operations. |
+| `isSharing`{.primary .text-primary} | `ComputedRef<any>` | Whether screen sharing is currently active. |
+| `startScreenShare`{.primary .text-primary} | `ScreenShareStartFn` | Function to start screen sharing. |
+| `stopScreenShare`{.primary .text-primary} | `ScreenShareStopFn` | Function to stop screen sharing. |
 
 
 

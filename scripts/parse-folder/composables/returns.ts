@@ -131,6 +131,85 @@ const extractPropertyDescription = (
 };
 
 /**
+ * Infer type from a variable declaration or function in the composable body
+ */
+const inferTypeFromBody = (
+  name: string,
+  functionNode: ts.FunctionDeclaration | ts.ArrowFunction,
+  sourceFile: ts.SourceFile
+): string | undefined => {
+  let inferredType: string | undefined;
+
+  const visitNode = (node: ts.Node) => {
+    // Chercher les déclarations de variables (const screenStream = ref(...))
+    if (ts.isVariableStatement(node)) {
+      const declaration = node.declarationList.declarations[0];
+      if (declaration && ts.isVariableDeclaration(declaration)) {
+        const varName = declaration.name.getText(sourceFile);
+        
+        if (varName === name && declaration.initializer) {
+          // Si c'est un appel de fonction (ref, computed, etc.)
+          if (ts.isCallExpression(declaration.initializer)) {
+            const callExpr = declaration.initializer;
+            const funcName = callExpr.expression.getText(sourceFile);
+            
+            // Extraire le type générique si présent
+            if (callExpr.typeArguments && callExpr.typeArguments.length > 0) {
+              const firstTypeArg = callExpr.typeArguments[0];
+              if (firstTypeArg) {
+                inferredType = firstTypeArg.getText(sourceFile);
+                
+                // Ajouter le wrapper approprié
+                if (funcName === 'ref') {
+                  inferredType = `Ref<${inferredType}>`;
+                } else if (funcName === 'computed') {
+                  inferredType = `ComputedRef<${inferredType}>`;
+                } else if (funcName === 'reactive') {
+                  inferredType = `UnwrapNestedRefs<${inferredType}>`;
+                }
+              }
+            } else {
+              // Pas de type générique explicite
+              if (funcName === 'computed') {
+                // Pour computed sans type générique, on peut essayer d'inférer depuis la fonction callback
+                // Pour l'instant, on utilise un type générique
+                inferredType = 'ComputedRef<any>';
+              } else if (funcName === 'ref') {
+                inferredType = 'Ref<any>';
+              } else if (funcName === 'reactive') {
+                inferredType = 'UnwrapNestedRefs<any>';
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Chercher les déclarations de fonctions (const startScreenShare: Type = ...)
+    if (ts.isVariableStatement(node)) {
+      const declaration = node.declarationList.declarations[0];
+      if (declaration && ts.isVariableDeclaration(declaration)) {
+        const varName = declaration.name.getText(sourceFile);
+        
+        if (varName === name && declaration.type) {
+          inferredType = declaration.type.getText(sourceFile);
+        }
+      }
+    }
+    
+    ts.forEachChild(node, visitNode);
+  };
+
+  if (ts.isFunctionDeclaration(functionNode) && functionNode.body) {
+    visitNode(functionNode.body);
+  } else if (ts.isArrowFunction(functionNode) && ts.isBlock(functionNode.body)) {
+    visitNode(functionNode.body);
+  }
+
+  return inferredType;
+};
+
+/**
  * Try to infer return type from function body by looking at return statements
  */
 const inferReturnTypeFromBody = (
@@ -153,16 +232,8 @@ const inferReturnTypeFromBody = (
             const name = prop.name.getText(sourceFile);
             const description = extractPropertyDescription(prop, sourceFile);
 
-            // Essayer d'extraire le type si c'est une PropertyAssignment
-            let type: string | undefined;
-            if (ts.isPropertyAssignment(prop) && prop.initializer) {
-              // Inférer le type basique depuis l'initializer
-              if (ts.isIdentifier(prop.initializer)) {
-                type = 'any'; // On ne peut pas déterminer le type d'une variable
-              } else if (ts.isCallExpression(prop.initializer)) {
-                type = 'any'; // On ne peut pas déterminer le type d'un appel de fonction
-              }
-            }
+            // Inférer le type depuis le corps de la fonction
+            const type = inferTypeFromBody(name, node, sourceFile);
 
             extractedProperties.push({ name, type, description });
           }
@@ -255,14 +326,8 @@ const inferReturnTypeFromArrowFunction = (
           const name = prop.name.getText(sourceFile);
           const description = extractPropertyDescription(prop, sourceFile);
 
-          let type: string | undefined;
-          if (ts.isPropertyAssignment(prop) && prop.initializer) {
-            if (ts.isIdentifier(prop.initializer)) {
-              type = 'any';
-            } else if (ts.isCallExpression(prop.initializer)) {
-              type = 'any';
-            }
-          }
+          // Inférer le type depuis le corps de la fonction
+          const type = inferTypeFromBody(name, node, sourceFile);
 
           extractedProperties.push({ name, type, description });
         }
@@ -292,14 +357,8 @@ const inferReturnTypeFromArrowFunction = (
             const name = prop.name.getText(sourceFile);
             const description = extractPropertyDescription(prop, sourceFile);
 
-            let type: string | undefined;
-            if (ts.isPropertyAssignment(prop) && prop.initializer) {
-              if (ts.isIdentifier(prop.initializer)) {
-                type = 'any';
-              } else if (ts.isCallExpression(prop.initializer)) {
-                type = 'any';
-              }
-            }
+            // Inférer le type depuis le corps de la fonction
+            const type = inferTypeFromBody(name, node, sourceFile);
 
             extractedProperties.push({ name, type, description });
           }
