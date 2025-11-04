@@ -13,7 +13,7 @@ description: A 1:1 aspect ratio button component for grid-based layouts.
 <script setup lang="ts">
 import { ref, onMounted, shallowRef, h } from "vue";
 import { ControlButton } from "@/components/ui/control-button";
-import { ControlsGrid } from "~~/registry/new-york/components/controls-grid";
+import { ControlsGrid } from "~~/registry/new-york/components/control-grid";
 import { useControlRegistry } from "~~/registry/new-york/composables/use-control-registry/useControlRegistry";
 import type { ControlDefinition } from "~~/registry/new-york/composables/use-control-registry/useControlRegistry";
 
@@ -297,7 +297,6 @@ import type { VariantProps } from "class-variance-authority";
 import { cva } from "class-variance-authority";
 
 export { default as ControlButton } from "./ControlButton.vue";
-export { default as ControlButtonLabel } from "./ControlButtonLabel.vue";
 
 export const buttonVariants = cva(
   "aspect-square w-auto h-auto min-w-0 min-h-0 inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
@@ -324,7 +323,6 @@ export const buttonVariants = cva(
 
 export type ControlButtonVariants = VariantProps<typeof buttonVariants>;
 export { type ControlButtonProps } from "./ControlButton.vue";
-export { type ControlButtonLabelProps } from "./ControlButtonLabel.vue";
 ```
 
 ```vue [src/components/ui/control-button/ControlButton.vue]
@@ -385,29 +383,6 @@ const colorStyle = computed(() => {
   </Primitive>
 </template>
 ```
-
-```vue [src/components/ui/control-button/ControlButtonLabel.vue]
-<script setup lang="ts">
-import type { HTMLAttributes } from "vue";
-import { cn } from "@/lib/utils";
-
-import { Label } from "@/components/ui/label";
-
-export interface ControlButtonLabelProps {
-  class?: HTMLAttributes["class"];
-}
-
-const props = defineProps<ControlButtonLabelProps>();
-</script>
-
-<template>
-  <div class="flex flex-col items-center justify-center">
-    <Label :class="cn(props.class)">
-      <slot />
-    </Label>
-  </div>
-</template>
-```
 :::
 
 ## ControlButton
@@ -439,28 +414,6 @@ const props = defineProps<ControlButtonLabelProps>();
   ### Child Components
 
   `Primitive`{.primary .text-primary}
-
----
-
-## ControlButtonLabel
-::hr-underline
-::
-
-**API**: composition
-
-  ### Props
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
-
-  ### Slots
-| Name | Description |
-|------|-------------|
-| `default`{.primary .text-primary} | — |
-
-  ### Child Components
-
-  `Label`{.primary .text-primary}
 
 ---
 

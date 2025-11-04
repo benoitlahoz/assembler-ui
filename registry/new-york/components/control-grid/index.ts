@@ -1,19 +1,18 @@
 /**
- * ControlsGrid - Composant de grille drag-and-drop
+ * ControlGrid - Composant de grille drag-and-drop
  *
  * @type registry:ui
  * @category controls
  *
- * @demo SimpleExample
- * @demo AdvancedExample
- * @demo ControlRegistryDemo
- * @demo ComponentRegistration
+ * @demo SimpleDemo
+ * @demo InteractiveDemo
  */
 
-import type { Component } from 'vue';
+import type { Component, InjectionKey, Ref } from 'vue';
 
-export { default as ControlsGrid } from './ControlsGrid.vue';
-export { default as ControlsToolbar } from './ControlsToolbar.vue';
+export { default as ControlGrid } from './ControlGrid.vue';
+export { default as ControlGridToolbar } from './ControlGridToolbar.vue';
+export { default as ControlGridItem } from './ControlGridItem.vue';
 
 // Export des composables associés
 export { useControlsGrid } from '../../composables/use-controls-grid/useControlsGrid';
@@ -307,3 +306,49 @@ export class GridUtils {
     });
   }
 }
+
+// ============================================================================
+// Injection Keys
+// ============================================================================
+
+/**
+ * Clés d'injection pour le provide/inject
+ */
+
+/** Items placés dans la grille */
+export const ControlGridItemsKey: InjectionKey<Ref<GridItem[]>> = Symbol('ControlGridItems');
+
+/** Configuration de la grille */
+export const ControlGridConfigKey: InjectionKey<Ref<GridConfig>> = Symbol('ControlGridConfig');
+
+/** Position de survol actuelle */
+export const ControlGridHoverKey: InjectionKey<Ref<GridPosition | null>> =
+  Symbol('ControlGridHover');
+
+/** État du drag en cours */
+export const ControlGridDragStateKey: InjectionKey<Ref<DragState>> = Symbol('ControlGridDragState');
+
+/** Registre des composants */
+export const ControlGridComponentRegistryKey: InjectionKey<Ref<Map<string, Component>>> = Symbol(
+  'ControlGridComponentRegistry'
+);
+
+/** Méthodes exposées */
+export const ControlGridAddItemKey: InjectionKey<GridMethods['addItem']> =
+  Symbol('ControlGridAddItem');
+
+export const ControlGridAddItemByComponentKey: InjectionKey<GridMethods['addItemByComponent']> =
+  Symbol('ControlGridAddItemByComponent');
+
+export const ControlGridRemoveItemKey: InjectionKey<GridMethods['removeItem']> =
+  Symbol('ControlGridRemoveItem');
+
+export const ControlGridClearGridKey: InjectionKey<GridMethods['clearGrid']> =
+  Symbol('ControlGridClearGrid');
+
+export const ControlGridGetComponentKey: InjectionKey<GridMethods['getComponent']> =
+  Symbol('ControlGridGetComponent');
+
+export const ControlGridGetRegisteredComponentsKey: InjectionKey<
+  GridMethods['getRegisteredComponents']
+> = Symbol('ControlGridGetRegisteredComponents');

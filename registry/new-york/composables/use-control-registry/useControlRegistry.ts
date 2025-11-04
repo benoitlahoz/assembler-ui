@@ -10,7 +10,7 @@
  */
 
 import { ref, shallowRef, type Component } from 'vue';
-import type { GridItem, GridItemTemplate } from '../../components/controls-grid';
+import type { GridItem, GridItemTemplate } from '../../components/control-grid';
 
 export interface ControlDefinition {
   id: string;

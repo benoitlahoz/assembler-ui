@@ -6,8 +6,8 @@
  */
 
 import { ref, computed } from 'vue';
-import type { GridItem } from '../../components/controls-grid';
-import { GridUtils } from '../../components/controls-grid';
+import type { GridItem } from '../../components/control-grid';
+import { GridUtils } from '../../components/control-grid';
 
 export function useControlsGrid(initialItems: GridItem[] = []) {
   // État

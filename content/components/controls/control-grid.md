@@ -1,5 +1,5 @@
 ---
-title: ControlsGrid
+title: ControlGrid
 description: ControlGrid - Composant de grille drag-and-drop
 ---
 
@@ -92,19 +92,19 @@ This will install the component in the path defined by your `components.json` fi
 
 :::code-group{.w-full}
 ```bash [yarn]
-  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/controls-grid.json"
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/control-grid.json"
   ```
 
 ```bash [npm]
-  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/controls-grid.json"
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/control-grid.json"
   ```
 
 ```bash [pnpm]
-  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/controls-grid.json"
+  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/control-grid.json"
   ```
 
 ```bash [bun]
-  bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/controls-grid.json"
+  bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/control-grid.json"
   ```
 :::
 
@@ -114,9 +114,9 @@ This will install the component in the path defined by your `components.json` fi
 
 Copy and paste these files into your project.
 
-:::code-tree{default-value="src/components/ui/controls-grid/index.ts"}
+:::code-tree{default-value="src/components/ui/control-grid/index.ts"}
 
-```ts [src/components/ui/controls-grid/index.ts]
+```ts [src/components/ui/control-grid/index.ts]
 import type { Component, InjectionKey, Ref } from "vue";
 
 export { default as ControlGrid } from "./ControlGrid.vue";
@@ -384,571 +384,7 @@ export const ControlGridGetRegisteredComponentsKey: InjectionKey<
 > = Symbol("ControlGridGetRegisteredComponents");
 ```
 
-```vue [src/components/ui/controls-grid/ControlGrid.old.vue]
-<script setup lang="ts">
-import {
-  ref,
-  computed,
-  watch,
-  onMounted,
-  onUnmounted,
-  type Component,
-} from "vue";
-import { useElementSize, useDropZone } from "@vueuse/core";
-import { useMotion } from "@vueuse/motion";
-
-interface GridItem {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  component?: any;
-  color?: string;
-}
-
-interface ComponentToRegister {
-  name: string;
-  component: Component;
-}
-
-interface Props {
-  cellSize?: number;
-  gap?: number;
-  minColumns?: number;
-  items?: GridItem[];
-  showGrid?: boolean;
-  snapToGrid?: boolean;
-  components?: ComponentToRegister[];
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  cellSize: 80,
-  gap: 8,
-  minColumns: 4,
-  items: () => [],
-  showGrid: true,
-  snapToGrid: true,
-  components: () => [],
-});
-
-const emit = defineEmits<{
-  "update:items": [items: GridItem[]];
-  "item-placed": [item: GridItem];
-  "item-moved": [item: GridItem];
-  "item-removed": [id: string];
-}>();
-
-const gridContainer = ref<HTMLElement | null>(null);
-const placedItems = ref<GridItem[]>([...props.items]);
-const hoverCell = ref<{ x: number; y: number } | null>(null);
-const draggedItem = ref<GridItem | null>(null);
-const draggedFromGrid = ref(false);
-const previewSize = ref<{ width: number; height: number } | null>(null);
-
-const componentRegistry = ref<Map<string, Component>>(new Map());
-
-const { width: gridWidth, height: gridHeight } = useElementSize(gridContainer);
-
-const columns = computed(() => {
-  const cols = Math.floor(gridWidth.value / (props.cellSize + props.gap));
-  return Math.max(cols, props.minColumns);
-});
-
-const rows = computed(() => {
-  return Math.max(
-    Math.floor(gridHeight.value / (props.cellSize + props.gap)),
-    6,
-  );
-});
-
-const gridTemplateColumns = computed(() => {
-  return `repeat(${columns.value}, ${props.cellSize}px)`;
-});
-
-const gridTemplateRows = computed(() => {
-  return `repeat(${rows.value}, ${props.cellSize}px)`;
-});
-
-const isCellOccupied = (x: number, y: number, excludeId?: string): boolean => {
-  return placedItems.value.some((item) => {
-    if (excludeId && item.id === excludeId) return false;
-    return (
-      x >= item.x &&
-      x < item.x + item.width &&
-      y >= item.y &&
-      y < item.y + item.height
-    );
-  });
-};
-
-const isValidPlacement = (
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  excludeId?: string,
-): boolean => {
-  if (x < 0 || y < 0 || x + width > columns.value || y + height > rows.value) {
-    return false;
-  }
-
-  for (let dx = 0; dx < width; dx++) {
-    for (let dy = 0; dy < height; dy++) {
-      if (isCellOccupied(x + dx, y + dy, excludeId)) {
-        return false;
-      }
-    }
-  }
-
-  return true;
-};
-
-const findAvailablePosition = (
-  width: number,
-  height: number,
-): { x: number; y: number } | null => {
-  for (let y = 0; y <= rows.value - height; y++) {
-    for (let x = 0; x <= columns.value - width; x++) {
-      if (isValidPlacement(x, y, width, height)) {
-        return { x, y };
-      }
-    }
-  }
-  return null;
-};
-
-const updateGridSize = () => {
-  if (gridContainer.value) {
-    const rect = gridContainer.value.getBoundingClientRect();
-    gridWidth.value = rect.width;
-    gridHeight.value = rect.height;
-  }
-};
-
-const getGridPosition = (
-  clientX: number,
-  clientY: number,
-): { x: number; y: number } => {
-  if (!gridContainer.value) return { x: 0, y: 0 };
-
-  const rect = gridContainer.value.getBoundingClientRect();
-  const relativeX = clientX - rect.left - props.gap;
-  const relativeY = clientY - rect.top - props.gap;
-
-  const x = Math.floor(relativeX / (props.cellSize + props.gap));
-  const y = Math.floor(relativeY / (props.cellSize + props.gap));
-
-  return {
-    x: Math.max(0, Math.min(x, columns.value - 1)),
-    y: Math.max(0, Math.min(y, rows.value - 1)),
-  };
-};
-
-const handleDragStart = (
-  event: DragEvent,
-  item: GridItem,
-  fromGrid = false,
-) => {
-  draggedItem.value = { ...item };
-  draggedFromGrid.value = fromGrid;
-  previewSize.value = { width: item.width, height: item.height };
-
-  if (event.dataTransfer) {
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("application/json", JSON.stringify(item));
-  }
-};
-
-const handleDragOver = (event: DragEvent) => {
-  event.preventDefault();
-
-  if (!draggedItem.value && event.dataTransfer) {
-    const types = event.dataTransfer.types;
-    if (types.includes("application/json")) {
-      previewSize.value = { width: 1, height: 1 };
-    }
-  }
-
-  if (event.dataTransfer) {
-    const effect = event.dataTransfer.effectAllowed;
-    if (effect === "copy" || effect === "copyMove") {
-      event.dataTransfer.dropEffect = "copy";
-    } else {
-      event.dataTransfer.dropEffect = "move";
-    }
-  }
-
-  const pos = getGridPosition(event.clientX, event.clientY);
-
-  if (draggedItem.value) {
-    const excludeId = draggedFromGrid.value ? draggedItem.value.id : undefined;
-
-    if (
-      isValidPlacement(
-        pos.x,
-        pos.y,
-        draggedItem.value.width,
-        draggedItem.value.height,
-        excludeId,
-      )
-    ) {
-      hoverCell.value = pos;
-    } else {
-      hoverCell.value = null;
-      if (event.dataTransfer) {
-        event.dataTransfer.dropEffect = "none";
-      }
-    }
-  } else if (previewSize.value) {
-    hoverCell.value = pos;
-  }
-};
-
-const handleDragLeave = (event: DragEvent) => {
-  const relatedTarget = event.relatedTarget as HTMLElement | null;
-  if (!relatedTarget || !gridContainer.value?.contains(relatedTarget)) {
-    hoverCell.value = null;
-  }
-};
-
-const handleDragEnter = (event: DragEvent) => {
-  event.preventDefault();
-
-  if (event.dataTransfer) {
-    const effect = event.dataTransfer.effectAllowed;
-    if (effect === "copy" || effect === "copyMove") {
-      event.dataTransfer.dropEffect = "copy";
-    } else {
-      event.dataTransfer.dropEffect = "move";
-    }
-  }
-};
-
-const handleDragEnd = () => {
-  draggedItem.value = null;
-  hoverCell.value = null;
-  draggedFromGrid.value = false;
-  previewSize.value = null;
-};
-
-const handleDrop = (event: DragEvent) => {
-  event.preventDefault();
-
-  let itemToDrop: GridItem | null = draggedItem.value;
-
-  if (!itemToDrop && event.dataTransfer) {
-    try {
-      const data = event.dataTransfer.getData("application/json");
-      if (data) {
-        itemToDrop = JSON.parse(data);
-
-        if (itemToDrop) {
-          previewSize.value = {
-            width: itemToDrop.width,
-            height: itemToDrop.height,
-          };
-        }
-      }
-    } catch (e) {
-      console.error("Erreur lors du parsing des données de drag:", e);
-      draggedItem.value = null;
-      hoverCell.value = null;
-      draggedFromGrid.value = false;
-      previewSize.value = null;
-      return;
-    }
-  }
-
-  if (!itemToDrop || !hoverCell.value) {
-    draggedItem.value = null;
-    hoverCell.value = null;
-    draggedFromGrid.value = false;
-    previewSize.value = null;
-    return;
-  }
-
-  const excludeId = draggedFromGrid.value ? itemToDrop.id : undefined;
-  if (
-    !isValidPlacement(
-      hoverCell.value.x,
-      hoverCell.value.y,
-      itemToDrop.width,
-      itemToDrop.height,
-      excludeId,
-    )
-  ) {
-    console.warn("Placement invalide");
-    draggedItem.value = null;
-    hoverCell.value = null;
-    draggedFromGrid.value = false;
-    previewSize.value = null;
-    return;
-  }
-
-  const newItem: GridItem = {
-    ...itemToDrop,
-    x: hoverCell.value.x,
-    y: hoverCell.value.y,
-  };
-
-  if (draggedFromGrid.value) {
-    const index = placedItems.value.findIndex((item) => item.id === newItem.id);
-    if (index !== -1) {
-      placedItems.value[index] = newItem;
-      emit("item-moved", newItem);
-    }
-  } else {
-    placedItems.value.push(newItem);
-    emit("item-placed", newItem);
-  }
-
-  emit("update:items", placedItems.value);
-
-  draggedItem.value = null;
-  hoverCell.value = null;
-  draggedFromGrid.value = false;
-  previewSize.value = null;
-};
-
-const removeItem = (id: string) => {
-  const index = placedItems.value.findIndex((item) => item.id === id);
-  if (index !== -1) {
-    placedItems.value.splice(index, 1);
-    emit("item-removed", id);
-    emit("update:items", placedItems.value);
-  }
-};
-
-const getComponent = (name: string): Component | undefined => {
-  return componentRegistry.value.get(name);
-};
-
-let resizeObserver: ResizeObserver | null = null;
-
-onMounted(() => {
-  props.components.forEach(({ name, component }) => {
-    componentRegistry.value.set(name, component);
-  });
-
-  updateGridSize();
-
-  if (gridContainer.value) {
-    resizeObserver = new ResizeObserver(() => {
-      updateGridSize();
-    });
-    resizeObserver.observe(gridContainer.value);
-  }
-});
-
-watch(
-  () => props.components,
-  (newComponents) => {
-    componentRegistry.value.clear();
-    newComponents.forEach(({ name, component }) => {
-      componentRegistry.value.set(name, component);
-    });
-  },
-  { deep: true },
-);
-
-onUnmounted(() => {
-  if (resizeObserver && gridContainer.value) {
-    resizeObserver.unobserve(gridContainer.value);
-  }
-});
-
-defineExpose({
-  addItem: (item: Omit<GridItem, "x" | "y">) => {
-    const position = findAvailablePosition(item.width, item.height);
-    if (position) {
-      const newItem: GridItem = { ...item, ...position } as GridItem;
-      placedItems.value.push(newItem);
-      emit("item-placed", newItem);
-      emit("update:items", placedItems.value);
-      return newItem;
-    }
-    return null;
-  },
-  addItemByComponent: (
-    componentName: string,
-    width: number = 1,
-    height: number = 1,
-    additionalProps?: Record<string, any>,
-  ) => {
-    const component = getComponent(componentName);
-    if (!component) {
-      console.warn(`Composant "${componentName}" non trouvé dans le registre`);
-      return null;
-    }
-
-    const position = findAvailablePosition(width, height);
-    if (position) {
-      const newItem: GridItem = {
-        id: `${componentName}-${Date.now()}`,
-        x: position.x,
-        y: position.y,
-        width,
-        height,
-        component,
-        ...additionalProps,
-      };
-      placedItems.value.push(newItem);
-      emit("item-placed", newItem);
-      emit("update:items", placedItems.value);
-      return newItem;
-    }
-    return null;
-  },
-  removeItem,
-  clearGrid: () => {
-    placedItems.value = [];
-    emit("update:items", []);
-  },
-  getComponent,
-  getRegisteredComponents: () => Array.from(componentRegistry.value.keys()),
-});
-</script>
-
-<template>
-  <div class="controls-grid-container flex gap-4 w-full h-full">
-    <slot
-      name="toolbar"
-      :columns="columns"
-      :rows="rows"
-      :placed-items="placedItems"
-      :component-registry="componentRegistry"
-      :get-component="getComponent"
-      :get-registered-components="() => Array.from(componentRegistry.keys())"
-    />
-
-    <div
-      ref="gridContainer"
-      class="relative w-full h-full min-h-[400px] overflow-auto bg-transparent border border-border rounded flex-1"
-      :style="{
-        '--cell-size': `${cellSize}px`,
-        '--gap-size': `${gap}px`,
-      }"
-      @dragenter="handleDragEnter"
-      @dragover="handleDragOver"
-      @dragleave="handleDragLeave"
-      @drop="handleDrop"
-    >
-      <div
-        class="relative grid z-1"
-        :style="{
-          gridTemplateColumns,
-          gridTemplateRows,
-          gap: `${gap}px`,
-          padding: `${gap}px`,
-        }"
-      >
-        <div
-          v-if="hoverCell && (draggedItem || previewSize)"
-          class="bg-primary/10 border-2 border-dashed border-primary rounded-lg pointer-events-none animate-pulse-subtle"
-          v-motion
-          :initial="{ opacity: 0, scale: 0.95 }"
-          :enter="{ opacity: 1, scale: 1, transition: { duration: 150 } }"
-          :style="{
-            gridColumn: `${hoverCell.x + 1} / span ${draggedItem?.width || previewSize?.width || 1}`,
-            gridRow: `${hoverCell.y + 1} / span ${draggedItem?.height || previewSize?.height || 1}`,
-          }"
-        />
-
-        <div
-          v-for="item in placedItems"
-          :key="item.id"
-          class="grid-item-wrapper relative cursor-move select-none transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:cursor-grabbing active:opacity-70"
-          :draggable="true"
-          :style="{
-            gridColumn: `${item.x + 1} / span ${item.width}`,
-            gridRow: `${item.y + 1} / span ${item.height}`,
-          }"
-          v-motion
-          :initial="{ opacity: 0, scale: 0.8 }"
-          :enter="{
-            opacity: 1,
-            scale: 1,
-            transition: { type: 'spring', stiffness: 300, damping: 20 },
-          }"
-          @dragstart.stop="handleDragStart($event, item, true)"
-          @dragend.stop="handleDragEnd"
-        >
-          <div
-            class="relative w-full h-full bg-card/50 border border-border rounded overflow-hidden flex flex-col"
-            draggable="false"
-          >
-            <button
-              class="grid-item-remove absolute top-1 right-1 z-10 flex items-center justify-center w-6 h-6 bg-destructive text-destructive-foreground border-none rounded cursor-pointer opacity-0 transition-all duration-200 scale-75 hover:bg-destructive/90 hover:scale-110 active:scale-95"
-              @click.stop="removeItem(item.id)"
-              aria-label="Supprimer"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M18 6 6 18" />
-                <path d="m6 6 12 12" />
-              </svg>
-            </button>
-
-            <div
-              class="flex-1 p-2 flex items-center justify-center overflow-hidden"
-            >
-              <component
-                v-if="item.component"
-                :is="item.component"
-                v-bind="item"
-              />
-              <div
-                v-else
-                class="flex flex-col items-center justify-center gap-2 w-full h-full text-muted-foreground"
-              >
-                <span class="text-sm">{{ item.id }}</span>
-                <span class="text-xs">
-                  {{ item.width }}x{{ item.height }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <slot :columns="columns" :rows="rows" :placed-items="placedItems" />
-    </div>
-  </div>
-</template>
-
-<style scoped>
-@keyframes pulse-subtle {
-  0%,
-  100% {
-    opacity: 0.5;
-  }
-  50% {
-    opacity: 0.8;
-  }
-}
-
-.animate-pulse-subtle {
-  animation: pulse-subtle 1.5s ease-in-out infinite;
-}
-
-.grid-item-wrapper:hover .grid-item-remove {
-  opacity: 1 !important;
-  transform: scale(1) !important;
-}
-</style>
-```
-
-```vue [src/components/ui/controls-grid/ControlGrid.vue]
+```vue [src/components/ui/control-grid/ControlGrid.vue]
 <script setup lang="ts">
 import { provide, watch, onMounted, computed, ref, type Ref } from "vue";
 import { useElementSize } from "@vueuse/core";
@@ -1557,7 +993,571 @@ defineExpose({
 </style>
 ```
 
-```vue [src/components/ui/controls-grid/ControlGridItem.vue]
+```vue [src/components/ui/control-grid/ControlGrid.old.vue]
+<script setup lang="ts">
+import {
+  ref,
+  computed,
+  watch,
+  onMounted,
+  onUnmounted,
+  type Component,
+} from "vue";
+import { useElementSize, useDropZone } from "@vueuse/core";
+import { useMotion } from "@vueuse/motion";
+
+interface GridItem {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  component?: any;
+  color?: string;
+}
+
+interface ComponentToRegister {
+  name: string;
+  component: Component;
+}
+
+interface Props {
+  cellSize?: number;
+  gap?: number;
+  minColumns?: number;
+  items?: GridItem[];
+  showGrid?: boolean;
+  snapToGrid?: boolean;
+  components?: ComponentToRegister[];
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  cellSize: 80,
+  gap: 8,
+  minColumns: 4,
+  items: () => [],
+  showGrid: true,
+  snapToGrid: true,
+  components: () => [],
+});
+
+const emit = defineEmits<{
+  "update:items": [items: GridItem[]];
+  "item-placed": [item: GridItem];
+  "item-moved": [item: GridItem];
+  "item-removed": [id: string];
+}>();
+
+const gridContainer = ref<HTMLElement | null>(null);
+const placedItems = ref<GridItem[]>([...props.items]);
+const hoverCell = ref<{ x: number; y: number } | null>(null);
+const draggedItem = ref<GridItem | null>(null);
+const draggedFromGrid = ref(false);
+const previewSize = ref<{ width: number; height: number } | null>(null);
+
+const componentRegistry = ref<Map<string, Component>>(new Map());
+
+const { width: gridWidth, height: gridHeight } = useElementSize(gridContainer);
+
+const columns = computed(() => {
+  const cols = Math.floor(gridWidth.value / (props.cellSize + props.gap));
+  return Math.max(cols, props.minColumns);
+});
+
+const rows = computed(() => {
+  return Math.max(
+    Math.floor(gridHeight.value / (props.cellSize + props.gap)),
+    6,
+  );
+});
+
+const gridTemplateColumns = computed(() => {
+  return `repeat(${columns.value}, ${props.cellSize}px)`;
+});
+
+const gridTemplateRows = computed(() => {
+  return `repeat(${rows.value}, ${props.cellSize}px)`;
+});
+
+const isCellOccupied = (x: number, y: number, excludeId?: string): boolean => {
+  return placedItems.value.some((item) => {
+    if (excludeId && item.id === excludeId) return false;
+    return (
+      x >= item.x &&
+      x < item.x + item.width &&
+      y >= item.y &&
+      y < item.y + item.height
+    );
+  });
+};
+
+const isValidPlacement = (
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  excludeId?: string,
+): boolean => {
+  if (x < 0 || y < 0 || x + width > columns.value || y + height > rows.value) {
+    return false;
+  }
+
+  for (let dx = 0; dx < width; dx++) {
+    for (let dy = 0; dy < height; dy++) {
+      if (isCellOccupied(x + dx, y + dy, excludeId)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+};
+
+const findAvailablePosition = (
+  width: number,
+  height: number,
+): { x: number; y: number } | null => {
+  for (let y = 0; y <= rows.value - height; y++) {
+    for (let x = 0; x <= columns.value - width; x++) {
+      if (isValidPlacement(x, y, width, height)) {
+        return { x, y };
+      }
+    }
+  }
+  return null;
+};
+
+const updateGridSize = () => {
+  if (gridContainer.value) {
+    const rect = gridContainer.value.getBoundingClientRect();
+    gridWidth.value = rect.width;
+    gridHeight.value = rect.height;
+  }
+};
+
+const getGridPosition = (
+  clientX: number,
+  clientY: number,
+): { x: number; y: number } => {
+  if (!gridContainer.value) return { x: 0, y: 0 };
+
+  const rect = gridContainer.value.getBoundingClientRect();
+  const relativeX = clientX - rect.left - props.gap;
+  const relativeY = clientY - rect.top - props.gap;
+
+  const x = Math.floor(relativeX / (props.cellSize + props.gap));
+  const y = Math.floor(relativeY / (props.cellSize + props.gap));
+
+  return {
+    x: Math.max(0, Math.min(x, columns.value - 1)),
+    y: Math.max(0, Math.min(y, rows.value - 1)),
+  };
+};
+
+const handleDragStart = (
+  event: DragEvent,
+  item: GridItem,
+  fromGrid = false,
+) => {
+  draggedItem.value = { ...item };
+  draggedFromGrid.value = fromGrid;
+  previewSize.value = { width: item.width, height: item.height };
+
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/json", JSON.stringify(item));
+  }
+};
+
+const handleDragOver = (event: DragEvent) => {
+  event.preventDefault();
+
+  if (!draggedItem.value && event.dataTransfer) {
+    const types = event.dataTransfer.types;
+    if (types.includes("application/json")) {
+      previewSize.value = { width: 1, height: 1 };
+    }
+  }
+
+  if (event.dataTransfer) {
+    const effect = event.dataTransfer.effectAllowed;
+    if (effect === "copy" || effect === "copyMove") {
+      event.dataTransfer.dropEffect = "copy";
+    } else {
+      event.dataTransfer.dropEffect = "move";
+    }
+  }
+
+  const pos = getGridPosition(event.clientX, event.clientY);
+
+  if (draggedItem.value) {
+    const excludeId = draggedFromGrid.value ? draggedItem.value.id : undefined;
+
+    if (
+      isValidPlacement(
+        pos.x,
+        pos.y,
+        draggedItem.value.width,
+        draggedItem.value.height,
+        excludeId,
+      )
+    ) {
+      hoverCell.value = pos;
+    } else {
+      hoverCell.value = null;
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = "none";
+      }
+    }
+  } else if (previewSize.value) {
+    hoverCell.value = pos;
+  }
+};
+
+const handleDragLeave = (event: DragEvent) => {
+  const relatedTarget = event.relatedTarget as HTMLElement | null;
+  if (!relatedTarget || !gridContainer.value?.contains(relatedTarget)) {
+    hoverCell.value = null;
+  }
+};
+
+const handleDragEnter = (event: DragEvent) => {
+  event.preventDefault();
+
+  if (event.dataTransfer) {
+    const effect = event.dataTransfer.effectAllowed;
+    if (effect === "copy" || effect === "copyMove") {
+      event.dataTransfer.dropEffect = "copy";
+    } else {
+      event.dataTransfer.dropEffect = "move";
+    }
+  }
+};
+
+const handleDragEnd = () => {
+  draggedItem.value = null;
+  hoverCell.value = null;
+  draggedFromGrid.value = false;
+  previewSize.value = null;
+};
+
+const handleDrop = (event: DragEvent) => {
+  event.preventDefault();
+
+  let itemToDrop: GridItem | null = draggedItem.value;
+
+  if (!itemToDrop && event.dataTransfer) {
+    try {
+      const data = event.dataTransfer.getData("application/json");
+      if (data) {
+        itemToDrop = JSON.parse(data);
+
+        if (itemToDrop) {
+          previewSize.value = {
+            width: itemToDrop.width,
+            height: itemToDrop.height,
+          };
+        }
+      }
+    } catch (e) {
+      console.error("Erreur lors du parsing des données de drag:", e);
+      draggedItem.value = null;
+      hoverCell.value = null;
+      draggedFromGrid.value = false;
+      previewSize.value = null;
+      return;
+    }
+  }
+
+  if (!itemToDrop || !hoverCell.value) {
+    draggedItem.value = null;
+    hoverCell.value = null;
+    draggedFromGrid.value = false;
+    previewSize.value = null;
+    return;
+  }
+
+  const excludeId = draggedFromGrid.value ? itemToDrop.id : undefined;
+  if (
+    !isValidPlacement(
+      hoverCell.value.x,
+      hoverCell.value.y,
+      itemToDrop.width,
+      itemToDrop.height,
+      excludeId,
+    )
+  ) {
+    console.warn("Placement invalide");
+    draggedItem.value = null;
+    hoverCell.value = null;
+    draggedFromGrid.value = false;
+    previewSize.value = null;
+    return;
+  }
+
+  const newItem: GridItem = {
+    ...itemToDrop,
+    x: hoverCell.value.x,
+    y: hoverCell.value.y,
+  };
+
+  if (draggedFromGrid.value) {
+    const index = placedItems.value.findIndex((item) => item.id === newItem.id);
+    if (index !== -1) {
+      placedItems.value[index] = newItem;
+      emit("item-moved", newItem);
+    }
+  } else {
+    placedItems.value.push(newItem);
+    emit("item-placed", newItem);
+  }
+
+  emit("update:items", placedItems.value);
+
+  draggedItem.value = null;
+  hoverCell.value = null;
+  draggedFromGrid.value = false;
+  previewSize.value = null;
+};
+
+const removeItem = (id: string) => {
+  const index = placedItems.value.findIndex((item) => item.id === id);
+  if (index !== -1) {
+    placedItems.value.splice(index, 1);
+    emit("item-removed", id);
+    emit("update:items", placedItems.value);
+  }
+};
+
+const getComponent = (name: string): Component | undefined => {
+  return componentRegistry.value.get(name);
+};
+
+let resizeObserver: ResizeObserver | null = null;
+
+onMounted(() => {
+  props.components.forEach(({ name, component }) => {
+    componentRegistry.value.set(name, component);
+  });
+
+  updateGridSize();
+
+  if (gridContainer.value) {
+    resizeObserver = new ResizeObserver(() => {
+      updateGridSize();
+    });
+    resizeObserver.observe(gridContainer.value);
+  }
+});
+
+watch(
+  () => props.components,
+  (newComponents) => {
+    componentRegistry.value.clear();
+    newComponents.forEach(({ name, component }) => {
+      componentRegistry.value.set(name, component);
+    });
+  },
+  { deep: true },
+);
+
+onUnmounted(() => {
+  if (resizeObserver && gridContainer.value) {
+    resizeObserver.unobserve(gridContainer.value);
+  }
+});
+
+defineExpose({
+  addItem: (item: Omit<GridItem, "x" | "y">) => {
+    const position = findAvailablePosition(item.width, item.height);
+    if (position) {
+      const newItem: GridItem = { ...item, ...position } as GridItem;
+      placedItems.value.push(newItem);
+      emit("item-placed", newItem);
+      emit("update:items", placedItems.value);
+      return newItem;
+    }
+    return null;
+  },
+  addItemByComponent: (
+    componentName: string,
+    width: number = 1,
+    height: number = 1,
+    additionalProps?: Record<string, any>,
+  ) => {
+    const component = getComponent(componentName);
+    if (!component) {
+      console.warn(`Composant "${componentName}" non trouvé dans le registre`);
+      return null;
+    }
+
+    const position = findAvailablePosition(width, height);
+    if (position) {
+      const newItem: GridItem = {
+        id: `${componentName}-${Date.now()}`,
+        x: position.x,
+        y: position.y,
+        width,
+        height,
+        component,
+        ...additionalProps,
+      };
+      placedItems.value.push(newItem);
+      emit("item-placed", newItem);
+      emit("update:items", placedItems.value);
+      return newItem;
+    }
+    return null;
+  },
+  removeItem,
+  clearGrid: () => {
+    placedItems.value = [];
+    emit("update:items", []);
+  },
+  getComponent,
+  getRegisteredComponents: () => Array.from(componentRegistry.value.keys()),
+});
+</script>
+
+<template>
+  <div class="controls-grid-container flex gap-4 w-full h-full">
+    <slot
+      name="toolbar"
+      :columns="columns"
+      :rows="rows"
+      :placed-items="placedItems"
+      :component-registry="componentRegistry"
+      :get-component="getComponent"
+      :get-registered-components="() => Array.from(componentRegistry.keys())"
+    />
+
+    <div
+      ref="gridContainer"
+      class="relative w-full h-full min-h-[400px] overflow-auto bg-transparent border border-border rounded flex-1"
+      :style="{
+        '--cell-size': `${cellSize}px`,
+        '--gap-size': `${gap}px`,
+      }"
+      @dragenter="handleDragEnter"
+      @dragover="handleDragOver"
+      @dragleave="handleDragLeave"
+      @drop="handleDrop"
+    >
+      <div
+        class="relative grid z-1"
+        :style="{
+          gridTemplateColumns,
+          gridTemplateRows,
+          gap: `${gap}px`,
+          padding: `${gap}px`,
+        }"
+      >
+        <div
+          v-if="hoverCell && (draggedItem || previewSize)"
+          class="bg-primary/10 border-2 border-dashed border-primary rounded-lg pointer-events-none animate-pulse-subtle"
+          v-motion
+          :initial="{ opacity: 0, scale: 0.95 }"
+          :enter="{ opacity: 1, scale: 1, transition: { duration: 150 } }"
+          :style="{
+            gridColumn: `${hoverCell.x + 1} / span ${draggedItem?.width || previewSize?.width || 1}`,
+            gridRow: `${hoverCell.y + 1} / span ${draggedItem?.height || previewSize?.height || 1}`,
+          }"
+        />
+
+        <div
+          v-for="item in placedItems"
+          :key="item.id"
+          class="grid-item-wrapper relative cursor-move select-none transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:cursor-grabbing active:opacity-70"
+          :draggable="true"
+          :style="{
+            gridColumn: `${item.x + 1} / span ${item.width}`,
+            gridRow: `${item.y + 1} / span ${item.height}`,
+          }"
+          v-motion
+          :initial="{ opacity: 0, scale: 0.8 }"
+          :enter="{
+            opacity: 1,
+            scale: 1,
+            transition: { type: 'spring', stiffness: 300, damping: 20 },
+          }"
+          @dragstart.stop="handleDragStart($event, item, true)"
+          @dragend.stop="handleDragEnd"
+        >
+          <div
+            class="relative w-full h-full bg-card/50 border border-border rounded overflow-hidden flex flex-col"
+            draggable="false"
+          >
+            <button
+              class="grid-item-remove absolute top-1 right-1 z-10 flex items-center justify-center w-6 h-6 bg-destructive text-destructive-foreground border-none rounded cursor-pointer opacity-0 transition-all duration-200 scale-75 hover:bg-destructive/90 hover:scale-110 active:scale-95"
+              @click.stop="removeItem(item.id)"
+              aria-label="Supprimer"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+
+            <div
+              class="flex-1 p-2 flex items-center justify-center overflow-hidden"
+            >
+              <component
+                v-if="item.component"
+                :is="item.component"
+                v-bind="item"
+              />
+              <div
+                v-else
+                class="flex flex-col items-center justify-center gap-2 w-full h-full text-muted-foreground"
+              >
+                <span class="text-sm">{{ item.id }}</span>
+                <span class="text-xs">
+                  {{ item.width }}x{{ item.height }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <slot :columns="columns" :rows="rows" :placed-items="placedItems" />
+    </div>
+  </div>
+</template>
+
+<style scoped>
+@keyframes pulse-subtle {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 1.5s ease-in-out infinite;
+}
+
+.grid-item-wrapper:hover .grid-item-remove {
+  opacity: 1 !important;
+  transform: scale(1) !important;
+}
+</style>
+```
+
+```vue [src/components/ui/control-grid/ControlGridItem.vue]
 <script setup lang="ts">
 import { inject, computed, type Ref } from "vue";
 import {
@@ -1642,7 +1642,7 @@ const handleClearGrid = () => {
 </template>
 ```
 
-```vue [src/components/ui/controls-grid/ControlGridToolbar.vue]
+```vue [src/components/ui/control-grid/ControlGridToolbar.vue]
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import {
@@ -1877,40 +1877,6 @@ const handleControlClick = (control: ControlDefinition) => {
 ```
 :::
 
-## ControlGridold
-::hr-underline
-::
-
-**API**: composition
-
-  ### Props
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `cellSize`{.primary .text-primary} | `number` | 80 |  |
-| `gap`{.primary .text-primary} | `number` | 8 |  |
-| `minColumns`{.primary .text-primary} | `number` | 4 |  |
-| `items`{.primary .text-primary} | `GridItem[]` |  |  |
-| `showGrid`{.primary .text-primary} | `boolean` | true |  |
-| `snapToGrid`{.primary .text-primary} | `boolean` | true |  |
-| `components`{.primary .text-primary} | `ComponentToRegister[]` |  |  |
-
-  ### Slots
-| Name | Description |
-|------|-------------|
-| `default`{.primary .text-primary} | Slot pour le contenu additionnel ou des actions |
-
-  ### Expose
-| Name | Type | Description |
-|------|------|-------------|
-| `addItem`{.primary .text-primary} | `(item: Omit<GridItem, 'x' \| 'y'>) => any` | — |
-| `addItemByComponent`{.primary .text-primary} | `(componentName: string, width: number, height: number, additionalProps: Record<string, any>) => any` | — |
-| `removeItem`{.primary .text-primary} | `(id: string) => void` | — |
-| `clearGrid`{.primary .text-primary} | `() => void` | — |
-| `getComponent`{.primary .text-primary} | `(name: string) => Component \| undefined` | — |
-| `getRegisteredComponents`{.primary .text-primary} | `() => void` | — |
-
----
-
 ## ControlGrid
 ::hr-underline
 ::
@@ -1964,6 +1930,40 @@ for placing and managing control components.
 | `isCellOccupied`{.primary .text-primary} | `(x: number, y: number, excludeId: string) => boolean` | — |
 | `isValidPlacement`{.primary .text-primary} | `(x: number, y: number, width: number, height: number, excludeId: string) => boolean` | — |
 | `findAvailablePosition`{.primary .text-primary} | `(width: number, height: number) => { x: number; y: number } \| null` | — |
+
+---
+
+## ControlGridold
+::hr-underline
+::
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `cellSize`{.primary .text-primary} | `number` | 80 |  |
+| `gap`{.primary .text-primary} | `number` | 8 |  |
+| `minColumns`{.primary .text-primary} | `number` | 4 |  |
+| `items`{.primary .text-primary} | `GridItem[]` |  |  |
+| `showGrid`{.primary .text-primary} | `boolean` | true |  |
+| `snapToGrid`{.primary .text-primary} | `boolean` | true |  |
+| `components`{.primary .text-primary} | `ComponentToRegister[]` |  |  |
+
+  ### Slots
+| Name | Description |
+|------|-------------|
+| `default`{.primary .text-primary} | Slot pour le contenu additionnel ou des actions |
+
+  ### Expose
+| Name | Type | Description |
+|------|------|-------------|
+| `addItem`{.primary .text-primary} | `(item: Omit<GridItem, 'x' \| 'y'>) => any` | — |
+| `addItemByComponent`{.primary .text-primary} | `(componentName: string, width: number, height: number, additionalProps: Record<string, any>) => any` | — |
+| `removeItem`{.primary .text-primary} | `(id: string) => void` | — |
+| `clearGrid`{.primary .text-primary} | `() => void` | — |
+| `getComponent`{.primary .text-primary} | `(name: string) => Component \| undefined` | — |
+| `getRegisteredComponents`{.primary .text-primary} | `() => void` | — |
 
 ---
 

@@ -37,8 +37,8 @@ Copy and paste these files into your project.
 
 ```ts [src/composables/use-controls-grid/useControlsGrid.ts]
 import { ref, computed } from "vue";
-import type { GridItem } from "../../components/controls-grid";
-import { GridUtils } from "../../components/controls-grid";
+import type { GridItem } from "../../components/control-grid";
+import { GridUtils } from "../../components/control-grid";
 
 export function useControlsGrid(initialItems: GridItem[] = []) {
   const items = ref<GridItem[]>([...initialItems]);
