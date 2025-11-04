@@ -6,6 +6,7 @@
  *
  * The demos below use different MediaDevicesProvider. In real world usage, you would typically wrap your application or a section of it with the MediaDevicesProvider component.
  *
+ * @type registry:component
  * @category devices
  * @demo MediaDevicesProviderDemoSimple
  * @demo MediaDeviceDemoSimple

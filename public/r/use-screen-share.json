@@ -1,0 +1,13 @@
+{
+  "$schema": "https://shadcn-vue.com/schema/registry-item.json",
+  "name": "use-screen-share",
+  "type": "registry:hook",
+  "title": "useScreenShare",
+  "description": "A composable that manages screen sharing functionality using the getDisplayMedia API.",
+  "files": [
+    {
+      "path": "registry/new-york/composables/use-screen-share/useScreenShare.ts",
+      "type": "registry:hook"
+    }
+  ]
+}

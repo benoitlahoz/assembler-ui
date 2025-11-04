@@ -7,12 +7,19 @@
  * Unlike MediaDevicesProvider, screen sharing doesn't enumerate available sources.
  * Instead, the browser displays a picker for the user to select what to share.
  *
+ * @type registry:component
  * @category devices
  * @demo ScreenShareProviderDemoSimple
  * @demo ScreenShareProviderDemoAdvanced
  * -- Advanced Options
  */
 import type { InjectionKey, Ref } from 'vue';
+import type {
+  ScreenShareType,
+  ScreenShareState,
+  ScreenShareStartFn,
+  ScreenShareStopFn,
+} from '~~/registry/new-york/composables/use-screen-share/useScreenShare';
 
 export { default as ScreenShareProvider } from './ScreenShareProvider.vue';
 export { default as ScreenShareViewer } from './ScreenShareViewer.vue';
@@ -20,33 +27,14 @@ export { default as ScreenShareViewer } from './ScreenShareViewer.vue';
 export { type ScreenShareProviderProps } from './ScreenShareProvider.vue';
 export { type ScreenShareViewerProps } from './ScreenShareViewer.vue';
 
-/**
- * Types of surfaces that can be shared.
- */
-export type ScreenShareType = 'monitor' | 'window' | 'browser';
-
-/**
- * Current state of screen sharing.
- */
-export type ScreenShareState = 'idle' | 'requesting' | 'active' | 'error';
-
-/**
- * Options for configuring screen sharing.
- */
-export interface ScreenShareOptions {
-  /** Enable or configure video capture */
-  video?: boolean | MediaTrackConstraints;
-  /** Enable or configure audio capture (system audio) */
-  audio?: boolean | MediaTrackConstraints;
-  /** Prefer sharing the current browser tab (Chrome/Edge) */
-  preferCurrentTab?: boolean;
-  /** Allow user to switch shared surface without re-requesting permission */
-  surfaceSwitching?: 'include' | 'exclude';
-  /** Include or exclude the browser itself from the picker */
-  selfBrowserSurface?: 'include' | 'exclude';
-  /** Include or exclude system audio in the picker (Chrome/Edge) */
-  systemAudio?: 'include' | 'exclude';
-}
+// Re-export types from the composable
+export type {
+  ScreenShareType,
+  ScreenShareState,
+  ScreenShareOptions,
+  ScreenShareStartFn,
+  ScreenShareStopFn,
+} from '~~/registry/new-york/composables/use-screen-share/useScreenShare';
 
 /**
  * Slot props exposed by ScreenShareProvider to child components.
@@ -67,17 +55,6 @@ export interface ScreenShareProviderSlotProps {
   /** Function to stop screen sharing */
   stopShare: ScreenShareStopFn;
 }
-
-/**
- * Function to start screen sharing with optional configuration.
- * Returns a Promise that resolves to the MediaStream.
- */
-export type ScreenShareStartFn = (options?: ScreenShareOptions) => Promise<MediaStream>;
-
-/**
- * Function to stop the active screen sharing session.
- */
-export type ScreenShareStopFn = () => void;
 
 /**
  * Injection keys for providing/injecting screen share functionality.
