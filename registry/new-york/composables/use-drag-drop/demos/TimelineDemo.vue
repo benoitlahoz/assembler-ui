@@ -155,7 +155,7 @@ const getEventStyle = (event: Event) => {
 
   // Trier les événements qui se chevauchent par heure de début
   const allOverlapping = [...overlapping, event].sort((a, b) => a.startHour - b.startHour);
-  
+
   // Trouver l'index de l'événement courant
   const columnIndex = allOverlapping.findIndex((e) => e.id === event.id);
   const totalColumns = allOverlapping.length;

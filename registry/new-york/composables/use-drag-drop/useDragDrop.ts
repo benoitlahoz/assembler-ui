@@ -63,7 +63,7 @@ export interface UseDragDropOptions {
   unitSize?: number;
   /** Espacement entre les unités (en pixels) */
   gap?: number;
-  /** 
+  /**
    * Permet aux items de se chevaucher sans validation de collision.
    * Par défaut à false. Si true, la fonction validatePlacement ne sera pas appelée.
    * Utile pour les timelines ou autres layouts où les éléments peuvent se superposer.
