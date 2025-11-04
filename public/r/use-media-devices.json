@@ -1,0 +1,11 @@
+{
+  "name": "use-media-devices",
+  "type": "registry:hook",
+  "files": [
+    {
+      "path": "composables/use-media-devices/useMediaDevices.ts",
+      "type": "registry:hook"
+    }
+  ],
+  "dependencies": ["@vueuse/core"]
+}

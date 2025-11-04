@@ -236,17 +236,8 @@ export { VideoPresets, AudioPresets, MediaPresets } from "./presets";
 
 ```vue [src/components/ui/media-devices-provider/MediaDevicesProvider.vue]
 <script setup lang="ts">
-import {
-  nextTick,
-  onMounted,
-  onBeforeUnmount,
-  ref,
-  watch,
-  provide,
-  computed,
-  type Ref,
-} from "vue";
-import { useEventListener } from "@vueuse/core";
+import { provide, watch, onMounted, type Ref } from "vue";
+import { useMediaDevices } from "../../composables/use-media-devices/useMediaDevices";
 import {
   MediaDevicesKey,
   MediaDevicesErrorsKey,
@@ -260,9 +251,7 @@ import {
   type MediaDevicesStopFn,
   type MediaDevicesStopAllFn,
   type MediaDeviceType,
-  type MediaDeviceKind,
   type MediaPermissions,
-  type MediaPermissionState,
 } from ".";
 
 export interface MediaDevicesProviderProps {
@@ -284,154 +273,31 @@ const emit = defineEmits<{
   error: [error: Error];
 }>();
 
-const devices = ref<MediaDeviceInfo[]>([]);
-const errors = ref<Error[]>([]);
-const isLoading = ref<boolean>(false);
-const permissions = ref<MediaPermissions>({
-  camera: "unknown",
-  microphone: "unknown",
+const {
+  devices,
+  cameras,
+  microphones,
+  speakers,
+  errors,
+  isLoading,
+  permissions,
+  activeStreams,
+  startStream,
+  stopStream,
+  stopAllStreams,
+  updateAvailableDevices,
+  ensurePermissions,
+  initialize,
+} = useMediaDevices({
+  type: props.type,
+  open: props.open,
+  onStreamStarted: (deviceId, stream) =>
+    emit("streamStarted", deviceId, stream),
+  onStreamStopped: (deviceId) => emit("streamStopped", deviceId),
+  onAllStreamsStopped: () => emit("allStreamsStopped"),
+  onDevicesUpdated: (devices) => emit("devicesUpdated", devices),
+  onError: (error) => emit("error", error),
 });
-
-const activeStreams = ref<Map<string, MediaStream>>(new Map());
-
-const filterDevicesByKind = (kind: MediaDeviceKind): MediaDeviceInfo[] => {
-  return devices.value.filter((d) => d.kind === kind);
-};
-
-const cameras = computed(() => filterDevicesByKind("videoinput"));
-const microphones = computed(() => filterDevicesByKind("audioinput"));
-const speakers = computed(() => filterDevicesByKind("audiooutput"));
-
-const roActiveStreams = computed(
-  () => activeStreams.value as ReadonlyMap<string, MediaStream>,
-);
-
-const checkPermission = async (
-  name: "camera" | "microphone",
-): Promise<MediaPermissionState> => {
-  if (typeof navigator === "undefined" || !navigator.permissions) {
-    return "unknown";
-  }
-
-  try {
-    const permissionName = name === "camera" ? "camera" : "microphone";
-    const result = await navigator.permissions.query({
-      name: permissionName as PermissionName,
-    });
-    return result.state as MediaPermissionState;
-  } catch (error) {
-    return "unknown";
-  }
-};
-
-const updatePermissions = async () => {
-  permissions.value.camera = await checkPermission("camera");
-  permissions.value.microphone = await checkPermission("microphone");
-};
-
-const startStream = async (
-  deviceId: string,
-  constraints: MediaStreamConstraints,
-): Promise<MediaStream> => {
-  const existingStream = activeStreams.value.get(deviceId);
-  if (existingStream?.active) {
-    return existingStream;
-  }
-
-  if (existingStream) {
-    activeStreams.value.delete(deviceId);
-  }
-
-  try {
-    if (typeof navigator === "undefined" || !navigator.mediaDevices) {
-      throw new Error(
-        "navigator.mediaDevices not available (SSR or unsupported browser)",
-      );
-    }
-
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-
-    activeStreams.value.set(deviceId, stream);
-    emit("streamStarted", deviceId, stream);
-    return stream;
-  } catch (error) {
-    errors.value.push(error as Error);
-    emit("error", error as Error);
-    throw error;
-  }
-};
-
-const stopStream = (deviceId: string) => {
-  const stream = activeStreams.value.get(deviceId);
-  if (stream) {
-    stream.getTracks().forEach((track) => track.stop());
-    activeStreams.value.delete(deviceId);
-    emit("streamStopped", deviceId);
-  }
-};
-
-const stopAllStreams = () => {
-  activeStreams.value.forEach((stream, deviceId) => {
-    stream.getTracks().forEach((track) => track.stop());
-  });
-  activeStreams.value.clear();
-  emit("allStreamsStopped");
-};
-
-const updateAvailableDevices = async () => {
-  if (
-    typeof navigator === "undefined" ||
-    !navigator.mediaDevices ||
-    !navigator.mediaDevices.enumerateDevices
-  ) {
-    devices.value = [];
-    return;
-  }
-
-  isLoading.value = true;
-  try {
-    devices.value = await navigator.mediaDevices.enumerateDevices();
-    emit("devicesUpdated", devices.value);
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-if (typeof navigator !== "undefined" && navigator.mediaDevices) {
-  useEventListener(
-    navigator.mediaDevices,
-    "devicechange",
-    updateAvailableDevices,
-  );
-}
-
-const requestMediaIfNeeded = async () => {
-  if (typeof navigator === "undefined" || !navigator.mediaDevices) {
-    return;
-  }
-
-  const needsVideo = props.type === "camera" || props.type === "all";
-  const needsAudio = props.type === "microphone" || props.type === "all";
-
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: needsVideo,
-      audio: needsAudio,
-    });
-
-    stream.getTracks().forEach((track) => track.stop());
-
-    await updatePermissions();
-  } catch (error) {
-    errors.value.push(error as Error);
-    emit("error", error as Error);
-
-    await updatePermissions();
-  }
-};
-
-const ensurePermissions = () =>
-  props.open ? requestMediaIfNeeded() : Promise.resolve();
 
 provide<Ref<MediaDeviceInfo[]>>(MediaDevicesKey, devices);
 
@@ -441,7 +307,7 @@ provide<Ref<boolean>>(MediaDevicesLoadingKey, isLoading);
 
 provide<Ref<MediaPermissions>>(MediaDevicesPermissionsKey, permissions);
 
-provide(MediaDevicesActiveStreamsKey, roActiveStreams);
+provide(MediaDevicesActiveStreamsKey, activeStreams);
 
 provide<MediaDevicesStartFn>(MediaDevicesStartKey, startStream);
 
@@ -450,36 +316,33 @@ provide<MediaDevicesStopFn>(MediaDevicesStopKey, stopStream);
 provide<MediaDevicesStopAllFn>(MediaDevicesStopAllKey, stopAllStreams);
 
 watch(
-  () => [props.type, props.open],
-  async () => {
-    try {
-      nextTick(async () => {
-        if (props.open) {
-          await ensurePermissions();
-          await updateAvailableDevices();
-        }
-      });
-    } catch (error) {
-      errors.value.push(error as Error);
-      emit("error", error as Error);
+  () => [props.type, props.open] as const,
+  async ([newType, newOpen], oldValue) => {
+    const [oldType, oldOpen] = oldValue || [props.type, false];
+
+    if (newOpen && !oldOpen) {
+      await ensurePermissions();
+      await updateAvailableDevices();
+    } else if (!newOpen && oldOpen) {
+      stopAllStreams();
+    } else if (newOpen && newType !== oldType) {
+      const shouldStopAll =
+        oldType === "all" ||
+        (oldType === "camera" && newType === "microphone") ||
+        (oldType === "microphone" && newType === "camera");
+
+      if (shouldStopAll) {
+        stopAllStreams();
+      }
+
+      await ensurePermissions();
+      await updateAvailableDevices();
     }
   },
-  { immediate: true },
 );
 
 onMounted(async () => {
-  await updatePermissions();
-
-  if (props.open) {
-    await ensurePermissions();
-
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    await updateAvailableDevices();
-  }
-});
-
-onBeforeUnmount(() => {
-  stopAllStreams();
+  await initialize();
 });
 </script>
 
@@ -1124,7 +987,7 @@ The MediaDevicesProvider component provides a list of available media devices
 | `MediaDevicesErrorsKey`{.primary .text-primary} | `errors` | `Ref<Error[]>` | Errors encountered during media operations. |
 | `MediaDevicesLoadingKey`{.primary .text-primary} | `isLoading` | `Ref<boolean>` | Loading state. |
 | `MediaDevicesPermissionsKey`{.primary .text-primary} | `permissions` | `Ref<MediaPermissions>` | Permissions state. |
-| `MediaDevicesActiveStreamsKey`{.primary .text-primary} | `roActiveStreams` | `any` | Active streams (readonly). |
+| `MediaDevicesActiveStreamsKey`{.primary .text-primary} | `activeStreams` | `any` | Active streams (readonly). |
 | `MediaDevicesStartKey`{.primary .text-primary} | `startStream` | `MediaDevicesStartFn` | Start a media stream for a specific device. |
 | `MediaDevicesStopKey`{.primary .text-primary} | `stopStream` | `MediaDevicesStopFn` | Stop a media stream for a specific device. |
 | `MediaDevicesStopAllKey`{.primary .text-primary} | `stopAllStreams` | `MediaDevicesStopAllFn` | Stop all active media streams. |
