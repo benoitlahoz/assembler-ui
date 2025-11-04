@@ -3,6 +3,12 @@
  *
  * @category interactions
  * @type registry:hook
+ *
+ * @demo FileListDemo
+ * @demo TimelineDemo
+ * @demo KanbanDemo
+ * @demo PaletteCanvasDemo
+ * @demo FreeLayoutDemo
  */
 
 import { ref, computed, type Ref } from 'vue';
