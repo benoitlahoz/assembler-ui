@@ -463,194 +463,205 @@ const stats = computed(() => ({
 </script>
 
 <template>
-  <div class="w-full h-full p-8 bg-slate-50">
-    <div class="max-w-6xl mx-auto space-y-6">
-      <div>
-        <h2 class="text-2xl font-bold mb-2">Grid Layout Demo</h2>
-        <p class="text-gray-600">
-          Déplacement d'items dans une grille avec validation de collision
-        </p>
-      </div>
+  <ClientOnly>
+    <div class="w-full h-full p-8 bg-slate-50">
+      <div class="max-w-6xl mx-auto space-y-6">
+        <div>
+          <h2 class="text-2xl font-bold mb-2">Grid Layout Demo</h2>
+          <p class="text-gray-600">
+            Déplacement d'items dans une grille avec validation de collision
+          </p>
+        </div>
 
-      <div class="grid grid-cols-4 gap-4">
-        <div class="bg-white p-4 rounded-lg border">
-          <div class="text-2xl font-bold text-blue-600">
-            {{ stats.totalItems }}
+        <div class="grid grid-cols-4 gap-4">
+          <div class="bg-white p-4 rounded-lg border">
+            <div class="text-2xl font-bold text-blue-600">
+              {{ stats.totalItems }}
+            </div>
+            <div class="text-xs text-gray-600">Items</div>
           </div>
-          <div class="text-xs text-gray-600">Items</div>
-        </div>
-        <div class="bg-white p-4 rounded-lg border">
-          <div class="text-2xl font-bold text-green-600">
-            {{ stats.usedCells }}
+          <div class="bg-white p-4 rounded-lg border">
+            <div class="text-2xl font-bold text-green-600">
+              {{ stats.usedCells }}
+            </div>
+            <div class="text-xs text-gray-600">Cellules occupées</div>
           </div>
-          <div class="text-xs text-gray-600">Cellules occupées</div>
-        </div>
-        <div class="bg-white p-4 rounded-lg border">
-          <div class="text-2xl font-bold text-orange-600">
-            {{ stats.freeCells }}
+          <div class="bg-white p-4 rounded-lg border">
+            <div class="text-2xl font-bold text-orange-600">
+              {{ stats.freeCells }}
+            </div>
+            <div class="text-xs text-gray-600">Cellules libres</div>
           </div>
-          <div class="text-xs text-gray-600">Cellules libres</div>
-        </div>
-        <div class="bg-white p-4 rounded-lg border">
-          <div class="text-2xl font-bold text-purple-600">
-            {{ COLUMNS }}×{{ ROWS }}
+          <div class="bg-white p-4 rounded-lg border">
+            <div class="text-2xl font-bold text-purple-600">
+              {{ COLUMNS }}×{{ ROWS }}
+            </div>
+            <div class="text-xs text-gray-600">Grille</div>
           </div>
-          <div class="text-xs text-gray-600">Grille</div>
         </div>
-      </div>
 
-      <DragDropProvider
-        :unit-size="CELL_SIZE"
-        :gap="GAP"
-        :validate-placement="validatePlacement"
-      >
-        <template>
-          <div class="bg-white p-6 rounded-lg border shadow-lg">
-            <div
-              ref="gridContainer"
-              class="relative bg-slate-100 rounded-lg"
-              :style="{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${COLUMNS}, ${CELL_SIZE}px)`,
-                gridTemplateRows: `repeat(${ROWS}, ${CELL_SIZE}px)`,
-                gap: `${GAP}px`,
-                padding: `${GAP}px`,
-              }"
-              @dragover="
-                (e) =>
-                  handleDragOverSimple?.(
-                    e,
-                    (virtualBounds, containerBounds) => {
-                      return DragDropUtils.getPositionByIntersection(
-                        virtualBounds,
-                        containerBounds,
-                        CELL_SIZE,
-                        GAP,
-                        COLUMNS,
-                        ROWS,
-                      );
-                    },
-                  )
-              "
-              @drop="
-                (e) => {
-                  e.preventDefault();
-                  if (
-                    dragState.item &&
-                    dragState.hoverPosition &&
-                    dragState.isValid
-                  ) {
-                    const item = items.find((i) => i.id === dragState.item!.id);
-                    if (item) {
-                      item.x = dragState.hoverPosition.x;
-                      item.y = dragState.hoverPosition.y;
-                    }
-                  }
-                  endDrag();
-                }
-              "
-            >
+        <DragDropProvider
+          :container-ref="gridContainer"
+          :unit-size="CELL_SIZE"
+          :gap="GAP"
+          :validate-placement="validatePlacement"
+        >
+          <template>
+            <div class="bg-white p-6 rounded-lg border shadow-lg">
               <div
-                v-for="item in items"
-                :key="item.id"
+                ref="gridContainer"
+                class="relative bg-slate-100 rounded-lg"
                 :style="{
-                  gridColumn: `${item.x + 1} / span ${item.width}`,
-                  gridRow: `${item.y + 1} / span ${item.height}`,
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${COLUMNS}, ${CELL_SIZE}px)`,
+                  gridTemplateRows: `repeat(${ROWS}, ${CELL_SIZE}px)`,
+                  gap: `${GAP}px`,
+                  padding: `${GAP}px`,
                 }"
-                :class="[
-                  'rounded-lg cursor-move transition-all p-4',
-                  'border-2 border-white shadow-md',
-                  item.color,
-                  dragState.isDragging && dragState.item?.id === item.id
-                    ? 'opacity-40'
-                    : 'opacity-100',
-                ]"
-                draggable="true"
-                @dragstart="
+                @dragover="
                   (e) =>
-                    startDrag(
+                    handleDragOverSimple?.(
                       e,
-                      {
-                        id: item.id,
-                        width: item.width,
-                        height: item.height,
-                        data: item,
+                      (virtualBounds, containerBounds) => {
+                        return DragDropUtils.getPositionByIntersection(
+                          virtualBounds,
+                          containerBounds,
+                          CELL_SIZE,
+                          GAP,
+                          COLUMNS,
+                          ROWS,
+                        );
                       },
-                      true,
                     )
                 "
-                @dragend="endDrag"
-              >
-                <div class="font-semibold text-white">{{ item.label }}</div>
-                <div class="text-xs text-white opacity-75">
-                  {{ item.width }}×{{ item.height }}
-                </div>
-              </div>
-
-              <div
-                v-if="
-                  dragState.isDragging &&
-                  dragState.hoverPosition &&
-                  dragState.item
+                @drop="
+                  (e) => {
+                    e.preventDefault();
+                    if (
+                      dragState.item &&
+                      dragState.hoverPosition &&
+                      dragState.isValid
+                    ) {
+                      const item = items.find(
+                        (i) => i.id === dragState.item!.id,
+                      );
+                      if (item) {
+                        item.x = dragState.hoverPosition.x;
+                        item.y = dragState.hoverPosition.y;
+                      }
+                    }
+                    endDrag();
+                  }
                 "
-                :style="{
-                  gridColumn: `${dragState.hoverPosition.x + 1} / span ${dragState.item.width}`,
-                  gridRow: `${dragState.hoverPosition.y + 1} / span ${dragState.item.height}`,
-                }"
-                :class="[
-                  'rounded-lg border-2 pointer-events-none',
-                  dragState.isValid
-                    ? 'border-green-400 bg-green-100 bg-opacity-50'
-                    : 'border-red-400 bg-red-100 bg-opacity-50',
-                ]"
               >
                 <div
-                  class="p-2 text-sm font-semibold"
-                  :class="dragState.isValid ? 'text-green-700' : 'text-red-700'"
+                  v-for="item in items"
+                  :key="item.id"
+                  :style="{
+                    gridColumn: `${item.x + 1} / span ${item.width}`,
+                    gridRow: `${item.y + 1} / span ${item.height}`,
+                  }"
+                  :class="[
+                    'rounded-lg cursor-move transition-all p-4',
+                    'border-2 border-white shadow-md',
+                    item.color,
+                    dragState.isDragging && dragState.item?.id === item.id
+                      ? 'opacity-40'
+                      : 'opacity-100',
+                  ]"
+                  draggable="true"
+                  @dragstart="
+                    (e) =>
+                      startDrag(
+                        e,
+                        {
+                          id: item.id,
+                          width: item.width,
+                          height: item.height,
+                          data: item,
+                        },
+                        true,
+                      )
+                  "
+                  @dragend="endDrag"
                 >
-                  {{ dragState.isValid ? "✓" : "✗" }}
+                  <div class="font-semibold text-white">{{ item.label }}</div>
+                  <div class="text-xs text-white opacity-75">
+                    {{ item.width }}×{{ item.height }}
+                  </div>
+                </div>
+
+                <div
+                  v-if="
+                    dragState.isDragging &&
+                    dragState.hoverPosition &&
+                    dragState.item
+                  "
+                  :style="{
+                    gridColumn: `${dragState.hoverPosition.x + 1} / span ${dragState.item.width}`,
+                    gridRow: `${dragState.hoverPosition.y + 1} / span ${dragState.item.height}`,
+                  }"
+                  :class="[
+                    'rounded-lg border-2 pointer-events-none',
+                    dragState.isValid
+                      ? 'border-green-400 bg-green-100 bg-opacity-50'
+                      : 'border-red-400 bg-red-100 bg-opacity-50',
+                  ]"
+                >
+                  <div
+                    class="p-2 text-sm font-semibold"
+                    :class="
+                      dragState.isValid ? 'text-green-700' : 'text-red-700'
+                    "
+                  >
+                    {{ dragState.isValid ? "✓" : "✗" }}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
-            <div class="font-semibold text-blue-900 mb-2">🔍 Drag State</div>
-            <div class="space-y-1 text-blue-800">
-              <div>Dragging: {{ dragState.isDragging }}</div>
-              <div v-if="dragState.item">
-                Item: {{ dragState.item.id }} ({{ dragState.item.width }}×{{
-                  dragState.item.height
-                }})
-              </div>
-              <div v-if="dragState.hoverPosition">
-                Position: ({{ dragState.hoverPosition.x }},
-                {{ dragState.hoverPosition.y }})
-              </div>
-              <div v-if="dragState.isDragging">
-                Valid: {{ dragState.isValid }}
+            <div
+              class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm"
+            >
+              <div class="font-semibold text-blue-900 mb-2">🔍 Drag State</div>
+              <div class="space-y-1 text-blue-800">
+                <div>Dragging: {{ dragState.isDragging }}</div>
+                <div v-if="dragState.item">
+                  Item: {{ dragState.item.id }} ({{ dragState.item.width }}×{{
+                    dragState.item.height
+                  }})
+                </div>
+                <div v-if="dragState.hoverPosition">
+                  Position: ({{ dragState.hoverPosition.x }},
+                  {{ dragState.hoverPosition.y }})
+                </div>
+                <div v-if="dragState.isDragging">
+                  Valid: {{ dragState.isValid }}
+                </div>
               </div>
             </div>
-          </div>
-        </template>
-      </DragDropProvider>
+          </template>
+        </DragDropProvider>
 
-      <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <h3 class="font-semibold text-sm text-yellow-900 mb-2">
-          💡 Instructions
-        </h3>
-        <ul class="text-sm text-yellow-800 space-y-1">
-          <li>• Drag les items pour les repositionner dans la grille</li>
-          <li>
-            • Les items ne peuvent pas se chevaucher (validation de collision)
-          </li>
-          <li>• Vert = placement valide, Rouge = placement invalide</li>
-          <li>• Les items gardent leur taille lors du déplacement</li>
-          <li>• Le provider centralise la configuration pour tous les items</li>
-        </ul>
+        <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <h3 class="font-semibold text-sm text-yellow-900 mb-2">
+            💡 Instructions
+          </h3>
+          <ul class="text-sm text-yellow-800 space-y-1">
+            <li>• Drag les items pour les repositionner dans la grille</li>
+            <li>
+              • Les items ne peuvent pas se chevaucher (validation de collision)
+            </li>
+            <li>• Vert = placement valide, Rouge = placement invalide</li>
+            <li>• Les items gardent leur taille lors du déplacement</li>
+            <li>
+              • Le provider centralise la configuration pour tous les items
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
-  </div>
+  </ClientOnly>
 </template>
 ```
   :::
@@ -670,36 +681,117 @@ import DragDropProvider from "../DragDropProvider.vue";
 const items = ref([
   { id: "1", title: "Item 1", width: 1, height: 1 },
   { id: "2", title: "Item 2", width: 1, height: 1 },
+  { id: "3", title: "Item 3", width: 1, height: 1 },
+  { id: "4", title: "Item 4", width: 1, height: 1 },
 ]);
+
+const draggedIndex = ref<number | null>(null);
+
+const hoverIndex = ref<number | null>(null);
+
+const handleDragStart = (index: number) => {
+  draggedIndex.value = index;
+  hoverIndex.value = null;
+};
+
+const handleDragOver = (index: number) => {
+  if (draggedIndex.value === null || draggedIndex.value === index) return;
+  hoverIndex.value = index;
+};
+
+const handleDrop = () => {
+  if (draggedIndex.value === null || hoverIndex.value === null) {
+    draggedIndex.value = null;
+    hoverIndex.value = null;
+    return;
+  }
+
+  const draggedItem = items.value[draggedIndex.value];
+  if (!draggedItem) return;
+
+  const newItems = [...items.value];
+
+  newItems.splice(draggedIndex.value, 1);
+
+  newItems.splice(hoverIndex.value, 0, draggedItem);
+
+  items.value = newItems;
+  draggedIndex.value = null;
+  hoverIndex.value = null;
+};
+
+const handleDragEnd = () => {
+  draggedIndex.value = null;
+  hoverIndex.value = null;
+};
 </script>
 
 <template>
-  <div class="p-8">
-    <h2 class="text-2xl font-bold mb-4">Test DragDropProvider</h2>
+  <ClientOnly>
+    <div class="p-8 bg-slate-50">
+      <h2 class="text-2xl font-bold mb-4">Sortable List Demo</h2>
+      <p class="text-gray-600 mb-6">
+        Démo de liste réorganisable par drag & drop
+      </p>
 
-    <DragDropProvider :allow-collision="true">
-      <template #default="{ dragState, startDrag, endDrag }">
-        <div class="space-y-4">
-          <div class="p-4 bg-blue-100 rounded">
-            Provider is rendering!
-            <br />
-            Is Dragging: {{ dragState.isDragging }}
+      <DragDropProvider :allow-collision="true">
+        <template #default="{ dragState }">
+          <div class="max-w-md space-y-3">
+            <div
+              v-for="(item, index) in items"
+              :key="item.id"
+              :class="[
+                'p-4 bg-white border-2 rounded-lg cursor-move transition-all',
+                draggedIndex === index
+                  ? 'opacity-40 border-blue-500'
+                  : hoverIndex === index
+                    ? 'border-green-500 bg-green-50'
+                    : 'border-gray-300 hover:border-blue-400',
+              ]"
+              draggable="true"
+              @dragstart="handleDragStart(index)"
+              @dragover.prevent="handleDragOver(index)"
+              @drop="handleDrop"
+              @dragend="handleDragEnd"
+            >
+              <div class="flex items-center gap-3">
+                <div class="text-2xl">☰</div>
+                <div class="font-semibold">{{ item.title }}</div>
+              </div>
+            </div>
           </div>
 
           <div
-            v-for="item in items"
-            :key="item.id"
-            class="p-4 bg-white border rounded cursor-move"
-            draggable="true"
-            @dragstart="(e) => startDrag(e, item, true)"
-            @dragend="endDrag"
+            class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm max-w-md"
           >
-            {{ item.title }}
+            <div class="font-semibold text-blue-900 mb-2">🔍 Drag State</div>
+            <div class="space-y-1 text-blue-800">
+              <div>Is Dragging: {{ dragState.isDragging }}</div>
+              <div v-if="draggedIndex !== null">
+                Dragged Index: {{ draggedIndex }}
+              </div>
+              <div v-if="hoverIndex !== null">
+                Hover Index: {{ hoverIndex }}
+              </div>
+            </div>
           </div>
-        </div>
-      </template>
-    </DragDropProvider>
-  </div>
+
+          <div
+            class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg max-w-md mt-4"
+          >
+            <h3 class="font-semibold text-sm text-yellow-900 mb-2">
+              💡 Instructions
+            </h3>
+            <ul class="text-sm text-yellow-800 space-y-1">
+              <li>• Drag un item pour le déplacer</li>
+              <li>• Drop sur un autre item pour échanger les positions</li>
+              <li>• La liste se réorganise automatiquement</li>
+            </ul>
+          </div>
+        </template>
+      </DragDropProvider>
+    </div>
+  </ClientOnly>
 </template>
 ```
   :::
