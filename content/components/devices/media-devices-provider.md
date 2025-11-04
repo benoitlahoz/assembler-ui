@@ -621,7 +621,7 @@ import type { MediaDevicesStartFn, MediaDevicesStopFn } from ".";
 export interface VideoDeviceProps {
   autoStart?: boolean;
 
-  deviceId: string;
+  deviceId?: string;
 
   width?: number | { min?: number; max?: number; ideal?: number };
 
@@ -675,8 +675,14 @@ const buildConstraints = (): MediaStreamConstraints => {
     return props.constraints;
   }
 
+  if (!props.deviceId && !props.facingMode) {
+    throw new Error("Either deviceId or facingMode must be provided");
+  }
+
   const videoConstraints: MediaTrackConstraints = {
-    deviceId: { exact: props.deviceId },
+    ...(props.facingMode
+      ? { facingMode: { ideal: props.facingMode } }
+      : { deviceId: { exact: props.deviceId } }),
     width: props.width
       ? typeof props.width === "number"
         ? { ideal: props.width }
@@ -697,7 +703,6 @@ const buildConstraints = (): MediaStreamConstraints => {
         ? { ideal: props.frameRate }
         : props.frameRate
       : undefined,
-    facingMode: props.facingMode ? { ideal: props.facingMode } : undefined,
   };
 
   return {
@@ -720,7 +725,7 @@ const start = async () => {
     error.value = null;
     const constraints = buildConstraints();
 
-    if (providerStart) {
+    if (providerStart && props.deviceId && !props.facingMode) {
       stream.value = await providerStart(props.deviceId, constraints);
     } else {
       stream.value = await navigator.mediaDevices.getUserMedia(constraints);
@@ -1053,17 +1058,21 @@ VideoDevice component - Manages a video stream with constraints.
 This component builds video constraints and uses the MediaDevicesProvider&#39;s
 start/stop functions to manage streams with device caching.
 
+IMPORTANT: On iOS/Safari, you cannot use both deviceId and facingMode constraints
+simultaneously. If both are provided, facingMode takes priority to allow the browser
+to select the appropriate camera automatically.
+
 **API**: composition
 
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `autoStart`{.primary .text-primary} | `boolean` | false | Whether to automatically start the media stream on mount. |
-| `deviceId`{.primary .text-primary} | `string` | - | The exact device ID to use for the video stream (REQUIRED). |
+| `deviceId`{.primary .text-primary} | `string` | - | The exact device ID to use for the video stream. Is optional if facingMode is provided. |
 | `width`{.primary .text-primary} | `number \| { min?: number; max?: number; ideal?: number }` | - | Video resolution width (in pixels). |
 | `height`{.primary .text-primary} | `number \| { min?: number; max?: number; ideal?: number }` | - | Video resolution height (in pixels). |
 | `frameRate`{.primary .text-primary} | `number \| { min?: number; max?: number; ideal?: number }` | - | Video framerate (frames per second). |
-| `facingMode`{.primary .text-primary} | `'user' \| 'environment' \| 'left' \| 'right'` | - | Camera facing mode. |
+| `facingMode`{.primary .text-primary} | `'user' \| 'environment' \| 'left' \| 'right'` | - | Camera facing mode. Takes priority on deviceId. |
 | `aspectRatio`{.primary .text-primary} | `number \| { min?: number; max?: number; ideal?: number }` | - | Video aspect ratio. |
 | `constraints`{.primary .text-primary} | `MediaStreamConstraints` | - | Custom MediaStreamConstraints to override simplified props. |
 
@@ -1328,6 +1337,23 @@ const selectedDeviceId = ref<string>("");
 const videoRef = ref<HTMLVideoElement | null>(null);
 const currentStream = ref<MediaStream | null>(null);
 
+const isMobile = computed(() => {
+  if (typeof navigator === "undefined") return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent,
+  );
+});
+
+const availablePresets = computed(() => {
+  const presets = { ...VideoPresets };
+
+  if (!isMobile.value) {
+    delete (presets as any).mobileFront;
+    delete (presets as any).mobileBack;
+  }
+  return presets;
+});
+
 const currentPreset = computed(() => VideoPresets[selectedPreset.value]);
 
 const handleStream = (stream: MediaStream | null) => {
@@ -1419,7 +1445,7 @@ const formatPresetName = (name: string): string => {
               <Label class="text-sm font-bold mb-4">Video Quality</Label>
               <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <Button
-                  v-for="(preset, name) in VideoPresets"
+                  v-for="(preset, name) in availablePresets"
                   :key="name"
                   @click="selectedPreset = name as PresetName"
                   :variant="selectedPreset === name ? 'default' : 'outline'"

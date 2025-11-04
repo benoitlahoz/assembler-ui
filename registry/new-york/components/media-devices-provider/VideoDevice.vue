@@ -3,6 +3,10 @@
  * VideoDevice component - Manages a video stream with constraints.
  * This component builds video constraints and uses the MediaDevicesProvider's
  * start/stop functions to manage streams with device caching.
+ *
+ * IMPORTANT: On iOS/Safari, you cannot use both deviceId and facingMode constraints
+ * simultaneously. If both are provided, facingMode takes priority to allow the browser
+ * to select the appropriate camera automatically.
  */
 
 import { ref, watch, onMounted, onBeforeUnmount, computed, inject, type Ref } from 'vue';
@@ -22,9 +26,9 @@ export interface VideoDeviceProps {
    */
   autoStart?: boolean;
   /**
-   * The exact device ID to use for the video stream (REQUIRED).
+   * The exact device ID to use for the video stream. Is optional if facingMode is provided.
    */
-  deviceId: string;
+  deviceId?: string;
 
   // Video constraints
 
@@ -41,7 +45,7 @@ export interface VideoDeviceProps {
    */
   frameRate?: number | { min?: number; max?: number; ideal?: number };
   /**
-   * Camera facing mode.
+   * Camera facing mode. Takes priority on deviceId.
    */
   facingMode?: 'user' | 'environment' | 'left' | 'right';
   /**
@@ -96,8 +100,18 @@ const buildConstraints = (): MediaStreamConstraints => {
     return props.constraints;
   }
 
+  // Validation: at least deviceId or facingMode must be provided
+  if (!props.deviceId && !props.facingMode) {
+    throw new Error('Either deviceId or facingMode must be provided');
+  }
+
   const videoConstraints: MediaTrackConstraints = {
-    deviceId: { exact: props.deviceId },
+    // If facingMode is specified, use it instead of exact deviceId
+    // because on iOS you cannot use both constraints together.
+    // facingMode has priority to allow the browser to select the appropriate camera.
+    ...(props.facingMode
+      ? { facingMode: { ideal: props.facingMode } }
+      : { deviceId: { exact: props.deviceId } }),
     width: props.width
       ? typeof props.width === 'number'
         ? { ideal: props.width }
@@ -118,7 +132,6 @@ const buildConstraints = (): MediaStreamConstraints => {
         ? { ideal: props.frameRate }
         : props.frameRate
       : undefined,
-    facingMode: props.facingMode ? { ideal: props.facingMode } : undefined,
   };
 
   return {
@@ -144,7 +157,9 @@ const start = async () => {
     error.value = null;
     const constraints = buildConstraints();
 
-    if (providerStart) {
+    if (providerStart && props.deviceId && !props.facingMode) {
+      // Use provider's start function only when we have a specific deviceId
+      // and no facingMode (since facingMode lets the browser choose)
       stream.value = await providerStart(props.deviceId, constraints);
     } else {
       stream.value = await navigator.mediaDevices.getUserMedia(constraints);

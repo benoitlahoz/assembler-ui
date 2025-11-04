@@ -21,6 +21,23 @@ const selectedDeviceId = ref<string>('');
 const videoRef = ref<HTMLVideoElement | null>(null);
 const currentStream = ref<MediaStream | null>(null);
 
+// Detect if we're on a mobile device
+const isMobile = computed(() => {
+  if (typeof navigator === 'undefined') return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+});
+
+// Filter presets based on device type
+const availablePresets = computed(() => {
+  const presets = { ...VideoPresets };
+  // Remove mobile presets on desktop
+  if (!isMobile.value) {
+    delete (presets as any).mobileFront;
+    delete (presets as any).mobileBack;
+  }
+  return presets;
+});
+
 const currentPreset = computed(() => VideoPresets[selectedPreset.value]);
 
 const handleStream = (stream: MediaStream | null) => {
@@ -116,7 +133,7 @@ const formatPresetName = (name: string): string => {
               <Label class="text-sm font-bold mb-4">Video Quality</Label>
               <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <Button
-                  v-for="(preset, name) in VideoPresets"
+                  v-for="(preset, name) in availablePresets"
                   :key="name"
                   @click="selectedPreset = name as PresetName"
                   :variant="selectedPreset === name ? 'default' : 'outline'"
