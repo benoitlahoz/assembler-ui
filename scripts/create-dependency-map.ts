@@ -37,15 +37,33 @@ export interface DependencyMapEntry {
 export type DependencyMap = Record<string, DependencyMapEntry>;
 
 /**
- * Récupère tous les fichiers .vue, .ts, .js d'un dossier
+ * Récupère tous les fichiers .vue, .ts, .js d'un dossier (récursivement)
+ * @param folderPath - Chemin du dossier à parcourir
+ * @param skipSubfolders - Liste des noms de sous-dossiers à ignorer
  */
-const getFilesInFolder = (folderPath: string): string[] => {
+const getFilesInFolder = (folderPath: string, skipSubfolders: string[] = []): string[] => {
   if (!fs.existsSync(folderPath)) return [];
 
-  const files = fs.readdirSync(folderPath);
-  return files
-    .filter((file) => /\.(vue|ts|js)$/.test(file) && !file.endsWith('.d.ts'))
-    .map((file) => path.join(folderPath, file));
+  const allFiles: string[] = [];
+  const items = fs.readdirSync(folderPath);
+
+  items.forEach((item) => {
+    const itemPath = path.join(folderPath, item);
+    const stat = fs.statSync(itemPath);
+
+    if (stat.isDirectory()) {
+      // Vérifier si ce sous-dossier doit être ignoré
+      if (skipSubfolders.includes(item)) {
+        return; // Skip ce dossier
+      }
+      // Récursion dans les sous-dossiers
+      allFiles.push(...getFilesInFolder(itemPath, skipSubfolders));
+    } else if (/\.(vue|ts|js)$/.test(item) && !item.endsWith('.d.ts')) {
+      allFiles.push(itemPath);
+    }
+  });
+
+  return allFiles;
 };
 
 /**
@@ -68,11 +86,13 @@ const readFileWithoutComments = (filePath: string): string => {
  *
  * @param jsonResults - Résultats d'analyse des dossiers
  * @param globalPath - Chemin de base du projet (ex: 'registry/new-york/')
+ * @param skipSubfolders - Liste des noms de sous-dossiers à ignorer
  * @returns Carte de dépendances complète
  */
 export function createDependencyMap(
   jsonResults: FolderAnalysisResult[],
-  globalPath: string
+  globalPath: string,
+  skipSubfolders: string[] = []
 ): DependencyMap {
   const dependencyMap: DependencyMap = {};
 
@@ -82,7 +102,7 @@ export function createDependencyMap(
     const folderFullPath = path.resolve(process.cwd(), result.folder);
 
     // Lire tous les fichiers du dossier avec leur code source
-    const files = getFilesInFolder(folderFullPath).map((filePath) => {
+    const files = getFilesInFolder(folderFullPath, skipSubfolders).map((filePath) => {
       const fileName = path.basename(filePath);
       const source = readFileWithoutComments(filePath);
       const relativePath = path.relative(process.cwd(), filePath);
@@ -117,7 +137,7 @@ export function createDependencyMap(
         const depFolderName = path.basename(imp.path);
         if (!dependencyMap[depFolderName]) {
           const depFolderFullPath = path.resolve(process.cwd(), globalPath, imp.path);
-          const depFiles = getFilesInFolder(depFolderFullPath).map((filePath) => {
+          const depFiles = getFilesInFolder(depFolderFullPath, skipSubfolders).map((filePath) => {
             const fileName = path.basename(filePath);
             const source = readFileWithoutComments(filePath);
             const relativePath = path.relative(process.cwd(), filePath);

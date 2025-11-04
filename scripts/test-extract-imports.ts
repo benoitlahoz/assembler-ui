@@ -69,15 +69,33 @@ const resolveConfig = {
 const jsonResults: FolderAnalysisResult[] = [];
 
 /**
- * Récupère tous les fichiers .vue, .ts, .js d'un dossier
+ * Récupère tous les fichiers .vue, .ts, .js d'un dossier (récursivement)
+ * @param folderPath - Chemin du dossier à parcourir
+ * @param skipSubfolders - Liste des noms de sous-dossiers à ignorer
  */
-const getFilesInFolder = (folderPath: string): string[] => {
+const getFilesInFolder = (folderPath: string, skipSubfolders: string[] = []): string[] => {
   if (!fs.existsSync(folderPath)) return [];
 
-  const files = fs.readdirSync(folderPath);
-  return files
-    .filter((file) => /\.(vue|ts|js)$/.test(file) && !file.endsWith('.d.ts'))
-    .map((file) => path.join(folderPath, file));
+  const allFiles: string[] = [];
+  const items = fs.readdirSync(folderPath);
+
+  items.forEach((item) => {
+    const itemPath = path.join(folderPath, item);
+    const stat = fs.statSync(itemPath);
+
+    if (stat.isDirectory()) {
+      // Vérifier si ce sous-dossier doit être ignoré
+      if (skipSubfolders.includes(item)) {
+        return; // Skip ce dossier
+      }
+      // Récursion dans les sous-dossiers
+      allFiles.push(...getFilesInFolder(itemPath, skipSubfolders));
+    } else if (/\.(vue|ts|js)$/.test(item) && !item.endsWith('.d.ts')) {
+      allFiles.push(itemPath);
+    }
+  });
+
+  return allFiles;
 };
 
 testFolders.forEach((folderPath) => {
@@ -90,13 +108,22 @@ testFolders.forEach((folderPath) => {
     return;
   }
 
+  // Vérifier si le dossier doit être ignoré
+  const folderName = path.basename(folderPath);
+  if (config.skipSubfolders && config.skipSubfolders.includes(folderName)) {
+    if (!shouldGenerateJson) {
+      console.log(`\n⏭️  Dossier ignoré: ${folderPath}`);
+    }
+    return;
+  }
+
   if (!isJsonMode) {
-    console.log(`\n� Dossier: ${folderPath}`);
+    console.log(`\n📁 Dossier: ${folderPath}`);
     console.log('-'.repeat(80));
   }
 
   // Récupérer tous les fichiers du dossier
-  const filesInFolder = getFilesInFolder(absFolderPath);
+  const filesInFolder = getFilesInFolder(absFolderPath, config.skipSubfolders || []);
 
   if (filesInFolder.length === 0) {
     if (!isJsonMode) {
@@ -156,7 +183,9 @@ testFolders.forEach((folderPath) => {
         // Pour chaque dossier importé, lister TOUS ses fichiers
         return Array.from(uniqueFolders.values()).map((folderPath) => {
           const fullFolderPath = path.resolve(process.cwd(), config.globalPath, folderPath);
-          const allFiles = getFilesInFolder(fullFolderPath).map((f) => path.basename(f));
+          const allFiles = getFilesInFolder(fullFolderPath, config.skipSubfolders || []).map((f) =>
+            path.basename(f)
+          );
 
           return {
             path: folderPath,
@@ -213,7 +242,11 @@ if (isJsonMode) {
   console.log(`✅ Résultats écrits dans: ${outputPath}`);
 } else if (isMapMode) {
   // Générer une carte de dépendances globale
-  const dependencyMap = createDependencyMap(jsonResults, config.globalPath);
+  const dependencyMap = createDependencyMap(
+    jsonResults,
+    config.globalPath,
+    config.skipSubfolders || []
+  );
 
   const mapOutputPath = path.resolve(__dirname, 'dependency-map.json');
   saveDependencyMap(dependencyMap, mapOutputPath);

@@ -11,6 +11,7 @@ export default {
   definitionFile: 'assemblerjs.json',
   globalPath: 'registry/new-york/',
   paths: ['components', 'blocks', 'composables'],
+  skipSubfolders: ['demos'] as string[],
   dependencies: ['vue-sonner'],
   registryDependencies: ['button', 'separator'],
   // Mapping des types registry vers les dossiers de documentation
