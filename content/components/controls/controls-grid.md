@@ -13,9 +13,9 @@ description: ControlsGrid - Composant de grille drag-and-drop
 <script setup lang="ts">
 import { ref, onMounted, shallowRef, h } from "vue";
 import { ControlsGrid } from "..";
-import { useControlRegistry } from "~~/registry/new-york/composables/use-control-registry";
+import { useControlRegistry } from "~~/registry/new-york/composables/use-control-registry/useControlRegistry";
 import { ControlButton } from "@/components/ui/control-button";
-import type { ControlDefinition } from "~~/registry/new-york/composables/use-control-registry";
+import type { ControlDefinition } from "~~/registry/new-york/composables/use-control-registry/useControlRegistry";
 
 const { registerControls, getAllControls, createControlInstance } =
   useControlRegistry();
@@ -439,27 +439,229 @@ Copy and paste these files into your project.
 :::code-tree{default-value="src/components/ui/controls-grid/index.ts"}
 
 ```ts [src/components/ui/controls-grid/index.ts]
+import type { Component } from "vue";
+
 export { default as ControlsGrid } from "./ControlsGrid.vue";
+export { default as ControlsToolbar } from "./ControlsToolbar.vue";
 
-export {
-  useControlsGrid,
-  useComponentPalette,
-  useGridConfig,
-} from "./composables";
+export interface ComponentToRegister {
+  name: string;
 
-export {
-  GridUtils,
-  type ComponentToRegister,
-  type GridItem,
-  type GridPosition,
-  type GridDimensions,
-  type GridConfig,
-  type GridItemTemplate,
-  type GridEvents,
-  type GridMethods,
-  type GridProps,
-  type DragState,
-} from "./types";
+  component: Component;
+}
+
+export interface GridItem {
+  id: string;
+
+  x: number;
+
+  y: number;
+
+  width: number;
+
+  height: number;
+
+  component?: any;
+
+  color?: string;
+
+  [key: string]: any;
+}
+
+export interface GridPosition {
+  x: number;
+
+  y: number;
+}
+
+export interface GridDimensions {
+  width: number;
+
+  height: number;
+}
+
+export interface GridConfig {
+  cellSize: number;
+
+  gap: number;
+
+  columns: number;
+
+  rows: number;
+
+  width: number;
+
+  height: number;
+}
+
+export interface GridItemTemplate extends Omit<GridItem, "x" | "y"> {
+  label?: string;
+
+  color?: string;
+
+  icon?: string;
+}
+
+export interface GridEvents {
+  "update:items": (items: GridItem[]) => void;
+
+  "item-placed": (item: GridItem) => void;
+
+  "item-moved": (item: GridItem) => void;
+
+  "item-removed": (id: string) => void;
+
+  "config-changed": (config: GridConfig) => void;
+}
+
+export interface GridMethods {
+  addItem: (item: Omit<GridItem, "x" | "y">) => GridItem | null;
+
+  addItemByComponent: (
+    componentName: string,
+    width?: number,
+    height?: number,
+    additionalProps?: Record<string, any>,
+  ) => GridItem | null;
+
+  removeItem: (id: string) => void;
+
+  clearGrid: () => void;
+
+  getComponent: (name: string) => Component | undefined;
+
+  getRegisteredComponents: () => string[];
+
+  isCellOccupied?: (x: number, y: number, excludeId?: string) => boolean;
+
+  isValidPlacement?: (
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    excludeId?: string,
+  ) => boolean;
+
+  findAvailablePosition?: (
+    width: number,
+    height: number,
+  ) => GridPosition | null;
+}
+
+export interface GridProps {
+  cellSize?: number;
+
+  gap?: number;
+
+  minColumns?: number;
+
+  items?: GridItem[];
+
+  showGrid?: boolean;
+
+  snapToGrid?: boolean;
+
+  components?: ComponentToRegister[];
+}
+
+export interface DragState {
+  item: GridItem | null;
+
+  fromGrid: boolean;
+
+  hoverPosition: GridPosition | null;
+
+  isValid: boolean;
+}
+
+export class GridUtils {
+  static pixelToGrid(
+    pixelX: number,
+    pixelY: number,
+    cellSize: number,
+    gap: number,
+  ): GridPosition {
+    const x = Math.floor(pixelX / (cellSize + gap));
+    const y = Math.floor(pixelY / (cellSize + gap));
+    return { x, y };
+  }
+
+  static gridToPixel(
+    gridX: number,
+    gridY: number,
+    cellSize: number,
+    gap: number,
+  ): { x: number; y: number } {
+    const x = gridX * (cellSize + gap);
+    const y = gridY * (cellSize + gap);
+    return { x, y };
+  }
+
+  static doItemsOverlap(item1: GridItem, item2: GridItem): boolean {
+    return !(
+      item1.x + item1.width <= item2.x ||
+      item2.x + item2.width <= item1.x ||
+      item1.y + item1.height <= item2.y ||
+      item2.y + item2.height <= item1.y
+    );
+  }
+
+  static calculateArea(item: GridItem): number {
+    return item.width * item.height;
+  }
+
+  static generateId(prefix = "item"): string {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  static cloneItemAtPosition(item: GridItem, x: number, y: number): GridItem {
+    return {
+      ...item,
+      id: this.generateId(item.id.split("-")[0]),
+      x,
+      y,
+    };
+  }
+
+  static isValidItem(item: Partial<GridItem>): boolean {
+    return (
+      typeof item.id === "string" &&
+      typeof item.width === "number" &&
+      typeof item.height === "number" &&
+      item.width > 0 &&
+      item.height > 0
+    );
+  }
+
+  static sortItems(items: GridItem[]): GridItem[] {
+    return [...items].sort((a, b) => {
+      if (a.y !== b.y) return a.y - b.y;
+      return a.x - b.x;
+    });
+  }
+
+  static findOverlappingItems(
+    items: GridItem[],
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    excludeId?: string,
+  ): GridItem[] {
+    const testItem: GridItem = {
+      id: "test",
+      x,
+      y,
+      width,
+      height,
+    };
+
+    return items.filter((item) => {
+      if (excludeId && item.id === excludeId) return false;
+      return this.doItemsOverlap(item, testItem);
+    });
+  }
+}
 ```
 
 ```vue [src/components/ui/controls-grid/ControlsGrid.vue]
@@ -889,104 +1091,118 @@ defineExpose({
 </script>
 
 <template>
-  <div
-    ref="gridContainer"
-    class="relative w-full h-full min-h-[400px] overflow-auto bg-transparent border border-border rounded"
-    :style="{
-      '--cell-size': `${cellSize}px`,
-      '--gap-size': `${gap}px`,
-    }"
-    @dragenter="handleDragEnter"
-    @dragover="handleDragOver"
-    @dragleave="handleDragLeave"
-    @drop="handleDrop"
-  >
+  <div class="controls-grid-container flex gap-4 w-full h-full">
+    <slot
+      name="toolbar"
+      :columns="columns"
+      :rows="rows"
+      :placed-items="placedItems"
+      :component-registry="componentRegistry"
+      :get-component="getComponent"
+      :get-registered-components="() => Array.from(componentRegistry.keys())"
+    />
+
     <div
-      class="relative grid z-1"
+      ref="gridContainer"
+      class="relative w-full h-full min-h-[400px] overflow-auto bg-transparent border border-border rounded flex-1"
       :style="{
-        gridTemplateColumns,
-        gridTemplateRows,
-        gap: `${gap}px`,
-        padding: `${gap}px`,
+        '--cell-size': `${cellSize}px`,
+        '--gap-size': `${gap}px`,
       }"
+      @dragenter="handleDragEnter"
+      @dragover="handleDragOver"
+      @dragleave="handleDragLeave"
+      @drop="handleDrop"
     >
       <div
-        v-if="hoverCell && (draggedItem || previewSize)"
-        class="bg-primary/10 border-2 border-dashed border-primary rounded-lg pointer-events-none animate-pulse-subtle"
-        v-motion
-        :initial="{ opacity: 0, scale: 0.95 }"
-        :enter="{ opacity: 1, scale: 1, transition: { duration: 150 } }"
+        class="relative grid z-1"
         :style="{
-          gridColumn: `${hoverCell.x + 1} / span ${draggedItem?.width || previewSize?.width || 1}`,
-          gridRow: `${hoverCell.y + 1} / span ${draggedItem?.height || previewSize?.height || 1}`,
+          gridTemplateColumns,
+          gridTemplateRows,
+          gap: `${gap}px`,
+          padding: `${gap}px`,
         }"
-      />
-
-      <div
-        v-for="item in placedItems"
-        :key="item.id"
-        class="grid-item-wrapper relative cursor-move select-none transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:cursor-grabbing active:opacity-70"
-        :draggable="true"
-        :style="{
-          gridColumn: `${item.x + 1} / span ${item.width}`,
-          gridRow: `${item.y + 1} / span ${item.height}`,
-        }"
-        v-motion
-        :initial="{ opacity: 0, scale: 0.8 }"
-        :enter="{
-          opacity: 1,
-          scale: 1,
-          transition: { type: 'spring', stiffness: 300, damping: 20 },
-        }"
-        @dragstart.stop="handleDragStart($event, item, true)"
-        @dragend.stop="handleDragEnd"
       >
         <div
-          class="relative w-full h-full bg-card/50 border border-border rounded overflow-hidden flex flex-col"
-          draggable="false"
-        >
-          <button
-            class="grid-item-remove absolute top-1 right-1 z-10 flex items-center justify-center w-6 h-6 bg-destructive text-destructive-foreground border-none rounded cursor-pointer opacity-0 transition-all duration-200 scale-75 hover:bg-destructive/90 hover:scale-110 active:scale-95"
-            @click.stop="removeItem(item.id)"
-            aria-label="Supprimer"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M18 6 6 18" />
-              <path d="m6 6 12 12" />
-            </svg>
-          </button>
+          v-if="hoverCell && (draggedItem || previewSize)"
+          class="bg-primary/10 border-2 border-dashed border-primary rounded-lg pointer-events-none animate-pulse-subtle"
+          v-motion
+          :initial="{ opacity: 0, scale: 0.95 }"
+          :enter="{ opacity: 1, scale: 1, transition: { duration: 150 } }"
+          :style="{
+            gridColumn: `${hoverCell.x + 1} / span ${draggedItem?.width || previewSize?.width || 1}`,
+            gridRow: `${hoverCell.y + 1} / span ${draggedItem?.height || previewSize?.height || 1}`,
+          }"
+        />
 
+        <div
+          v-for="item in placedItems"
+          :key="item.id"
+          class="grid-item-wrapper relative cursor-move select-none transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:cursor-grabbing active:opacity-70"
+          :draggable="true"
+          :style="{
+            gridColumn: `${item.x + 1} / span ${item.width}`,
+            gridRow: `${item.y + 1} / span ${item.height}`,
+          }"
+          v-motion
+          :initial="{ opacity: 0, scale: 0.8 }"
+          :enter="{
+            opacity: 1,
+            scale: 1,
+            transition: { type: 'spring', stiffness: 300, damping: 20 },
+          }"
+          @dragstart.stop="handleDragStart($event, item, true)"
+          @dragend.stop="handleDragEnd"
+        >
           <div
-            class="flex-1 p-2 flex items-center justify-center overflow-hidden"
+            class="relative w-full h-full bg-card/50 border border-border rounded overflow-hidden flex flex-col"
+            draggable="false"
           >
-            <component
-              v-if="item.component"
-              :is="item.component"
-              v-bind="item"
-            />
-            <div
-              v-else
-              class="flex flex-col items-center justify-center gap-2 w-full h-full text-muted-foreground"
+            <button
+              class="grid-item-remove absolute top-1 right-1 z-10 flex items-center justify-center w-6 h-6 bg-destructive text-destructive-foreground border-none rounded cursor-pointer opacity-0 transition-all duration-200 scale-75 hover:bg-destructive/90 hover:scale-110 active:scale-95"
+              @click.stop="removeItem(item.id)"
+              aria-label="Supprimer"
             >
-              <span class="text-sm">{{ item.id }}</span>
-              <span class="text-xs"> {{ item.width }}x{{ item.height }} </span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+
+            <div
+              class="flex-1 p-2 flex items-center justify-center overflow-hidden"
+            >
+              <component
+                v-if="item.component"
+                :is="item.component"
+                v-bind="item"
+              />
+              <div
+                v-else
+                class="flex flex-col items-center justify-center gap-2 w-full h-full text-muted-foreground"
+              >
+                <span class="text-sm">{{ item.id }}</span>
+                <span class="text-xs">
+                  {{ item.width }}x{{ item.height }}
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <slot :columns="columns" :rows="rows" :placed-items="placedItems" />
+      <slot :columns="columns" :rows="rows" :placed-items="placedItems" />
+    </div>
   </div>
 </template>
 
@@ -1012,517 +1228,238 @@ defineExpose({
 </style>
 ```
 
-```ts [src/components/ui/controls-grid/composables.ts]
-import { ref, computed, type Ref } from "vue";
-import type { GridItem, GridItemTemplate, GridConfig } from "./types";
-import { GridUtils } from "./types";
-
-export function useControlsGrid(initialItems: GridItem[] = []) {
-  const items = ref<GridItem[]>([...initialItems]);
-  const selectedItemId = ref<string | null>(null);
-  const history = ref<GridItem[][]>([]);
-  const historyIndex = ref(-1);
-  const maxHistorySize = 50;
-
-  const selectedItem = computed(() => {
-    if (!selectedItemId.value) return null;
-    return items.value.find((item) => item.id === selectedItemId.value) || null;
-  });
-
-  const canUndo = computed(() => historyIndex.value > 0);
-  const canRedo = computed(() => historyIndex.value < history.value.length - 1);
-
-  const totalArea = computed(() => {
-    return items.value.reduce(
-      (sum, item) => sum + GridUtils.calculateArea(item),
-      0,
-    );
-  });
-
-  const addToHistory = () => {
-    history.value = history.value.slice(0, historyIndex.value + 1);
-
-    history.value.push(JSON.parse(JSON.stringify(items.value)));
-
-    if (history.value.length > maxHistorySize) {
-      history.value.shift();
-    } else {
-      historyIndex.value++;
-    }
-  };
-
-  const undo = () => {
-    if (!canUndo.value) return;
-
-    historyIndex.value--;
-    items.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]));
-  };
-
-  const redo = () => {
-    if (!canRedo.value) return;
-
-    historyIndex.value++;
-    items.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]));
-  };
-
-  const addItem = (item: GridItem) => {
-    items.value.push(item);
-    addToHistory();
-  };
-
-  const removeItem = (id: string) => {
-    const index = items.value.findIndex((item) => item.id === id);
-    if (index !== -1) {
-      items.value.splice(index, 1);
-      if (selectedItemId.value === id) {
-        selectedItemId.value = null;
-      }
-      addToHistory();
-    }
-  };
-
-  const updateItem = (id: string, updates: Partial<GridItem>) => {
-    const index = items.value.findIndex((item) => item.id === id);
-    if (index !== -1) {
-      items.value[index] = { ...items.value[index], ...updates } as GridItem;
-      addToHistory();
-    }
-  };
-
-  const clearItems = () => {
-    items.value = [];
-    selectedItemId.value = null;
-    addToHistory();
-  };
-
-  const selectItem = (id: string | null) => {
-    selectedItemId.value = id;
-  };
-
-  const duplicateItem = (id: string, offsetX = 1, offsetY = 0) => {
-    const item = items.value.find((item) => item.id === id);
-    if (!item) return null;
-
-    const newItem = GridUtils.cloneItemAtPosition(
-      item,
-      item.x + offsetX,
-      item.y + offsetY,
-    );
-
-    items.value.push(newItem);
-    addToHistory();
-
-    return newItem;
-  };
-
-  const exportConfig = () => {
-    return {
-      items: items.value,
-      timestamp: new Date().toISOString(),
-      version: "1.0.0",
-    };
-  };
-
-  const importConfig = (config: { items: GridItem[] }) => {
-    items.value = config.items;
-    selectedItemId.value = null;
-    addToHistory();
-  };
-
-  const saveToLocalStorage = (key = "controls-grid-config") => {
-    try {
-      localStorage.setItem(key, JSON.stringify(exportConfig()));
-      return true;
-    } catch (error) {
-      console.error("Failed to save to localStorage:", error);
-      return false;
-    }
-  };
-
-  const loadFromLocalStorage = (key = "controls-grid-config") => {
-    try {
-      const data = localStorage.getItem(key);
-      if (data) {
-        const config = JSON.parse(data);
-        importConfig(config);
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("Failed to load from localStorage:", error);
-      return false;
-    }
-  };
-
-  const sortItems = () => {
-    items.value = GridUtils.sortItems(items.value);
-  };
-
-  const getItemById = (id: string) => {
-    return items.value.find((item) => item.id === id);
-  };
-
-  const getItemsAtPosition = (x: number, y: number) => {
-    return items.value.filter(
-      (item) =>
-        x >= item.x &&
-        x < item.x + item.width &&
-        y >= item.y &&
-        y < item.y + item.height,
-    );
-  };
-
-  if (items.value.length > 0) {
-    addToHistory();
-  }
-
-  return {
-    items,
-    selectedItemId,
-    selectedItem,
-    canUndo,
-    canRedo,
-    totalArea,
-
-    addItem,
-    removeItem,
-    updateItem,
-    clearItems,
-    selectItem,
-    duplicateItem,
-    undo,
-    redo,
-    exportConfig,
-    importConfig,
-    saveToLocalStorage,
-    loadFromLocalStorage,
-    sortItems,
-    getItemById,
-    getItemsAtPosition,
-  };
-}
-
-export function useComponentPalette(templates: GridItemTemplate[] = []) {
-  const availableTemplates = ref<GridItemTemplate[]>([...templates]);
-  const itemCounter = ref(0);
-
-  const createItemFromTemplate = (
-    template: GridItemTemplate,
-  ): Omit<GridItem, "x" | "y"> => {
-    itemCounter.value++;
-    const { label, color, icon, ...rest } = template;
-
-    return {
-      ...rest,
-      id: `${template.id}-${itemCounter.value}`,
-    };
-  };
-
-  const addTemplate = (template: GridItemTemplate) => {
-    availableTemplates.value.push(template);
-  };
-
-  const removeTemplate = (id: string) => {
-    const index = availableTemplates.value.findIndex((t) => t.id === id);
-    if (index !== -1) {
-      availableTemplates.value.splice(index, 1);
-    }
-  };
-
-  const getTemplateById = (id: string) => {
-    return availableTemplates.value.find((t) => t.id === id);
-  };
-
-  const filterTemplatesBySize = (maxWidth: number, maxHeight: number) => {
-    return availableTemplates.value.filter(
-      (t) => t.width <= maxWidth && t.height <= maxHeight,
-    );
-  };
-
-  return {
-    availableTemplates,
-    createItemFromTemplate,
-    addTemplate,
-    removeTemplate,
-    getTemplateById,
-    filterTemplatesBySize,
-  };
-}
-
-export function useGridConfig(initialConfig: Partial<GridConfig> = {}) {
-  const config = ref<GridConfig>({
-    cellSize: initialConfig.cellSize || 80,
-    gap: initialConfig.gap || 8,
-    columns: initialConfig.columns || 6,
-    rows: initialConfig.rows || 6,
-    width: initialConfig.width || 0,
-    height: initialConfig.height || 0,
-  });
-
-  const updateConfig = (updates: Partial<GridConfig>) => {
-    config.value = { ...config.value, ...updates };
-  };
-
-  const resetConfig = () => {
-    config.value = {
-      cellSize: 80,
-      gap: 8,
-      columns: 6,
-      rows: 6,
-      width: 0,
-      height: 0,
-    };
-  };
-
-  const calculateGridSize = (
-    containerWidth: number,
-    containerHeight: number,
-  ) => {
-    const columns = Math.floor(
-      containerWidth / (config.value.cellSize + config.value.gap),
-    );
-    const rows = Math.floor(
-      containerHeight / (config.value.cellSize + config.value.gap),
-    );
-
-    updateConfig({
-      columns,
-      rows,
-      width: containerWidth,
-      height: containerHeight,
-    });
-  };
-
-  return {
-    config,
-    updateConfig,
-    resetConfig,
-    calculateGridSize,
-  };
-}
-```
-
-```ts [src/components/ui/controls-grid/types.ts]
-import type { Component } from "vue";
-
-export interface ComponentToRegister {
-  name: string;
-
-  component: Component;
-}
-
-export interface GridItem {
-  id: string;
-
-  x: number;
-
-  y: number;
-
-  width: number;
-
-  height: number;
-
-  component?: any;
-
-  color?: string;
-
-  [key: string]: any;
-}
-
-export interface GridPosition {
-  x: number;
-
-  y: number;
-}
-
-export interface GridDimensions {
-  width: number;
-
-  height: number;
-}
-
-export interface GridConfig {
-  cellSize: number;
-
-  gap: number;
-
-  columns: number;
-
-  rows: number;
-
-  width: number;
-
-  height: number;
-}
-
-export interface GridItemTemplate extends Omit<GridItem, "x" | "y"> {
-  label?: string;
-
-  color?: string;
-
-  icon?: string;
-}
-
-export interface GridEvents {
-  "update:items": (items: GridItem[]) => void;
-
-  "item-placed": (item: GridItem) => void;
-
-  "item-moved": (item: GridItem) => void;
-
-  "item-removed": (id: string) => void;
-
-  "config-changed": (config: GridConfig) => void;
-}
-
-export interface GridMethods {
-  addItem: (item: Omit<GridItem, "x" | "y">) => GridItem | null;
-
-  addItemByComponent: (
-    componentName: string,
-    width?: number,
-    height?: number,
-    additionalProps?: Record<string, any>,
-  ) => GridItem | null;
-
-  removeItem: (id: string) => void;
-
-  clearGrid: () => void;
-
-  getComponent: (name: string) => Component | undefined;
-
-  getRegisteredComponents: () => string[];
-
-  isCellOccupied?: (x: number, y: number, excludeId?: string) => boolean;
-
-  isValidPlacement?: (
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    excludeId?: string,
-  ) => boolean;
-
-  findAvailablePosition?: (
-    width: number,
-    height: number,
-  ) => GridPosition | null;
-}
-
-export interface GridProps {
-  cellSize?: number;
+```vue [src/components/ui/controls-grid/ControlsToolbar.vue]
+<script setup lang="ts">
+import { ref, computed } from "vue";
+import {
+  useControlRegistry,
+  type ControlDefinition,
+} from "../../composables/use-control-registry/useControlRegistry";
+
+interface Props {
+  category?: string;
+
+  orientation?: "horizontal" | "vertical";
+
+  itemSize?: number;
 
   gap?: number;
 
-  minColumns?: number;
+  showLabels?: boolean;
 
-  items?: GridItem[];
-
-  showGrid?: boolean;
-
-  snapToGrid?: boolean;
-
-  components?: ComponentToRegister[];
+  labelSize?: "sm" | "md" | "lg";
 }
 
-export interface DragState {
-  item: GridItem | null;
+const props = withDefaults(defineProps<Props>(), {
+  orientation: "horizontal",
+  itemSize: 60,
+  gap: 8,
+  showLabels: true,
+  labelSize: "sm",
+});
 
-  fromGrid: boolean;
+const emit = defineEmits<{
+  "control-selected": [control: ControlDefinition];
+  "control-drag-start": [control: ControlDefinition, event: DragEvent];
+}>();
 
-  hoverPosition: GridPosition | null;
+const { getAllControls, getControlsByCategory } = useControlRegistry();
 
-  isValid: boolean;
+const controls = computed(() => {
+  if (props.category) {
+    return getControlsByCategory(props.category);
+  }
+  return getAllControls();
+});
+
+const groupedControls = computed(() => {
+  if (props.category) {
+    return { [props.category]: controls.value };
+  }
+
+  const groups: Record<string, ControlDefinition[]> = {};
+  controls.value.forEach((control) => {
+    const category = control.category || "Autres";
+    if (!groups[category]) {
+      groups[category] = [];
+    }
+    groups[category].push(control);
+  });
+  return groups;
+});
+
+const labelClasses = computed(() => {
+  const sizeClasses = {
+    sm: "text-xs",
+    md: "text-sm",
+    lg: "text-base",
+  };
+  return `${sizeClasses[props.labelSize]} font-medium truncate`;
+});
+
+const handleDragStart = (event: DragEvent, control: ControlDefinition) => {
+  if (!event.dataTransfer) return;
+
+  const dragData = {
+    id: `${control.id}-${Date.now()}`,
+    width: control.defaultSize?.width || 1,
+    height: control.defaultSize?.height || 1,
+    component: control.component,
+    color: control.color,
+    ...control.defaultProps,
+  };
+
+  event.dataTransfer.effectAllowed = "copy";
+  event.dataTransfer.setData("application/json", JSON.stringify(dragData));
+
+  emit("control-drag-start", control, event);
+};
+
+const handleControlClick = (control: ControlDefinition) => {
+  emit("control-selected", control);
+};
+</script>
+
+<template>
+  <div
+    class="controls-toolbar flex bg-card border border-border rounded-lg shadow-sm"
+    :class="{
+      'flex-col overflow-y-auto': orientation === 'vertical',
+      'flex-row overflow-x-auto': orientation === 'horizontal',
+    }"
+    :style="{
+      '--item-size': `${itemSize}px`,
+      '--gap-size': `${gap}px`,
+    }"
+  >
+    <div
+      v-for="(categoryControls, categoryName) in groupedControls"
+      :key="categoryName"
+      class="controls-group"
+      :class="{
+        'flex flex-col': orientation === 'vertical',
+        'flex flex-row': orientation === 'horizontal',
+      }"
+    >
+      <div
+        v-if="!category && Object.keys(groupedControls).length > 1"
+        class="category-header px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-muted/50 sticky"
+        :class="{
+          'top-0': orientation === 'vertical',
+          'left-0': orientation === 'horizontal',
+        }"
+      >
+        {{ categoryName }}
+      </div>
+
+      <div
+        class="controls-list flex"
+        :class="{
+          'flex-col': orientation === 'vertical',
+          'flex-row': orientation === 'horizontal',
+        }"
+        :style="{ gap: `${gap}px`, padding: `${gap}px` }"
+      >
+        <div
+          v-for="control in categoryControls"
+          :key="control.id"
+          class="control-item flex cursor-move select-none transition-all duration-200 hover:scale-105 active:cursor-grabbing active:opacity-70"
+          :class="{
+            'flex-col items-center': true,
+            'min-w-(--item-size)': orientation === 'horizontal',
+          }"
+          :draggable="true"
+          @dragstart="handleDragStart($event, control)"
+          @click="handleControlClick(control)"
+          :title="control.description || control.name"
+        >
+          <div
+            class="control-preview relative flex items-center justify-center bg-background border-2 border-border rounded-lg overflow-hidden transition-all duration-200 hover:border-primary hover:shadow-md"
+            :style="{
+              width: `${itemSize}px`,
+              height: `${itemSize}px`,
+              backgroundColor: control.color ? `${control.color}20` : undefined,
+              borderColor: control.color || undefined,
+            }"
+          >
+            <div
+              v-if="control.icon"
+              class="control-icon text-2xl"
+              :style="{ color: control.color }"
+            >
+              {{ control.icon }}
+            </div>
+
+            <div
+              v-else
+              class="control-component-preview w-full h-full flex items-center justify-center p-2 pointer-events-none"
+            >
+              <component
+                v-if="control.component"
+                :is="control.component"
+                v-bind="{ ...control.defaultProps, disabled: true }"
+                class="scale-75 opacity-80"
+              />
+            </div>
+
+            <div
+              class="absolute bottom-1 right-1 px-1.5 py-0.5 text-[10px] font-mono bg-background/90 border border-border rounded"
+            >
+              {{ control.defaultSize?.width || 1 }}×{{
+                control.defaultSize?.height || 1
+              }}
+            </div>
+          </div>
+
+          <span
+            v-if="showLabels"
+            class="control-label mt-1 text-center max-w-full"
+            :class="labelClasses"
+            :style="{ maxWidth: `${itemSize}px` }"
+          >
+            {{ control.name }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <slot :controls="controls" />
+  </div>
+</template>
+
+<style scoped>
+.controls-toolbar {
+  --item-size: 60px;
+  --gap-size: 8px;
 }
 
-export class GridUtils {
-  static pixelToGrid(
-    pixelX: number,
-    pixelY: number,
-    cellSize: number,
-    gap: number,
-  ): GridPosition {
-    const x = Math.floor(pixelX / (cellSize + gap));
-    const y = Math.floor(pixelY / (cellSize + gap));
-    return { x, y };
-  }
-
-  static gridToPixel(
-    gridX: number,
-    gridY: number,
-    cellSize: number,
-    gap: number,
-  ): { x: number; y: number } {
-    const x = gridX * (cellSize + gap);
-    const y = gridY * (cellSize + gap);
-    return { x, y };
-  }
-
-  static doItemsOverlap(item1: GridItem, item2: GridItem): boolean {
-    return !(
-      item1.x + item1.width <= item2.x ||
-      item2.x + item2.width <= item1.x ||
-      item1.y + item1.height <= item2.y ||
-      item2.y + item2.height <= item1.y
-    );
-  }
-
-  static calculateArea(item: GridItem): number {
-    return item.width * item.height;
-  }
-
-  static generateId(prefix = "item"): string {
-    return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  static cloneItemAtPosition(item: GridItem, x: number, y: number): GridItem {
-    return {
-      ...item,
-      id: this.generateId(item.id.split("-")[0]),
-      x,
-      y,
-    };
-  }
-
-  static isValidItem(item: Partial<GridItem>): boolean {
-    return (
-      typeof item.id === "string" &&
-      typeof item.width === "number" &&
-      typeof item.height === "number" &&
-      item.width > 0 &&
-      item.height > 0
-    );
-  }
-
-  static sortItems(items: GridItem[]): GridItem[] {
-    return [...items].sort((a, b) => {
-      if (a.y !== b.y) return a.y - b.y;
-      return a.x - b.x;
-    });
-  }
-
-  static findOverlappingItems(
-    items: GridItem[],
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    excludeId?: string,
-  ): GridItem[] {
-    const testItem: GridItem = {
-      id: "test",
-      x,
-      y,
-      width,
-      height,
-    };
-
-    return items.filter((item) => {
-      if (excludeId && item.id === excludeId) return false;
-      return this.doItemsOverlap(item, testItem);
-    });
-  }
+.controls-toolbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
+
+.controls-toolbar::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 4px;
+}
+
+.controls-toolbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 4px;
+}
+
+.controls-toolbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+.control-item:hover .control-preview {
+  transform: translateY(-2px);
+}
+
+.control-item:active .control-preview {
+  transform: translateY(0);
+}
+</style>
 ```
 :::
 
@@ -1560,6 +1497,37 @@ export class GridUtils {
 
 ---
 
+## ControlsToolbar
+::hr-underline
+::
+
+Catégorie de contrôles à afficher (si non spécifié, affiche tous les contrôles)
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `category`{.primary .text-primary} | `string` | - | Catégorie de contrôles à afficher (si non spécifié, affiche tous les contrôles) |
+| `orientation`{.primary .text-primary} | `'horizontal' \| 'vertical'` | horizontal | Orientation de la toolbar |
+| `itemSize`{.primary .text-primary} | `number` | 60 | Taille des items dans la toolbar |
+| `gap`{.primary .text-primary} | `number` | 8 | Espacement entre les items |
+| `showLabels`{.primary .text-primary} | `boolean` | true | Afficher les labels des contrôles |
+| `labelSize`{.primary .text-primary} | `'sm' \| 'md' \| 'lg'` | sm | Taille des labels |
+
+  ### Slots
+| Name | Description |
+|------|-------------|
+| `default`{.primary .text-primary} | Slot pour contenu personnalisé |
+
+  ### CSS Variables
+| Name | Value | Description |
+|------|-------|-------------|
+| `--item-size`{.primary .text-primary} | `60px` | — |
+| `--gap-size`{.primary .text-primary} | `8px` | — |
+
+---
+
   ## Examples
   ::hr-underline
   ::
@@ -1582,9 +1550,9 @@ import {
   computed,
 } from "vue";
 import { ControlsGrid } from "..";
-import { useControlRegistry } from "~~/registry/new-york/composables/use-control-registry";
+import { useControlRegistry } from "~~/registry/new-york/composables/use-control-registry/useControlRegistry";
 import { ControlButton } from "@/components/ui/control-button";
-import type { ControlDefinition } from "~~/registry/new-york/composables/use-control-registry";
+import type { ControlDefinition } from "~~/registry/new-york/composables/use-control-registry/useControlRegistry";
 
 const { registerControls, getAllControls, createControlInstance } =
   useControlRegistry();
@@ -2348,9 +2316,9 @@ onUnmounted(() => {
 <script setup lang="ts">
 import { ref, onMounted, shallowRef, h } from "vue";
 import { ControlsGrid } from "@/components/ui/controls-grid";
-import { useControlRegistry } from "~~/registry/new-york/composables/use-control-registry";
+import { useControlRegistry } from "~~/registry/new-york/composables/use-control-registry/useControlRegistry";
 import { ControlButton } from "~~/registry/new-york/components/control-button";
-import type { ControlDefinition } from "~~/registry/new-york/composables/use-control-registry";
+import type { ControlDefinition } from "~~/registry/new-york/composables/use-control-registry/useControlRegistry";
 
 const { registerControls, getAllControls, createControlInstance } =
   useControlRegistry();
@@ -2665,9 +2633,9 @@ const handleItemRemoved = (id: string) => {
 <script setup lang="ts">
 import { ref, onMounted, shallowRef, h } from "vue";
 import { ControlsGrid } from "..";
-import { useControlRegistry } from "~~/registry/new-york/composables/use-control-registry";
+import { useControlRegistry } from "~~/registry/new-york/composables/use-control-registry/useControlRegistry";
 import { ControlButton } from "@/components/ui/control-button";
-import type { ControlDefinition } from "~~/registry/new-york/composables/use-control-registry";
+import type { ControlDefinition } from "~~/registry/new-york/composables/use-control-registry/useControlRegistry";
 
 const { registerControl, createControlInstance } = useControlRegistry();
 

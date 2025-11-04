@@ -1,10 +1,14 @@
-import { ref, computed, type Ref } from 'vue';
-import type { GridItem, GridItemTemplate, GridConfig } from './types';
-import { GridUtils } from './types';
-
 /**
  * Composable pour gérer l'état et les opérations d'une grille de contrôles
+ *
+ * @type registry:composable
+ * @category controls
  */
+
+import { ref, computed } from 'vue';
+import type { GridItem } from '../../components/controls-grid';
+import { GridUtils } from '../../components/controls-grid';
+
 export function useControlsGrid(initialItems: GridItem[] = []) {
   // État
   const items = ref<GridItem[]>([...initialItems]);
@@ -185,99 +189,5 @@ export function useControlsGrid(initialItems: GridItem[] = []) {
     sortItems,
     getItemById,
     getItemsAtPosition,
-  };
-}
-
-/**
- * Composable pour gérer une palette de templates de composants
- */
-export function useComponentPalette(templates: GridItemTemplate[] = []) {
-  const availableTemplates = ref<GridItemTemplate[]>([...templates]);
-  const itemCounter = ref(0);
-
-  const createItemFromTemplate = (template: GridItemTemplate): Omit<GridItem, 'x' | 'y'> => {
-    itemCounter.value++;
-    const { label, color, icon, ...rest } = template;
-
-    return {
-      ...rest,
-      id: `${template.id}-${itemCounter.value}`,
-    };
-  };
-
-  const addTemplate = (template: GridItemTemplate) => {
-    availableTemplates.value.push(template);
-  };
-
-  const removeTemplate = (id: string) => {
-    const index = availableTemplates.value.findIndex((t) => t.id === id);
-    if (index !== -1) {
-      availableTemplates.value.splice(index, 1);
-    }
-  };
-
-  const getTemplateById = (id: string) => {
-    return availableTemplates.value.find((t) => t.id === id);
-  };
-
-  const filterTemplatesBySize = (maxWidth: number, maxHeight: number) => {
-    return availableTemplates.value.filter((t) => t.width <= maxWidth && t.height <= maxHeight);
-  };
-
-  return {
-    availableTemplates,
-    createItemFromTemplate,
-    addTemplate,
-    removeTemplate,
-    getTemplateById,
-    filterTemplatesBySize,
-  };
-}
-
-/**
- * Composable pour gérer la configuration de la grille
- */
-export function useGridConfig(initialConfig: Partial<GridConfig> = {}) {
-  const config = ref<GridConfig>({
-    cellSize: initialConfig.cellSize || 80,
-    gap: initialConfig.gap || 8,
-    columns: initialConfig.columns || 6,
-    rows: initialConfig.rows || 6,
-    width: initialConfig.width || 0,
-    height: initialConfig.height || 0,
-  });
-
-  const updateConfig = (updates: Partial<GridConfig>) => {
-    config.value = { ...config.value, ...updates };
-  };
-
-  const resetConfig = () => {
-    config.value = {
-      cellSize: 80,
-      gap: 8,
-      columns: 6,
-      rows: 6,
-      width: 0,
-      height: 0,
-    };
-  };
-
-  const calculateGridSize = (containerWidth: number, containerHeight: number) => {
-    const columns = Math.floor(containerWidth / (config.value.cellSize + config.value.gap));
-    const rows = Math.floor(containerHeight / (config.value.cellSize + config.value.gap));
-
-    updateConfig({
-      columns,
-      rows,
-      width: containerWidth,
-      height: containerHeight,
-    });
-  };
-
-  return {
-    config,
-    updateConfig,
-    resetConfig,
-    calculateGridSize,
   };
 }

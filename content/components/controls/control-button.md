@@ -14,8 +14,8 @@ description: A 1:1 aspect ratio button component for grid-based layouts.
 import { ref, onMounted, shallowRef, h } from "vue";
 import { ControlButton } from "@/components/ui/control-button";
 import { ControlsGrid } from "~~/registry/new-york/components/controls-grid";
-import { useControlRegistry } from "~~/registry/new-york/composables/use-control-registry";
-import type { ControlDefinition } from "~~/registry/new-york/composables/use-control-registry";
+import { useControlRegistry } from "~~/registry/new-york/composables/use-control-registry/useControlRegistry";
+import type { ControlDefinition } from "~~/registry/new-york/composables/use-control-registry/useControlRegistry";
 
 const { registerControls, getAllControls, createControlInstance } =
   useControlRegistry();

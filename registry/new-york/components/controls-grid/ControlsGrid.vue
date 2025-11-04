@@ -421,101 +421,115 @@ defineExpose({
 </script>
 
 <template>
-  <div
-    ref="gridContainer"
-    class="relative w-full h-full min-h-[400px] overflow-auto bg-transparent border border-border rounded"
-    :style="{
-      '--cell-size': `${cellSize}px`,
-      '--gap-size': `${gap}px`,
-    }"
-    @dragenter="handleDragEnter"
-    @dragover="handleDragOver"
-    @dragleave="handleDragLeave"
-    @drop="handleDrop"
-  >
-    <!-- Items placés -->
+  <div class="controls-grid-container flex gap-4 w-full h-full">
+    <!-- Slot pour la toolbar (optionnel) -->
+    <slot
+      name="toolbar"
+      :columns="columns"
+      :rows="rows"
+      :placed-items="placedItems"
+      :component-registry="componentRegistry"
+      :get-component="getComponent"
+      :get-registered-components="() => Array.from(componentRegistry.keys())"
+    />
+
+    <!-- Grille principale -->
     <div
-      class="relative grid z-1"
+      ref="gridContainer"
+      class="relative w-full h-full min-h-[400px] overflow-auto bg-transparent border border-border rounded flex-1"
       :style="{
-        gridTemplateColumns,
-        gridTemplateRows,
-        gap: `${gap}px`,
-        padding: `${gap}px`,
+        '--cell-size': `${cellSize}px`,
+        '--gap-size': `${gap}px`,
       }"
+      @dragenter="handleDragEnter"
+      @dragover="handleDragOver"
+      @dragleave="handleDragLeave"
+      @drop="handleDrop"
     >
-      <!-- Aperçu du placement lors du drag -->
+      <!-- Items placés -->
       <div
-        v-if="hoverCell && (draggedItem || previewSize)"
-        class="bg-primary/10 border-2 border-dashed border-primary rounded-lg pointer-events-none animate-pulse-subtle"
-        v-motion
-        :initial="{ opacity: 0, scale: 0.95 }"
-        :enter="{ opacity: 1, scale: 1, transition: { duration: 150 } }"
+        class="relative grid z-1"
         :style="{
-          gridColumn: `${hoverCell.x + 1} / span ${draggedItem?.width || previewSize?.width || 1}`,
-          gridRow: `${hoverCell.y + 1} / span ${draggedItem?.height || previewSize?.height || 1}`,
+          gridTemplateColumns,
+          gridTemplateRows,
+          gap: `${gap}px`,
+          padding: `${gap}px`,
         }"
-      />
-
-      <div
-        v-for="item in placedItems"
-        :key="item.id"
-        class="grid-item-wrapper relative cursor-move select-none transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:cursor-grabbing active:opacity-70"
-        :draggable="true"
-        :style="{
-          gridColumn: `${item.x + 1} / span ${item.width}`,
-          gridRow: `${item.y + 1} / span ${item.height}`,
-        }"
-        v-motion
-        :initial="{ opacity: 0, scale: 0.8 }"
-        :enter="{
-          opacity: 1,
-          scale: 1,
-          transition: { type: 'spring', stiffness: 300, damping: 20 },
-        }"
-        @dragstart.stop="handleDragStart($event, item, true)"
-        @dragend.stop="handleDragEnd"
       >
+        <!-- Aperçu du placement lors du drag -->
         <div
-          class="relative w-full h-full bg-card/50 border border-border rounded overflow-hidden flex flex-col"
-          draggable="false"
-        >
-          <button
-            class="grid-item-remove absolute top-1 right-1 z-10 flex items-center justify-center w-6 h-6 bg-destructive text-destructive-foreground border-none rounded cursor-pointer opacity-0 transition-all duration-200 scale-75 hover:bg-destructive/90 hover:scale-110 active:scale-95"
-            @click.stop="removeItem(item.id)"
-            aria-label="Supprimer"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M18 6 6 18" />
-              <path d="m6 6 12 12" />
-            </svg>
-          </button>
+          v-if="hoverCell && (draggedItem || previewSize)"
+          class="bg-primary/10 border-2 border-dashed border-primary rounded-lg pointer-events-none animate-pulse-subtle"
+          v-motion
+          :initial="{ opacity: 0, scale: 0.95 }"
+          :enter="{ opacity: 1, scale: 1, transition: { duration: 150 } }"
+          :style="{
+            gridColumn: `${hoverCell.x + 1} / span ${draggedItem?.width || previewSize?.width || 1}`,
+            gridRow: `${hoverCell.y + 1} / span ${draggedItem?.height || previewSize?.height || 1}`,
+          }"
+        />
 
-          <div class="flex-1 p-2 flex items-center justify-center overflow-hidden">
-            <component v-if="item.component" :is="item.component" v-bind="item" />
-            <div
-              v-else
-              class="flex flex-col items-center justify-center gap-2 w-full h-full text-muted-foreground"
+        <div
+          v-for="item in placedItems"
+          :key="item.id"
+          class="grid-item-wrapper relative cursor-move select-none transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:cursor-grabbing active:opacity-70"
+          :draggable="true"
+          :style="{
+            gridColumn: `${item.x + 1} / span ${item.width}`,
+            gridRow: `${item.y + 1} / span ${item.height}`,
+          }"
+          v-motion
+          :initial="{ opacity: 0, scale: 0.8 }"
+          :enter="{
+            opacity: 1,
+            scale: 1,
+            transition: { type: 'spring', stiffness: 300, damping: 20 },
+          }"
+          @dragstart.stop="handleDragStart($event, item, true)"
+          @dragend.stop="handleDragEnd"
+        >
+          <div
+            class="relative w-full h-full bg-card/50 border border-border rounded overflow-hidden flex flex-col"
+            draggable="false"
+          >
+            <button
+              class="grid-item-remove absolute top-1 right-1 z-10 flex items-center justify-center w-6 h-6 bg-destructive text-destructive-foreground border-none rounded cursor-pointer opacity-0 transition-all duration-200 scale-75 hover:bg-destructive/90 hover:scale-110 active:scale-95"
+              @click.stop="removeItem(item.id)"
+              aria-label="Supprimer"
             >
-              <span class="text-sm">{{ item.id }}</span>
-              <span class="text-xs"> {{ item.width }}x{{ item.height }} </span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+
+            <div class="flex-1 p-2 flex items-center justify-center overflow-hidden">
+              <component v-if="item.component" :is="item.component" v-bind="item" />
+              <div
+                v-else
+                class="flex flex-col items-center justify-center gap-2 w-full h-full text-muted-foreground"
+              >
+                <span class="text-sm">{{ item.id }}</span>
+                <span class="text-xs"> {{ item.width }}x{{ item.height }} </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Slot pour le contenu additionnel ou des actions -->
-    <slot :columns="columns" :rows="rows" :placed-items="placedItems" />
+      <!-- Slot pour le contenu additionnel ou des actions -->
+      <slot :columns="columns" :rows="rows" :placed-items="placedItems" />
+    </div>
   </div>
 </template>
 

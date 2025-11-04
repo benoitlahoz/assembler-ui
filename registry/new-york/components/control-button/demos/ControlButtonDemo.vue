@@ -2,8 +2,8 @@
 import { ref, onMounted, shallowRef, h } from 'vue';
 import { ControlButton } from '~~/registry/new-york/components/control-button';
 import { ControlsGrid } from '~~/registry/new-york/components/controls-grid';
-import { useControlRegistry } from '~~/registry/new-york/composables/use-control-registry';
-import type { ControlDefinition } from '~~/registry/new-york/composables/use-control-registry';
+import { useControlRegistry } from '~~/registry/new-york/composables/use-control-registry/useControlRegistry';
+import type { ControlDefinition } from '~~/registry/new-york/composables/use-control-registry/useControlRegistry';
 
 // Initialiser le registre de contrôles
 const { registerControls, getAllControls, createControlInstance } = useControlRegistry();

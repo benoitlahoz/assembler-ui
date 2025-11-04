@@ -1,13 +1,44 @@
-/**
- * Control Registry Composable
- *
- * Gère l'enregistrement et la récupération de composants de contrôle
- * pour être utilisés dans ControlsGrid
- *
- * @category composables
- */
+---
+title: useControlRegistry
+description: Control Registry Composable
+---
 
-import { ref, shallowRef, type Component } from 'vue';
+  <p class="text-pretty mt-4"><br>Gère l'enregistrement et la récupération de composants de contrôle<br>pour être utilisés dans ControlsGrid</p>
+
+## Install with CLI
+::hr-underline
+::
+
+This will install the component in the path defined by your `components.json` file, thanks to shadcn-vue.
+
+:::code-group{.w-full}
+```bash [yarn]
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-control-registry.json"
+  ```
+
+```bash [npm]
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-control-registry.json"
+  ```
+
+```bash [pnpm]
+  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-control-registry.json"
+  ```
+
+```bash [bun]
+  bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-control-registry.json"
+  ```
+:::
+
+## Install Manually
+::hr-underline
+::
+
+Copy and paste these files into your project.
+
+:::code-tree{default-value="src/components/ui/use-control-registry/useControlRegistry.ts"}
+
+```ts [src/components/ui/use-control-registry/useControlRegistry.ts]
+import { ref, shallowRef, type Component } from "vue";
 
 export interface ControlDefinition {
   id: string;
@@ -39,12 +70,11 @@ export interface ControlInstance {
 const registeredControls = ref<Map<string, ControlDefinition>>(new Map());
 
 export function useControlRegistry() {
-  /**
-   * Enregistre un nouveau contrôle dans le registre
-   */
   const registerControl = (definition: ControlDefinition) => {
     if (registeredControls.value.has(definition.id)) {
-      console.warn(`Control with id "${definition.id}" is already registered. Overwriting.`);
+      console.warn(
+        `Control with id "${definition.id}" is already registered. Overwriting.`,
+      );
     }
 
     registeredControls.value.set(definition.id, {
@@ -53,41 +83,26 @@ export function useControlRegistry() {
     });
   };
 
-  /**
-   * Enregistre plusieurs contrôles à la fois
-   */
   const registerControls = (definitions: ControlDefinition[]) => {
     definitions.forEach(registerControl);
   };
 
-  /**
-   * Récupère un contrôle par son ID
-   */
   const getControl = (id: string): ControlDefinition | undefined => {
     return registeredControls.value.get(id);
   };
 
-  /**
-   * Récupère tous les contrôles enregistrés
-   */
   const getAllControls = (): ControlDefinition[] => {
     return Array.from(registeredControls.value.values());
   };
 
-  /**
-   * Récupère les contrôles par catégorie
-   */
   const getControlsByCategory = (category: string): ControlDefinition[] => {
     return getAllControls().filter((control) => control.category === category);
   };
 
-  /**
-   * Crée une instance d'un contrôle pour la grille
-   */
   const createControlInstance = (
     controlId: string,
     position?: { x: number; y: number },
-    customProps?: Record<string, any>
+    customProps?: Record<string, any>,
   ): Partial<ControlInstance> | null => {
     const control = getControl(controlId);
     if (!control) {
@@ -114,23 +129,14 @@ export function useControlRegistry() {
     };
   };
 
-  /**
-   * Supprime un contrôle du registre
-   */
   const unregisterControl = (id: string): boolean => {
     return registeredControls.value.delete(id);
   };
 
-  /**
-   * Vide le registre
-   */
   const clearRegistry = () => {
     registeredControls.value.clear();
   };
 
-  /**
-   * Vérifie si un contrôle est enregistré
-   */
   const hasControl = (id: string): boolean => {
     return registeredControls.value.has(id);
   };
@@ -147,3 +153,20 @@ export function useControlRegistry() {
     hasControl,
   };
 }
+```
+:::
+
+## useControlRegistry
+::hr-underline
+::
+
+Control Registry Composable
+
+Gère l&#39;enregistrement et la récupération de composants de contrôle
+pour être utilisés dans ControlsGrid
+
+---
+
+::tip
+You can copy and adapt this template for any component documentation.
+::
