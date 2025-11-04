@@ -5,7 +5,7 @@
  */
 
 import { provide, watch, onMounted, type Ref } from 'vue';
-import { useMediaDevices } from '../../composables/use-media-devices/useMediaDevices';
+import { useMediaDevices } from '~~/registry/new-york/composables/use-media-devices/useMediaDevices';
 import {
   MediaDevicesKey,
   MediaDevicesErrorsKey,

@@ -6,7 +6,7 @@
  */
 
 import { provide, watch, nextTick, type Ref } from 'vue';
-import { useScreenShare } from '../../composables/use-screen-share/useScreenShare';
+import { useScreenShare } from '~~/registry/new-york/composables/use-screen-share/useScreenShare';
 import {
   ScreenShareStreamKey,
   ScreenShareStateKey,
