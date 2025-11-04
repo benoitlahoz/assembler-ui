@@ -1,7 +1,7 @@
-# Récapitulatif des modifications - Control Button & Controllers Grid
+# Récapitulatif des modifications - Control Button & Controls Grid
 
 ## 🎯 Objectif
-Adapter le composant `control-button` pour fonctionner avec la grille `controllers-grid` et créer un système d'enregistrement de contrôles.
+Adapter le composant `control-button` pour fonctionner avec la grille `controls-grid` et créer un système d'enregistrement de contrôles.
 
 ## ✅ Modifications effectuées
 
@@ -22,7 +22,7 @@ Adapter le composant `control-button` pour fonctionner avec la grille `controlle
 - ✅ Conservation de la variante `shape`: `square`, `circle`
 
 ### 2. Nouvelle démo ControlButtonDemo.vue
-- ✅ Démo interactive avec `ControllersGrid`
+- ✅ Démo interactive avec `ControlsGrid`
 - ✅ Palette de boutons glissables
 - ✅ Exemples de différentes tailles (1×1, 2×1, 1×2, 2×2)
 - ✅ Exemples de variantes et formes
@@ -78,7 +78,7 @@ Les contrôles utilisent directement le composant `ControlButton` :
 - ✅ Tableau des contrôles prédéfinis
 
 ### 8. Exports mis à jour
-- ✅ `controllers-grid/index.ts` - Export des contrôles
+- ✅ `controls-grid/index.ts` - Export des contrôles
 - ✅ `use-control-registry/use-control-registry.ts` - Export du composable
 
 ## 🎨 Nouvelles fonctionnalités
@@ -125,7 +125,7 @@ registry/new-york/
 │   │   └── demos/
 │   │       ├── ControlButtonDemo.vue            [MODIFIÉ]
 │   │       └── PlaygroundDemo.vue               [NOUVEAU]
-│   └── controllers-grid/
+│   └── controls-grid/
 │       ├── index.ts                             [MODIFIÉ]
 │       └── demos/
 │           └── ControlRegistryDemo.vue          [NOUVEAU]

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { ControllersGrid } from '..';
-import { useControllersGrid, useComponentPalette } from '../composables';
+import { ControlsGrid } from '..';
+import { useControlsGrid, useComponentPalette } from '../composables';
 import type { GridItemTemplate } from '../types';
 
 // Templates de composants
@@ -65,7 +65,7 @@ const templates: GridItemTemplate[] = [
 ];
 
 // Utilisation des composables
-const grid = ref<InstanceType<typeof ControllersGrid> | null>(null);
+const grid = ref<InstanceType<typeof ControlsGrid> | null>(null);
 const {
   items,
   canUndo,
@@ -79,7 +79,7 @@ const {
   selectedItemId,
   saveToLocalStorage,
   loadFromLocalStorage,
-} = useControllersGrid();
+} = useControlsGrid();
 const { availableTemplates, createItemFromTemplate } = useComponentPalette(templates);
 
 // État local
@@ -437,7 +437,7 @@ onUnmounted(() => {
 
       <!-- Grid -->
       <div class="grid-container">
-        <ControllersGrid
+        <ControlsGrid
           ref="grid"
           v-model:items="items"
           :cell-size="cellSize"

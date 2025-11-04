@@ -13,7 +13,7 @@ description: A 1:1 aspect ratio button component for grid-based layouts.
 <script setup lang="ts">
 import { ref, shallowRef } from "vue";
 import { ControlButton } from "@/components/ui/control-button";
-import { ControllersGrid } from "~~/registry/new-york/components/controllers-grid";
+import { ControlsGrid } from "~~/registry/new-york/components/controls-grid";
 
 const GridControlButton = {
   props: [
@@ -205,7 +205,7 @@ const handleItemRemoved = (id: string) => {
 
     <div class="space-y-2">
       <h4 class="text-sm font-medium">Grille de contrôles</h4>
-      <ControllersGrid
+      <ControlsGrid
         v-model:items="gridItems"
         :cell-size="80"
         :gap="8"

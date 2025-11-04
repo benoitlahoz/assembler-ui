@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, shallowRef, h } from 'vue';
-import { ControllersGrid } from '~~/registry/new-york/components/controllers-grid';
+import { ControlsGrid } from '~~/registry/new-york/components/controls-grid';
 import { useControlRegistry } from '~~/registry/new-york/composables/use-control-registry';
 import { ControlButton } from '~~/registry/new-york/components/control-button';
 import type { ControlDefinition } from '~~/registry/new-york/composables/use-control-registry';
@@ -254,7 +254,7 @@ const handleItemRemoved = (id: string) => {
           Vider la grille
         </button>
       </div>
-      <ControllersGrid
+      <ControlsGrid
         ref="gridRef"
         v-model:items="gridItems"
         :cell-size="80"

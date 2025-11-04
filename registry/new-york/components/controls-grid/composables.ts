@@ -3,9 +3,9 @@ import type { GridItem, GridItemTemplate, GridConfig } from './types';
 import { GridUtils } from './types';
 
 /**
- * Composable pour gérer l'état et les opérations d'une grille de contrôleurs
+ * Composable pour gérer l'état et les opérations d'une grille de contrôles
  */
-export function useControllersGrid(initialItems: GridItem[] = []) {
+export function useControlsGrid(initialItems: GridItem[] = []) {
   // État
   const items = ref<GridItem[]>([...initialItems]);
   const selectedItemId = ref<string | null>(null);
@@ -116,7 +116,7 @@ export function useControllersGrid(initialItems: GridItem[] = []) {
     addToHistory();
   };
 
-  const saveToLocalStorage = (key = 'controllers-grid-config') => {
+  const saveToLocalStorage = (key = 'controls-grid-config') => {
     try {
       localStorage.setItem(key, JSON.stringify(exportConfig()));
       return true;
@@ -126,7 +126,7 @@ export function useControllersGrid(initialItems: GridItem[] = []) {
     }
   };
 
-  const loadFromLocalStorage = (key = 'controllers-grid-config') => {
+  const loadFromLocalStorage = (key = 'controls-grid-config') => {
     try {
       const data = localStorage.getItem(key);
       if (data) {

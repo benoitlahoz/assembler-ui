@@ -1,6 +1,6 @@
 ---
-title: ControllersGrid
-description: ControllersGrid - Composant de grille drag-and-drop
+title: ControlsGrid
+description: ControlsGrid - Composant de grille drag-and-drop
 ---
 
 ::tabs
@@ -12,7 +12,7 @@ description: ControllersGrid - Composant de grille drag-and-drop
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";
-import { ControllersGrid } from "..";
+import { ControlsGrid } from "..";
 
 interface GridItem {
   id: string;
@@ -24,7 +24,7 @@ interface GridItem {
   color?: string;
 }
 
-const grid = ref<InstanceType<typeof ControllersGrid> | null>(null);
+const grid = ref<InstanceType<typeof ControlsGrid> | null>(null);
 
 const gridItems = ref<GridItem[]>([]);
 
@@ -148,7 +148,7 @@ const exportConfig = () => {
       </aside>
 
       <div class="grid-wrapper">
-        <ControllersGrid
+        <ControlsGrid
           ref="grid"
           v-model:items="gridItems"
           :cell-size="100"
@@ -165,7 +165,7 @@ const exportConfig = () => {
               <span>Items: {{ placedItems.length }}</span>
             </div>
           </template>
-        </ControllersGrid>
+        </ControlsGrid>
       </div>
     </div>
   </div>
@@ -354,19 +354,19 @@ This will install the component in the path defined by your `components.json` fi
 
 :::code-group{.w-full}
 ```bash [yarn]
-  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/controllers-grid.json"
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/controls-grid.json"
   ```
 
 ```bash [npm]
-  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/controllers-grid.json"
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/controls-grid.json"
   ```
 
 ```bash [pnpm]
-  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/controllers-grid.json"
+  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/controls-grid.json"
   ```
 
 ```bash [bun]
-  bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/controllers-grid.json"
+  bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/controls-grid.json"
   ```
 :::
 
@@ -376,13 +376,13 @@ This will install the component in the path defined by your `components.json` fi
 
 Copy and paste these files into your project.
 
-:::code-tree{default-value="src/components/ui/controllers-grid/index.ts"}
+:::code-tree{default-value="src/components/ui/controls-grid/index.ts"}
 
-```ts [src/components/ui/controllers-grid/index.ts]
-export { default as ControllersGrid } from "./ControllersGrid.vue";
+```ts [src/components/ui/controls-grid/index.ts]
+export { default as ControlsGrid } from "./ControlsGrid.vue";
 
 export {
-  useControllersGrid,
+  useControlsGrid,
   useComponentPalette,
   useGridConfig,
 } from "./composables";
@@ -401,7 +401,7 @@ export {
 } from "./types";
 ```
 
-```vue [src/components/ui/controllers-grid/ControllersGrid.vue]
+```vue [src/components/ui/controls-grid/ControlsGrid.vue]
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useElementSize, useDropZone } from "@vueuse/core";
@@ -884,12 +884,12 @@ defineExpose({
 </style>
 ```
 
-```ts [src/components/ui/controllers-grid/composables.ts]
+```ts [src/components/ui/controls-grid/composables.ts]
 import { ref, computed, type Ref } from "vue";
 import type { GridItem, GridItemTemplate, GridConfig } from "./types";
 import { GridUtils } from "./types";
 
-export function useControllersGrid(initialItems: GridItem[] = []) {
+export function useControlsGrid(initialItems: GridItem[] = []) {
   const items = ref<GridItem[]>([...initialItems]);
   const selectedItemId = ref<string | null>(null);
   const history = ref<GridItem[][]>([]);
@@ -1001,7 +1001,7 @@ export function useControllersGrid(initialItems: GridItem[] = []) {
     addToHistory();
   };
 
-  const saveToLocalStorage = (key = "controllers-grid-config") => {
+  const saveToLocalStorage = (key = "controls-grid-config") => {
     try {
       localStorage.setItem(key, JSON.stringify(exportConfig()));
       return true;
@@ -1011,7 +1011,7 @@ export function useControllersGrid(initialItems: GridItem[] = []) {
     }
   };
 
-  const loadFromLocalStorage = (key = "controllers-grid-config") => {
+  const loadFromLocalStorage = (key = "controls-grid-config") => {
     try {
       const data = localStorage.getItem(key);
       if (data) {
@@ -1174,7 +1174,7 @@ export function useGridConfig(initialConfig: Partial<GridConfig> = {}) {
 }
 ```
 
-```ts [src/components/ui/controllers-grid/types.ts]
+```ts [src/components/ui/controls-grid/types.ts]
 export interface GridItem {
   id: string;
 
@@ -1377,7 +1377,7 @@ export class GridUtils {
 ```
 :::
 
-## ControllersGrid
+## ControlsGrid
 ::hr-underline
 ::
 
@@ -1420,8 +1420,8 @@ export class GridUtils {
 ```vue
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import { ControllersGrid } from "..";
-import { useControllersGrid, useComponentPalette } from "../composables";
+import { ControlsGrid } from "..";
+import { useControlsGrid, useComponentPalette } from "../composables";
 import type { GridItemTemplate } from "../types";
 
 const templates: GridItemTemplate[] = [
@@ -1483,7 +1483,7 @@ const templates: GridItemTemplate[] = [
   },
 ];
 
-const grid = ref<InstanceType<typeof ControllersGrid> | null>(null);
+const grid = ref<InstanceType<typeof ControlsGrid> | null>(null);
 const {
   items,
   canUndo,
@@ -1497,7 +1497,7 @@ const {
   selectedItemId,
   saveToLocalStorage,
   loadFromLocalStorage,
-} = useControllersGrid();
+} = useControlsGrid();
 const { availableTemplates, createItemFromTemplate } =
   useComponentPalette(templates);
 
@@ -1862,7 +1862,7 @@ onUnmounted(() => {
       </aside>
 
       <div class="grid-container">
-        <ControllersGrid
+        <ControlsGrid
           ref="grid"
           v-model:items="items"
           :cell-size="cellSize"
@@ -2099,7 +2099,7 @@ onUnmounted(() => {
 ```vue
 <script setup lang="ts">
 import { ref, onMounted, shallowRef, h } from "vue";
-import { ControllersGrid } from "@/components/ui/controllers-grid";
+import { ControlsGrid } from "@/components/ui/controls-grid";
 import { useControlRegistry } from "~~/registry/new-york/composables/use-control-registry";
 import { ControlButton } from "~~/registry/new-york/components/control-button";
 import type { ControlDefinition } from "~~/registry/new-york/composables/use-control-registry";
@@ -2347,7 +2347,7 @@ const handleItemRemoved = (id: string) => {
           Vider la grille
         </button>
       </div>
-      <ControllersGrid
+      <ControlsGrid
         ref="gridRef"
         v-model:items="gridItems"
         :cell-size="80"

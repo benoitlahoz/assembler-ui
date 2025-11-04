@@ -3,9 +3,9 @@
 ## ✅ Changements effectués
 
 ### Suppression du dossier `controls/`
-- ❌ Supprimé `controllers-grid/controls/ButtonControl.vue`
-- ❌ Supprimé `controllers-grid/controls/index.ts`
-- ❌ Supprimé tout le dossier `controllers-grid/controls/`
+- ❌ Supprimé `controls-grid/controls/ButtonControl.vue`
+- ❌ Supprimé `controls-grid/controls/index.ts`
+- ❌ Supprimé tout le dossier `controls-grid/controls/`
 
 ### Utilisation directe de ControlButton
 
@@ -68,8 +68,8 @@ registry/new-york/
 │   │   └── demos/
 │   │       ├── ControlButtonDemo.vue  # Wrapper avec template string
 │   │       └── PlaygroundDemo.vue
-│   └── controllers-grid/
-│       ├── ControllersGrid.vue
+│   └── controls-grid/
+│       ├── ControlsGrid.vue
 │       ├── index.ts
 │       └── demos/
 │           ├── ControlRegistryDemo.vue  # Wrapper avec render function

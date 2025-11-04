@@ -2,7 +2,7 @@
  * Control Registry Composable
  *
  * Gère l'enregistrement et la récupération de composants de contrôle
- * pour être utilisés dans ControllersGrid
+ * pour être utilisés dans ControlsGrid
  *
  * @category composables
  */

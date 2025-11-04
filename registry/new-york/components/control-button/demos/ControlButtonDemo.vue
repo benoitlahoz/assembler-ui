@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, shallowRef } from 'vue';
 import { ControlButton } from '~~/registry/new-york/components/control-button';
-import { ControllersGrid } from '~~/registry/new-york/components/controllers-grid';
+import { ControlsGrid } from '~~/registry/new-york/components/controls-grid';
 
 // Composant wrapper pour le ControlButton dans la grille
 const GridControlButton = {
@@ -185,7 +185,7 @@ const handleItemRemoved = (id: string) => {
     <!-- Grille de contrôles -->
     <div class="space-y-2">
       <h4 class="text-sm font-medium">Grille de contrôles</h4>
-      <ControllersGrid
+      <ControlsGrid
         v-model:items="gridItems"
         :cell-size="80"
         :gap="8"

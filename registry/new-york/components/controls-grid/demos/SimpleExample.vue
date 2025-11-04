@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { ControllersGrid } from '..';
+import { ControlsGrid } from '..';
 
 interface GridItem {
   id: string;
@@ -13,7 +13,7 @@ interface GridItem {
 }
 
 // Référence à la grille
-const grid = ref<InstanceType<typeof ControllersGrid> | null>(null);
+const grid = ref<InstanceType<typeof ControlsGrid> | null>(null);
 
 // Items actuellement dans la grille
 const gridItems = ref<GridItem[]>([]);
@@ -124,7 +124,7 @@ const exportConfig = () => {
 
       <!-- Grille -->
       <div class="grid-wrapper">
-        <ControllersGrid
+        <ControlsGrid
           ref="grid"
           v-model:items="gridItems"
           :cell-size="100"
@@ -141,7 +141,7 @@ const exportConfig = () => {
               <span>Items: {{ placedItems.length }}</span>
             </div>
           </template>
-        </ControllersGrid>
+        </ControlsGrid>
       </div>
     </div>
   </div>

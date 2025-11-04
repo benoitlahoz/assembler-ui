@@ -1,5 +1,5 @@
 /**
- * ControllersGrid - Composant de grille drag-and-drop
+ * ControlsGrid - Composant de grille drag-and-drop
  *
  * @type registry:ui
  * @category controls
@@ -9,9 +9,9 @@
  * @demo ControlRegistryDemo
  */
 
-export { default as ControllersGrid } from './ControllersGrid.vue';
+export { default as ControlsGrid } from './ControlsGrid.vue';
 
-export { useControllersGrid, useComponentPalette, useGridConfig } from './composables';
+export { useControlsGrid, useComponentPalette, useGridConfig } from './composables';
 
 export {
   GridUtils,

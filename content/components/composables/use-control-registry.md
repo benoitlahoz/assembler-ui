@@ -3,7 +3,7 @@ title: useControlRegistry
 description: Control Registry Composable
 ---
 
-  <p class="text-pretty mt-4"><br>Gère l'enregistrement et la récupération de composants de contrôle<br>pour être utilisés dans ControllersGrid</p>
+  <p class="text-pretty mt-4"><br>Gère l'enregistrement et la récupération de composants de contrôle<br>pour être utilisés dans ControlsGrid</p>
 
 ## Install with CLI
 ::hr-underline

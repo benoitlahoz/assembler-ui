@@ -1,5 +1,5 @@
 /**
- * Types pour le composant ControllersGrid
+ * Types pour le composant ControlsGrid
  */
 
 /**
@@ -115,7 +115,7 @@ export interface GridMethods {
 }
 
 /**
- * Props du composant ControllersGrid
+ * Props du composant ControlsGrid
  */
 export interface GridProps {
   /** Taille de base d'une cellule en pixels */
