@@ -208,12 +208,17 @@ export function useScreenShare(options: UseScreenShareOptions = {}) {
 
   return {
     screenStream,
+
     shareState,
+
     shareType,
+
     errors,
+
     isSharing,
 
     startScreenShare,
+
     stopScreenShare,
   };
 }
@@ -224,6 +229,90 @@ export function useScreenShare(options: UseScreenShareOptions = {}) {
 :::
 
 
+
+
+## useScreenShare
+::hr-underline
+::
+
+
+Composable for managing screen sharing functionality.
+
+This composable provides reactive state and methods for screen sharing
+using the getDisplayMedia API.
+
+
+
+
+
+
+
+
+
+  ### Parameters
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `options`{.primary .text-primary} | `UseScreenShareOptions` | {} | — |
+
+
+
+
+
+  ### Returns
+
+
+The reactive state and methods for screen sharing.
+
+
+
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `screenStream`{.primary .text-primary} | `any` | The stream being shared, or null if not sharing. |
+| `shareState`{.primary .text-primary} | `any` | Current state of screen sharing. |
+| `shareType`{.primary .text-primary} | `any` | Type of surface being shared (if detectable). |
+| `errors`{.primary .text-primary} | `any` | List of errors encountered during screen sharing operations. |
+| `isSharing`{.primary .text-primary} | `any` | Whether screen sharing is currently active. |
+| `startScreenShare`{.primary .text-primary} | `any` | Function to start screen sharing. |
+| `stopScreenShare`{.primary .text-primary} | `any` | Function to stop screen sharing. |
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ### Types
+| Name | Type | Description |
+|------|------|-------------|
+| `ScreenShareType`{.primary .text-primary} | `type` | — |
+| `ScreenShareState`{.primary .text-primary} | `type` | — |
+| `ScreenShareOptions`{.primary .text-primary} | `interface` | — |
+| `ScreenShareStartFn`{.primary .text-primary} | `type` | — |
+| `ScreenShareStopFn`{.primary .text-primary} | `type` | — |
+| `UseScreenShareOptions`{.primary .text-primary} | `interface` | — |
+
+
+
+
+
+
+---
 
 
 

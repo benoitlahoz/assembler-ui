@@ -231,6 +231,10 @@ const props = defineProps<ControlButtonLabelProps>();
 
 
 
+
+
+
+
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
@@ -288,6 +292,10 @@ const props = defineProps<ControlButtonLabelProps>();
 
 
 **API**: composition
+
+
+
+
 
 
 

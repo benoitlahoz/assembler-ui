@@ -31,6 +31,7 @@ export const main = async () => {
   const directories = Paths.map((path: string) => join(GlobalPath, path));
   const errors: { dir: string; error: any }[] = [];
   let total = 0;
+
   for (const path of directories) {
     const componentDirs = getDirectories(path);
 
@@ -45,8 +46,10 @@ export const main = async () => {
             const result = parseFolder(join(dir), config) as any;
 
             result.$schema = config.$schema;
+
             // Toujours forcer le champ type : si absent, mettre registry:ui
             result.type = typeof result.type !== 'undefined' ? result.type : 'registry:ui';
+
             // Ajouter un type à chaque entrée de files si absent
             if (Array.isArray(result.files)) {
               result.files = result.files.map((f: any) => ({
@@ -88,6 +91,7 @@ export const main = async () => {
               }
               result.category = mainCategory || 'miscellaneous';
             }
+
             // Normaliser la catégorie : si c'est un objet structuré, extraire le nom
             if (
               typeof result.category === 'object' &&
@@ -96,6 +100,7 @@ export const main = async () => {
             ) {
               result.category = result.category.name;
             }
+
             // Réorganiser les clés pour respecter l'ordre souhaité
             const ordered: any = {};
             if (result.$schema) ordered.$schema = result.$schema;
@@ -107,12 +112,14 @@ export const main = async () => {
             if (result.type) ordered.type = result.type;
             if (result.demo) ordered.demo = result.demo;
             if (result.files) ordered.files = result.files;
+
             // Ajoute toutes les autres clés restantes
             Object.keys(result).forEach((key) => {
               if (!(key in ordered)) {
                 ordered[key] = result[key];
               }
             });
+
             fs.writeFileSync(
               outputPath,
               DEBUG_JSON ? JSON.stringify(ordered, null, 2) : JSON.stringify(ordered),

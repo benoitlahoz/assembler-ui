@@ -472,6 +472,10 @@ Instead, the browser displays a picker for the user to select what to share.
 
 
 
+
+
+
+
   ### Types
 | Name | Type | Description |
 |------|------|-------------|
@@ -498,6 +502,10 @@ via scoped slots and provide/inject.
 
 
 **API**: composition
+
+
+
+
 
 
 
@@ -569,6 +577,10 @@ It automatically connects to the screen stream provided by ScreenShareProvider.
 
 
 **API**: composition
+
+
+
+
 
 
 

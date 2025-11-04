@@ -278,6 +278,10 @@ Un champ de saisie simple avec label et placeholder
 
 
 
+
+
+
+
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
@@ -363,6 +367,10 @@ Un champ de saisie simple avec label et placeholder (API Composition)
 
 
 **Author**: Jane Doe &lt;jane.doe@example.com&gt;
+
+
+
+
 
 
 

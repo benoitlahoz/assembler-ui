@@ -84,6 +84,14 @@ Copy and paste these files into your project.
   <%- include('sections/variants-section.ejs', { variants: file.doc.variants }) %>
 <% } %>
 
+<% if (file.doc && file.doc.params && file.doc.params.length) { %>
+  <%- include('sections/params-section.ejs', { params: file.doc.params }) %>
+<% } %>
+
+<% if (file.doc && file.doc.returns) { %>
+  <%- include('sections/returns-section.ejs', { returns: file.doc.returns }) %>
+<% } %>
+
 <% if (file.doc && file.doc.props && file.doc.props.length) { %>
   <%- include('sections/props-section.ejs', { props: file.doc.props }) %>
 <% } %>

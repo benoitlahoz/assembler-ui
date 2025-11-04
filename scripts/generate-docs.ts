@@ -100,11 +100,14 @@ export async function generateDocs(): Promise<void> {
         message: `Generating doc for '${assembler.name}'`,
         action: async () => {
           const allFiles: FileEntry[] = getFilesFromAssembler(assemblerPath);
-          // On ne garde que les .vue pour la doc détaillée si registry:ui ou registry:hook
+          // On ne garde que les .vue pour la doc détaillée si registry:ui
+          // Pour registry:hook, on garde les .ts (composables)
           const normalizedType = (assembler.type || '').split(':').pop() || '';
           let files: FileEntry[] = allFiles;
-          if (normalizedType === 'ui' || normalizedType === 'hook') {
+          if (normalizedType === 'ui') {
             files = allFiles.filter((f) => f.path.endsWith('.vue'));
+          } else if (normalizedType === 'hook') {
+            files = allFiles.filter((f) => f.path.endsWith('.ts') && !f.path.endsWith('.d.ts'));
           }
 
           // Pour le code-tree, on prend tous les fichiers (vue ou non)

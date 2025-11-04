@@ -232,15 +232,23 @@ export function useScreenShare(options: UseScreenShareOptions = {}) {
     stopScreenShare();
   });
 
+  /**
+   * The reactive state and methods for screen sharing.
+   */
   return {
-    // State
+    /** The stream being shared, or null if not sharing. */
     screenStream,
+    /** Current state of screen sharing. */
     shareState,
+    /** Type of surface being shared (if detectable). */
     shareType,
+    /** List of errors encountered during screen sharing operations. */
     errors,
+    /** Whether screen sharing is currently active. */
     isSharing,
-    // Methods
+    /** Function to start screen sharing. */
     startScreenShare,
+    /** Function to stop screen sharing. */
     stopScreenShare,
   };
 }

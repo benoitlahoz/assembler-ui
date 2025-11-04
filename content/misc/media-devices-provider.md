@@ -1156,6 +1156,10 @@ The demos below use different MediaDevicesProvider. In real world usage, you wou
 
 
 
+
+
+
+
   ### Types
 | Name | Type | Description |
 |------|------|-------------|
@@ -1195,6 +1199,10 @@ The MediaDevicesProvider component provides a list of available media devices
 
 
 **API**: composition
+
+
+
+
 
 
 
@@ -1269,6 +1277,10 @@ start/stop functions to manage streams with device caching.
 
 
 **API**: composition
+
+
+
+
 
 
 
@@ -1368,6 +1380,10 @@ start/stop functions to manage streams with device caching.
 
 
 
+
+
+
+
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
@@ -1454,6 +1470,10 @@ Usage:
 &gt;
 ```
  
+
+
+
+
 
 
 

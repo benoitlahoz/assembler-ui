@@ -1,0 +1,15 @@
+### Returns
+
+<% if (returns.description && returns.description.trim() && returns.description !== '—') { %>
+<%= returns.description %>
+<% } %>
+
+<% if (returns.properties && returns.properties.length > 0) { %>
+
+| Property | Type | Description |
+|----------|------|-------------|
+<% returns.properties.forEach(function(prop) { %>| `<%= prop.name %>`{.primary .text-primary} | `<%- typeof escapePipe === 'function' ? escapePipe(prop.type || 'any') : (prop.type || 'any') %>` | <%= prop.description || '—' %> |
+<% }); %>
+<% } %>
+
+

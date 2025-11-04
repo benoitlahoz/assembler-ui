@@ -1,0 +1,5 @@
+### Parameters
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+<% params.forEach(function(param) { %>| `<%= param.name %>`{.primary .text-primary} | `<%- typeof escapePipe === 'function' ? escapePipe(param.type) : param.type %>` | <% if (typeof param.default !== 'undefined' && param.default !== '') { %><%- param.default %><% } else { %>—<% } %> | <%= param.description || '—' %> |
+<% }); %>
