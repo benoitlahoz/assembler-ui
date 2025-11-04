@@ -304,6 +304,8 @@ export interface UseDragDropOptions {
 
   gap?: number;
 
+  allowCollision?: boolean;
+
   validatePlacement?: (
     x: number,
     y: number,
@@ -342,7 +344,12 @@ export interface UseDragDropReturn<T = any> {
 export function useDragDrop<T = any>(
   options: UseDragDropOptions,
 ): UseDragDropReturn<T> {
-  const { unitSize, gap = 0, validatePlacement } = options;
+  const {
+    unitSize,
+    gap = 0,
+    allowCollision = false,
+    validatePlacement,
+  } = options;
 
   const dragState = ref<DragDropState<T>>({
     item: null,
@@ -452,7 +459,7 @@ export function useDragDrop<T = any>(
     const pos = getPosition(virtualBounds);
     if (!pos) return null;
 
-    if (validatePlacement && dragState.value.item) {
+    if (!allowCollision && validatePlacement && dragState.value.item) {
       const excludeId = dragState.value.fromContainer
         ? dragState.value.item.id
         : undefined;
@@ -695,6 +702,7 @@ const WORK_END = 18;
 const { dragState, startDrag, handleDragOver, endDrag } = useDragDrop({
   unitSize: HOUR_HEIGHT,
   gap: 0,
+  allowCollision: true,
   validatePlacement: (x, y, width, height) => {
     const endHour = y + height;
 
@@ -769,10 +777,31 @@ const formatHour = (hour: number) => {
 };
 
 const getEventStyle = (event: Event) => {
+  const overlapping = events.value.filter((e) => {
+    if (e.id === event.id) return false;
+    const eventEnd = event.startHour + event.duration;
+    const eEnd = e.startHour + e.duration;
+
+    return (
+      (event.startHour < eEnd && eventEnd > e.startHour) ||
+      (e.startHour < eventEnd && eEnd > event.startHour)
+    );
+  });
+
+  const allOverlapping = [...overlapping, event].sort(
+    (a, b) => a.startHour - b.startHour,
+  );
+
+  const columnIndex = allOverlapping.findIndex((e) => e.id === event.id);
+  const totalColumns = allOverlapping.length;
+
+  const columnWidth = 100 / totalColumns;
+  const leftOffset = columnWidth * columnIndex;
+
   return {
     position: "absolute" as const,
-    left: "80px",
-    right: "20px",
+    left: `calc(80px + ${leftOffset}%)`,
+    width: `calc(${columnWidth}% - 20px)`,
     top: `${(event.startHour - START_HOUR) * HOUR_HEIGHT}px`,
     height: `${event.duration * HOUR_HEIGHT}px`,
   };
@@ -957,6 +986,7 @@ const removeEvent = (id: string) => {
           <li>• Drag events to reschedule them</li>
           <li>• Events snap to 15-minute intervals</li>
           <li>• Can only place events during work hours (8 AM - 6 PM)</li>
+          <li>• Events can overlap (collision detection disabled)</li>
           <li>• Click to select, double-click to delete</li>
         </ul>
       </div>
@@ -1726,7 +1756,7 @@ interface Card {
   content: string;
   x: number;
   y: number;
-  width: number;  
+  width: number; 
   height: number; 
   color: string;
 }
@@ -1773,12 +1803,16 @@ const { dragState, startDrag, handleDragOver, endDrag } = useDragDrop({
 });
 
 const onDragStart = (event: DragEvent, card: Card) => {
-  startDrag(event, {
-    id: card.id,
-    width: card.width,   
-    height: card.height, 
-    data: card,
-  }, true);
+  startDrag(
+    event,
+    {
+      id: card.id,
+      width: card.width, 
+      height: card.height, 
+      data: card,
+    },
+    true
+  );
 };
 
 const onDragOver = (event: DragEvent) => {
@@ -1802,15 +1836,15 @@ const onDragOver = (event: DragEvent) => {
 
 const onDrop = (event: DragEvent) => {
   event.preventDefault();
-  
+
   if (dragState.value.item && dragState.value.hoverPosition) {
-    const card = cards.value.find(c => c.id === dragState.value.item!.id);
+    const card = cards.value.find((c) => c.id === dragState.value.item!.id);
     if (card) {
       card.x = dragState.value.hoverPosition.x;
       card.y = dragState.value.hoverPosition.y;
     }
   }
-  
+
   endDrag();
 };
 
@@ -1824,9 +1858,9 @@ const addCard = () => {
     'bg-green-100 border-green-300',
     'bg-purple-100 border-purple-300',
   ];
-  
+
   const randomIndex = Math.floor(Math.random() * colors.length);
-  
+
   const newCard: Card = {
     id: `card-${Date.now()}`,
     title: 'Nouvelle note',
@@ -1837,13 +1871,13 @@ const addCard = () => {
     height: 150,
     color: colors[randomIndex]!,
   };
-  
+
   cards.value.push(newCard);
   selectedCard.value = newCard.id;
 };
 
 const removeCard = (id: string) => {
-  cards.value = cards.value.filter(c => c.id !== id);
+  cards.value = cards.value.filter((c) => c.id !== id);
   if (selectedCard.value === id) {
     selectedCard.value = null;
   }
@@ -1860,7 +1894,7 @@ const resizeCard = (card: Card, delta: number) => {
     
     <aside class="w-64 bg-white border-r p-4">
       <h3 class="font-bold text-lg mb-4">Mode Adaptatif</h3>
-      
+
       <div class="space-y-4">
         <button
           @click="addCard"
@@ -1868,31 +1902,31 @@ const resizeCard = (card: Card, delta: number) => {
         >
           ➕ Ajouter une carte
         </button>
-        
+
         <div v-if="selectedCard" class="p-3 bg-slate-100 rounded">
           <h4 class="font-semibold text-sm mb-3">Carte sélectionnée</h4>
-          
+
           <div class="space-y-2">
             <div class="text-xs">
               <span class="text-slate-600">ID:</span>
               <code class="ml-1 text-xs">{{ selectedCard }}</code>
             </div>
-            
+
             <div class="flex gap-2">
               <button
-                @click="resizeCard(cards.find(c => c.id === selectedCard)!, 20)"
+                @click="resizeCard(cards.find((c) => c.id === selectedCard)!, 20)"
                 class="flex-1 px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
               >
                 ➕ Agrandir
               </button>
               <button
-                @click="resizeCard(cards.find(c => c.id === selectedCard)!, -20)"
+                @click="resizeCard(cards.find((c) => c.id === selectedCard)!, -20)"
                 class="flex-1 px-2 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600"
               >
                 ➖ Réduire
               </button>
             </div>
-            
+
             <button
               @click="removeCard(selectedCard)"
               class="w-full px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
@@ -1902,7 +1936,7 @@ const resizeCard = (card: Card, delta: number) => {
           </div>
         </div>
       </div>
-      
+
       <div class="mt-6 p-3 bg-blue-50 rounded text-xs">
         <p class="font-semibold text-blue-900 mb-2">✨ Avantages</p>
         <ul class="text-blue-800 space-y-1">
@@ -1912,7 +1946,7 @@ const resizeCard = (card: Card, delta: number) => {
           <li>• Adapté aux interfaces fluides</li>
         </ul>
       </div>
-      
+
       <div class="mt-4 p-3 bg-slate-100 rounded text-xs">
         <p class="font-semibold mb-2">📊 Statistiques</p>
         <div class="space-y-1 text-slate-600">
@@ -1931,24 +1965,24 @@ const resizeCard = (card: Card, delta: number) => {
           En mode adaptatif, width et height sont interprétés comme des pixels directement
         </p>
       </div>
-      
-      <div 
+
+      <div
         ref="workspace"
         class="relative w-full h-[700px] bg-white rounded-lg shadow-lg border-2 border-slate-200 overflow-hidden"
         @dragover="onDragOver"
         @drop="onDrop"
       >
         
-        <div 
+        <div
           class="absolute inset-0 pointer-events-none opacity-5"
           style="
-            background-image: 
-              linear-gradient(rgba(0,0,0,.1) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(0,0,0,.1) 1px, transparent 1px);
+            background-image:
+              linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
             background-size: 50px 50px;
           "
         ></div>
-        
+
         
         <div
           v-for="card in cards"
@@ -1975,12 +2009,12 @@ const resizeCard = (card: Card, delta: number) => {
         >
           <div class="font-bold text-sm mb-2">{{ card.title }}</div>
           <div class="text-xs text-slate-700">{{ card.content }}</div>
-          
+
           <div class="absolute bottom-2 right-2 text-xs text-slate-400 font-mono">
             {{ card.width }}×{{ card.height }}px
           </div>
         </div>
-        
+
         
         <div
           v-if="dragState.isDragging && dragState.hoverPosition && dragState.item"
@@ -1993,7 +2027,7 @@ const resizeCard = (card: Card, delta: number) => {
           }"
           class="border-2 border-dashed border-blue-400 bg-blue-100 bg-opacity-30 rounded-lg pointer-events-none"
         ></div>
-        
+
         
         <div
           v-if="cards.length === 0"
@@ -2005,13 +2039,15 @@ const resizeCard = (card: Card, delta: number) => {
           </div>
         </div>
       </div>
+
       
-      
-      <div class="mt-6 p-4 bg-slate-800 text-slate-100 rounded-lg text-xs font-mono overflow-x-auto">
+      <div
+        class="mt-6 p-4 bg-slate-800 text-slate-100 rounded-lg text-xs font-mono overflow-x-auto"
+      >
         <div class="text-green-400 mb-2">
         <div>
-          <span class="text-purple-400">const</span> {{ '{' }} dragState, startDrag, handleDragOver, endDrag {{ '}' }} = 
-          <span class="text-yellow-400">useDragDrop</span>({{ '{' }}
+          <span class="text-purple-400">const</span> {{ '{' }} dragState, startDrag, handleDragOver,
+          endDrag {{ '}' }} = <span class="text-yellow-400">useDragDrop</span>({{ '{' }}
         </div>
         <div class="pl-4 text-slate-400">
         <div class="pl-4">gap: <span class="text-blue-400">0</span>,</div>

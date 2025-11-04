@@ -38,40 +38,44 @@ const { dragState, startDrag, endDrag } = useDragDrop({
 const dragOverIndex = ref<number | null>(null);
 
 const onDragStart = (event: DragEvent, file: FileItem) => {
-  startDrag(event, {
-    id: file.id,
-    width: 1,
-    height: 1,
-    data: file,
-  }, true);
+  startDrag(
+    event,
+    {
+      id: file.id,
+      width: 1,
+      height: 1,
+      data: file,
+    },
+    true
+  );
 };
 
 const onDragOver = (event: DragEvent, index: number) => {
   event.preventDefault();
-  
+
   if (!dragState.value.item) return;
-  
+
   dragOverIndex.value = index;
-  
+
   const targetFile = sortedFiles.value[index];
   if (!targetFile || dragState.value.item.id === targetFile.id) return;
-  
+
   // Trouver l'index actuel de l'item draggé
-  const draggedFile = files.value.find(f => f.id === dragState.value.item!.id);
+  const draggedFile = files.value.find((f) => f.id === dragState.value.item!.id);
   if (!draggedFile) return;
-  
-  const currentIndex = sortedFiles.value.findIndex(f => f.id === draggedFile.id);
-  
+
+  const currentIndex = sortedFiles.value.findIndex((f) => f.id === draggedFile.id);
+
   // Si on change de position, réorganiser
   if (currentIndex !== index) {
     // Réorganiser les ordres
     const newFiles = [...sortedFiles.value];
     newFiles.splice(currentIndex, 1);
     newFiles.splice(index, 0, draggedFile);
-    
+
     // Mettre à jour les ordres
     newFiles.forEach((f, i) => {
-      const file = files.value.find(file => file.id === f.id);
+      const file = files.value.find((file) => file.id === f.id);
       if (file) file.order = i;
     });
   }
@@ -97,7 +101,7 @@ const selectFile = (id: string) => {
   <div class="w-full h-full p-8 bg-slate-50">
     <div class="max-w-2xl mx-auto">
       <h2 class="text-2xl font-bold mb-6">File Explorer - Reorder Files</h2>
-      
+
       <div class="bg-white rounded-lg shadow-sm border">
         <!-- Header -->
         <div class="px-4 py-3 bg-slate-100 border-b font-semibold text-sm flex items-center gap-4">
@@ -105,7 +109,7 @@ const selectFile = (id: string) => {
           <span class="w-24 text-right">Size</span>
           <span class="w-16 text-right">Type</span>
         </div>
-        
+
         <!-- File list -->
         <div class="divide-y">
           <div
@@ -122,7 +126,9 @@ const selectFile = (id: string) => {
               'hover:bg-slate-50',
               selectedFile === file.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : '',
               dragState.isDragging && dragState.item?.id === file.id ? 'opacity-40' : 'opacity-100',
-              dragOverIndex === index && dragState.item?.id !== file.id ? 'border-t-2 border-t-blue-400' : '',
+              dragOverIndex === index && dragState.item?.id !== file.id
+                ? 'border-t-2 border-t-blue-400'
+                : '',
             ]"
           >
             <!-- Icon & Name -->
@@ -130,28 +136,25 @@ const selectFile = (id: string) => {
               <span class="text-2xl shrink-0">{{ file.icon }}</span>
               <span class="font-medium text-sm truncate">{{ file.name }}</span>
             </div>
-            
+
             <!-- Size -->
             <span class="w-24 text-right text-sm text-slate-600">
               {{ file.size || '-' }}
             </span>
-            
+
             <!-- Type -->
             <span class="w-16 text-right text-xs text-slate-500 capitalize">
               {{ file.type }}
             </span>
           </div>
         </div>
-        
+
         <!-- Empty state -->
-        <div
-          v-if="files.length === 0"
-          class="px-4 py-12 text-center text-slate-400"
-        >
+        <div v-if="files.length === 0" class="px-4 py-12 text-center text-slate-400">
           No files found
         </div>
       </div>
-      
+
       <!-- Instructions -->
       <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <h3 class="font-semibold text-sm text-blue-900 mb-2">💡 Instructions</h3>
@@ -161,7 +164,7 @@ const selectFile = (id: string) => {
           <li>• The list maintains the order automatically</li>
         </ul>
       </div>
-      
+
       <!-- Debug info -->
       <div v-if="dragState.isDragging" class="mt-4 p-3 bg-slate-100 rounded text-xs font-mono">
         <div>Dragging: {{ dragState.item?.data?.name }}</div>

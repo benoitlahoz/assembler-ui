@@ -63,6 +63,12 @@ export interface UseDragDropOptions {
   unitSize?: number;
   /** Espacement entre les unités (en pixels) */
   gap?: number;
+  /** 
+   * Permet aux items de se chevaucher sans validation de collision.
+   * Par défaut à false. Si true, la fonction validatePlacement ne sera pas appelée.
+   * Utile pour les timelines ou autres layouts où les éléments peuvent se superposer.
+   */
+  allowCollision?: boolean;
   /** Fonction de validation de placement */
   validatePlacement?: (
     x: number,
@@ -98,7 +104,7 @@ export interface UseDragDropReturn<T = any> {
  * Composable pour gérer le drag and drop avec intersection précise
  */
 export function useDragDrop<T = any>(options: UseDragDropOptions): UseDragDropReturn<T> {
-  const { unitSize, gap = 0, validatePlacement } = options;
+  const { unitSize, gap = 0, allowCollision = false, validatePlacement } = options;
 
   // État du drag
   const dragState = ref<DragDropState<T>>({
@@ -221,8 +227,8 @@ export function useDragDrop<T = any>(options: UseDragDropOptions): UseDragDropRe
     const pos = getPosition(virtualBounds);
     if (!pos) return null;
 
-    // Valider le placement si une fonction de validation est fournie
-    if (validatePlacement && dragState.value.item) {
+    // Valider le placement si allowCollision est false et qu'une fonction de validation est fournie
+    if (!allowCollision && validatePlacement && dragState.value.item) {
       const excludeId = dragState.value.fromContainer ? dragState.value.item.id : undefined;
       const isValid = validatePlacement(
         pos.x,

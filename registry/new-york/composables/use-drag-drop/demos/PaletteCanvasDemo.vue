@@ -26,26 +26,56 @@ interface PlacedItem {
 }
 
 const palette: PaletteItem[] = [
-  { id: 'circle', label: 'Circle', type: 'circle', emoji: '⭕', color: 'bg-red-100 border-red-300' },
-  { id: 'square', label: 'Square', type: 'square', emoji: '⬜', color: 'bg-blue-100 border-blue-300' },
-  { id: 'star', label: 'Star', type: 'star', emoji: '⭐', color: 'bg-yellow-100 border-yellow-300' },
+  {
+    id: 'circle',
+    label: 'Circle',
+    type: 'circle',
+    emoji: '⭕',
+    color: 'bg-red-100 border-red-300',
+  },
+  {
+    id: 'square',
+    label: 'Square',
+    type: 'square',
+    emoji: '⬜',
+    color: 'bg-blue-100 border-blue-300',
+  },
+  {
+    id: 'star',
+    label: 'Star',
+    type: 'star',
+    emoji: '⭐',
+    color: 'bg-yellow-100 border-yellow-300',
+  },
   { id: 'heart', label: 'Heart', type: 'heart', emoji: '❤️', color: 'bg-pink-100 border-pink-300' },
-  { id: 'diamond', label: 'Diamond', type: 'diamond', emoji: '💎', color: 'bg-purple-100 border-purple-300' },
-  { id: 'rocket', label: 'Rocket', type: 'rocket', emoji: '🚀', color: 'bg-green-100 border-green-300' },
+  {
+    id: 'diamond',
+    label: 'Diamond',
+    type: 'diamond',
+    emoji: '💎',
+    color: 'bg-purple-100 border-purple-300',
+  },
+  {
+    id: 'rocket',
+    label: 'Rocket',
+    type: 'rocket',
+    emoji: '🚀',
+    color: 'bg-green-100 border-green-300',
+  },
 ];
 
 const canvas = ref<HTMLElement | null>(null);
 const canvasBounds = useElementBounding(canvas);
 
 const placedItems = ref<PlacedItem[]>([
-  { 
-    id: 'demo-1', 
-    x: 100, 
-    y: 100, 
-    type: 'star', 
-    emoji: '⭐', 
+  {
+    id: 'demo-1',
+    x: 100,
+    y: 100,
+    type: 'star',
+    emoji: '⭐',
     color: 'bg-yellow-100 border-yellow-300',
-    label: 'Star'
+    label: 'Star',
   },
 ]);
 
@@ -55,21 +85,29 @@ const { dragState, startDrag, handleDragOver, endDrag } = useDragDrop({
 });
 
 const onDragFromPalette = (event: DragEvent, item: PaletteItem) => {
-  startDrag(event, {
-    id: `${item.id}-${Date.now()}`,
-    width: 80,
-    height: 80,
-    data: item,
-  }, false); // fromContainer = false car vient de la palette
+  startDrag(
+    event,
+    {
+      id: `${item.id}-${Date.now()}`,
+      width: 80,
+      height: 80,
+      data: item,
+    },
+    false
+  ); // fromContainer = false car vient de la palette
 };
 
 const onDragFromCanvas = (event: DragEvent, item: PlacedItem) => {
-  startDrag(event, {
-    id: item.id,
-    width: 80,
-    height: 80,
-    data: item,
-  }, true); // fromContainer = true car déjà sur le canvas
+  startDrag(
+    event,
+    {
+      id: item.id,
+      width: 80,
+      height: 80,
+      data: item,
+    },
+    true
+  ); // fromContainer = true car déjà sur le canvas
 };
 
 const onCanvasDragOver = (event: DragEvent) => {
@@ -90,15 +128,15 @@ const onCanvasDragOver = (event: DragEvent) => {
 
 const onDropToCanvas = (event: DragEvent) => {
   event.preventDefault();
-  
+
   if (!dragState.value.item || !dragState.value.hoverPosition) {
     endDrag();
     return;
   }
-  
+
   if (dragState.value.fromContainer) {
     // Déplacer un item existant
-    const item = placedItems.value.find(i => i.id === dragState.value.item!.id);
+    const item = placedItems.value.find((i) => i.id === dragState.value.item!.id);
     if (item) {
       item.x = dragState.value.hoverPosition.x;
       item.y = dragState.value.hoverPosition.y;
@@ -116,12 +154,12 @@ const onDropToCanvas = (event: DragEvent) => {
       label: paletteData.label,
     });
   }
-  
+
   endDrag();
 };
 
 const removeItem = (id: string) => {
-  placedItems.value = placedItems.value.filter(item => item.id !== id);
+  placedItems.value = placedItems.value.filter((item) => item.id !== id);
 };
 
 const clearCanvas = () => {
@@ -137,7 +175,7 @@ const selectedItem = ref<string | null>(null);
     <aside class="w-64 bg-white border-r p-4 space-y-4">
       <div>
         <h3 class="font-bold text-lg mb-4">Shape Palette</h3>
-        
+
         <div class="space-y-2">
           <div
             v-for="item in palette"
@@ -157,22 +195,22 @@ const selectedItem = ref<string | null>(null);
           </div>
         </div>
       </div>
-      
+
       <div class="pt-4 border-t">
         <h4 class="font-semibold text-sm mb-3">Canvas Controls</h4>
-        
+
         <button
           @click="clearCanvas"
           class="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition text-sm"
         >
           🗑️ Clear Canvas
         </button>
-        
+
         <div class="mt-4 text-xs text-slate-600">
           <p class="font-semibold mb-1">Items: {{ placedItems.length }}</p>
         </div>
       </div>
-      
+
       <div class="pt-4 border-t text-xs text-slate-500">
         <p class="font-semibold mb-2">💡 How to use:</p>
         <ul class="list-disc list-inside space-y-1">
@@ -192,24 +230,24 @@ const selectedItem = ref<string | null>(null);
           Drag shapes from the palette to place them on the canvas
         </div>
       </div>
-      
-      <div 
+
+      <div
         ref="canvas"
         class="relative w-full h-[700px] bg-white rounded-lg shadow-lg border-2 border-slate-200 overflow-hidden"
         @dragover="onCanvasDragOver"
         @drop="onDropToCanvas"
       >
         <!-- Grid pattern -->
-        <div 
+        <div
           class="absolute inset-0 pointer-events-none opacity-10"
           style="
-            background-image: 
-              linear-gradient(rgba(0,0,0,.1) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(0,0,0,.1) 1px, transparent 1px);
+            background-image:
+              linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
             background-size: 40px 40px;
           "
         ></div>
-        
+
         <!-- Placed items -->
         <div
           v-for="item in placedItems"
@@ -226,7 +264,9 @@ const selectedItem = ref<string | null>(null);
             'flex items-center justify-center text-4xl',
             'hover:shadow-lg hover:scale-110',
             item.color,
-            dragState.isDragging && dragState.item?.id === item.id ? 'opacity-40 scale-95' : 'opacity-100',
+            dragState.isDragging && dragState.item?.id === item.id
+              ? 'opacity-40 scale-95'
+              : 'opacity-100',
             selectedItem === item.id ? 'ring-4 ring-blue-400' : '',
           ]"
           draggable="true"
@@ -238,7 +278,7 @@ const selectedItem = ref<string | null>(null);
         >
           {{ item.emoji }}
         </div>
-        
+
         <!-- Hover preview -->
         <div
           v-if="dragState.isDragging && dragState.hoverPosition && dragState.item"
@@ -253,7 +293,7 @@ const selectedItem = ref<string | null>(null);
         >
           {{ dragState.item.data?.emoji }}
         </div>
-        
+
         <!-- Empty state -->
         <div
           v-if="placedItems.length === 0 && !dragState.isDragging"
