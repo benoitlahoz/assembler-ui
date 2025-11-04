@@ -41,8 +41,9 @@ const tasks = ref<Task[]>([
 ]);
 
 const { dragState, startDrag, endDrag } = useDragDrop({
-  unitSize: 60, // Hauteur approximative d'une tâche
   gap: 8,
+  // Mode adaptatif : unitSize non défini
+  // Les cartes peuvent avoir différentes tailles
 });
 
 const onDragStart = (event: DragEvent, task: Task) => {

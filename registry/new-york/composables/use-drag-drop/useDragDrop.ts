@@ -9,6 +9,7 @@
  * @demo KanbanDemo
  * @demo PaletteCanvasDemo
  * @demo FreeLayoutDemo
+ * @demo AdaptiveModeDemo
  */
 
 import { ref, computed, type Ref } from 'vue';
@@ -55,8 +56,11 @@ export interface DragDropState<T = any> {
 }
 
 export interface UseDragDropOptions {
-  /** Taille de l'unité de base (ex: taille d'une cellule en pixels) */
-  unitSize: number;
+  /**
+   * Taille de l'unité de base (ex: taille d'une cellule en pixels).
+   * Si non fourni, utilise les dimensions de l'item draggé (mode adaptatif)
+   */
+  unitSize?: number;
   /** Espacement entre les unités (en pixels) */
   gap?: number;
   /** Fonction de validation de placement */
@@ -139,8 +143,16 @@ export function useDragDrop<T = any>(options: UseDragDropOptions): UseDragDropRe
   const getVirtualBounds = (clientX: number, clientY: number): DragDropBounds | null => {
     if (!dragState.value.item) return null;
 
-    const itemWidth = dragState.value.item.width * (unitSize + gap) - gap;
-    const itemHeight = dragState.value.item.height * (unitSize + gap) - gap;
+    // Mode adaptatif : si unitSize n'est pas fourni, utilise les dimensions de l'item
+    // Mode grille : si unitSize est fourni, calcule en fonction des unités
+    const itemWidth =
+      unitSize !== undefined
+        ? dragState.value.item.width * (unitSize + gap) - gap
+        : dragState.value.item.width; // Utilise width directement comme pixels
+    const itemHeight =
+      unitSize !== undefined
+        ? dragState.value.item.height * (unitSize + gap) - gap
+        : dragState.value.item.height; // Utilise height directement comme pixels
 
     // Utiliser l'offset du clic ou centrer par défaut
     const offsetX = dragOffset.value?.x ?? itemWidth / 2;

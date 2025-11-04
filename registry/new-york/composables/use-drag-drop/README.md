@@ -9,6 +9,7 @@ Composable réutilisable pour gérer le drag and drop avec calcul d'intersection
 🔧 **Validation personnalisable** : Fonction de validation de placement optionnelle  
 📦 **Réutilisable** : Fonctionne avec n'importe quel système de grille ou disposition  
 🎨 **Agnostique du framework** : Logique pure, pas de dépendances sur la structure DOM  
+⚡ **Mode adaptatif** : Fonctionne avec ou sans `unitSize` pour une flexibilité maximale  
 
 ## Installation
 
@@ -20,6 +21,8 @@ npx shadcn-vue@latest add use-drag-drop
 
 ## Utilisation basique
 
+### Mode grille (avec unitSize)
+
 ```typescript
 import { useDragDrop } from '@/composables/use-drag-drop';
 
@@ -27,13 +30,24 @@ const { dragState, startDrag, handleDragOver, endDrag } = useDragDrop({
   unitSize: 80,  // Taille d'une unité en pixels
   gap: 8,        // Espacement entre les unités
 });
+```
 
-// Dans le template
-<div
-  @dragstart="startDrag($event, item, true)"
-  @dragover="handleDragOver($event, containerBounds, getPositionFn)"
-  @dragend="endDrag"
->
+### Mode adaptatif (sans unitSize)
+
+```typescript
+import { useDragDrop } from '@/composables/use-drag-drop';
+
+// En mode adaptatif, width et height sont en pixels directement
+const { dragState, startDrag, handleDragOver, endDrag } = useDragDrop({
+  gap: 0, // Optionnel
+});
+
+// Les dimensions sont maintenant en pixels
+startDrag(event, {
+  id: 'item-1',
+  width: 250,  // 250 pixels
+  height: 150, // 150 pixels
+}, true);
 ```
 
 ## API
@@ -44,8 +58,11 @@ const { dragState, startDrag, handleDragOver, endDrag } = useDragDrop({
 
 ```typescript
 interface UseDragDropOptions {
-  /** Taille de l'unité de base (ex: taille d'une cellule en pixels) */
-  unitSize: number;
+  /** 
+   * Taille de l'unité de base (ex: taille d'une cellule en pixels).
+   * Si non fourni, utilise les dimensions de l'item draggé (mode adaptatif)
+   */
+  unitSize?: number;
   /** Espacement entre les unités (en pixels) */
   gap?: number;
   /** Fonction de validation de placement */
@@ -252,8 +269,58 @@ La fonction `validatePlacement` permet d'ajouter votre logique de validation per
 
 ## Exemples d'utilisation
 
-- ✅ Grilles de contrôles drag & drop
-- ✅ Tableaux de bord personnalisables
-- ✅ Planificateurs visuels
-- ✅ Éditeurs de mise en page
-- ✅ Systèmes de gestion de tâches (Kanban, etc.)
+- ✅ Grilles de contrôles drag & drop (mode grille)
+- ✅ Tableaux de bord personnalisables (mode grille)
+- ✅ Planificateurs visuels (mode grille)
+- ✅ Éditeurs de mise en page (mode grille)
+- ✅ Systèmes de gestion de tâches Kanban (mode adaptatif)
+- ✅ Canvas libre style Figma (mode adaptatif)
+- ✅ Listes réorganisables (mode adaptatif)
+
+## Modes de fonctionnement
+
+### Mode Grille (unitSize défini)
+
+Idéal pour les layouts structurés avec des cellules de taille fixe.
+
+```typescript
+// Mode grille : les dimensions sont en unités
+const { dragState, startDrag, endDrag } = useDragDrop({
+  unitSize: 80, // Chaque unité = 80px
+  gap: 8,
+});
+
+startDrag(event, {
+  id: 'widget-1',
+  width: 2,  // 2 unités = 2 × (80 + 8) - 8 = 168px
+  height: 3, // 3 unités = 3 × (80 + 8) - 8 = 256px
+}, true);
+```
+
+**Cas d'usage** :
+- Grilles de dashboard
+- Systèmes de contrôles
+- Planificateurs horaires avec slots fixes
+
+### Mode Adaptatif (unitSize non défini)
+
+Idéal pour les layouts libres où chaque élément a sa propre taille.
+
+```typescript
+// Mode adaptatif : les dimensions sont en pixels
+const { dragState, startDrag, endDrag } = useDragDrop({
+  gap: 0, // Optionnel
+});
+
+startDrag(event, {
+  id: 'card-1',
+  width: 250,  // 250 pixels directement
+  height: 150, // 150 pixels directement
+}, true);
+```
+
+**Cas d'usage** :
+- Canvas libres (Figma, Canva)
+- Notes post-it
+- Listes de fichiers
+- Cartes Kanban de tailles variables

@@ -57,8 +57,9 @@ const widgets = ref<Widget[]>([
 const selectedWidget = ref<string | null>(null);
 
 const { dragState, startDrag, handleDragOver, endDrag, getVirtualBounds } = useDragDrop({
-  unitSize: 1, // Pixel par pixel pour un positionnement libre
   gap: 0,
+  // Mode adaptatif : unitSize non défini
+  // width et height seront en pixels directement
 });
 
 const onDragStart = (event: DragEvent, widget: Widget) => {
