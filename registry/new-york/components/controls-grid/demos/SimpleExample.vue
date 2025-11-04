@@ -1,63 +1,121 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted, shallowRef, h } from 'vue';
 import { ControlsGrid } from '..';
+import { useControlRegistry } from '~~/registry/new-york/composables/use-control-registry';
+import { ControlButton } from '~~/registry/new-york/components/control-button';
+import type { ControlDefinition } from '~~/registry/new-york/composables/use-control-registry';
 
-interface GridItem {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  component?: any;
-  color?: string;
-}
+// Initialiser le registre de contrôles
+const { registerControls, getAllControls, createControlInstance } = useControlRegistry();
 
 // Référence à la grille
 const grid = ref<InstanceType<typeof ControlsGrid> | null>(null);
 
 // Items actuellement dans la grille
-const gridItems = ref<GridItem[]>([]);
+const gridItems = ref<any[]>([]);
 
-// Composants disponibles pour le drag and drop
-const availableComponents = [
-  { id: 'btn-1', width: 1, height: 1, label: 'Bouton 1x1', color: '#3b82f6' },
-  { id: 'btn-2', width: 2, height: 1, label: 'Bouton 2x1', color: '#8b5cf6' },
-  { id: 'slider-1', width: 2, height: 1, label: 'Slider 2x1', color: '#ec4899' },
-  { id: 'knob-1', width: 1, height: 1, label: 'Knob 1x1', color: '#f59e0b' },
-  { id: 'meter-1', width: 1, height: 2, label: 'Meter 1x2', color: '#10b981' },
-  { id: 'pad-1', width: 2, height: 2, label: 'Pad 2x2', color: '#ef4444' },
-];
-
-// Compteur pour générer des IDs uniques
-let itemCounter = 0;
-
-// Créer un nouvel item à partir d'un template
-const createItemFromTemplate = (template: (typeof availableComponents)[0]) => {
+// Créer un composant wrapper pour ControlButton avec icône
+const createButtonComponent = (icon: string, label?: string) => {
   return {
-    id: `${template.id}-${itemCounter++}`,
-    width: template.width,
-    height: template.height,
-    component: null, // On pourrait passer un vrai composant ici
-    label: template.label,
-    color: template.color,
+    name: 'GridControlButton',
+    props: ['color', 'variant', 'shape'],
+    setup(props: any) {
+      return () =>
+        h(
+          ControlButton,
+          {
+            color: props.color,
+            variant: props.variant || 'default',
+            shape: props.shape || 'square',
+          },
+          () =>
+            h('span', { class: label ? 'text-xs font-bold' : 'text-lg font-bold' }, label || icon)
+        );
+    },
   };
 };
 
+// Définir les contrôles
+const controlDefinitions: ControlDefinition[] = [
+  {
+    id: 'button-1x1',
+    name: 'Bouton 1x1',
+    component: shallowRef(createButtonComponent('●')),
+    defaultSize: { width: 1, height: 1 },
+    defaultProps: { color: '#3b82f6', variant: 'default', shape: 'square' },
+    category: 'buttons',
+    color: '#3b82f6',
+  },
+  {
+    id: 'button-2x1',
+    name: 'Bouton 2x1',
+    component: shallowRef(createButtonComponent('▶', 'WIDE')),
+    defaultSize: { width: 2, height: 1 },
+    defaultProps: { color: '#8b5cf6', variant: 'default', shape: 'square' },
+    category: 'buttons',
+    color: '#8b5cf6',
+  },
+  {
+    id: 'slider',
+    name: 'Slider 2x1',
+    component: shallowRef(createButtonComponent('⬌')),
+    defaultSize: { width: 2, height: 1 },
+    defaultProps: { color: '#ec4899', variant: 'outline', shape: 'square' },
+    category: 'controls',
+    color: '#ec4899',
+  },
+  {
+    id: 'knob',
+    name: 'Knob 1x1',
+    component: shallowRef(createButtonComponent('◉')),
+    defaultSize: { width: 1, height: 1 },
+    defaultProps: { color: '#f59e0b', variant: 'default', shape: 'circle' },
+    category: 'controls',
+    color: '#f59e0b',
+  },
+  {
+    id: 'meter',
+    name: 'Meter 1x2',
+    component: shallowRef(createButtonComponent('▮')),
+    defaultSize: { width: 1, height: 2 },
+    defaultProps: { color: '#10b981', variant: 'ghost', shape: 'square' },
+    category: 'display',
+    color: '#10b981',
+  },
+  {
+    id: 'pad',
+    name: 'Pad 2x2',
+    component: shallowRef(createButtonComponent('✦')),
+    defaultSize: { width: 2, height: 2 },
+    defaultProps: { color: '#ef4444', variant: 'solid', shape: 'square' },
+    category: 'controls',
+    color: '#ef4444',
+  },
+];
+
+// Contrôles disponibles
+const availableControls = ref<ControlDefinition[]>([]);
+
+onMounted(() => {
+  registerControls(controlDefinitions);
+  availableControls.value = getAllControls();
+});
+
 // Gestion du drag depuis la palette
-const handlePaletteDragStart = (event: DragEvent, template: (typeof availableComponents)[0]) => {
-  const item = createItemFromTemplate(template);
-  if (event.dataTransfer) {
+const handlePaletteDragStart = (event: DragEvent, control: ControlDefinition) => {
+  const instance = createControlInstance(control.id);
+  if (instance && event.dataTransfer) {
     event.dataTransfer.effectAllowed = 'copy';
-    event.dataTransfer.setData('application/json', JSON.stringify(item));
+    event.dataTransfer.setData('application/json', JSON.stringify(instance));
   }
 };
 
 // Handlers d'événements
-const handleItemPlaced = (item: GridItem) => {
+const handleItemPlaced = (item: any) => {
   console.log('Item placé:', item);
 };
 
-const handleItemMoved = (item: GridItem) => {
+const handleItemMoved = (item: any) => {
   console.log('Item déplacé:', item);
 };
 
@@ -71,10 +129,13 @@ const clearGrid = () => {
 };
 
 const addRandomItem = () => {
-  const template = availableComponents[Math.floor(Math.random() * availableComponents.length)];
-  if (template) {
-    const item = createItemFromTemplate(template);
-    grid.value?.addItem(item);
+  const controls = getAllControls();
+  const randomControl = controls[Math.floor(Math.random() * controls.length)];
+  if (randomControl) {
+    const instance = createControlInstance(randomControl.id);
+    if (instance && instance.id) {
+      grid.value?.addItem(instance as any);
+    }
   }
 };
 
@@ -103,15 +164,17 @@ const exportConfig = () => {
 
         <div class="palette-items">
           <div
-            v-for="component in availableComponents"
-            :key="component.id"
+            v-for="control in availableControls"
+            :key="control.id"
             class="palette-item"
             :draggable="true"
-            :style="{ backgroundColor: component.color }"
-            @dragstart="handlePaletteDragStart($event, component)"
+            :style="{ backgroundColor: control.color }"
+            @dragstart="handlePaletteDragStart($event, control)"
           >
-            <span class="palette-item-label">{{ component.label }}</span>
-            <span class="palette-item-size">{{ component.width }}×{{ component.height }}</span>
+            <span class="palette-item-label">{{ control.name }}</span>
+            <span class="palette-item-size"
+              >{{ control.defaultSize?.width }}×{{ control.defaultSize?.height }}</span
+            >
           </div>
         </div>
 

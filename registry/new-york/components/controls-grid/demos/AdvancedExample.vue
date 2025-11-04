@@ -1,86 +1,116 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted, onUnmounted, shallowRef, h, computed } from 'vue';
 import { ControlsGrid } from '..';
-import { useControlsGrid, useComponentPalette } from '../composables';
-import type { GridItemTemplate } from '../types';
+import { useControlRegistry } from '~~/registry/new-york/composables/use-control-registry';
+import { ControlButton } from '~~/registry/new-york/components/control-button';
+import type { ControlDefinition } from '~~/registry/new-york/composables/use-control-registry';
 
-// Templates de composants
-const templates: GridItemTemplate[] = [
+// Initialiser le registre de contrôles
+const { registerControls, getAllControls, createControlInstance } = useControlRegistry();
+
+// Créer un composant wrapper pour ControlButton avec icône
+const createButtonComponent = (icon: string) => {
+  return {
+    name: 'GridControlButton',
+    props: ['color', 'variant', 'shape'],
+    setup(props: any) {
+      return () =>
+        h(
+          ControlButton,
+          {
+            color: props.color,
+            variant: props.variant || 'default',
+            shape: props.shape || 'square',
+          },
+          () => h('span', { class: 'text-lg font-bold' }, icon)
+        );
+    },
+  };
+};
+
+// Définir les contrôles
+const controlDefinitions: ControlDefinition[] = [
   {
     id: 'button',
-    width: 1,
-    height: 1,
-    label: '🎛️ Button',
+    name: '🎛️ Button',
+    component: shallowRef(createButtonComponent('●')),
+    defaultSize: { width: 1, height: 1 },
+    defaultProps: { color: '#3b82f6', variant: 'default', shape: 'square' },
+    category: 'basic',
     color: '#3b82f6',
   },
   {
     id: 'fader',
-    width: 1,
-    height: 2,
-    label: '🎚️ Fader',
+    name: '🎚️ Fader',
+    component: shallowRef(createButtonComponent('▮')),
+    defaultSize: { width: 1, height: 2 },
+    defaultProps: { color: '#8b5cf6', variant: 'default', shape: 'square' },
+    category: 'basic',
     color: '#8b5cf6',
   },
   {
     id: 'knob',
-    width: 1,
-    height: 1,
-    label: '🎛️ Knob',
+    name: '🎛️ Knob',
+    component: shallowRef(createButtonComponent('◉')),
+    defaultSize: { width: 1, height: 1 },
+    defaultProps: { color: '#ec4899', variant: 'default', shape: 'circle' },
+    category: 'basic',
     color: '#ec4899',
   },
   {
     id: 'slider',
-    width: 2,
-    height: 1,
-    label: '⬌ Slider',
+    name: '⬌ Slider',
+    component: shallowRef(createButtonComponent('⬌')),
+    defaultSize: { width: 2, height: 1 },
+    defaultProps: { color: '#f59e0b', variant: 'outline', shape: 'square' },
+    category: 'basic',
     color: '#f59e0b',
   },
   {
     id: 'xy-pad',
-    width: 2,
-    height: 2,
-    label: '⊞ XY Pad',
+    name: '⊞ XY Pad',
+    component: shallowRef(createButtonComponent('⊞')),
+    defaultSize: { width: 2, height: 2 },
+    defaultProps: { color: '#ef4444', variant: 'solid', shape: 'square' },
+    category: 'advanced',
     color: '#ef4444',
   },
   {
     id: 'meter',
-    width: 1,
-    height: 2,
-    label: '📊 Meter',
+    name: '📊 Meter',
+    component: shallowRef(createButtonComponent('📊')),
+    defaultSize: { width: 1, height: 2 },
+    defaultProps: { color: '#10b981', variant: 'ghost', shape: 'square' },
+    category: 'display',
     color: '#10b981',
   },
   {
     id: 'display',
-    width: 2,
-    height: 1,
-    label: '📺 Display',
+    name: '📺 Display',
+    component: shallowRef(createButtonComponent('📺')),
+    defaultSize: { width: 2, height: 1 },
+    defaultProps: { color: '#06b6d4', variant: 'outline', shape: 'square' },
+    category: 'display',
     color: '#06b6d4',
   },
   {
     id: 'keyboard',
-    width: 4,
-    height: 2,
-    label: '🎹 Keyboard',
+    name: '🎹 Keyboard',
+    component: shallowRef(createButtonComponent('🎹')),
+    defaultSize: { width: 4, height: 2 },
+    defaultProps: { color: '#6366f1', variant: 'default', shape: 'square' },
+    category: 'advanced',
     color: '#6366f1',
   },
 ];
 
-// Utilisation des composables
+// État du composant
 const grid = ref<InstanceType<typeof ControlsGrid> | null>(null);
-const {
-  items,
-  canUndo,
-  canRedo,
-  totalArea,
-  undo,
-  redo,
-  clearItems,
-  duplicateItem,
-  selectItem,
-  selectedItemId,
-  saveToLocalStorage,
-  loadFromLocalStorage,
-} = useControlsGrid();
-const { availableTemplates, createItemFromTemplate } = useComponentPalette(templates);
+const items = ref<any[]>([]);
+const availableControls = ref<ControlDefinition[]>([]);
+const selectedItemId = ref<string | null>(null);
+const historyIndex = ref(-1);
+const history = ref<any[][]>([]);
 
 // État local
 const showGrid = ref(true);
@@ -88,18 +118,78 @@ const cellSize = ref(100);
 const gap = ref(12);
 const autoSave = ref(false);
 
+// Computed
+const canUndo = computed(() => historyIndex.value > 0);
+const canRedo = computed(() => historyIndex.value < history.value.length - 1);
+const totalArea = computed(() =>
+  items.value.reduce((sum, item) => sum + item.width * item.height, 0)
+);
+
+// Fonctions d'historique
+const saveToHistory = () => {
+  history.value = history.value.slice(0, historyIndex.value + 1);
+  history.value.push(JSON.parse(JSON.stringify(items.value)));
+  historyIndex.value = history.value.length - 1;
+};
+
+const undo = () => {
+  if (canUndo.value) {
+    historyIndex.value--;
+    items.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]));
+  }
+};
+
+const redo = () => {
+  if (canRedo.value) {
+    historyIndex.value++;
+    items.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]));
+  }
+};
+
+const clearItems = () => {
+  items.value = [];
+  saveToHistory();
+};
+
+const duplicateItem = (id: string) => {
+  const item = items.value.find((i) => i.id === id);
+  if (item) {
+    const newItem = { ...item, id: `${item.controlId}-${Date.now()}` };
+    grid.value?.addItem(newItem as any);
+  }
+};
+
+const selectItem = (id: string | null) => {
+  selectedItemId.value = id;
+};
+
+const saveToLocalStorage = () => {
+  localStorage.setItem('controls-grid-items', JSON.stringify(items.value));
+};
+
+const loadFromLocalStorage = () => {
+  const saved = localStorage.getItem('controls-grid-items');
+  if (saved) {
+    items.value = JSON.parse(saved);
+    saveToHistory();
+    return true;
+  }
+  return false;
+};
+
 // Gestion du drag depuis la palette
-const handlePaletteDragStart = (event: DragEvent, template: GridItemTemplate) => {
-  const item = createItemFromTemplate(template);
-  if (event.dataTransfer) {
+const handlePaletteDragStart = (event: DragEvent, control: ControlDefinition) => {
+  const instance = createControlInstance(control.id);
+  if (instance && event.dataTransfer) {
     event.dataTransfer.effectAllowed = 'copy';
-    event.dataTransfer.setData('application/json', JSON.stringify(item));
+    event.dataTransfer.setData('application/json', JSON.stringify(instance));
   }
 };
 
 // Handlers
 const handleItemPlaced = (item: any) => {
   console.log('Item placé:', item);
+  saveToHistory();
   if (autoSave.value) {
     saveToLocalStorage();
   }
@@ -107,6 +197,7 @@ const handleItemPlaced = (item: any) => {
 
 const handleItemMoved = (item: any) => {
   console.log('Item déplacé:', item);
+  saveToHistory();
   if (autoSave.value) {
     saveToLocalStorage();
   }
@@ -114,6 +205,7 @@ const handleItemMoved = (item: any) => {
 
 const handleItemRemoved = (id: string) => {
   console.log('Item supprimé:', id);
+  saveToHistory();
   if (autoSave.value) {
     saveToLocalStorage();
   }
@@ -164,16 +256,6 @@ const handleExport = () => {
   URL.revokeObjectURL(url);
 };
 
-// Auto-save
-watch(
-  () => autoSave.value,
-  (enabled) => {
-    if (enabled) {
-      saveToLocalStorage();
-    }
-  }
-);
-
 // Raccourcis clavier
 const handleKeyDown = (event: KeyboardEvent) => {
   // Ctrl/Cmd + Z : Undo
@@ -200,16 +282,22 @@ const handleKeyDown = (event: KeyboardEvent) => {
   }
 };
 
-// Lifecycle
-import { onMounted, onUnmounted } from 'vue';
-
-onMounted(() => {
-  window.addEventListener('keydown', handleKeyDown);
-
-  // Charger automatiquement la dernière config
-  if (autoSave.value) {
-    loadFromLocalStorage();
+// Auto-save watcher
+watch(
+  () => autoSave.value,
+  (enabled) => {
+    if (enabled) {
+      saveToLocalStorage();
+    }
   }
+);
+
+// Lifecycle
+onMounted(() => {
+  registerControls(controlDefinitions);
+  availableControls.value = getAllControls();
+  saveToHistory();
+  window.addEventListener('keydown', handleKeyDown);
 });
 
 onUnmounted(() => {
@@ -412,15 +500,17 @@ onUnmounted(() => {
 
         <div class="palette-grid">
           <div
-            v-for="template in availableTemplates"
-            :key="template.id"
+            v-for="control in availableControls"
+            :key="control.id"
             class="palette-item"
             :draggable="true"
-            :style="{ backgroundColor: template.color }"
-            @dragstart="handlePaletteDragStart($event, template)"
+            :style="{ backgroundColor: control.color }"
+            @dragstart="handlePaletteDragStart($event, control)"
           >
-            <span class="palette-label">{{ template.label }}</span>
-            <span class="palette-size">{{ template.width }}×{{ template.height }}</span>
+            <span class="palette-label">{{ control.name }}</span>
+            <span class="palette-size"
+              >{{ control.defaultSize?.width }}×{{ control.defaultSize?.height }}</span
+            >
           </div>
         </div>
 

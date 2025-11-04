@@ -1,132 +1,144 @@
 <script setup lang="ts">
-import { ref, shallowRef } from 'vue';
+import { ref, onMounted, shallowRef, h } from 'vue';
 import { ControlButton } from '~~/registry/new-york/components/control-button';
 import { ControlsGrid } from '~~/registry/new-york/components/controls-grid';
+import { useControlRegistry } from '~~/registry/new-york/composables/use-control-registry';
+import type { ControlDefinition } from '~~/registry/new-york/composables/use-control-registry';
 
-// Composant wrapper pour le ControlButton dans la grille
-const GridControlButton = {
-  props: ['id', 'width', 'height', 'color', 'variant', 'shape', 'icon', 'label'],
-  setup(props: any) {
-    const isActive = ref(false);
+// Initialiser le registre de contrôles
+const { registerControls, getAllControls, createControlInstance } = useControlRegistry();
 
-    const toggle = () => {
-      isActive.value = !isActive.value;
-      console.log(
-        `Button ${props.label || props.id} ${isActive.value ? 'activated' : 'deactivated'}`
-      );
-    };
+// Créer un composant wrapper pour ControlButton avec icône
+const createButtonComponent = (icon: string, label?: string) => {
+  return {
+    name: 'GridControlButton',
+    props: ['color', 'variant', 'shape'],
+    setup(props: any) {
+      const isActive = ref(false);
 
-    return { isActive, toggle };
-  },
-  template: `
-    <ControlButton 
-      :color="color" 
-      :variant="variant || 'default'" 
-      :shape="shape || 'square'"
-      :class="{ 'ring-2 ring-offset-2': isActive }"
-      @click="toggle"
-    >
-      <span v-if="icon" class="text-lg">{{ icon }}</span>
-      <span v-else-if="label" class="text-xs font-bold">{{ label }}</span>
-    </ControlButton>
-  `,
+      const toggle = () => {
+        isActive.value = !isActive.value;
+        console.log(`Button ${isActive.value ? 'activated' : 'deactivated'}`);
+      };
+
+      return () =>
+        h(
+          ControlButton,
+          {
+            color: props.color,
+            variant: props.variant || 'default',
+            shape: props.shape || 'square',
+            class: isActive.value ? 'ring-2 ring-offset-2' : '',
+            onClick: toggle,
+          },
+          () => h('span', { class: label ? 'text-xs font-bold' : 'text-lg' }, label || icon)
+        );
+    },
+  };
 };
 
-// Items prédéfinis pour la grille
-const gridItems = ref([
+// Définir les contrôles
+const controlDefinitions: ControlDefinition[] = [
   {
-    id: 'btn-1',
-    x: 0,
-    y: 0,
-    width: 1,
-    height: 1,
-    component: shallowRef(GridControlButton),
+    id: 'button-play',
+    name: 'Play',
+    component: shallowRef(createButtonComponent('▶')),
+    defaultSize: { width: 1, height: 1 },
+    defaultProps: { color: '#3b82f6', variant: 'default', shape: 'square' },
+    category: 'buttons',
     color: '#3b82f6',
-    variant: 'default',
-    shape: 'square',
-    icon: '▶',
   },
   {
-    id: 'btn-2',
-    x: 1,
-    y: 0,
-    width: 1,
-    height: 1,
-    component: shallowRef(GridControlButton),
+    id: 'button-stop',
+    name: 'Stop',
+    component: shallowRef(createButtonComponent('■')),
+    defaultSize: { width: 1, height: 1 },
+    defaultProps: { color: '#ef4444', variant: 'default', shape: 'square' },
+    category: 'buttons',
     color: '#ef4444',
-    variant: 'default',
-    shape: 'square',
-    icon: '■',
   },
   {
-    id: 'btn-3',
-    x: 2,
-    y: 0,
-    width: 1,
-    height: 1,
-    component: shallowRef(GridControlButton),
+    id: 'button-circle',
+    name: 'Circle',
+    component: shallowRef(createButtonComponent('●')),
+    defaultSize: { width: 1, height: 1 },
+    defaultProps: { color: '#8b5cf6', variant: 'outline', shape: 'circle' },
+    category: 'buttons',
     color: '#8b5cf6',
-    variant: 'outline',
-    shape: 'circle',
-    icon: '●',
   },
   {
-    id: 'btn-4',
-    x: 0,
-    y: 1,
-    width: 2,
-    height: 1,
-    component: shallowRef(GridControlButton),
+    id: 'button-wide',
+    name: 'Wide',
+    component: shallowRef(createButtonComponent('', 'WIDE')),
+    defaultSize: { width: 2, height: 1 },
+    defaultProps: { color: '#10b981', variant: 'default', shape: 'square' },
+    category: 'buttons',
     color: '#10b981',
-    variant: 'default',
-    shape: 'square',
-    label: 'WIDE',
   },
-]);
-
-// Palette de boutons à ajouter
-const buttonPalette = ref([
   {
-    id: 'new-square',
-    width: 1,
-    height: 1,
-    component: shallowRef(GridControlButton),
+    id: 'button-star',
+    name: 'Star',
+    component: shallowRef(createButtonComponent('★')),
+    defaultSize: { width: 1, height: 1 },
+    defaultProps: { color: '#f59e0b', variant: 'default', shape: 'square' },
+    category: 'special',
     color: '#f59e0b',
-    variant: 'default',
-    shape: 'square',
-    icon: '★',
   },
   {
-    id: 'new-circle',
-    width: 1,
-    height: 1,
-    component: shallowRef(GridControlButton),
+    id: 'button-heart',
+    name: 'Heart',
+    component: shallowRef(createButtonComponent('♥')),
+    defaultSize: { width: 1, height: 1 },
+    defaultProps: { color: '#ec4899', variant: 'outline', shape: 'circle' },
+    category: 'special',
     color: '#ec4899',
-    variant: 'outline',
-    shape: 'circle',
-    icon: '♥',
   },
   {
-    id: 'new-tall',
-    width: 1,
-    height: 2,
-    component: shallowRef(GridControlButton),
+    id: 'button-tall',
+    name: 'Tall',
+    component: shallowRef(createButtonComponent('', 'TALL')),
+    defaultSize: { width: 1, height: 2 },
+    defaultProps: { color: '#06b6d4', variant: 'ghost', shape: 'square' },
+    category: 'special',
     color: '#06b6d4',
-    variant: 'ghost',
-    shape: 'square',
-    label: 'TALL',
   },
   {
-    id: 'new-big',
-    width: 2,
-    height: 2,
-    component: shallowRef(GridControlButton),
+    id: 'button-big',
+    name: 'Big',
+    component: shallowRef(createButtonComponent('✦')),
+    defaultSize: { width: 2, height: 2 },
+    defaultProps: { color: '#a855f7', variant: 'solid', shape: 'square' },
+    category: 'special',
     color: '#a855f7',
-    variant: 'solid',
-    shape: 'square',
-    icon: '✦',
   },
-]);
+];
+
+// État
+const gridItems = ref<any[]>([]);
+const availableControls = ref<ControlDefinition[]>([]);
+
+onMounted(() => {
+  registerControls(controlDefinitions);
+  availableControls.value = getAllControls();
+
+  // Ajouter les items initiaux
+  const initialControls = ['button-play', 'button-stop', 'button-circle', 'button-wide'];
+  initialControls.forEach((controlId, index) => {
+    const instance = createControlInstance(controlId, { x: index % 3, y: Math.floor(index / 3) });
+    if (instance) {
+      gridItems.value.push(instance);
+    }
+  });
+});
+
+// Gestion du drag depuis la palette
+const handlePaletteDragStart = (event: DragEvent, control: ControlDefinition) => {
+  const instance = createControlInstance(control.id);
+  if (instance && event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'copy';
+    event.dataTransfer.setData('application/json', JSON.stringify(instance));
+  }
+};
 
 const handleItemPlaced = (item: any) => {
   console.log('Item placed:', item);
@@ -154,30 +166,22 @@ const handleItemRemoved = (id: string) => {
     <!-- Palette de boutons à glisser -->
     <div class="space-y-2">
       <h4 class="text-sm font-medium">Palette de contrôles</h4>
-      <div class="flex gap-3 p-4 bg-muted/30 rounded-lg border border-border">
+      <div class="flex gap-3 p-4 bg-muted/30 rounded-lg border border-border flex-wrap">
         <div
-          v-for="btn in buttonPalette"
-          :key="btn.id"
+          v-for="control in availableControls"
+          :key="control.id"
           class="control-palette-item cursor-grab active:cursor-grabbing"
           :draggable="true"
           :style="{
-            width: `${btn.width * 80 + (btn.width - 1) * 8}px`,
-            height: `${btn.height * 80 + (btn.height - 1) * 8}px`,
+            width: `${(control.defaultSize?.width || 1) * 80 + ((control.defaultSize?.width || 1) - 1) * 8}px`,
+            height: `${(control.defaultSize?.height || 1) * 80 + ((control.defaultSize?.height || 1) - 1) * 8}px`,
+            backgroundColor: control.color,
           }"
-          @dragstart="
-            (e) => {
-              e.dataTransfer!.effectAllowed = 'copy';
-              e.dataTransfer!.setData(
-                'application/json',
-                JSON.stringify({
-                  ...btn,
-                  id: btn.id + '-' + Date.now(), // ID unique
-                })
-              );
-            }
-          "
+          @dragstart="handlePaletteDragStart($event, control)"
         >
-          <component :is="btn.component" v-bind="btn" class="pointer-events-none" />
+          <div class="w-full h-full flex items-center justify-center text-white font-bold text-xs">
+            {{ control.name }}
+          </div>
         </div>
       </div>
     </div>

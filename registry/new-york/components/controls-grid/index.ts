@@ -7,6 +7,7 @@
  * @demo SimpleExample
  * @demo AdvancedExample
  * @demo ControlRegistryDemo
+ * @demo ComponentRegistration
  */
 
 export { default as ControlsGrid } from './ControlsGrid.vue';
@@ -15,6 +16,7 @@ export { useControlsGrid, useComponentPalette, useGridConfig } from './composabl
 
 export {
   GridUtils,
+  type ComponentToRegister,
   type GridItem,
   type GridPosition,
   type GridDimensions,

@@ -11,67 +11,123 @@ description: ControlsGrid - Composant de grille drag-and-drop
   :::tabs-item{icon="i-lucide-code" label="Code"}
 ```vue
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onMounted, shallowRef, h } from "vue";
 import { ControlsGrid } from "..";
+import { useControlRegistry } from "~~/registry/new-york/composables/use-control-registry";
+import { ControlButton } from "@/components/ui/control-button";
+import type { ControlDefinition } from "~~/registry/new-york/composables/use-control-registry";
 
-interface GridItem {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  component?: any;
-  color?: string;
-}
+const { registerControls, getAllControls, createControlInstance } =
+  useControlRegistry();
 
 const grid = ref<InstanceType<typeof ControlsGrid> | null>(null);
 
-const gridItems = ref<GridItem[]>([]);
+const gridItems = ref<any[]>([]);
 
-const availableComponents = [
-  { id: "btn-1", width: 1, height: 1, label: "Bouton 1x1", color: "#3b82f6" },
-  { id: "btn-2", width: 2, height: 1, label: "Bouton 2x1", color: "#8b5cf6" },
-  {
-    id: "slider-1",
-    width: 2,
-    height: 1,
-    label: "Slider 2x1",
-    color: "#ec4899",
-  },
-  { id: "knob-1", width: 1, height: 1, label: "Knob 1x1", color: "#f59e0b" },
-  { id: "meter-1", width: 1, height: 2, label: "Meter 1x2", color: "#10b981" },
-  { id: "pad-1", width: 2, height: 2, label: "Pad 2x2", color: "#ef4444" },
-];
-
-let itemCounter = 0;
-
-const createItemFromTemplate = (template: (typeof availableComponents)[0]) => {
+const createButtonComponent = (icon: string, label?: string) => {
   return {
-    id: `${template.id}-${itemCounter++}`,
-    width: template.width,
-    height: template.height,
-    component: null,
-    label: template.label,
-    color: template.color,
+    name: "GridControlButton",
+    props: ["color", "variant", "shape"],
+    setup(props: any) {
+      return () =>
+        h(
+          ControlButton,
+          {
+            color: props.color,
+            variant: props.variant || "default",
+            shape: props.shape || "square",
+          },
+          () =>
+            h(
+              "span",
+              { class: label ? "text-xs font-bold" : "text-lg font-bold" },
+              label || icon,
+            ),
+        );
+    },
   };
 };
 
+const controlDefinitions: ControlDefinition[] = [
+  {
+    id: "button-1x1",
+    name: "Bouton 1x1",
+    component: shallowRef(createButtonComponent("●")),
+    defaultSize: { width: 1, height: 1 },
+    defaultProps: { color: "#3b82f6", variant: "default", shape: "square" },
+    category: "buttons",
+    color: "#3b82f6",
+  },
+  {
+    id: "button-2x1",
+    name: "Bouton 2x1",
+    component: shallowRef(createButtonComponent("▶", "WIDE")),
+    defaultSize: { width: 2, height: 1 },
+    defaultProps: { color: "#8b5cf6", variant: "default", shape: "square" },
+    category: "buttons",
+    color: "#8b5cf6",
+  },
+  {
+    id: "slider",
+    name: "Slider 2x1",
+    component: shallowRef(createButtonComponent("⬌")),
+    defaultSize: { width: 2, height: 1 },
+    defaultProps: { color: "#ec4899", variant: "outline", shape: "square" },
+    category: "controls",
+    color: "#ec4899",
+  },
+  {
+    id: "knob",
+    name: "Knob 1x1",
+    component: shallowRef(createButtonComponent("◉")),
+    defaultSize: { width: 1, height: 1 },
+    defaultProps: { color: "#f59e0b", variant: "default", shape: "circle" },
+    category: "controls",
+    color: "#f59e0b",
+  },
+  {
+    id: "meter",
+    name: "Meter 1x2",
+    component: shallowRef(createButtonComponent("▮")),
+    defaultSize: { width: 1, height: 2 },
+    defaultProps: { color: "#10b981", variant: "ghost", shape: "square" },
+    category: "display",
+    color: "#10b981",
+  },
+  {
+    id: "pad",
+    name: "Pad 2x2",
+    component: shallowRef(createButtonComponent("✦")),
+    defaultSize: { width: 2, height: 2 },
+    defaultProps: { color: "#ef4444", variant: "solid", shape: "square" },
+    category: "controls",
+    color: "#ef4444",
+  },
+];
+
+const availableControls = ref<ControlDefinition[]>([]);
+
+onMounted(() => {
+  registerControls(controlDefinitions);
+  availableControls.value = getAllControls();
+});
+
 const handlePaletteDragStart = (
   event: DragEvent,
-  template: (typeof availableComponents)[0],
+  control: ControlDefinition,
 ) => {
-  const item = createItemFromTemplate(template);
-  if (event.dataTransfer) {
+  const instance = createControlInstance(control.id);
+  if (instance && event.dataTransfer) {
     event.dataTransfer.effectAllowed = "copy";
-    event.dataTransfer.setData("application/json", JSON.stringify(item));
+    event.dataTransfer.setData("application/json", JSON.stringify(instance));
   }
 };
 
-const handleItemPlaced = (item: GridItem) => {
+const handleItemPlaced = (item: any) => {
   console.log("Item placé:", item);
 };
 
-const handleItemMoved = (item: GridItem) => {
+const handleItemMoved = (item: any) => {
   console.log("Item déplacé:", item);
 };
 
@@ -84,11 +140,13 @@ const clearGrid = () => {
 };
 
 const addRandomItem = () => {
-  const template =
-    availableComponents[Math.floor(Math.random() * availableComponents.length)];
-  if (template) {
-    const item = createItemFromTemplate(template);
-    grid.value?.addItem(item);
+  const controls = getAllControls();
+  const randomControl = controls[Math.floor(Math.random() * controls.length)];
+  if (randomControl) {
+    const instance = createControlInstance(randomControl.id);
+    if (instance && instance.id) {
+      grid.value?.addItem(instance as any);
+    }
   }
 };
 
@@ -125,16 +183,18 @@ const exportConfig = () => {
 
         <div class="palette-items">
           <div
-            v-for="component in availableComponents"
-            :key="component.id"
+            v-for="control in availableControls"
+            :key="control.id"
             class="palette-item"
             :draggable="true"
-            :style="{ backgroundColor: component.color }"
-            @dragstart="handlePaletteDragStart($event, component)"
+            :style="{ backgroundColor: control.color }"
+            @dragstart="handlePaletteDragStart($event, control)"
           >
-            <span class="palette-item-label">{{ component.label }}</span>
+            <span class="palette-item-label">{{ control.name }}</span>
             <span class="palette-item-size"
-              >{{ component.width }}×{{ component.height }}</span
+              >{{ control.defaultSize?.width }}×{{
+                control.defaultSize?.height
+              }}</span
             >
           </div>
         </div>
@@ -389,6 +449,7 @@ export {
 
 export {
   GridUtils,
+  type ComponentToRegister,
   type GridItem,
   type GridPosition,
   type GridDimensions,
@@ -403,7 +464,14 @@ export {
 
 ```vue [src/components/ui/controls-grid/ControlsGrid.vue]
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  onMounted,
+  onUnmounted,
+  type Component,
+} from "vue";
 import { useElementSize, useDropZone } from "@vueuse/core";
 import { useMotion } from "@vueuse/motion";
 
@@ -417,6 +485,11 @@ interface GridItem {
   color?: string;
 }
 
+interface ComponentToRegister {
+  name: string;
+  component: Component;
+}
+
 interface Props {
   cellSize?: number;
   gap?: number;
@@ -424,6 +497,7 @@ interface Props {
   items?: GridItem[];
   showGrid?: boolean;
   snapToGrid?: boolean;
+  components?: ComponentToRegister[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -433,6 +507,7 @@ const props = withDefaults(defineProps<Props>(), {
   items: () => [],
   showGrid: true,
   snapToGrid: true,
+  components: () => [],
 });
 
 const emit = defineEmits<{
@@ -448,6 +523,8 @@ const hoverCell = ref<{ x: number; y: number } | null>(null);
 const draggedItem = ref<GridItem | null>(null);
 const draggedFromGrid = ref(false);
 const previewSize = ref<{ width: number; height: number } | null>(null);
+
+const componentRegistry = ref<Map<string, Component>>(new Map());
 
 const { width: gridWidth, height: gridHeight } = useElementSize(gridContainer);
 
@@ -721,9 +798,17 @@ const removeItem = (id: string) => {
   }
 };
 
+const getComponent = (name: string): Component | undefined => {
+  return componentRegistry.value.get(name);
+};
+
 let resizeObserver: ResizeObserver | null = null;
 
 onMounted(() => {
+  props.components.forEach(({ name, component }) => {
+    componentRegistry.value.set(name, component);
+  });
+
   updateGridSize();
 
   if (gridContainer.value) {
@@ -733,6 +818,17 @@ onMounted(() => {
     resizeObserver.observe(gridContainer.value);
   }
 });
+
+watch(
+  () => props.components,
+  (newComponents) => {
+    componentRegistry.value.clear();
+    newComponents.forEach(({ name, component }) => {
+      componentRegistry.value.set(name, component);
+    });
+  },
+  { deep: true },
+);
 
 onUnmounted(() => {
   if (resizeObserver && gridContainer.value) {
@@ -752,11 +848,43 @@ defineExpose({
     }
     return null;
   },
+  addItemByComponent: (
+    componentName: string,
+    width: number = 1,
+    height: number = 1,
+    additionalProps?: Record<string, any>,
+  ) => {
+    const component = getComponent(componentName);
+    if (!component) {
+      console.warn(`Composant "${componentName}" non trouvé dans le registre`);
+      return null;
+    }
+
+    const position = findAvailablePosition(width, height);
+    if (position) {
+      const newItem: GridItem = {
+        id: `${componentName}-${Date.now()}`,
+        x: position.x,
+        y: position.y,
+        width,
+        height,
+        component,
+        ...additionalProps,
+      };
+      placedItems.value.push(newItem);
+      emit("item-placed", newItem);
+      emit("update:items", placedItems.value);
+      return newItem;
+    }
+    return null;
+  },
   removeItem,
   clearGrid: () => {
     placedItems.value = [];
     emit("update:items", []);
   },
+  getComponent,
+  getRegisteredComponents: () => Array.from(componentRegistry.value.keys()),
 });
 </script>
 
@@ -1175,6 +1303,14 @@ export function useGridConfig(initialConfig: Partial<GridConfig> = {}) {
 ```
 
 ```ts [src/components/ui/controls-grid/types.ts]
+import type { Component } from "vue";
+
+export interface ComponentToRegister {
+  name: string;
+
+  component: Component;
+}
+
 export interface GridItem {
   id: string;
 
@@ -1242,9 +1378,20 @@ export interface GridEvents {
 export interface GridMethods {
   addItem: (item: Omit<GridItem, "x" | "y">) => GridItem | null;
 
+  addItemByComponent: (
+    componentName: string,
+    width?: number,
+    height?: number,
+    additionalProps?: Record<string, any>,
+  ) => GridItem | null;
+
   removeItem: (id: string) => void;
 
   clearGrid: () => void;
+
+  getComponent: (name: string) => Component | undefined;
+
+  getRegisteredComponents: () => string[];
 
   isCellOccupied?: (x: number, y: number, excludeId?: string) => boolean;
 
@@ -1274,6 +1421,8 @@ export interface GridProps {
   showGrid?: boolean;
 
   snapToGrid?: boolean;
+
+  components?: ComponentToRegister[];
 }
 
 export interface DragState {
@@ -1392,6 +1541,7 @@ export class GridUtils {
 | `items`{.primary .text-primary} | `GridItem[]` |  |  |
 | `showGrid`{.primary .text-primary} | `boolean` | true |  |
 | `snapToGrid`{.primary .text-primary} | `boolean` | true |  |
+| `components`{.primary .text-primary} | `ComponentToRegister[]` |  |  |
 
   ### Slots
 | Name | Description |
@@ -1402,8 +1552,11 @@ export class GridUtils {
 | Name | Type | Description |
 |------|------|-------------|
 | `addItem`{.primary .text-primary} | `(item: Omit<GridItem, 'x' \| 'y'>) => any` | — |
+| `addItemByComponent`{.primary .text-primary} | `(componentName: string, width: number, height: number, additionalProps: Record<string, any>) => any` | — |
 | `removeItem`{.primary .text-primary} | `(id: string) => void` | — |
 | `clearGrid`{.primary .text-primary} | `() => void` | — |
+| `getComponent`{.primary .text-primary} | `(name: string) => Component \| undefined` | — |
+| `getRegisteredComponents`{.primary .text-primary} | `() => void` | — |
 
 ---
 
@@ -1419,106 +1572,200 @@ export class GridUtils {
   :::tabs-item{icon="i-lucide-code" label="Code"}
 ```vue
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import {
+  ref,
+  watch,
+  onMounted,
+  onUnmounted,
+  shallowRef,
+  h,
+  computed,
+} from "vue";
 import { ControlsGrid } from "..";
-import { useControlsGrid, useComponentPalette } from "../composables";
-import type { GridItemTemplate } from "../types";
+import { useControlRegistry } from "~~/registry/new-york/composables/use-control-registry";
+import { ControlButton } from "@/components/ui/control-button";
+import type { ControlDefinition } from "~~/registry/new-york/composables/use-control-registry";
 
-const templates: GridItemTemplate[] = [
+const { registerControls, getAllControls, createControlInstance } =
+  useControlRegistry();
+
+const createButtonComponent = (icon: string) => {
+  return {
+    name: "GridControlButton",
+    props: ["color", "variant", "shape"],
+    setup(props: any) {
+      return () =>
+        h(
+          ControlButton,
+          {
+            color: props.color,
+            variant: props.variant || "default",
+            shape: props.shape || "square",
+          },
+          () => h("span", { class: "text-lg font-bold" }, icon),
+        );
+    },
+  };
+};
+
+const controlDefinitions: ControlDefinition[] = [
   {
     id: "button",
-    width: 1,
-    height: 1,
-    label: "🎛️ Button",
+    name: "🎛️ Button",
+    component: shallowRef(createButtonComponent("●")),
+    defaultSize: { width: 1, height: 1 },
+    defaultProps: { color: "#3b82f6", variant: "default", shape: "square" },
+    category: "basic",
     color: "#3b82f6",
   },
   {
     id: "fader",
-    width: 1,
-    height: 2,
-    label: "🎚️ Fader",
+    name: "🎚️ Fader",
+    component: shallowRef(createButtonComponent("▮")),
+    defaultSize: { width: 1, height: 2 },
+    defaultProps: { color: "#8b5cf6", variant: "default", shape: "square" },
+    category: "basic",
     color: "#8b5cf6",
   },
   {
     id: "knob",
-    width: 1,
-    height: 1,
-    label: "🎛️ Knob",
+    name: "🎛️ Knob",
+    component: shallowRef(createButtonComponent("◉")),
+    defaultSize: { width: 1, height: 1 },
+    defaultProps: { color: "#ec4899", variant: "default", shape: "circle" },
+    category: "basic",
     color: "#ec4899",
   },
   {
     id: "slider",
-    width: 2,
-    height: 1,
-    label: "⬌ Slider",
+    name: "⬌ Slider",
+    component: shallowRef(createButtonComponent("⬌")),
+    defaultSize: { width: 2, height: 1 },
+    defaultProps: { color: "#f59e0b", variant: "outline", shape: "square" },
+    category: "basic",
     color: "#f59e0b",
   },
   {
     id: "xy-pad",
-    width: 2,
-    height: 2,
-    label: "⊞ XY Pad",
+    name: "⊞ XY Pad",
+    component: shallowRef(createButtonComponent("⊞")),
+    defaultSize: { width: 2, height: 2 },
+    defaultProps: { color: "#ef4444", variant: "solid", shape: "square" },
+    category: "advanced",
     color: "#ef4444",
   },
   {
     id: "meter",
-    width: 1,
-    height: 2,
-    label: "📊 Meter",
+    name: "📊 Meter",
+    component: shallowRef(createButtonComponent("📊")),
+    defaultSize: { width: 1, height: 2 },
+    defaultProps: { color: "#10b981", variant: "ghost", shape: "square" },
+    category: "display",
     color: "#10b981",
   },
   {
     id: "display",
-    width: 2,
-    height: 1,
-    label: "📺 Display",
+    name: "📺 Display",
+    component: shallowRef(createButtonComponent("📺")),
+    defaultSize: { width: 2, height: 1 },
+    defaultProps: { color: "#06b6d4", variant: "outline", shape: "square" },
+    category: "display",
     color: "#06b6d4",
   },
   {
     id: "keyboard",
-    width: 4,
-    height: 2,
-    label: "🎹 Keyboard",
+    name: "🎹 Keyboard",
+    component: shallowRef(createButtonComponent("🎹")),
+    defaultSize: { width: 4, height: 2 },
+    defaultProps: { color: "#6366f1", variant: "default", shape: "square" },
+    category: "advanced",
     color: "#6366f1",
   },
 ];
 
 const grid = ref<InstanceType<typeof ControlsGrid> | null>(null);
-const {
-  items,
-  canUndo,
-  canRedo,
-  totalArea,
-  undo,
-  redo,
-  clearItems,
-  duplicateItem,
-  selectItem,
-  selectedItemId,
-  saveToLocalStorage,
-  loadFromLocalStorage,
-} = useControlsGrid();
-const { availableTemplates, createItemFromTemplate } =
-  useComponentPalette(templates);
+const items = ref<any[]>([]);
+const availableControls = ref<ControlDefinition[]>([]);
+const selectedItemId = ref<string | null>(null);
+const historyIndex = ref(-1);
+const history = ref<any[][]>([]);
 
 const showGrid = ref(true);
 const cellSize = ref(100);
 const gap = ref(12);
 const autoSave = ref(false);
 
+const canUndo = computed(() => historyIndex.value > 0);
+const canRedo = computed(() => historyIndex.value < history.value.length - 1);
+const totalArea = computed(() =>
+  items.value.reduce((sum, item) => sum + item.width * item.height, 0),
+);
+
+const saveToHistory = () => {
+  history.value = history.value.slice(0, historyIndex.value + 1);
+  history.value.push(JSON.parse(JSON.stringify(items.value)));
+  historyIndex.value = history.value.length - 1;
+};
+
+const undo = () => {
+  if (canUndo.value) {
+    historyIndex.value--;
+    items.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]));
+  }
+};
+
+const redo = () => {
+  if (canRedo.value) {
+    historyIndex.value++;
+    items.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]));
+  }
+};
+
+const clearItems = () => {
+  items.value = [];
+  saveToHistory();
+};
+
+const duplicateItem = (id: string) => {
+  const item = items.value.find((i) => i.id === id);
+  if (item) {
+    const newItem = { ...item, id: `${item.controlId}-${Date.now()}` };
+    grid.value?.addItem(newItem as any);
+  }
+};
+
+const selectItem = (id: string | null) => {
+  selectedItemId.value = id;
+};
+
+const saveToLocalStorage = () => {
+  localStorage.setItem("controls-grid-items", JSON.stringify(items.value));
+};
+
+const loadFromLocalStorage = () => {
+  const saved = localStorage.getItem("controls-grid-items");
+  if (saved) {
+    items.value = JSON.parse(saved);
+    saveToHistory();
+    return true;
+  }
+  return false;
+};
+
 const handlePaletteDragStart = (
   event: DragEvent,
-  template: GridItemTemplate,
+  control: ControlDefinition,
 ) => {
-  const item = createItemFromTemplate(template);
-  if (event.dataTransfer) {
+  const instance = createControlInstance(control.id);
+  if (instance && event.dataTransfer) {
     event.dataTransfer.effectAllowed = "copy";
-    event.dataTransfer.setData("application/json", JSON.stringify(item));
+    event.dataTransfer.setData("application/json", JSON.stringify(instance));
   }
 };
 
 const handleItemPlaced = (item: any) => {
   console.log("Item placé:", item);
+  saveToHistory();
   if (autoSave.value) {
     saveToLocalStorage();
   }
@@ -1526,6 +1773,7 @@ const handleItemPlaced = (item: any) => {
 
 const handleItemMoved = (item: any) => {
   console.log("Item déplacé:", item);
+  saveToHistory();
   if (autoSave.value) {
     saveToLocalStorage();
   }
@@ -1533,6 +1781,7 @@ const handleItemMoved = (item: any) => {
 
 const handleItemRemoved = (id: string) => {
   console.log("Item supprimé:", id);
+  saveToHistory();
   if (autoSave.value) {
     saveToLocalStorage();
   }
@@ -1582,15 +1831,6 @@ const handleExport = () => {
   URL.revokeObjectURL(url);
 };
 
-watch(
-  () => autoSave.value,
-  (enabled) => {
-    if (enabled) {
-      saveToLocalStorage();
-    }
-  },
-);
-
 const handleKeyDown = (event: KeyboardEvent) => {
   if (
     (event.ctrlKey || event.metaKey) &&
@@ -1619,14 +1859,20 @@ const handleKeyDown = (event: KeyboardEvent) => {
   }
 };
 
-import { onMounted, onUnmounted } from "vue";
+watch(
+  () => autoSave.value,
+  (enabled) => {
+    if (enabled) {
+      saveToLocalStorage();
+    }
+  },
+);
 
 onMounted(() => {
+  registerControls(controlDefinitions);
+  availableControls.value = getAllControls();
+  saveToHistory();
   window.addEventListener("keydown", handleKeyDown);
-
-  if (autoSave.value) {
-    loadFromLocalStorage();
-  }
 });
 
 onUnmounted(() => {
@@ -1836,16 +2082,18 @@ onUnmounted(() => {
 
         <div class="palette-grid">
           <div
-            v-for="template in availableTemplates"
-            :key="template.id"
+            v-for="control in availableControls"
+            :key="control.id"
             class="palette-item"
             :draggable="true"
-            :style="{ backgroundColor: template.color }"
-            @dragstart="handlePaletteDragStart($event, template)"
+            :style="{ backgroundColor: control.color }"
+            @dragstart="handlePaletteDragStart($event, control)"
           >
-            <span class="palette-label">{{ template.label }}</span>
+            <span class="palette-label">{{ control.name }}</span>
             <span class="palette-size"
-              >{{ template.width }}×{{ template.height }}</span
+              >{{ control.defaultSize?.width }}×{{
+                control.defaultSize?.height
+              }}</span
             >
           </div>
         </div>
@@ -2403,6 +2651,118 @@ const handleItemRemoved = (id: string) => {
   transform: scale(0.95);
 }
 </style>
+```
+  :::
+::
+
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <component-registration />
+  :::
+
+  :::tabs-item{icon="i-lucide-code" label="Code"}
+```vue
+<script setup lang="ts">
+import { ref, onMounted, shallowRef, h } from "vue";
+import { ControlsGrid } from "..";
+import { useControlRegistry } from "~~/registry/new-york/composables/use-control-registry";
+import { ControlButton } from "@/components/ui/control-button";
+import type { ControlDefinition } from "~~/registry/new-york/composables/use-control-registry";
+
+const { registerControl, createControlInstance } = useControlRegistry();
+
+const gridRef = ref<InstanceType<typeof ControlsGrid> | null>(null);
+const gridItems = ref<any[]>([]);
+
+const createButtonComponent = () => {
+  return {
+    name: "GridControlButton",
+    props: ["color", "variant", "shape"],
+    setup(props: any) {
+      const isActive = ref(false);
+
+      const toggle = () => {
+        isActive.value = !isActive.value;
+      };
+
+      return () =>
+        h(
+          ControlButton,
+          {
+            color: props.color,
+            variant: props.variant || "default",
+            shape: props.shape || "square",
+            class: isActive.value ? "ring-2 ring-offset-2" : "",
+            onClick: toggle,
+          },
+          () => h("span", { class: "text-lg font-bold" }, "●"),
+        );
+    },
+  };
+};
+
+onMounted(() => {
+  const controlDefinition: ControlDefinition = {
+    id: "control-button",
+    name: "Control Button",
+    description: "Un bouton de contrôle interactif",
+    component: shallowRef(createButtonComponent()),
+    defaultSize: { width: 2, height: 2 },
+    defaultProps: {
+      color: "#3b82f6",
+      variant: "default",
+      shape: "circle",
+    },
+    category: "controls",
+    color: "#3b82f6",
+  };
+
+  registerControl(controlDefinition);
+});
+
+const addControlButton = () => {
+  const instance = createControlInstance("control-button", undefined, {
+    color: "#" + Math.floor(Math.random() * 16777215).toString(16),
+  });
+
+  if (instance && instance.id) {
+    gridRef.value?.addItem(instance as any);
+  }
+};
+
+const listRegisteredComponents = () => {
+  console.log("Items dans la grille:", gridItems.value);
+  console.log("Nombre d'items:", gridItems.value.length);
+};
+</script>
+
+<template>
+  <div class="space-y-4">
+    <div class="flex gap-2">
+      <button
+        class="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+        @click="addControlButton"
+      >
+        Ajouter un ControlButton
+      </button>
+      <button
+        class="px-4 py-2 bg-secondary text-secondary-foreground rounded hover:bg-secondary/90"
+        @click="listRegisteredComponents"
+      >
+        Lister les composants
+      </button>
+    </div>
+
+    <ControlsGrid
+      ref="gridRef"
+      v-model:items="gridItems"
+      :cell-size="80"
+      :gap="8"
+      :min-columns="6"
+      class="h-[600px]"
+    />
+  </div>
+</template>
 ```
   :::
 ::

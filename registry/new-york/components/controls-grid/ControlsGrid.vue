@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, type Component } from 'vue';
 import { useElementSize, useDropZone } from '@vueuse/core';
 import { useMotion } from '@vueuse/motion';
 
@@ -13,6 +13,11 @@ interface GridItem {
   color?: string; // couleur de fond du contrôleur
 }
 
+interface ComponentToRegister {
+  name: string; // nom du composant (ex: "ControlButton")
+  component: Component; // le composant Vue
+}
+
 interface Props {
   cellSize?: number; // taille de base d'une cellule en px
   gap?: number; // espacement entre les cellules en px
@@ -20,6 +25,7 @@ interface Props {
   items?: GridItem[]; // items déjà placés dans la grille
   showGrid?: boolean; // afficher la grille
   snapToGrid?: boolean; // snap automatique à la grille
+  components?: ComponentToRegister[]; // composants à enregistrer
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -29,6 +35,7 @@ const props = withDefaults(defineProps<Props>(), {
   items: () => [],
   showGrid: true,
   snapToGrid: true,
+  components: () => [],
 });
 
 const emit = defineEmits<{
@@ -45,6 +52,9 @@ const hoverCell = ref<{ x: number; y: number } | null>(null);
 const draggedItem = ref<GridItem | null>(null);
 const draggedFromGrid = ref(false);
 const previewSize = ref<{ width: number; height: number } | null>(null);
+
+// Registre des composants
+const componentRegistry = ref<Map<string, Component>>(new Map());
 
 // Use VueUse pour la taille du conteneur
 const { width: gridWidth, height: gridHeight } = useElementSize(gridContainer);
@@ -315,10 +325,20 @@ const removeItem = (id: string) => {
   }
 };
 
+// Récupérer un composant depuis le registre
+const getComponent = (name: string): Component | undefined => {
+  return componentRegistry.value.get(name);
+};
+
 // Lifecycle
 let resizeObserver: ResizeObserver | null = null;
 
 onMounted(() => {
+  // Enregistrer les composants initiaux
+  props.components.forEach(({ name, component }) => {
+    componentRegistry.value.set(name, component);
+  });
+
   updateGridSize();
 
   if (gridContainer.value) {
@@ -328,6 +348,18 @@ onMounted(() => {
     resizeObserver.observe(gridContainer.value);
   }
 });
+
+// Watcher pour mettre à jour le registre si les composants changent
+watch(
+  () => props.components,
+  (newComponents) => {
+    componentRegistry.value.clear();
+    newComponents.forEach(({ name, component }) => {
+      componentRegistry.value.set(name, component);
+    });
+  },
+  { deep: true }
+);
 
 onUnmounted(() => {
   if (resizeObserver && gridContainer.value) {
@@ -348,11 +380,43 @@ defineExpose({
     }
     return null;
   },
+  addItemByComponent: (
+    componentName: string,
+    width: number = 1,
+    height: number = 1,
+    additionalProps?: Record<string, any>
+  ) => {
+    const component = getComponent(componentName);
+    if (!component) {
+      console.warn(`Composant "${componentName}" non trouvé dans le registre`);
+      return null;
+    }
+
+    const position = findAvailablePosition(width, height);
+    if (position) {
+      const newItem: GridItem = {
+        id: `${componentName}-${Date.now()}`,
+        x: position.x,
+        y: position.y,
+        width,
+        height,
+        component,
+        ...additionalProps,
+      };
+      placedItems.value.push(newItem);
+      emit('item-placed', newItem);
+      emit('update:items', placedItems.value);
+      return newItem;
+    }
+    return null;
+  },
   removeItem,
   clearGrid: () => {
     placedItems.value = [];
     emit('update:items', []);
   },
+  getComponent,
+  getRegisteredComponents: () => Array.from(componentRegistry.value.keys()),
 });
 </script>
 

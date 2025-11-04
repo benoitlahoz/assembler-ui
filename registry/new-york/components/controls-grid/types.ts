@@ -2,6 +2,18 @@
  * Types pour le composant ControlsGrid
  */
 
+import type { Component } from 'vue';
+
+/**
+ * Composant à enregistrer dans la grille
+ */
+export interface ComponentToRegister {
+  /** Nom unique du composant */
+  name: string;
+  /** Le composant Vue à enregistrer */
+  component: Component;
+}
+
 /**
  * Interface représentant un item dans la grille
  */
@@ -96,10 +108,21 @@ export interface GridEvents {
 export interface GridMethods {
   /** Ajoute un item à la première position disponible */
   addItem: (item: Omit<GridItem, 'x' | 'y'>) => GridItem | null;
+  /** Ajoute un item en utilisant un composant enregistré */
+  addItemByComponent: (
+    componentName: string,
+    width?: number,
+    height?: number,
+    additionalProps?: Record<string, any>
+  ) => GridItem | null;
   /** Supprime un item par son ID */
   removeItem: (id: string) => void;
   /** Vide complètement la grille */
   clearGrid: () => void;
+  /** Récupère un composant enregistré par son nom */
+  getComponent: (name: string) => Component | undefined;
+  /** Récupère la liste des noms de tous les composants enregistrés */
+  getRegisteredComponents: () => string[];
   /** Vérifie si une position est occupée */
   isCellOccupied?: (x: number, y: number, excludeId?: string) => boolean;
   /** Vérifie si un placement est valide */
@@ -130,6 +153,8 @@ export interface GridProps {
   showGrid?: boolean;
   /** Activer le snap automatique à la grille */
   snapToGrid?: boolean;
+  /** Composants à enregistrer dans la grille */
+  components?: ComponentToRegister[];
 }
 
 /**
