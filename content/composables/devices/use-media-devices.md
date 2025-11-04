@@ -632,7 +632,7 @@ The reactive state and methods for media devices.
 
 ---
 
-## index
+## bar/index
 ::hr-underline
 ::
 

@@ -67,8 +67,17 @@ Copy and paste these files into your project.
 <% if (typeof files !== 'undefined' && Array.isArray(files)) { %>
 <% files.forEach(function(file) { %>
 <% const isMainFile = file.name === title || file.title === title; %>
+<% 
+  // Calculer le filename depuis codes
+  const fileCode = codes.find(c => c.name === file.name);
+  const filename = fileCode ? fileCode.filename : file.name;
+  const isInSubfolder = filename && filename.includes('/');
+  // Enlever l'extension du fichier
+  const filenameWithoutExt = filename ? filename.replace(/\.(vue|ts|js|json|html|css|scss|md)$/, '') : filename;
+  const displayTitle = isMainFile ? 'API' : (isInSubfolder ? filenameWithoutExt : (file.title || file.name));
+%>
 
-## <%= isMainFile ? 'API' : (file.title || file.name) %>
+## <%= displayTitle %>
 ::hr-underline
 ::
 
