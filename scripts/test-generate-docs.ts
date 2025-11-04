@@ -135,7 +135,17 @@ export async function generateTestDocs(): Promise<void> {
           allFiles.map(async (file) => {
             let code = '';
             let lang = '';
+
+            // Calculer le filename relatif au dossier du composable
+            // Ex: "registry/new-york/composables/use-media-devices/bar/index.ts"
+            // -> chercher "use-media-devices/" et prendre ce qui suit
             let filename = path.basename(file.path);
+            const componentFolderName = `${assembler.name}/`;
+            const componentFolderIndex = file.path.indexOf(componentFolderName);
+            if (componentFolderIndex !== -1) {
+              // Extraire le chemin relatif après le nom du composable
+              filename = file.path.substring(componentFolderIndex + componentFolderName.length);
+            }
 
             if (file.doc && file.doc.source) {
               if (typeof file.doc.source === 'object') {
@@ -226,7 +236,15 @@ export async function generateTestDocs(): Promise<void> {
               depFiles.map(async (file) => {
                 let code = '';
                 let lang = '';
+
+                // Calculer le filename relatif au dossier de la dépendance
                 let filename = path.basename(file.path);
+                const depFolderName = `${dep.name}/`;
+                const depFolderIndex = file.path.indexOf(depFolderName);
+                if (depFolderIndex !== -1) {
+                  // Extraire le chemin relatif après le nom de la dépendance
+                  filename = file.path.substring(depFolderIndex + depFolderName.length);
+                }
 
                 if (file.doc && file.doc.source) {
                   if (typeof file.doc.source === 'object') {

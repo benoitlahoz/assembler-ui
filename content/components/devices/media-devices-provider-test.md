@@ -1231,6 +1231,10 @@ import { bar } from "./bar";
 
 export const foo = "bar";
 ```
+
+```ts [src/composables/use-media-devices/bar/index.ts]
+export const bar = "foo";
+```
 :::
 
 ## MediaDevicesProvider

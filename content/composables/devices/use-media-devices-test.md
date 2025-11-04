@@ -305,6 +305,10 @@ import { bar } from "./bar";
 export const foo = "bar";
 ```
 
+```ts [src/composables/use-media-devices/bar/index.ts]
+export const bar = "foo";
+```
+
 ```ts [src/composables/use-media-devices/useMediaDevices.ts]
 import { ref, computed, onBeforeUnmount } from "vue";
 import { useEventListener } from "@vueuse/core";
@@ -572,6 +576,10 @@ import { bar } from "./bar";
 
 export const foo = "bar";
 ```
+
+```ts [src/composables/use-media-devices/bar/index.ts]
+export const bar = "foo";
+```
 :::
 
 ## useMediaDevices
@@ -625,6 +633,12 @@ The reactive state and methods for media devices.
 ---
 
 ## foo
+::hr-underline
+::
+
+---
+
+## index
 ::hr-underline
 ::
 

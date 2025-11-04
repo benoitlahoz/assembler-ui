@@ -162,6 +162,15 @@
         "source": "import { bar } from './bar';\n\nexport const foo = 'bar';\n"
       },
       "type": "registry:hook"
+    },
+    {
+      "name": "index",
+      "title": "index",
+      "path": "registry/new-york/composables/use-media-devices/bar/index.ts",
+      "doc": {
+        "source": "export const bar = 'foo';\n"
+      },
+      "type": "registry:hook"
     }
   ]
 }

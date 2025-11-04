@@ -179,6 +179,27 @@ const main = async () => {
       // Enrichir avec les dépendances
       const enriched = enrichWithDependencies(result, folderName, dependencyMap);
 
+      // AJOUT: Ajouter les fichiers manquants depuis dependency-map (fichiers dans sous-dossiers)
+      if (dependencyMap[folderName] && Array.isArray(dependencyMap[folderName].files)) {
+        const existingPaths = new Set((enriched.files || []).map((f: any) => f.path));
+
+        // Ajouter les fichiers qui sont dans dependency-map mais pas dans result.files
+        dependencyMap[folderName].files.forEach((depFile: any) => {
+          if (!existingPaths.has(depFile.path)) {
+            // Créer une entrée file à partir du fichier de dependency-map
+            enriched.files = enriched.files || [];
+            enriched.files.push({
+              name: path.basename(depFile.name, path.extname(depFile.name)),
+              title: path.basename(depFile.name, path.extname(depFile.name)),
+              path: depFile.path,
+              doc: {
+                source: depFile.source,
+              },
+            });
+          }
+        });
+      }
+
       // Ajouter les métadonnées standards
       enriched.$schema = config.$schema;
       enriched.type = typeof enriched.type !== 'undefined' ? enriched.type : 'registry:ui';
