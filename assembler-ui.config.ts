@@ -13,6 +13,13 @@ export default {
   paths: ['components', 'blocks', 'composables'],
   dependencies: ['vue-sonner'],
   registryDependencies: ['button', 'separator'],
+  // Mapping des types registry vers les dossiers de documentation
+  typeMapping: {
+    ui: 'components',
+    component: 'components',
+    hook: 'composables',
+    block: 'blocks',
+  },
   install: {
     pnpm: 'pnpm dlx shadcn-vue@latest add',
     npm: 'npx shadcn-vue@latest add',

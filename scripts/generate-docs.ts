@@ -70,10 +70,9 @@ function getFilesFromAssembler(assemblerPath: string): FileEntry[] {
 function getOutputDir(type: string, category?: string): string {
   // Normalise le type (ex: 'registry:ui' => 'ui')
   const normalizedType = (type || '').split(':').pop() || '';
-  let base = 'misc';
-  if (normalizedType === 'ui') base = 'components';
-  else if (normalizedType === 'hook') base = 'composables';
-  else if (normalizedType === 'block') base = 'blocks';
+  // Utilise le mapping de la configuration si disponible, sinon 'misc'
+  const typeMapping = config.typeMapping as Record<string, string> | undefined;
+  const base = typeMapping?.[normalizedType] || 'misc';
   // Ajoute la catégorie si présente
   if (category && base !== 'misc') {
     return path.resolve(process.cwd(), `content/${base}/${category}`);
@@ -106,11 +105,11 @@ export async function generateDocs(): Promise<void> {
         message: `Generating doc for '${assembler.name}'`,
         action: async () => {
           const allFiles: FileEntry[] = getFilesFromAssembler(assemblerPath);
-          // On ne garde que les .vue pour la doc détaillée si registry:ui
+          // On ne garde que les .vue pour la doc détaillée si registry:ui ou registry:component
           // Pour registry:hook, on garde les .ts (composables)
           const normalizedType = (assembler.type || '').split(':').pop() || '';
           let files: FileEntry[] = allFiles;
-          if (normalizedType === 'ui') {
+          if (normalizedType === 'ui' || normalizedType === 'component') {
             files = allFiles.filter((f) => f.path.endsWith('.vue'));
           } else if (normalizedType === 'hook') {
             files = allFiles.filter((f) => f.path.endsWith('.ts') && !f.path.endsWith('.d.ts'));
@@ -192,6 +191,8 @@ export async function generateDocs(): Promise<void> {
           let codeBasePath = `src/components/ui/${assembler.name}`;
           if (normalizedType === 'block') codeBasePath = `src/components/blocks/${assembler.name}`;
           else if (normalizedType === 'hook') codeBasePath = `src/composables/${assembler.name}`;
+          else if (normalizedType === 'component')
+            codeBasePath = `src/components/ui/${assembler.name}`;
 
           // Définit le default-value pour le code-tree (premier fichier du tableau codes)
           let codeTreeDefaultValue = '';

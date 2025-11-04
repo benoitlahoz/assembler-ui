@@ -7,7 +7,7 @@
  * Unlike MediaDevicesProvider, screen sharing doesn't enumerate available sources.
  * Instead, the browser displays a picker for the user to select what to share.
  *
- * @type registry:component
+ * @type registry:ui
  * @category devices
  * @demo ScreenShareProviderDemoSimple
  * @demo ScreenShareProviderDemoAdvanced

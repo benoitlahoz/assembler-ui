@@ -3,16 +3,7 @@ title: MediaDevicesProvider
 description: A renderless provider component that supplies media devices information and handles permissions.
 ---
 
-
-  
   <p class="text-pretty mt-4"><br>This component uses the MediaDevices API to list available audio and video input devices.<br>It manages user permissions and provides reactive access to device information.<br><br>The demos below use different MediaDevicesProvider. In real world usage, you would typically wrap your application or a section of it with the MediaDevicesProvider component.</p>
-
-
-
-  
-
-
-
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
@@ -20,7 +11,7 @@ description: A renderless provider component that supplies media devices informa
   :::
 
   :::tabs-item{icon="i-lucide-code" label="Code"}
-  ```vue
+```vue
 <script setup lang="ts">
 import { ref } from "vue";
 import { Badge } from "@/components/ui/badge";
@@ -91,38 +82,33 @@ const open = ref(false);
     </MediaDevicesProvider>
   </div>
 </template>
-
-  ```
+```
   :::
 ::
-
-
 
 ## Install with CLI
 ::hr-underline
 ::
 
-This will install the item in the path defined by your `components.json` file, thanks to shadcn-vue.
+This will install the component in the path defined by your `components.json` file, thanks to shadcn-vue.
 
 :::code-group{.w-full}
-  ```bash [yarn]
+```bash [yarn]
   npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/media-devices-provider.json"
   ```
 
-  ```bash [npm]
+```bash [npm]
   npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/media-devices-provider.json"
   ```
 
-  ```bash [pnpm]
+```bash [pnpm]
   pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/media-devices-provider.json"
   ```
 
-  ```bash [bun]
+```bash [bun]
   bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/media-devices-provider.json"
   ```
 :::
-
-
 
 ## Install Manually
 ::hr-underline
@@ -131,7 +117,6 @@ This will install the item in the path defined by your `components.json` file, t
 Copy and paste these files into your project.
 
 :::code-tree{default-value="src/components/ui/media-devices-provider/index.ts"}
-
 
 ```ts [src/components/ui/media-devices-provider/index.ts]
 import type { InjectionKey, Ref } from "vue";
@@ -247,7 +232,6 @@ export const MediaDevicesStopAllKey: InjectionKey<MediaDevicesStopAllFn> =
   Symbol("MediaDevicesStopAll");
 
 export { VideoPresets, AudioPresets, MediaPresets } from "./presets";
-
 ```
 
 ```vue [src/components/ui/media-devices-provider/MediaDevicesProvider.vue]
@@ -517,7 +501,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped></style>
-
 ```
 
 ```vue [src/components/ui/media-devices-provider/AudioDevice.vue]
@@ -749,7 +732,6 @@ defineExpose({
 </template>
 
 <style scoped></style>
-
 ```
 
 ```vue [src/components/ui/media-devices-provider/VideoDevice.vue]
@@ -989,7 +971,6 @@ defineExpose({
 </template>
 
 <style scoped></style>
-
 ```
 
 ```ts [src/components/ui/media-devices-provider/presets.ts]
@@ -1113,33 +1094,17 @@ export const MediaPresets = {
     ...AudioPresets.default,
   },
 } as const;
-
 ```
-
-
 :::
-
-
-
 
 ## MediaDevicesProvider
 ::hr-underline
 ::
 
-
 The MediaDevicesProvider component provides a list of available media devices
 (cameras, microphones, etc.) to its child components via a scoped slot.
- 
-
-
 
 **API**: composition
-
-
-
-
-
-
 
   ### Props
 | Name | Type | Default | Description |
@@ -1147,19 +1112,10 @@ The MediaDevicesProvider component provides a list of available media devices
 | `type`{.primary .text-primary} | `MediaDeviceType` | all | The type of media devices to request. |
 | `open`{.primary .text-primary} | `boolean` | false | Whether to automatically request media permissions and devices on mount. |
 
-
-
-
-
-
   ### Slots
 | Name | Description |
 |------|-------------|
 | `default`{.primary .text-primary} | Slot for child components to access media devices, errors, and stream management |
-
-
-
-
 
   ### Provide
 | Key | Value | Type | Description |
@@ -1173,47 +1129,17 @@ The MediaDevicesProvider component provides a list of available media devices
 | `MediaDevicesStopKey`{.primary .text-primary} | `stopStream` | `MediaDevicesStopFn` | Stop a media stream for a specific device. |
 | `MediaDevicesStopAllKey`{.primary .text-primary} | `stopAllStreams` | `MediaDevicesStopAllFn` | Stop all active media streams. |
 
-
-
-
-
-
-
-
-
-
-  ### Types
-| Name | Type | Description |
-|------|------|-------------|
-| `MediaDevicesProviderProps`{.primary .text-primary} | `interface` | - |
-
-
-
-
-
-
 ---
-
 
 ## AudioDevice
 ::hr-underline
 ::
 
-
 AudioDevice component - Manages an audio stream with constraints.
 This component builds audio constraints and uses the MediaDevicesProvider&#39;s
 start/stop functions to manage streams with device caching.
- 
-
-
 
 **API**: composition
-
-
-
-
-
-
 
   ### Props
 | Name | Type | Default | Description |
@@ -1227,21 +1153,10 @@ start/stop functions to manage streams with device caching.
 | `sampleSize`{.primary .text-primary} | `number \| { min?: number; max?: number; ideal?: number }` | - | Audio sample size (in bits). |
 | `constraints`{.primary .text-primary} | `MediaStreamConstraints` | - | Custom MediaStreamConstraints to override simplified props. |
 
-
-
-
-
-
   ### Slots
 | Name | Description |
 |------|-------------|
 | `default`{.primary .text-primary} | — |
-
-
-
-
-
-
 
   ### Inject
 | Key | Default | Type | Description |
@@ -1251,9 +1166,6 @@ start/stop functions to manage streams with device caching.
 | `MediaDevicesLoadingKey`{.primary .text-primary} | `ref(false)` | `any` | — |
 | `MediaDevicesPermissionsKey`{.primary .text-primary} | `ref({ camera: 'unknown', microphone: 'unknown' })` | `any` | — |
 | `MediaDevicesActiveStreamsKey`{.primary .text-primary} | `computed(() => new Map() as ReadonlyMap<string, MediaStream>)` | `any` | — |
-
-
-
 
   ### Expose
 | Name | Type | Description |
@@ -1268,44 +1180,17 @@ start/stop functions to manage streams with device caching.
 | `providerActiveStreams`{.primary .text-primary} | — | — |
 | `error`{.primary .text-primary} | — | — |
 
-
-
-
-
-
-
-  ### Types
-| Name | Type | Description |
-|------|------|-------------|
-| `AudioDeviceProps`{.primary .text-primary} | `interface` | - |
-
-
-
-
-
-
 ---
-
 
 ## VideoDevice
 ::hr-underline
 ::
 
-
 VideoDevice component - Manages a video stream with constraints.
 This component builds video constraints and uses the MediaDevicesProvider&#39;s
 start/stop functions to manage streams with device caching.
- 
-
-
 
 **API**: composition
-
-
-
-
-
-
 
   ### Props
 | Name | Type | Default | Description |
@@ -1319,21 +1204,10 @@ start/stop functions to manage streams with device caching.
 | `aspectRatio`{.primary .text-primary} | `number \| { min?: number; max?: number; ideal?: number }` | - | Video aspect ratio. |
 | `constraints`{.primary .text-primary} | `MediaStreamConstraints` | - | Custom MediaStreamConstraints to override simplified props. |
 
-
-
-
-
-
   ### Slots
 | Name | Description |
 |------|-------------|
 | `default`{.primary .text-primary} | — |
-
-
-
-
-
-
 
   ### Inject
 | Key | Default | Type | Description |
@@ -1343,9 +1217,6 @@ start/stop functions to manage streams with device caching.
 | `MediaDevicesLoadingKey`{.primary .text-primary} | `ref(false)` | `any` | — |
 | `MediaDevicesPermissionsKey`{.primary .text-primary} | `ref({ camera: 'unknown', microphone: 'unknown' })` | `any` | — |
 | `MediaDevicesActiveStreamsKey`{.primary .text-primary} | `computed(() => new Map() as ReadonlyMap<string, MediaStream>)` | `any` | — |
-
-
-
 
   ### Expose
 | Name | Type | Description |
@@ -1360,37 +1231,11 @@ start/stop functions to manage streams with device caching.
 | `providerActiveStreams`{.primary .text-primary} | — | — |
 | `error`{.primary .text-primary} | — | — |
 
-
-
-
-
-
-
-  ### Types
-| Name | Type | Description |
-|------|------|-------------|
-| `VideoDeviceProps`{.primary .text-primary} | `interface` | - |
-
-
-
-
-
-
 ---
-
-
-
-
-
 
   ## Advanced Usage
   ::hr-underline
   ::
-
-  
-    
-
-
 
 ### Stream Cache
 ::hr-underline
@@ -1398,15 +1243,13 @@ start/stop functions to manage streams with device caching.
 
 Select a camera from the list. The provider caches streams to avoid reopening the same device.
 
-
-
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
     <media-device-demo-simple />
   :::
 
   :::tabs-item{icon="i-lucide-code" label="Code"}
-  ```vue
+```vue
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { Button } from "@/components/ui/button";
@@ -1586,15 +1429,9 @@ watch([videoRef, selectedDeviceId], async () => {
     </MediaDevicesProvider>
   </div>
 </template>
-
-  ```
+```
   :::
 ::
-
-  
-    
-
-
 
 ### Presets
 ::hr-underline
@@ -1602,15 +1439,13 @@ watch([videoRef, selectedDeviceId], async () => {
 
 Select a camera and quality preset. The provider caches streams efficiently when switching presets.
 
-
-
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
     <media-device-demo-presets />
   :::
 
   :::tabs-item{icon="i-lucide-code" label="Code"}
-  ```vue
+```vue
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { toPascalCase } from "@assemblerjs/core";
@@ -1871,15 +1706,9 @@ const formatPresetName = (name: string): string => {
     </MediaDevicesProvider>
   </div>
 </template>
-
-  ```
+```
   :::
 ::
-
-  
-    
-
-
 
 ### Multiple Viewers
 ::hr-underline
@@ -1887,15 +1716,13 @@ const formatPresetName = (name: string): string => {
 
 Open two devices simultaneously. If you select the same device for both, the provider will reuse the cached stream instead of opening it twice.
 
-
-
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
     <media-device-demo-multiple />
   :::
 
   :::tabs-item{icon="i-lucide-code" label="Code"}
-  ```vue
+```vue
 <script setup lang="ts">
 import { ref } from "vue";
 import { Button } from "@/components/ui/button";
@@ -2164,13 +1991,9 @@ const handleStream2 = (stream: MediaStream | null) => {
     </MediaDevicesProvider>
   </div>
 </template>
-
-  ```
+```
   :::
 ::
-
-  
-
 
 ::tip
 You can copy and adapt this template for any component documentation.
