@@ -1,6 +1,7 @@
 import * as ts from 'typescript';
 import path from 'path';
 import fs from 'fs';
+import { formatAliasesForExtractImports } from './resolve-tsconfig-paths';
 
 /**
  * Interface pour représenter un import détecté
@@ -30,8 +31,15 @@ interface ResolveConfig {
   globalPath: string;
   /** Dossiers à scanner dans globalPath */
   paths: string[];
-  /** Alias de chemins (ex: {'~~': 'registry/new-york', '@': 'app'}) */
+  /**
+   * Alias de chemins (ex: {'~~': 'registry/new-york', '@': 'app'})
+   * Si non fourni, sera automatiquement résolu depuis tsconfig.json
+   */
   aliases?: Record<string, string>;
+  /** Racine du projet pour la résolution des alias (par défaut: process.cwd()) */
+  root?: string;
+  /** Chemin vers le tsconfig.json (par défaut: 'tsconfig.json') */
+  tsconfigPath?: string;
 }
 
 /**
@@ -46,6 +54,12 @@ export const extractImports = (
   filePath: string,
   config: ResolveConfig
 ): ImportInfo[] => {
+  // Auto-résoudre les alias depuis tsconfig.json si non fournis
+  const resolvedConfig = {
+    ...config,
+    aliases: config.aliases || formatAliasesForExtractImports(config.tsconfigPath, config.root),
+  };
+
   const imports: ImportInfo[] = [];
   const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true);
 
@@ -55,7 +69,7 @@ export const extractImports = (
       if (ts.isStringLiteral(node.moduleSpecifier)) {
         const importPath = node.moduleSpecifier.text;
         const specifiers = extractImportSpecifiers(node);
-        const importInfo = resolveImportPath(importPath, config);
+        const importInfo = resolveImportPath(importPath, resolvedConfig);
 
         imports.push({
           name: extractModuleName(importPath),
@@ -71,7 +85,7 @@ export const extractImports = (
       const arg = node.arguments[0];
       if (arg && ts.isStringLiteral(arg)) {
         const importPath = arg.text;
-        const importInfo = resolveImportPath(importPath, config);
+        const importInfo = resolveImportPath(importPath, resolvedConfig);
 
         imports.push({
           name: extractModuleName(importPath),
@@ -136,7 +150,7 @@ const resolveImportPath = (
   importPath: string,
   config: ResolveConfig
 ): Pick<ImportInfo, 'resolvedPath' | 'relativePath' | 'type'> => {
-  const { sourceFilePath, globalPath, paths, aliases = {} } = config;
+  const { sourceFilePath, globalPath, paths, aliases = {}, root } = config;
 
   // Import externe (node_modules)
   // Un import est externe s'il ne commence pas par '.', '/', ou un alias configuré
@@ -154,7 +168,7 @@ const resolveImportPath = (
 
   // Résolution avec alias
   if (startsWithAlias(importPath, aliases)) {
-    resolvedPath = resolveAlias(importPath, aliases);
+    resolvedPath = resolveAlias(importPath, aliases, root);
   }
   // Import relatif
   else if (importPath.startsWith('.')) {
@@ -209,11 +223,17 @@ const startsWithAlias = (importPath: string, aliases: Record<string, string>): b
 /**
  * Résout un chemin d'import avec alias
  */
-const resolveAlias = (importPath: string, aliases: Record<string, string>): string => {
+const resolveAlias = (
+  importPath: string,
+  aliases: Record<string, string>,
+  root?: string
+): string => {
+  const projectRoot = root || process.cwd();
+
   for (const [alias, target] of Object.entries(aliases)) {
-    if (importPath.startsWith(alias)) {
+    if (importPath === alias || importPath.startsWith(alias + '/')) {
       const remainder = importPath.slice(alias.length);
-      return path.resolve(process.cwd(), target, remainder.replace(/^\//, ''));
+      return path.resolve(projectRoot, target, remainder.replace(/^\//, ''));
     }
   }
   return importPath;

@@ -1,148 +1,41 @@
 [
   {
+    "folder": "registry/new-york/components/control-button",
+    "imports": []
+  },
+  {
     "folder": "registry/new-york/components/media-devices-provider",
-    "filesCount": 5,
-    "totalImports": 1,
-    "internal": [
+    "imports": [
       {
-        "name": "useMediaDevices",
-        "importPath": "~~/registry/new-york/composables/use-media-devices/useMediaDevices",
-        "relativePath": "composables/use-media-devices/useMediaDevices.ts",
-        "resolvedPath": "/Users/benoitlahoz/Documents/Development/assembler-ui/registry/new-york/composables/use-media-devices/useMediaDevices.ts",
-        "specifiers": [
-          "useMediaDevices"
+        "path": "composables/use-media-devices",
+        "files": [
+          "foo.ts",
+          "useMediaDevices.ts"
         ]
       }
-    ],
-    "grouped": {
-      "components": [],
-      "blocks": [],
-      "composables": [
-        {
-          "name": "useMediaDevices",
-          "relativePath": "composables/use-media-devices/useMediaDevices.ts"
-        }
-      ]
-    },
-    "fileImports": {
-      "MediaDevicesProvider.vue": [
-        {
-          "name": "useMediaDevices",
-          "importPath": "~~/registry/new-york/composables/use-media-devices/useMediaDevices",
-          "resolvedPath": "/Users/benoitlahoz/Documents/Development/assembler-ui/registry/new-york/composables/use-media-devices/useMediaDevices.ts",
-          "relativePath": "composables/use-media-devices/useMediaDevices.ts",
-          "type": "internal",
-          "specifiers": [
-            "useMediaDevices"
-          ]
-        }
-      ]
-    }
+    ]
   },
   {
     "folder": "registry/new-york/components/screen-share-provider",
-    "filesCount": 3,
-    "totalImports": 1,
-    "internal": [
+    "imports": [
       {
-        "name": "useScreenShare",
-        "importPath": "~~/registry/new-york/composables/use-screen-share/useScreenShare",
-        "relativePath": "composables/use-screen-share/useScreenShare.ts",
-        "resolvedPath": "/Users/benoitlahoz/Documents/Development/assembler-ui/registry/new-york/composables/use-screen-share/useScreenShare.ts",
-        "specifiers": [
-          "ScreenShareType",
-          "ScreenShareState",
-          "ScreenShareStartFn",
-          "ScreenShareStopFn"
+        "path": "composables/use-screen-share",
+        "files": [
+          "useScreenShare.ts"
         ]
       }
-    ],
-    "grouped": {
-      "components": [],
-      "blocks": [],
-      "composables": [
-        {
-          "name": "useScreenShare",
-          "relativePath": "composables/use-screen-share/useScreenShare.ts"
-        }
-      ]
-    },
-    "fileImports": {
-      "ScreenShareProvider.vue": [
-        {
-          "name": "useScreenShare",
-          "importPath": "~~/registry/new-york/composables/use-screen-share/useScreenShare",
-          "resolvedPath": "/Users/benoitlahoz/Documents/Development/assembler-ui/registry/new-york/composables/use-screen-share/useScreenShare.ts",
-          "relativePath": "composables/use-screen-share/useScreenShare.ts",
-          "type": "internal",
-          "specifiers": [
-            "useScreenShare"
-          ]
-        }
-      ],
-      "index.ts": [
-        {
-          "name": "useScreenShare",
-          "importPath": "~~/registry/new-york/composables/use-screen-share/useScreenShare",
-          "resolvedPath": "/Users/benoitlahoz/Documents/Development/assembler-ui/registry/new-york/composables/use-screen-share/useScreenShare.ts",
-          "relativePath": "composables/use-screen-share/useScreenShare.ts",
-          "type": "internal",
-          "specifiers": [
-            "ScreenShareType",
-            "ScreenShareState",
-            "ScreenShareStartFn",
-            "ScreenShareStopFn"
-          ]
-        }
-      ]
-    }
+    ]
   },
   {
     "folder": "registry/new-york/components/simple-input",
-    "filesCount": 3,
-    "totalImports": 0,
-    "internal": [],
-    "grouped": {
-      "components": [],
-      "blocks": [],
-      "composables": []
-    },
-    "fileImports": {}
-  },
-  {
-    "folder": "registry/new-york/components/control-button",
-    "filesCount": 3,
-    "totalImports": 0,
-    "internal": [],
-    "grouped": {
-      "components": [],
-      "blocks": [],
-      "composables": []
-    },
-    "fileImports": {}
+    "imports": []
   },
   {
     "folder": "registry/new-york/composables/use-media-devices",
-    "filesCount": 1,
-    "totalImports": 0,
-    "internal": [],
-    "grouped": {
-      "components": [],
-      "blocks": [],
-      "composables": []
-    },
-    "fileImports": {}
+    "imports": []
   },
   {
     "folder": "registry/new-york/composables/use-screen-share",
-    "filesCount": 1,
-    "totalImports": 0,
-    "internal": [],
-    "grouped": {
-      "components": [],
-      "blocks": [],
-      "composables": []
-    },
-    "fileImports": {}
+    "imports": []
   }
 ]

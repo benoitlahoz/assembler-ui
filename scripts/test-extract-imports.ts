@@ -51,12 +51,9 @@ if (!isJsonMode) {
 const resolveConfig = {
   globalPath: config.globalPath,
   paths: config.paths,
-  aliases: {
-    '~~/': '',
-    '~~': '',
-    '@/': 'app/',
-    '@': 'app',
-  },
+  // Les alias seront automatiquement résolus depuis tsconfig.json par extractImports
+  // Utiliser la racine du projet pour la résolution
+  root: process.cwd(),
 };
 
 // Résultats pour mode JSON
@@ -126,29 +123,43 @@ testFolders.forEach((folderPath) => {
   // Grouper par dossier
   const grouped = groupImportsByFolder(uniqueImports, config.paths);
 
-  // Stocker pour mode JSON
+  // Stocker pour mode JSON - format pour code-tree
   if (isJsonMode) {
+    // Créer la structure pour le code-tree
+    const imports = Object.entries(grouped)
+      .map(([folderType, imports]) => {
+        // Extraire les chemins uniques de dossiers importés
+        const uniqueFolders = new Map<string, string>();
+
+        imports.forEach((imp) => {
+          if (imp.relativePath) {
+            // Extraire le chemin du dossier (ex: "composables/use-media-devices/useMediaDevices.ts" -> "composables/use-media-devices")
+            const parts = imp.relativePath.split('/');
+            parts.pop(); // Retirer le nom du fichier
+            const folderPath = parts.join('/');
+
+            if (!uniqueFolders.has(folderPath)) {
+              uniqueFolders.set(folderPath, folderPath);
+            }
+          }
+        });
+
+        // Pour chaque dossier importé, lister TOUS ses fichiers
+        return Array.from(uniqueFolders.values()).map((folderPath) => {
+          const fullFolderPath = path.resolve(process.cwd(), config.globalPath, folderPath);
+          const allFiles = getFilesInFolder(fullFolderPath).map((f) => path.basename(f));
+
+          return {
+            path: folderPath,
+            files: allFiles,
+          };
+        });
+      })
+      .flat();
+
     jsonResults.push({
       folder: folderPath,
-      filesCount: filesInFolder.length,
-      totalImports: uniqueImports.length,
-      internal: uniqueImports.map((imp) => ({
-        name: imp.name,
-        importPath: imp.importPath,
-        relativePath: imp.relativePath,
-        resolvedPath: imp.resolvedPath,
-        specifiers: imp.specifiers,
-      })),
-      grouped: Object.fromEntries(
-        Object.entries(grouped).map(([folder, imports]) => [
-          folder,
-          imports.map((imp) => ({
-            name: imp.name,
-            relativePath: imp.relativePath,
-          })),
-        ])
-      ),
-      fileImports: fileImportsMap,
+      imports,
     });
   } else {
     console.log(`\n📊 Fichiers analysés: ${filesInFolder.length}`);
