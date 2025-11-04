@@ -146,19 +146,19 @@ const inferTypeFromBody = (
       const declaration = node.declarationList.declarations[0];
       if (declaration && ts.isVariableDeclaration(declaration)) {
         const varName = declaration.name.getText(sourceFile);
-        
+
         if (varName === name && declaration.initializer) {
           // Si c'est un appel de fonction (ref, computed, etc.)
           if (ts.isCallExpression(declaration.initializer)) {
             const callExpr = declaration.initializer;
             const funcName = callExpr.expression.getText(sourceFile);
-            
+
             // Extraire le type générique si présent
             if (callExpr.typeArguments && callExpr.typeArguments.length > 0) {
               const firstTypeArg = callExpr.typeArguments[0];
               if (firstTypeArg) {
                 inferredType = firstTypeArg.getText(sourceFile);
-                
+
                 // Ajouter le wrapper approprié
                 if (funcName === 'ref') {
                   inferredType = `Ref<${inferredType}>`;
@@ -184,19 +184,19 @@ const inferTypeFromBody = (
         }
       }
     }
-    
+
     // Chercher les déclarations de fonctions (const startScreenShare: Type = ...)
     if (ts.isVariableStatement(node)) {
       const declaration = node.declarationList.declarations[0];
       if (declaration && ts.isVariableDeclaration(declaration)) {
         const varName = declaration.name.getText(sourceFile);
-        
+
         if (varName === name && declaration.type) {
           inferredType = declaration.type.getText(sourceFile);
         }
       }
     }
-    
+
     ts.forEachChild(node, visitNode);
   };
 

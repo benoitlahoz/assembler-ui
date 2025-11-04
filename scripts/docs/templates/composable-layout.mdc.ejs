@@ -16,7 +16,7 @@ description: <%= typeof description === 'string' ? description.split('\n')[0] : 
 ::hr-underline
 ::
 
-This will install the component in the path defined by your `components.json` file, thanks to shadcn-vue.
+This will install the composable in the path defined by your `components.json` file, thanks to shadcn-vue.
 
 :::code-group{.w-full}
   ```bash [yarn]
@@ -84,36 +84,16 @@ Copy and paste these files into your project.
   <%- include('sections/variants-section.ejs', { variants: file.doc.variants }) %>
 <% } %>
 
-<% if (file.doc && file.doc.props && file.doc.props.length) { %>
-  <%- include('sections/props-section.ejs', { props: file.doc.props }) %>
+<% if (file.doc && file.doc.params && file.doc.params.length) { %>
+  <%- include('sections/params-section.ejs', { params: file.doc.params }) %>
 <% } %>
 
-<% if (file.doc && file.doc.emits && file.doc.emits.length) { %>
-  <%- include('sections/events-section.ejs', { events: file.doc.emits }) %>
+<% if (file.doc && file.doc.returns) { %>
+  <%- include('sections/returns-section.ejs', { returns: file.doc.returns }) %>
 <% } %>
 
-<% if (file.doc && file.doc.slots && file.doc.slots.length) { %>
-  <%- include('sections/slots-section.ejs', { slots: file.doc.slots }) %>
-<% } %>
-
-<% if (file.doc && file.doc.provides && file.doc.provides.length) { %>
-  <%- include('sections/provides-section.ejs', { provides: file.doc.provides }) %>
-<% } %>
-
-<% if (file.doc && file.doc.injects && file.doc.injects.length) { %>
-  <%- include('sections/injects-section.ejs', { injects: file.doc.injects }) %>
-<% } %>
-
-<% if (file.doc && file.doc.exposes && file.doc.exposes.length) { %>
-  <%- include('sections/exposes-section.ejs', { exposes: file.doc.exposes }) %>
-<% } %>
-
-<% if (file.doc && file.doc.cssVars && file.doc.cssVars.length) { %>
-  <%- include('sections/cssvars-section.ejs', { cssVars: file.doc.cssVars }) %>
-<% } %>
-
-<% if (file.doc && file.doc.childComponents && file.doc.childComponents.length) { %>
-  <%- include('sections/childcomponents-section.ejs', { childComponents: file.doc.childComponents }) %>
+<% if (file.doc && file.doc.types && file.doc.types.length) { %>
+  <%- include('sections/types-section.ejs', { types: file.doc.types }) %>
 <% } %>
 
 ---
@@ -133,5 +113,5 @@ Copy and paste these files into your project.
 <% } %>
 
 ::tip
-You can copy and adapt this template for any component documentation.
+You can copy and adapt this template for any composable documentation.
 ::

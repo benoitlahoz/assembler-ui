@@ -60,7 +60,7 @@ import { Separator } from "@/components/ui/separator";
 ::hr-underline
 ::
 
-This will install the item in the path defined by your `components.json` file, thanks to shadcn-vue.
+This will install the component in the path defined by your `components.json` file, thanks to shadcn-vue.
 
 :::code-group{.w-full}
   ```bash [yarn]
@@ -231,10 +231,6 @@ const props = defineProps<ControlButtonLabelProps>();
 
 
 
-
-
-
-
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
@@ -265,15 +261,6 @@ const props = defineProps<ControlButtonLabelProps>();
 
 
 
-  ### Types
-| Name | Type | Description |
-|------|------|-------------|
-| `ControlButtonProps`{.primary .text-primary} | `interface` | - |
-
-
-
-
-
   ### Child Components
 
   `Primitive`{.primary .text-primary}
@@ -292,10 +279,6 @@ const props = defineProps<ControlButtonLabelProps>();
 
 
 **API**: composition
-
-
-
-
 
 
 
@@ -325,15 +308,6 @@ const props = defineProps<ControlButtonLabelProps>();
 
 
 
-
-
-
-
-
-  ### Types
-| Name | Type | Description |
-|------|------|-------------|
-| `ControlButtonLabelProps`{.primary .text-primary} | `interface` | - |
 
 
 

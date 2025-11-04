@@ -81,9 +81,13 @@ function getOutputDir(type: string, category?: string): string {
 
 export async function generateDocs(): Promise<void> {
   const baseDir = path.resolve(process.cwd(), GlobalComponentsPath);
-  const templatePath = path.resolve(
+  const componentTemplatePath = path.resolve(
     process.cwd(),
     'scripts/docs/templates/component-layout.mdc.ejs'
+  );
+  const composableTemplatePath = path.resolve(
+    process.cwd(),
+    'scripts/docs/templates/composable-layout.mdc.ejs'
   );
   const assemblerJsons = findAssemblerJsons(baseDir);
 
@@ -239,6 +243,9 @@ export async function generateDocs(): Promise<void> {
             templateData.demo = formattedDemo;
           }
 
+          // Choisir le bon template selon le type
+          const templatePath =
+            normalizedType === 'hook' ? composableTemplatePath : componentTemplatePath;
           const template = fs.readFileSync(templatePath, 'utf-8');
           const rendered = ejs.render(template, templateData, { filename: templatePath });
 

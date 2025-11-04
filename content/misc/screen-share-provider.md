@@ -130,7 +130,7 @@ import { ScreenShareProvider, ScreenShareViewer } from "..";
 ::hr-underline
 ::
 
-This will install the item in the path defined by your `components.json` file, thanks to shadcn-vue.
+This will install the component in the path defined by your `components.json` file, thanks to shadcn-vue.
 
 :::code-group{.w-full}
   ```bash [yarn]
@@ -473,19 +473,6 @@ Instead, the browser displays a picker for the user to select what to share.
 
 
 
-
-
-
-  ### Types
-| Name | Type | Description |
-|------|------|-------------|
-| `ScreenShareProviderSlotProps`{.primary .text-primary} | `interface` | — |
-
-
-
-
-
-
 ---
 
 
@@ -502,10 +489,6 @@ via scoped slots and provide/inject.
 
 
 **API**: composition
-
-
-
-
 
 
 
@@ -552,15 +535,6 @@ via scoped slots and provide/inject.
 
 
 
-  ### Types
-| Name | Type | Description |
-|------|------|-------------|
-| `ScreenShareProviderProps`{.primary .text-primary} | `interface` | - |
-
-
-
-
-
 
 ---
 
@@ -577,10 +551,6 @@ It automatically connects to the screen stream provided by ScreenShareProvider.
 
 
 **API**: composition
-
-
-
-
 
 
 
@@ -618,15 +588,6 @@ If true, will call startShare() on mount if not already sharing. |
 
 
 
-
-
-
-
-
-  ### Types
-| Name | Type | Description |
-|------|------|-------------|
-| `ScreenShareViewerProps`{.primary .text-primary} | `interface` | - |
 
 
 

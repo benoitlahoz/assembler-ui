@@ -40,7 +40,7 @@ import { SimpleInput } from "@/components/ui/simple-input";
 ::hr-underline
 ::
 
-This will install the item in the path defined by your `components.json` file, thanks to shadcn-vue.
+This will install the component in the path defined by your `components.json` file, thanks to shadcn-vue.
 
 :::code-group{.w-full}
   ```bash [yarn]
@@ -278,10 +278,6 @@ Un champ de saisie simple avec label et placeholder
 
 
 
-
-
-
-
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
@@ -347,8 +343,6 @@ Un champ de saisie simple avec label et placeholder
 
 
 
-
-
 ---
 
 
@@ -367,10 +361,6 @@ Un champ de saisie simple avec label et placeholder (API Composition)
 
 
 **Author**: Jane Doe &lt;jane.doe@example.com&gt;
-
-
-
-
 
 
 
@@ -436,8 +426,6 @@ Un champ de saisie simple avec label et placeholder (API Composition)
 | `--input-border-radius`{.primary .text-primary} | `4px` | — |
 | `--input-padding`{.primary .text-primary} | `0.5em 1em` | — |
 | `--input-font-size`{.primary .text-primary} | `1em` | — |
-
-
 
 
 

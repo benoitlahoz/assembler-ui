@@ -14,7 +14,7 @@ description: Composable for managing screen sharing functionality.
 ::hr-underline
 ::
 
-This will install the item in the path defined by your `components.json` file, thanks to shadcn-vue.
+This will install the composable in the path defined by your `components.json` file, thanks to shadcn-vue.
 
 :::code-group{.w-full}
   ```bash [yarn]
@@ -283,20 +283,6 @@ The reactive state and methods for screen sharing.
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   ### Types
 | Name | Type | Description |
 |------|------|-------------|
@@ -310,8 +296,6 @@ The reactive state and methods for screen sharing.
 
 
 
-
-
 ---
 
 
@@ -321,5 +305,5 @@ The reactive state and methods for screen sharing.
 
 
 ::tip
-You can copy and adapt this template for any component documentation.
+You can copy and adapt this template for any composable documentation.
 ::

@@ -102,7 +102,7 @@ const open = ref(false);
 ::hr-underline
 ::
 
-This will install the item in the path defined by your `components.json` file, thanks to shadcn-vue.
+This will install the component in the path defined by your `components.json` file, thanks to shadcn-vue.
 
 :::code-group{.w-full}
   ```bash [yarn]
@@ -1157,33 +1157,6 @@ The demos below use different MediaDevicesProvider. In real world usage, you wou
 
 
 
-
-
-
-  ### Types
-| Name | Type | Description |
-|------|------|-------------|
-| `MediaDeviceType`{.primary .text-primary} | `type` | — |
-| `MediaDeviceKind`{.primary .text-primary} | `type` | — |
-| `MediaPermissionState`{.primary .text-primary} | `type` | — |
-| `MediaPermissions`{.primary .text-primary} | `interface` | — |
-| `FilteredDevices`{.primary .text-primary} | `interface` | — |
-| `CameraConstraints`{.primary .text-primary} | `type` | — |
-| `MicrophoneConstraints`{.primary .text-primary} | `type` | — |
-| `DeviceConstraints`{.primary .text-primary} | `type` | — |
-| `MediaDeviceErrorName`{.primary .text-primary} | `type` | — |
-| `MediaDeviceError`{.primary .text-primary} | `interface` | — |
-| `MediaDevicesProviderSlotProps`{.primary .text-primary} | `interface` | — |
-| `MediaDevicesStartFn`{.primary .text-primary} | `type` | — |
-| `MediaDevicesStopFn`{.primary .text-primary} | `type` | — |
-| `MediaDevicesStopAllFn`{.primary .text-primary} | `type` | — |
-| `MediaDevicesIsActiveStreamFn`{.primary .text-primary} | `type` | — |
-
-
-
-
-
-
 ---
 
 
@@ -1199,10 +1172,6 @@ The MediaDevicesProvider component provides a list of available media devices
 
 
 **API**: composition
-
-
-
-
 
 
 
@@ -1251,15 +1220,6 @@ The MediaDevicesProvider component provides a list of available media devices
 
 
 
-  ### Types
-| Name | Type | Description |
-|------|------|-------------|
-| `MediaDevicesProviderProps`{.primary .text-primary} | `interface` | - |
-
-
-
-
-
 
 ---
 
@@ -1277,10 +1237,6 @@ start/stop functions to manage streams with device caching.
 
 
 **API**: composition
-
-
-
-
 
 
 
@@ -1347,15 +1303,6 @@ start/stop functions to manage streams with device caching.
 
 
 
-  ### Types
-| Name | Type | Description |
-|------|------|-------------|
-| `AudioDeviceProps`{.primary .text-primary} | `interface` | - |
-
-
-
-
-
 
 ---
 
@@ -1373,10 +1320,6 @@ start/stop functions to manage streams with device caching.
 
 
 **API**: composition
-
-
-
-
 
 
 
@@ -1443,15 +1386,6 @@ start/stop functions to manage streams with device caching.
 
 
 
-  ### Types
-| Name | Type | Description |
-|------|------|-------------|
-| `VideoDeviceProps`{.primary .text-primary} | `interface` | - |
-
-
-
-
-
 
 ---
 
@@ -1470,12 +1404,6 @@ Usage:
 &gt;
 ```
  
-
-
-
-
-
-
 
 
 
