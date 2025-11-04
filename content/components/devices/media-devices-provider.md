@@ -1377,7 +1377,7 @@ to select the appropriate camera automatically.
 
 ---
 
-  ## Advanced Usage
+  ## Examples
   ::hr-underline
   ::
 

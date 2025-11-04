@@ -217,14 +217,9 @@ export function useScreenShare(options: UseScreenShareOptions = {}) {
 ```
 :::
 
-## useScreenShare
+## API
 ::hr-underline
 ::
-
-Composable for managing screen sharing functionality.
-
-This composable provides reactive state and methods for screen sharing
-using the getDisplayMedia API.
 
   ### Parameters
 | Name | Type | Default | Description |

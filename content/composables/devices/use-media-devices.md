@@ -582,15 +582,9 @@ export const bar = "foo";
 ```
 :::
 
-## useMediaDevices
+## API
 ::hr-underline
 ::
-
-Composable for managing media devices (cameras, microphones, speakers).
-
-This composable provides reactive state and methods for accessing and managing
-media devices using the MediaDevices API. It handles permissions, device enumeration,
-and stream management with caching.
 
   ### Parameters
 | Name | Type | Default | Description |

@@ -656,7 +656,7 @@ If true, will call startShare() on mount if not already sharing. |
 
 ---
 
-  ## Advanced Usage
+  ## Examples
   ::hr-underline
   ::
 

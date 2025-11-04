@@ -341,7 +341,7 @@ Un champ de saisie simple avec label et placeholder (API Composition)
 
 ---
 
-  ## Advanced Usage
+  ## Examples
   ::hr-underline
   ::
 
