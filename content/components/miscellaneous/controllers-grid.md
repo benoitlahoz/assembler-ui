@@ -21,6 +21,7 @@ interface GridItem {
   width: number;
   height: number;
   component?: any;
+  color?: string;
 }
 
 const grid = ref<InstanceType<typeof ControllersGrid> | null>(null);
@@ -402,7 +403,9 @@ export {
 
 ```vue [src/components/ui/controllers-grid/ControllersGrid.vue]
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { useElementSize, useDropZone } from "@vueuse/core";
+import { useMotion } from "@vueuse/motion";
 
 interface GridItem {
   id: string;
@@ -411,6 +414,7 @@ interface GridItem {
   width: number;
   height: number;
   component?: any;
+  color?: string;
 }
 
 interface Props {
@@ -439,13 +443,13 @@ const emit = defineEmits<{
 }>();
 
 const gridContainer = ref<HTMLElement | null>(null);
-const gridWidth = ref(0);
-const gridHeight = ref(0);
+const placedItems = ref<GridItem[]>([...props.items]);
+const hoverCell = ref<{ x: number; y: number } | null>(null);
 const draggedItem = ref<GridItem | null>(null);
 const draggedFromGrid = ref(false);
-const hoverCell = ref<{ x: number; y: number } | null>(null);
-const placedItems = ref<GridItem[]>([...props.items]);
 const previewSize = ref<{ width: number; height: number } | null>(null);
+
+const { width: gridWidth, height: gridHeight } = useElementSize(gridContainer);
 
 const columns = computed(() => {
   const cols = Math.floor(gridWidth.value / (props.cellSize + props.gap));
@@ -761,31 +765,28 @@ defineExpose({
     ref="gridContainer"
     class="controllers-grid"
     :class="{ 'show-grid': showGrid }"
+    :style="{
+      '--cell-size': `${cellSize}px`,
+      '--gap-size': `${gap}px`,
+    }"
     @dragenter="handleDragEnter"
     @dragover="handleDragOver"
     @dragleave="handleDragLeave"
     @drop="handleDrop"
   >
-    <div
-      class="grid-background"
-      :style="{
-        gridTemplateColumns,
-        gridTemplateRows,
-        gap: `${gap}px`,
-      }"
-    >
-      <div
-        v-for="index in rows * columns"
-        :key="`cell-${index}`"
-        class="grid-cell"
-      />
-
+    <div class="grid-background">
       <div
         v-if="hoverCell && (draggedItem || previewSize)"
         class="grid-item-preview"
+        v-motion
+        :initial="{ opacity: 0, scale: 0.95 }"
+        :enter="{ opacity: 1, scale: 1, transition: { duration: 150 } }"
         :style="{
-          gridColumn: `${hoverCell.x + 1} / span ${draggedItem?.width || previewSize?.width || 1}`,
-          gridRow: `${hoverCell.y + 1} / span ${draggedItem?.height || previewSize?.height || 1}`,
+          position: 'absolute',
+          left: `calc(var(--spacing, 1rem) + ${hoverCell.x} * (var(--cell-size) + var(--gap-size)))`,
+          top: `calc(var(--spacing, 1rem) + ${hoverCell.y} * (var(--cell-size) + var(--gap-size)))`,
+          width: `calc(${draggedItem?.width || previewSize?.width || 1} * var(--cell-size) + ${(draggedItem?.width || previewSize?.width || 1) - 1} * var(--gap-size))`,
+          height: `calc(${draggedItem?.height || previewSize?.height || 1} * var(--cell-size) + ${(draggedItem?.height || previewSize?.height || 1) - 1} * var(--gap-size))`,
         }"
       />
     </div>
@@ -807,10 +808,23 @@ defineExpose({
           gridColumn: `${item.x + 1} / span ${item.width}`,
           gridRow: `${item.y + 1} / span ${item.height}`,
         }"
+        v-motion
+        :initial="{ opacity: 0, scale: 0.8 }"
+        :enter="{
+          opacity: 1,
+          scale: 1,
+          transition: { type: 'spring', stiffness: 300, damping: 20 },
+        }"
         @dragstart.stop="handleDragStart($event, item, true)"
         @dragend.stop="handleDragEnd"
       >
-        <div class="grid-item-content" draggable="false">
+        <div
+          class="grid-item-content"
+          draggable="false"
+          :style="{
+            backgroundColor: item.color || 'hsl(var(--card))',
+          }"
+        >
           <button
             class="grid-item-remove"
             @click.stop="removeItem(item.id)"
@@ -868,22 +882,23 @@ defineExpose({
 .grid-background {
   position: absolute;
   inset: 0;
-  display: grid;
   padding: var(--spacing, 1rem);
   pointer-events: none;
 }
 
-.grid-cell {
-  width: 100%;
-  height: 100%;
-  border: 1px dashed transparent;
-  border-radius: 4px;
-  transition: border-color 0.2s ease;
-  pointer-events: none;
+.show-grid .grid-background {
+  background-image: radial-gradient(
+    circle,
+    hsl(var(--border) / 0.5) 2px,
+    transparent 2px
+  );
+  background-size: calc(var(--cell-size) + var(--gap-size))
+    calc(var(--cell-size) + var(--gap-size));
+  background-position: var(--spacing, 1rem) var(--spacing, 1rem);
 }
 
-.show-grid .grid-cell {
-  border-color: hsl(var(--border) / 0.3);
+.grid-cell {
+  display: none;
 }
 
 .grid-item-preview {
@@ -958,15 +973,22 @@ defineExpose({
   border-radius: 4px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: all 0.2s ease;
+  transform: scale(0.8);
 }
 
 .grid-item:hover .grid-item-remove {
   opacity: 1;
+  transform: scale(1);
 }
 
 .grid-item-remove:hover {
   background-color: hsl(var(--destructive) / 0.9);
+  transform: scale(1.1);
+}
+
+.grid-item-remove:active {
+  transform: scale(0.95);
 }
 
 .grid-item-body {
@@ -1299,6 +1321,8 @@ export interface GridItem {
   height: number;
 
   component?: any;
+
+  color?: string;
 
   [key: string]: any;
 }

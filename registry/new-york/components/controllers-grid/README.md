@@ -1,21 +1,28 @@
 # ControllersGrid
 
-Un composant de grille drag-and-drop responsive pour organiser des contrôleurs ou widgets de manière flexible.
+Un composant de grille drag-and-drop intelligent pour placer et organiser des contrôleurs ou composants dans une interface. Optimisé avec **VueUse** et **@vueuse/motion** pour des performances et animations de qualité.
 
-## Fonctionnalités
+## ✨ Fonctionnalités
 
-✨ **Principales caractéristiques :**
+- ✅ **Drag and drop fluide** : Glissez des items depuis une palette externe ou déplacez-les dans la grille
+- ✅ **Grille responsive** : S'adapte automatiquement à la taille du conteneur
+- ✅ **Placement intelligent** : Validation automatique des placements (pas de chevauchement)
+- ✅ **Preview visuel** : Aperçu en temps réel pendant le drag avec animation
+- ✅ **Animations élégantes** : Animations spring naturelles avec @vueuse/motion
+- ✅ **Multi-tailles** : Supporte des items de tailles variées (1x1, 2x1, 2x2, etc.)
+- ✅ **Grille visuelle** : Points aux coins des cellules (style minimaliste)
+- ✅ **Suppression facile** : Bouton × animé au survol
+- ✅ **TypeScript** : Entièrement typé pour une meilleure DX
 
-- 🎯 **Grille responsive** : S'adapte automatiquement à la taille du conteneur
-- 🔄 **Drag & Drop** : Interface intuitive avec glisser-déposer natif HTML5
-- 📏 **Multi-tailles** : Support des items 1x1, 1x2, 2x1, 2x2, etc.
-- 👁️ **Aperçu visuel** : Prévisualisation du placement pendant le drag
-- ✅ **Validation** : Empêche les chevauchements et placements invalides
-- 🎨 **Personnalisable** : Taille de cellules, espacement et style configurables
-- 💾 **Événements** : Émission d'événements pour la persistance des données
-- 🔧 **API programmatique** : Méthodes exposées pour contrôle externe
+## 🎨 Technologies
 
-## Installation
+- **Vue 3** Composition API
+- **@vueuse/core** : `useElementSize` pour le dimensionnement réactif
+- **@vueuse/motion** : Animations fluides et naturelles
+- **HTML5 Drag and Drop API** : Drag-drop natif optimisé
+- **CSS Grid** : Layout performant et flexible
+
+## 📦 Installation
 
 ```bash
 # Copiez le composant dans votre projet
@@ -183,7 +190,47 @@ const items = ref([
 
 ### Créer une palette d'items draggables
 
-Voir le fichier `example.vue` pour un exemple complet avec une palette de composants.
+Pour créer une palette externe, utilisez `effectAllowed: 'copy'` :
+
+```vue
+<script setup lang="ts">
+const handlePaletteDragStart = (event: DragEvent, template: any) => {
+  const item = {
+    id: `${template.id}-${Date.now()}`,
+    width: template.width,
+    height: template.height,
+  };
+  
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'copy'; // Important !
+    event.dataTransfer.setData('application/json', JSON.stringify(item));
+  }
+};
+</script>
+
+<template>
+  <div
+    v-for="template in availableComponents"
+    :key="template.id"
+    :draggable="true"
+    @dragstart="handlePaletteDragStart($event, template)"
+  >
+    {{ template.label }}
+  </div>
+</template>
+```
+
+Voir `demos/SimpleExample.vue` pour un exemple complet avec palette.
+
+## 🎬 Animations
+
+Le composant utilise `@vueuse/motion` pour des animations fluides. Consultez [ANIMATIONS.md](./ANIMATIONS.md) pour plus de détails.
+
+**Animations incluses :**
+- ✨ Apparition spring des items placés (scale + fade)
+- 🎯 Preview animé pendant le drag
+- 🔘 Bouton de suppression avec micro-interactions
+- 💫 Animation pulse du preview
 
 ## Personnalisation CSS
 

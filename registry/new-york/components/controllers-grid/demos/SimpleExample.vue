@@ -9,6 +9,7 @@ interface GridItem {
   width: number;
   height: number;
   component?: any;
+  color?: string;
 }
 
 // Référence à la grille

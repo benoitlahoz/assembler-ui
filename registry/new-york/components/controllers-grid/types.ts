@@ -18,6 +18,8 @@ export interface GridItem {
   height: number;
   /** Composant Vue optionnel à rendre */
   component?: any;
+  /** Couleur de fond du contrôleur */
+  color?: string;
   /** Propriétés additionnelles personnalisées */
   [key: string]: any;
 }
