@@ -88,6 +88,14 @@ export const main = async () => {
               }
               result.category = mainCategory || 'miscellaneous';
             }
+            // Normaliser la catégorie : si c'est un objet structuré, extraire le nom
+            if (
+              typeof result.category === 'object' &&
+              result.category !== null &&
+              'name' in result.category
+            ) {
+              result.category = result.category.name;
+            }
             // Réorganiser les clés pour respecter l'ordre souhaité
             const ordered: any = {};
             if (result.$schema) ordered.$schema = result.$schema;
