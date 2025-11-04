@@ -15,6 +15,18 @@ import {
 
 import config from '../assembler-ui.config';
 
+/**
+ * Script de test pour générer des documentations MDC à partir des assemblerjs-test.json enrichis
+ *
+ * Différences avec generate-docs.ts :
+ * 1. Utilise assemblerjs-test.json au lieu de assemblerjs.json
+ * 2. Utilise les templates de tests/ qui incluent les dépendances dans le code-tree
+ * 3. Génère dans les dossiers content/ avec le suffixe -test.md
+ *
+ * Usage:
+ *   yarn tsx scripts/generate-docs.ts
+ */
+
 const GlobalComponentsPath = config.globalPath || 'registry/new-york/';
 const DescriptionFilename = config.definitionFile || 'assemblerjs.json';
 const InstallPaths = config.install || {
@@ -30,6 +42,10 @@ type AssemblerDoc = {
   title?: string;
   description?: string;
   author?: string;
+  dependencies?: {
+    dependsOn: Array<{ path: string; name: string }>;
+    usedBy: string[];
+  };
   [key: string]: any;
 };
 
@@ -73,7 +89,7 @@ function getOutputDir(type: string, category?: string): string {
   // Utilise le mapping de la configuration si disponible, sinon 'miscellaneous'
   const typeMapping = config.typeMapping as Record<string, string> | undefined;
   const base = typeMapping?.[normalizedType] || 'miscellaneous';
-  // Ajoute la catégorie si présente
+  // Génère dans les dossiers content/ usuels
   if (category && base !== 'miscellaneous') {
     return path.resolve(process.cwd(), `content/${base}/${category}`);
   }
@@ -95,6 +111,7 @@ export async function generateDocs(): Promise<void> {
   const errors: { dir: string; error: any }[] = [];
   let total = 0;
   let remaining = assemblerJsons.length;
+  let withDependencies = 0;
 
   for (const assemblerPath of assemblerJsons) {
     total++;
@@ -105,29 +122,35 @@ export async function generateDocs(): Promise<void> {
         message: `Generating doc for '${assembler.name}'`,
         action: async () => {
           const allFiles: FileEntry[] = getFilesFromAssembler(assemblerPath);
-          // On ne garde que les .vue pour la doc détaillée si registry:ui ou registry:component
-          // Pour registry:hook, on garde les .ts (composables)
           const normalizedType = (assembler.type || '').split(':').pop() || '';
           let files: FileEntry[] = allFiles;
+
           if (normalizedType === 'ui' || normalizedType === 'component') {
             files = allFiles.filter((f) => f.path.endsWith('.vue'));
           } else if (normalizedType === 'hook') {
             files = allFiles.filter((f) => f.path.endsWith('.ts') && !f.path.endsWith('.d.ts'));
-            // Pour les composables, trie les fichiers pour mettre le fichier principal en premier
             files = sortFilesByMain(files, assembler.name);
           }
 
-          // Pour le code-tree, on prend tous les fichiers (vue ou non)
           const codes = (
             await Promise.all(
               allFiles.map(async (file) => {
                 let code = '';
                 let lang = '';
+
+                // Calculer le filename relatif au dossier du composable
+                // Ex: "registry/new-york/composables/use-media-devices/bar/index.ts"
+                // -> chercher "use-media-devices/" et prendre ce qui suit
                 let filename = path.basename(file.path);
-                // On prend le code brut, sans entités, pour tous les fichiers connus
+                const componentFolderName = `${assembler.name}/`;
+                const componentFolderIndex = file.path.indexOf(componentFolderName);
+                if (componentFolderIndex !== -1) {
+                  // Extraire le chemin relatif après le nom du composable
+                  filename = file.path.substring(componentFolderIndex + componentFolderName.length);
+                }
+
                 if (file.doc && file.doc.source) {
                   if (typeof file.doc.source === 'object') {
-                    // On privilégie .html, sinon on prend la première string longue ou multi-ligne
                     if (file.doc.source.html) {
                       code = file.doc.source.html;
                     } else {
@@ -155,17 +178,18 @@ export async function generateDocs(): Promise<void> {
                     code = file.doc.source;
                   }
                 }
+
                 const ext = (file.path.split('.').pop() ?? '').toLowerCase();
                 if (ext === 'vue') lang = 'vue';
                 else if (ext === 'js') lang = 'js';
                 else if (ext === 'ts') lang = 'ts';
                 else if (ext === 'json') lang = 'json';
                 else lang = ext;
+
                 const validExts = ['vue', 'js', 'ts', 'json', 'html', 'css', 'scss', 'md', 'd.ts'];
                 if (!validExts.some((e) => filename.endsWith(e))) return null;
                 if (!code || !code.trim()) return null;
 
-                // Décodage complet (entities) puis suppression des commentaires puis formatage
                 code = decode(code);
                 code = stripComments(code);
                 code = await formatCode(code, filename);
@@ -181,26 +205,124 @@ export async function generateDocs(): Promise<void> {
             )
           ).filter(Boolean);
 
-          // Pour les composables, trie les codes pour mettre le fichier principal en premier
           let sortedCodes = codes;
           if (normalizedType === 'hook') {
             sortedCodes = sortCodesByMain(codes, assembler.name);
           }
 
-          // Détermine le chemin de base pour le code-tree selon le type et le nom de l'item
           let codeBasePath = `src/components/ui/${assembler.name}`;
           if (normalizedType === 'block') codeBasePath = `src/components/blocks/${assembler.name}`;
           else if (normalizedType === 'hook') codeBasePath = `src/composables/${assembler.name}`;
           else if (normalizedType === 'component')
             codeBasePath = `src/components/ui/${assembler.name}`;
 
-          // Définit le default-value pour le code-tree (premier fichier du tableau codes)
           let codeTreeDefaultValue = '';
           if (sortedCodes.length > 0 && sortedCodes[0] && sortedCodes[0].filename) {
             codeTreeDefaultValue = `${codeBasePath}/${sortedCodes[0].filename}`;
           }
-          // Lecture du champ install (toujours une string) et création d'un objet des chemins
-          // Crée les commandes d'installation finales à partir des templates InstallPaths et assembler.install
+
+          // AJOUT: Charger les codes des dépendances
+          let dependencyCodes: any[] = [];
+          if (assembler.dependencies && assembler.dependencies.dependsOn.length > 0) {
+            for (const dep of assembler.dependencies.dependsOn) {
+              const depPath = path.resolve(process.cwd(), GlobalComponentsPath, dep.path);
+              const depAssemblerPath = path.join(depPath, DescriptionFilename);
+
+              if (fs.existsSync(depAssemblerPath)) {
+                const depAssembler = JSON.parse(fs.readFileSync(depAssemblerPath, 'utf-8'));
+                const depFiles = getFilesFromAssembler(depAssemblerPath);
+                const depNormalizedType = (depAssembler.type || '').split(':').pop() || '';
+
+                let depBasePath = `src/components/ui/${dep.name}`;
+                if (depNormalizedType === 'block')
+                  depBasePath = `src/components/blocks/${dep.name}`;
+                else if (depNormalizedType === 'hook') depBasePath = `src/composables/${dep.name}`;
+                else if (depNormalizedType === 'component')
+                  depBasePath = `src/components/ui/${dep.name}`;
+
+                const depCodesRaw = await Promise.all(
+                  depFiles.map(async (file) => {
+                    let code = '';
+                    let lang = '';
+
+                    let filename = path.basename(file.path);
+                    const depFolderName = `${dep.name}/`;
+                    const depFolderIndex = file.path.indexOf(depFolderName);
+                    if (depFolderIndex !== -1) {
+                      filename = file.path.substring(depFolderIndex + depFolderName.length);
+                    }
+
+                    if (file.doc && file.doc.source) {
+                      if (typeof file.doc.source === 'object') {
+                        if (file.doc.source.html) {
+                          code = file.doc.source.html;
+                        } else {
+                          const docKeys = [
+                            'description',
+                            'tags',
+                            'author',
+                            'category',
+                            'title',
+                            'name',
+                          ];
+                          const firstString = Object.entries(file.doc.source)
+                            .filter(
+                              ([k, v]) =>
+                                typeof v === 'string' &&
+                                !docKeys.includes(k) &&
+                                (v.includes('\n') ||
+                                  v.length > 40 ||
+                                  ['vue', 'js', 'ts', 'json', 'html', 'css', 'scss', 'md'].includes(
+                                    k
+                                  ))
+                            )
+                            .map(([k, v]) => v)[0];
+                          if (firstString) code = firstString;
+                        }
+                      } else if (typeof file.doc.source === 'string') {
+                        code = file.doc.source;
+                      }
+                    }
+
+                    const ext = (file.path.split('.').pop() ?? '').toLowerCase();
+                    if (ext === 'vue') lang = 'vue';
+                    else if (ext === 'js') lang = 'js';
+                    else if (ext === 'ts') lang = 'ts';
+                    else if (ext === 'json') lang = 'json';
+                    else lang = ext;
+
+                    const validExts = [
+                      'vue',
+                      'js',
+                      'ts',
+                      'json',
+                      'html',
+                      'css',
+                      'scss',
+                      'md',
+                      'd.ts',
+                    ];
+                    if (!validExts.some((e) => filename.endsWith(e))) return null;
+                    if (!code || !code.trim()) return null;
+
+                    code = decode(code);
+                    code = stripComments(code);
+                    code = await formatCode(code, filename);
+
+                    return {
+                      code,
+                      lang,
+                      filename,
+                      basePath: depBasePath,
+                    };
+                  })
+                );
+
+                dependencyCodes.push(...depCodesRaw.filter(Boolean));
+              }
+            }
+          }
+
           let installPaths: Record<string, string>;
           if (assembler.install && typeof assembler.install === 'string') {
             installPaths = {
@@ -212,20 +334,44 @@ export async function generateDocs(): Promise<void> {
           } else {
             installPaths = InstallPaths;
           }
-          const templateData: Record<string, any> = {
-            install: installPaths,
-            name: assembler.name,
-            title: assembler.title || assembler.name,
+
+          const templateData: {
+            assembler: AssemblerDoc;
+            title: string;
+            description: string;
+            install: Record<string, string>;
+            files: FileEntry[];
+            codes: any[];
+            codeBasePath: string;
+            codeTreeDefaultValue: string;
+            installPaths: Record<string, string>;
+            dependencies: { dependsOn: Array<{ path: string; name: string }>; usedBy: string[] };
+            dependencyCodes: any[];
+            demo?: any;
+            escapePipe?: (text: string) => string;
+          } = {
+            assembler,
+            title: assembler.title || assembler.name || '',
             description: assembler.description || '',
-            author: assembler.author || '',
+            install: installPaths ?? {},
             files,
             codes: sortedCodes,
             codeBasePath,
             codeTreeDefaultValue,
-            // Helper function for escaping pipes in markdown tables
+            installPaths: installPaths ?? {},
+            dependencies: assembler.dependencies || { dependsOn: [], usedBy: [] },
+            dependencyCodes,
             escapePipe: escapeMarkdownTableCell,
           };
-          // Si demo existe et est un array non vide, formater chaque entrée comme pour le code-tree et passer à templateData.demo
+
+          // Compter les composants avec dépendances
+          if (assembler.dependencies) {
+            const hasDepends = assembler.dependencies.dependsOn.length > 0;
+            const hasUsedBy = assembler.dependencies.usedBy.length > 0;
+            if (hasDepends || hasUsedBy) {
+              withDependencies++;
+            }
+          }
           if (Array.isArray(assembler.demo) && assembler.demo.length > 0) {
             const formattedDemo = await Promise.all(
               assembler.demo.map(async (demo) => {
@@ -254,16 +400,13 @@ export async function generateDocs(): Promise<void> {
             templateData.demo = formattedDemo;
           }
 
-          // Choisir le bon template selon le type
           const templatePath =
             normalizedType === 'hook' ? composableTemplatePath : componentTemplatePath;
           const template = fs.readFileSync(templatePath, 'utf-8');
           const rendered = ejs.render(template, templateData, { filename: templatePath });
 
-          // Normalise les sauts de lignes multiples dans le rendu final
           const normalizedRendered = normalizeLineBreaks(rendered);
 
-          // Déterminer le dossier de sortie selon le type et la catégorie
           const type = assembler.type || 'ui';
           const category = assembler.category;
           const outputDir = getOutputDir(type, category);
@@ -271,10 +414,18 @@ export async function generateDocs(): Promise<void> {
           const docFile = path.join(outputDir, `${assembler.name}.md`);
           fs.writeFileSync(docFile, normalizedRendered, 'utf-8');
 
-          return { name: assembler.name, type: normalizedType };
+          return {
+            name: assembler.name,
+            type: normalizedType,
+            hasDeps:
+              assembler.dependencies &&
+              (assembler.dependencies.dependsOn.length > 0 ||
+                assembler.dependencies.usedBy.length > 0),
+          };
         },
-        successMessage: (res) => `Doc generated for '${res?.name}' (type: ${res?.type}).`,
-        failMessage: `Error while generating doc for '${assembler.name}'`,
+        successMessage: (res) =>
+          `Test doc generated for '${res?.name}' (type: ${res?.type})${res?.hasDeps ? ' with dependencies' : ''}.`,
+        failMessage: `Error while generating test doc for '${assembler.name}'`,
       });
     } catch (error) {
       errors.push({ dir: assembler.name, error });
@@ -285,8 +436,12 @@ export async function generateDocs(): Promise<void> {
   }
 
   displayGenerationSummary(total, errors, {
-    successMessage: `✔ {count} doc(s) generated successfully.`,
+    successMessage: `✔ {count} test doc(s) generated successfully.`,
   });
+
+  if (withDependencies > 0) {
+    console.log(`📦 ${withDependencies} with dependencies`);
+  }
   console.log('');
 }
 

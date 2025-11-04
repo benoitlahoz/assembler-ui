@@ -53,6 +53,15 @@ Copy and paste these files into your project.
 ```
 <%_ }); _%>
 <%_ } _%>
+<%# AJOUT: Dépendances dans le code-tree -%>
+<%_ if (typeof dependencyCodes !== 'undefined' && Array.isArray(dependencyCodes)) { _%>
+<%_ dependencyCodes.forEach(function(depCode) { _%>
+
+```<%- depCode.lang %> [<%- depCode.basePath %>/<%- depCode.filename %>]
+<%- depCode.code -%>
+```
+<%_ }); _%>
+<%_ } _%>
 :::
 
 <% if (typeof files !== 'undefined' && Array.isArray(files)) { %>
