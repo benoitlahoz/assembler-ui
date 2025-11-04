@@ -4,13 +4,6 @@ description: Index file for input components
 ---
 
 
-
-
-  
-
-
-
-
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
     <simple-input-demo />
@@ -33,7 +26,6 @@ import { SimpleInput } from "@/components/ui/simple-input";
   ```
   :::
 ::
-
 
 
 ## Install with CLI
@@ -59,7 +51,6 @@ This will install the component in the path defined by your `components.json` fi
   bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/simple-input.json"
   ```
 :::
-
 
 
 ## Install Manually
@@ -255,8 +246,6 @@ label {
 :::
 
 
-
-
 ## SimpleInput
 ::hr-underline
 ::
@@ -265,17 +254,10 @@ label {
 Un champ de saisie simple avec label et placeholder
 
 
-
 **API**: options
 
 
-
-
 **Author**: Jane Doe &lt;jane.doe@example.com&gt;
-
-
-
-
 
 
   ### Props
@@ -286,17 +268,10 @@ Un champ de saisie simple avec label et placeholder
 | `modelValue`{.primary .text-primary} | `String` | — | Valeur du champ |
 
 
-
-
   ### Events
 | Name | Description |
 |------|-------------|
 | `update:modelValue`{.primary .text-primary} | Valeur du champ |
-
-
-
-
-
 
 
   ### Provide
@@ -307,16 +282,12 @@ Un champ de saisie simple avec label et placeholder
 | `computedKey`{.primary .text-primary} | `true` | `boolean` | Provide avec clé computed |
 
 
-
-
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
 | `injected`{.primary .text-primary} | `'someKey'` | `string` | Injects a value with key 'someKey'. |
 | `injectedSym`{.primary .text-primary} | `symKey` | `any` | Inject avec clé symbole |
 | `injectedSpread`{.primary .text-primary} | `'spread'` | `string` | Inject avec spread |
-
-
 
 
   ### Expose
@@ -327,9 +298,6 @@ Un champ de saisie simple avec label et placeholder
 | `myFunc`{.primary .text-primary} | — | An exposed function that logs a message and returns &#39;foo&#39; |
 
 
-
-
-
   ### CSS Variables
 | Name | Value | Description |
 |------|-------|-------------|
@@ -337,10 +305,6 @@ Un champ de saisie simple avec label et placeholder
 | `--input-border-radius`{.primary .text-primary} | `4px` | — |
 | `--input-padding`{.primary .text-primary} | `0.5em 1em` | — |
 | `--input-font-size`{.primary .text-primary} | `1em` | — |
-
-
-
-
 
 
 ---
@@ -354,17 +318,10 @@ Un champ de saisie simple avec label et placeholder
 Un champ de saisie simple avec label et placeholder (API Composition)
 
 
-
 **API**: composition
 
 
-
-
 **Author**: Jane Doe &lt;jane.doe@example.com&gt;
-
-
-
-
 
 
   ### Props
@@ -375,17 +332,10 @@ Un champ de saisie simple avec label et placeholder (API Composition)
 | `modelValue`{.primary .text-primary} | `String` | '' | Valeur du champ |
 
 
-
-
   ### Events
 | Name | Description |
 |------|-------------|
 | `update:modelValue`{.primary .text-primary} | Émis à chaque modification de la valeur |
-
-
-
-
-
 
 
   ### Provide
@@ -396,8 +346,6 @@ Un champ de saisie simple avec label et placeholder (API Composition)
 | `computedKey`{.primary .text-primary} | `true` | `boolean` | — |
 
 
-
-
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
@@ -406,17 +354,12 @@ Un champ de saisie simple avec label et placeholder (API Composition)
 | `spread`{.primary .text-primary} | — | — | — |
 
 
-
-
   ### Expose
 | Name | Type | Description |
 |------|------|-------------|
 | `exposed`{.primary .text-primary} | `Ref<any>` | — |
 | `other`{.primary .text-primary} | `Ref<any>` | — |
 | `myFunc`{.primary .text-primary} | `() => string` | — |
-
-
-
 
 
   ### CSS Variables
@@ -428,15 +371,7 @@ Un champ de saisie simple avec label et placeholder (API Composition)
 | `--input-font-size`{.primary .text-primary} | `1em` | — |
 
 
-
-
-
-
 ---
-
-
-
-
 
 
   ## Advanced Usage
@@ -444,16 +379,11 @@ Un champ de saisie simple avec label et placeholder (API Composition)
   ::
 
   
-    
-
-
-
 ### Example
 ::hr-underline
 ::
 
 A very simple example of SimpleInput usage.
-
 
 
 ::tabs
@@ -480,8 +410,6 @@ import { SimpleInput } from "@/components/ui/simple-input";
 ::
 
   
-
-
 ::tip
 You can copy and adapt this template for any component documentation.
 ::

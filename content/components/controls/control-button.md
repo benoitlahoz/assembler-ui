@@ -4,13 +4,6 @@ description: A 1:1 aspect ratio button component.
 ---
 
 
-
-
-  
-
-
-
-
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
     <control-button-demo />
@@ -55,7 +48,6 @@ import { Separator } from "@/components/ui/separator";
 ::
 
 
-
 ## Install with CLI
 ::hr-underline
 ::
@@ -79,7 +71,6 @@ This will install the component in the path defined by your `components.json` fi
   bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/control-button.json"
   ```
 :::
-
 
 
 ## Install Manually
@@ -204,22 +195,14 @@ const props = defineProps<ControlButtonLabelProps>();
 :::
 
 
-
-
 ## ControlButton
 ::hr-underline
 ::
 
 
-
-
 **API**: composition
 
 
-
-
-
-  
 ### Variants
 **ControlButtonVariants**
 | Name | Values |
@@ -227,8 +210,6 @@ const props = defineProps<ControlButtonLabelProps>();
 |`variant`{.primary .text-primary} | `default`{.mr-2} `destructive`{.mr-2} `outline`{.mr-2} `secondary`{.mr-2} |
 |`size`{.primary .text-primary} | `default`{.mr-2} `sm`{.mr-2} `lg`{.mr-2} |
 |`shape`{.primary .text-primary} | `square`{.mr-2} `circle`{.mr-2} |
-
-
 
 
   ### Props
@@ -240,32 +221,15 @@ const props = defineProps<ControlButtonLabelProps>();
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
 
-
-
-
-
   ### Slots
 | Name | Description |
 |------|-------------|
 | `default`{.primary .text-primary} | Typically a ControlButtonLabel |
 
 
-
-
-
-
-
-
-
-
-
-
-
   ### Child Components
 
   `Primitive`{.primary .text-primary}
-
-
 
 
 ---
@@ -276,14 +240,7 @@ const props = defineProps<ControlButtonLabelProps>();
 ::
 
 
-
-
 **API**: composition
-
-
-
-
-
 
 
   ### Props
@@ -292,25 +249,10 @@ const props = defineProps<ControlButtonLabelProps>();
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
 
-
-
-
-
   ### Slots
 | Name | Description |
 |------|-------------|
 | `default`{.primary .text-primary} | — |
-
-
-
-
-
-
-
-
-
-
-
 
 
   ### Child Components
@@ -318,14 +260,7 @@ const props = defineProps<ControlButtonLabelProps>();
   `Label`{.primary .text-primary}
 
 
-
-
 ---
-
-
-
-
-
 
 
 ::tip

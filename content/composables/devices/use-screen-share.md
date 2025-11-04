@@ -4,10 +4,7 @@ description: Composable for managing screen sharing functionality.
 ---
 
 
-  
   <p class="text-pretty mt-4"><br>This composable provides reactive state and methods for screen sharing<br>using the getDisplayMedia API.</p>
-
-
 
 
 ## Install with CLI
@@ -33,7 +30,6 @@ This will install the composable in the path defined by your `components.json` f
   bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-screen-share.json"
   ```
 :::
-
 
 
 ## Install Manually
@@ -229,8 +225,6 @@ export function useScreenShare(options: UseScreenShareOptions = {}) {
 :::
 
 
-
-
 ## useScreenShare
 ::hr-underline
 ::
@@ -242,28 +236,16 @@ This composable provides reactive state and methods for screen sharing
 using the getDisplayMedia API.
 
 
-
-
-
-
-
-
-
   ### Parameters
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `options`{.primary .text-primary} | `UseScreenShareOptions` | {} | — |
 
 
-
-
-
   ### Returns
 
 
 The reactive state and methods for screen sharing.
-
-
 
 
 | Property | Type | Description |
@@ -277,12 +259,6 @@ The reactive state and methods for screen sharing.
 | `stopScreenShare`{.primary .text-primary} | `ScreenShareStopFn` | Function to stop screen sharing. |
 
 
-
-
-
-
-
-
   ### Types
 | Name | Type | Description |
 |------|------|-------------|
@@ -294,14 +270,7 @@ The reactive state and methods for screen sharing.
 | `UseScreenShareOptions`{.primary .text-primary} | `interface` | — |
 
 
-
-
 ---
-
-
-
-
-
 
 
 ::tip

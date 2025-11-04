@@ -4,14 +4,7 @@ description: A renderless provider component that manages screen sharing functio
 ---
 
 
-  
   <p class="text-pretty mt-4"><br>This component uses the getDisplayMedia API to enable screen, window, or tab sharing.<br>It manages the sharing state and provides reactive access to the screen stream.<br><br>Unlike MediaDevicesProvider, screen sharing doesn't enumerate available sources.<br>Instead, the browser displays a picker for the user to select what to share.</p>
-
-
-
-  
-
-
 
 
 ::tabs
@@ -125,7 +118,6 @@ import { ScreenShareProvider, ScreenShareViewer } from "..";
 ::
 
 
-
 ## Install with CLI
 ::hr-underline
 ::
@@ -149,7 +141,6 @@ This will install the component in the path defined by your `components.json` fi
   bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/screen-share-provider.json"
   ```
 :::
-
 
 
 ## Install Manually
@@ -435,8 +426,6 @@ video {
 :::
 
 
-
-
 ## index
 ::hr-underline
 ::
@@ -449,28 +438,6 @@ It manages the sharing state and provides reactive access to the screen stream.
 
 Unlike MediaDevicesProvider, screen sharing doesn&#39;t enumerate available sources.
 Instead, the browser displays a picker for the user to select what to share.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 ---
@@ -486,14 +453,7 @@ and exposes the screen stream and control functions to its child components
 via scoped slots and provide/inject.
  
 
-
-
 **API**: composition
-
-
-
-
-
 
 
   ### Props
@@ -503,17 +463,10 @@ via scoped slots and provide/inject.
 | `defaultOptions`{.primary .text-primary} | `ScreenShareOptions` | - | Default options to use when starting screen share. |
 
 
-
-
-
-
   ### Slots
 | Name | Description |
 |------|-------------|
 | `default`{.primary .text-primary} | Slot for child components to access screen sharing state and controls |
-
-
-
 
 
   ### Provide
@@ -525,15 +478,6 @@ via scoped slots and provide/inject.
 | `ScreenShareErrorsKey`{.primary .text-primary} | `errors` | `Ref<Error[]>` | — |
 | `ScreenShareStartKey`{.primary .text-primary} | `startScreenShare` | `ScreenShareStartFn` | — |
 | `ScreenShareStopKey`{.primary .text-primary} | `stopScreenShare` | `ScreenShareStopFn` | — |
-
-
-
-
-
-
-
-
-
 
 
 ---
@@ -548,14 +492,7 @@ The ScreenShareViewer component displays the shared screen in a video element.
 It automatically connects to the screen stream provided by ScreenShareProvider.
  
 
-
-
 **API**: composition
-
-
-
-
-
 
 
   ### Props
@@ -570,14 +507,6 @@ It automatically connects to the screen stream provided by ScreenShareProvider.
 If true, will call startShare() on mount if not already sharing. |
 
 
-
-
-
-
-
-
-
-
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
@@ -587,18 +516,7 @@ If true, will call startShare() on mount if not already sharing. |
 | `ScreenShareStopKey`{.primary .text-primary} | — | — | — |
 
 
-
-
-
-
-
-
-
 ---
-
-
-
-
 
 
   ## Advanced Usage
@@ -606,14 +524,9 @@ If true, will call startShare() on mount if not already sharing. |
   ::
 
   
-    
-
-
-
 ### Advanced Options
 ::hr-underline
 ::
-
 
 
 ::tabs
@@ -825,8 +738,6 @@ const shareOptions = computed<ScreenShareOptions>(() => ({
 ::
 
   
-
-
 ::tip
 You can copy and adapt this template for any component documentation.
 ::

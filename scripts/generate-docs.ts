@@ -5,6 +5,7 @@ import { decode } from 'entities';
 import { stripComments } from './docs/common/strip-comments';
 import { formatCode } from './docs/common/format-code';
 import { escapeMarkdownTableCell } from './docs/common/escape-markdown';
+import { normalizeLineBreaks } from './docs/common/normalize-line-breaks';
 import {
   runWithSpinner,
   displayGenerationSummary,
@@ -249,13 +250,16 @@ export async function generateDocs(): Promise<void> {
           const template = fs.readFileSync(templatePath, 'utf-8');
           const rendered = ejs.render(template, templateData, { filename: templatePath });
 
+          // Normalise les sauts de lignes multiples dans le rendu final
+          const normalizedRendered = normalizeLineBreaks(rendered);
+
           // Déterminer le dossier de sortie selon le type et la catégorie
           const type = assembler.type || 'ui';
           const category = assembler.category;
           const outputDir = getOutputDir(type, category);
           if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
           const docFile = path.join(outputDir, `${assembler.name}.md`);
-          fs.writeFileSync(docFile, rendered, 'utf-8');
+          fs.writeFileSync(docFile, normalizedRendered, 'utf-8');
 
           return { name: assembler.name, type: normalizedType };
         },

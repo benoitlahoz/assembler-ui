@@ -4,14 +4,7 @@ description: A renderless provider component that supplies media devices informa
 ---
 
 
-  
   <p class="text-pretty mt-4"><br>This component uses the MediaDevices API to list available audio and video input devices.<br>It manages user permissions and provides reactive access to device information.<br><br>The demos below use different MediaDevicesProvider. In real world usage, you would typically wrap your application or a section of it with the MediaDevicesProvider component.</p>
-
-
-
-  
-
-
 
 
 ::tabs
@@ -97,7 +90,6 @@ const open = ref(false);
 ::
 
 
-
 ## Install with CLI
 ::hr-underline
 ::
@@ -121,7 +113,6 @@ This will install the component in the path defined by your `components.json` fi
   bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/media-devices-provider.json"
   ```
 :::
-
 
 
 ## Install Manually
@@ -1120,8 +1111,6 @@ export const MediaPresets = {
 :::
 
 
-
-
 ## index
 ::hr-underline
 ::
@@ -1133,28 +1122,6 @@ This component uses the MediaDevices API to list available audio and video input
 It manages user permissions and provides reactive access to device information.
 
 The demos below use different MediaDevicesProvider. In real world usage, you would typically wrap your application or a section of it with the MediaDevicesProvider component.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 ---
@@ -1169,14 +1136,7 @@ The MediaDevicesProvider component provides a list of available media devices
 (cameras, microphones, etc.) to its child components via a scoped slot.
  
 
-
-
 **API**: composition
-
-
-
-
-
 
 
   ### Props
@@ -1186,17 +1146,10 @@ The MediaDevicesProvider component provides a list of available media devices
 | `open`{.primary .text-primary} | `boolean` | false | Whether to automatically request media permissions and devices on mount. |
 
 
-
-
-
-
   ### Slots
 | Name | Description |
 |------|-------------|
 | `default`{.primary .text-primary} | Slot for child components to access media devices, errors, and stream management |
-
-
-
 
 
   ### Provide
@@ -1212,15 +1165,6 @@ The MediaDevicesProvider component provides a list of available media devices
 | `MediaDevicesStopAllKey`{.primary .text-primary} | `stopAllStreams` | `MediaDevicesStopAllFn` | Stop all active media streams. |
 
 
-
-
-
-
-
-
-
-
-
 ---
 
 
@@ -1234,14 +1178,7 @@ This component builds audio constraints and uses the MediaDevicesProvider&#39;s
 start/stop functions to manage streams with device caching.
  
 
-
-
 **API**: composition
-
-
-
-
-
 
 
   ### Props
@@ -1257,19 +1194,10 @@ start/stop functions to manage streams with device caching.
 | `constraints`{.primary .text-primary} | `MediaStreamConstraints` | - | Custom MediaStreamConstraints to override simplified props. |
 
 
-
-
-
-
   ### Slots
 | Name | Description |
 |------|-------------|
 | `default`{.primary .text-primary} | — |
-
-
-
-
-
 
 
   ### Inject
@@ -1280,8 +1208,6 @@ start/stop functions to manage streams with device caching.
 | `MediaDevicesLoadingKey`{.primary .text-primary} | `ref(false)` | `any` | — |
 | `MediaDevicesPermissionsKey`{.primary .text-primary} | `ref({ camera: 'unknown', microphone: 'unknown' })` | `any` | — |
 | `MediaDevicesActiveStreamsKey`{.primary .text-primary} | `computed(() => new Map() as ReadonlyMap<string, MediaStream>)` | `any` | — |
-
-
 
 
   ### Expose
@@ -1296,12 +1222,6 @@ start/stop functions to manage streams with device caching.
 | `providerPermissions`{.primary .text-primary} | — | — |
 | `providerActiveStreams`{.primary .text-primary} | — | — |
 | `error`{.primary .text-primary} | — | — |
-
-
-
-
-
-
 
 
 ---
@@ -1317,14 +1237,7 @@ This component builds video constraints and uses the MediaDevicesProvider&#39;s
 start/stop functions to manage streams with device caching.
  
 
-
-
 **API**: composition
-
-
-
-
-
 
 
   ### Props
@@ -1340,19 +1253,10 @@ start/stop functions to manage streams with device caching.
 | `constraints`{.primary .text-primary} | `MediaStreamConstraints` | - | Custom MediaStreamConstraints to override simplified props. |
 
 
-
-
-
-
   ### Slots
 | Name | Description |
 |------|-------------|
 | `default`{.primary .text-primary} | — |
-
-
-
-
-
 
 
   ### Inject
@@ -1363,8 +1267,6 @@ start/stop functions to manage streams with device caching.
 | `MediaDevicesLoadingKey`{.primary .text-primary} | `ref(false)` | `any` | — |
 | `MediaDevicesPermissionsKey`{.primary .text-primary} | `ref({ camera: 'unknown', microphone: 'unknown' })` | `any` | — |
 | `MediaDevicesActiveStreamsKey`{.primary .text-primary} | `computed(() => new Map() as ReadonlyMap<string, MediaStream>)` | `any` | — |
-
-
 
 
   ### Expose
@@ -1379,12 +1281,6 @@ start/stop functions to manage streams with device caching.
 | `providerPermissions`{.primary .text-primary} | — | — |
 | `providerActiveStreams`{.primary .text-primary} | — | — |
 | `error`{.primary .text-primary} | — | — |
-
-
-
-
-
-
 
 
 ---
@@ -1405,34 +1301,7 @@ Usage:
 ```
  
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ---
-
-
-
-
 
 
   ## Advanced Usage
@@ -1440,16 +1309,11 @@ Usage:
   ::
 
   
-    
-
-
-
 ### Stream Cache
 ::hr-underline
 ::
 
 Select a camera from the list. The provider caches streams to avoid reopening the same device.
-
 
 
 ::tabs
@@ -1644,16 +1508,11 @@ watch([videoRef, selectedDeviceId], async () => {
 ::
 
   
-    
-
-
-
 ### Presets
 ::hr-underline
 ::
 
 Select a camera and quality preset. The provider caches streams efficiently when switching presets.
-
 
 
 ::tabs
@@ -1929,16 +1788,11 @@ const formatPresetName = (name: string): string => {
 ::
 
   
-    
-
-
-
 ### Multiple Viewers
 ::hr-underline
 ::
 
 Open two devices simultaneously. If you select the same device for both, the provider will reuse the cached stream instead of opening it twice.
-
 
 
 ::tabs
@@ -2222,8 +2076,6 @@ const handleStream2 = (stream: MediaStream | null) => {
 ::
 
   
-
-
 ::tip
 You can copy and adapt this template for any component documentation.
 ::
