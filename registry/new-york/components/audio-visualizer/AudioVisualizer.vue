@@ -5,11 +5,18 @@ export interface AudioVisualizerProps {
   stream?: MediaStream | null;
   width?: number;
   height?: number;
+  fftSize?: number;
+  lineWidth?: number;
+  background?: string;
+  colors?: string[];
 }
 
 const props = withDefaults(defineProps<AudioVisualizerProps>(), {
   width: 600,
   height: 200,
+  fftSize: 2048,
+  lineWidth: 2,
+  colors: () => ['#ff5252', '#448aff', '#43a047', '#ffd600'],
 });
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
@@ -23,29 +30,43 @@ const draw = () => {
   if (!analyser || !canvasRef.value) return;
   const ctx = canvasRef.value.getContext('2d');
   if (!ctx) return;
-  ctx.clearRect(0, 0, props.width, props.height);
-  // Pour la plupart des navigateurs, channelCount = 1 (mono) ou 2 (stéréo)
+  ctx.save();
+
+  if (props.background) ctx.fillStyle = props.background;
+
+  ctx.fillRect(0, 0, props.width, props.height);
+  ctx.restore();
   const channels = analyser.channelCount || 1;
   for (let ch = 0; ch < channels; ch++) {
-    // Toujours initialiser channelData[ch] avant usage
     if (!channelData[ch] || !(channelData[ch] instanceof Float32Array)) {
-      channelData[ch] = new Float32Array(analyser.fftSize);
+      channelData[ch] = new Float32Array(props.fftSize);
     }
     const data = channelData[ch] as Float32Array<ArrayBuffer>;
+
+    if (!data) continue;
+
     analyser.getFloatTimeDomainData(data);
     ctx.beginPath();
     const yOffset = (props.height / channels) * ch;
     for (let i = 0; i < data.length; i++) {
-      const value = data[i] && Number.isFinite(data[i]) ? data[i] : 0;
+      const value = typeof data[i] === 'number' && Number.isFinite(data[i]) ? data[i] : 0;
 
-      if (typeof value !== 'number') continue;
+      if (!value) continue;
 
       const x = (i / data.length) * props.width;
       const y = yOffset + (value * (props.height / channels)) / 2 + props.height / channels / 2;
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
-    ctx.strokeStyle = `hsl(${ch * 60}, 80%, 60%)`;
+    const color =
+      Array.isArray(props.colors) && typeof props.colors[ch % props.colors.length] === 'string'
+        ? props.colors[ch % props.colors.length]
+        : '#fff';
+
+    if (!color) continue;
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = props.lineWidth ?? 2;
     ctx.stroke();
   }
   animationId = requestAnimationFrame(draw);
@@ -53,12 +74,12 @@ const draw = () => {
 
 const setupAudio = () => {
   if (audioCtx) audioCtx.close();
-  if (props.stream == null) return;
+  if (!props.stream) return;
 
-  audioCtx = new AudioContext();
+  audioCtx = new window.AudioContext();
   source = audioCtx.createMediaStreamSource(props.stream);
   analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 2048;
+  analyser.fftSize = props.fftSize;
   source.connect(analyser);
   draw();
 };
@@ -84,13 +105,6 @@ onUnmounted(() => {
   if (animationId) cancelAnimationFrame(animationId);
   if (audioCtx) audioCtx.close();
 });
-
-watch(
-  () => props.stream,
-  () => {
-    setupAudio();
-  }
-);
 </script>
 
 <template>
