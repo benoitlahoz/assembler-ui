@@ -12,14 +12,13 @@ const props = withDefaults(defineProps<AudioContextProviderProps>(), {
   sampleRate: 44100,
 });
 
-const { context, updateContext, errors } = useAudioContext({
+const { context, updateContext, errors, state } = useAudioContext({
   latencyHint: props.latencyHint,
   sampleRate: props.sampleRate,
 });
 
 const latencyHint = ref(props.latencyHint);
 const sampleRate = ref(props.sampleRate);
-const isActive = computed(() => !!context.value);
 
 watch(
   () => [props.latencyHint, props.sampleRate],
@@ -43,7 +42,7 @@ defineExpose({
   latencyHint,
   sampleRate,
   errors: computed(() => errors.value),
-  isActive,
+  state: computed(() => state.value),
 });
 </script>
 
@@ -54,7 +53,7 @@ defineExpose({
     :latency-hint="latencyHint"
     :sample-rate="sampleRate"
     :errors="errors"
-    :is-active="isActive"
+    :state="state"
   />
 </template>
 

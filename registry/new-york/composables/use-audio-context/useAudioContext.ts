@@ -18,6 +18,7 @@ export const useAudioContext = (options: UseAudioContextOptions) => {
   const latency = ref(options.latencyHint || 'interactive');
   const sampleRate = ref(options.sampleRate || 44100);
   const errors = ref<Error[]>([]);
+  const state = ref<'suspended' | 'running' | 'closed' | 'interrupted'>('suspended');
 
   const createContext = () => {
     try {
@@ -25,9 +26,14 @@ export const useAudioContext = (options: UseAudioContextOptions) => {
         latencyHint: latency.value,
         sampleRate: sampleRate.value,
       });
+      state.value = context.value.state;
+      context.value.onstatechange = () => {
+        state.value = context.value?.state ?? 'closed';
+      };
     } catch (err) {
       errors.value.push(err as Error);
       context.value = null;
+      state.value = 'closed';
     }
   };
 
@@ -39,6 +45,7 @@ export const useAudioContext = (options: UseAudioContextOptions) => {
       if (context.value) {
         context.value.close();
         context.value = null;
+        state.value = 'closed';
       }
       if (options.latencyHint) latency.value = options.latencyHint;
       if (options.sampleRate) sampleRate.value = options.sampleRate;
@@ -66,5 +73,6 @@ export const useAudioContext = (options: UseAudioContextOptions) => {
     context,
     updateContext,
     errors,
+    state,
   };
 };
