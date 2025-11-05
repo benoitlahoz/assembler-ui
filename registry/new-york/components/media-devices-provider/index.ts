@@ -8,6 +8,8 @@
  *
  * @type registry:ui
  * @category devices
+ *
+ * @demo MediaDevicesSimple
  * @demo MediaDevicesProviderDemoSimple
  * @demo MediaDeviceDemoSimple
  * -- Stream Cache

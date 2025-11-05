@@ -7,7 +7,7 @@ description: A renderless provider component that supplies media devices informa
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <media-devices-provider-demo-simple />
+    <media-devices-simple />
   :::
 
   :::tabs-item{icon="i-lucide-code" label="Code"}
@@ -16,69 +16,130 @@ description: A renderless provider component that supplies media devices informa
 import { ref } from "vue";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSeparator,
+  FieldSet,
+} from "@/components/ui/field";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { MediaDevicesProvider } from "@/components/ui/media-devices-provider";
 
 const open = ref(false);
+
+const camerasSelect = ref<string[]>([]);
+const microphonesSelect = ref<string[]>([]);
 </script>
 <template>
-  <div class="h-128 max-h-128 overflow-hidden flex flex-col">
-    <Button :disabled="open" class="m-4 mb-2" @click="open = true"
-      >Open Devices</Button
+  <div class="flex flex-col">
+    <Button
+      :disabled="open"
+      variant="outline"
+      class="m-4 mb-2"
+      @click="open = true"
+      >List Devices</Button
     >
-    <MediaDevicesProvider :open="open" v-slot="{ devices, errors }">
-      <div
-        class="overflow-y-auto flex-1 min-h-0 select-none m-4 rounded border border-muted"
-      >
-        <table class="w-full">
-          <thead
-            class="sticky top-0 bg-default z-10 after:content-[''] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-border"
-          >
-            <tr class="text-sm">
-              <th class="text-left py-2 bg-default w-32 pl-4">Type</th>
-              <th class="text-left py-2 bg-default">Label</th>
-              <th class="text-left py-2 bg-default">Device ID</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="device in devices"
-              :key="device.deviceId"
-              class="border-b border-muted hover:bg-accent"
-            >
-              <td class="py-2 w-32 pl-4">
-                <Badge
-                  :variant="
-                    device.kind === 'videoinput'
-                      ? 'default'
-                      : device.kind === 'audioinput'
-                        ? 'secondary'
-                        : 'destructive'
-                  "
-                >
-                  {{ device.kind }}
+    <MediaDevicesProvider
+      :open="open"
+      v-slot="{ cameras, microphones, errors }"
+    >
+      <FieldGroup class="flex gap-4">
+        <FieldSet>
+          <FieldLegend>Cameras</FieldLegend>
+          <FieldDescription>
+            Select from the list of available camera devices.
+          </FieldDescription>
+          <Field>
+            <Select multiple v-model="camerasSelect">
+              <SelectTrigger class="w-[180px]">
+                <SelectValue placeholder="Select a camera" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <template v-if="cameras.length">
+                    <SelectLabel>Available Cameras</SelectLabel>
+                    <SelectItem
+                      v-for="camera in cameras"
+                      :key="camera.deviceId"
+                      :value="camera.deviceId"
+                    >
+                      {{ camera.label || "Unnamed Device" }}
+                    </SelectItem>
+                  </template>
+                  <template v-else>
+                    <SelectLabel>No Devices Found</SelectLabel>
+                  </template>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+        </FieldSet>
+
+        <FieldSet>
+          <FieldLegend>Audio Inputs</FieldLegend>
+          <FieldDescription>
+            Select from the list of available audio input devices.
+          </FieldDescription>
+          <Field>
+            <Select multiple v-model="microphonesSelect">
+              <SelectTrigger class="w-[180px]">
+                <SelectValue placeholder="Select an audio input" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <template v-if="microphones.length">
+                    <SelectLabel>Available Microphones</SelectLabel>
+                    <SelectItem
+                      v-for="microphone in microphones"
+                      :key="microphone.deviceId"
+                      :value="microphone.deviceId"
+                    >
+                      {{ microphone.label || "Unnamed Device" }}
+                    </SelectItem>
+                  </template>
+                  <template v-else>
+                    <SelectLabel>No Devices Found</SelectLabel>
+                  </template>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+        </FieldSet>
+      </FieldGroup>
+      <Separator class="my-4" />
+      <FieldGroup>
+        <FieldSet>
+          <Field>
+            <FieldLabel>Errors</FieldLabel>
+            <div class="flex space-x-2">
+              <template
+                v-if="errors.length"
+                v-for="(error, index) in errors"
+                :key="index"
+              >
+                <Badge variant="destructive">
+                  {{ error.message || (error as any).constraint || error }}
                 </Badge>
-              </td>
-              <td class="py-2 text-sm">
-                {{ device.label || "Without label" }}
-              </td>
-              <td class="py-2 font-mono text-xs text-gray-500">
-                {{ device.deviceId.substring(0, 20) }}...
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div
-        v-if="errors && errors.length > 0"
-        class="mt-4 mx-4 p-4 rounded border border-destructive bg-destructive/10 text-destructive mb-4"
-      >
-        <p class="font-bold">Errors:</p>
-        <ul>
-          <li v-for="(error, index) in errors" :key="index" class="text-sm">
-            {{ error }}
-          </li>
-        </ul>
-      </div>
+              </template>
+              <template v-else>
+                <Badge variant="default">No Errors</Badge>
+              </template>
+            </div>
+          </Field>
+        </FieldSet>
+      </FieldGroup>
     </MediaDevicesProvider>
   </div>
 </template>
@@ -1387,6 +1448,87 @@ to select the appropriate camera automatically.
   ## Examples
   ::hr-underline
   ::
+
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <media-devices-provider-demo-simple />
+  :::
+
+  :::tabs-item{icon="i-lucide-code" label="Code"}
+```vue
+<script setup lang="ts">
+import { ref } from "vue";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { MediaDevicesProvider } from "@/components/ui/media-devices-provider";
+
+const open = ref(false);
+</script>
+<template>
+  <div class="h-128 max-h-128 overflow-hidden flex flex-col">
+    <Button :disabled="open" class="m-4 mb-2" @click="open = true"
+      >Open Devices</Button
+    >
+    <MediaDevicesProvider :open="open" v-slot="{ devices, errors }">
+      <div
+        class="overflow-y-auto flex-1 min-h-0 select-none m-4 rounded border border-muted"
+      >
+        <table class="w-full">
+          <thead
+            class="sticky top-0 bg-default z-10 after:content-[''] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-border"
+          >
+            <tr class="text-sm">
+              <th class="text-left py-2 bg-default w-32 pl-4">Type</th>
+              <th class="text-left py-2 bg-default">Label</th>
+              <th class="text-left py-2 bg-default">Device ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="device in devices"
+              :key="device.deviceId"
+              class="border-b border-muted hover:bg-accent"
+            >
+              <td class="py-2 w-32 pl-4">
+                <Badge
+                  :variant="
+                    device.kind === 'videoinput'
+                      ? 'default'
+                      : device.kind === 'audioinput'
+                        ? 'secondary'
+                        : 'destructive'
+                  "
+                >
+                  {{ device.kind }}
+                </Badge>
+              </td>
+              <td class="py-2 text-sm">
+                {{ device.label || "Without label" }}
+              </td>
+              <td class="py-2 font-mono text-xs text-gray-500">
+                {{ device.deviceId.substring(0, 20) }}...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div
+        v-if="errors && errors.length > 0"
+        class="mt-4 mx-4 p-4 rounded border border-destructive bg-destructive/10 text-destructive mb-4"
+      >
+        <p class="font-bold">Errors:</p>
+        <ul>
+          <li v-for="(error, index) in errors" :key="index" class="text-sm">
+            {{ error }}
+          </li>
+        </ul>
+      </div>
+    </MediaDevicesProvider>
+  </div>
+</template>
+```
+  :::
+::
 
 ### Stream Cache
 ::hr-underline
