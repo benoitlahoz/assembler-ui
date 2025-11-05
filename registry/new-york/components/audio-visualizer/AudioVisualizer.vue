@@ -2,8 +2,10 @@
 import { ref, onUnmounted, watch, computed } from 'vue';
 import { drawWaveforms } from './visualizers/drawWaveform';
 import { drawFrequencyBars } from './visualizers/drawFrequencyBars';
+import { drawFft } from './visualizers/drawFft';
+import { drawFftEnhanced } from './visualizers/drawFftEnhanced';
 
-export type AudioVisualizerMode = 'waveform' | 'frequency-bars';
+export type AudioVisualizerMode = 'waveform' | 'frequency-bars' | 'fft' | 'fft-enhanced';
 
 export interface AudioVisualizerProps {
   mode?: AudioVisualizerMode;
@@ -34,7 +36,17 @@ let source: MediaStreamAudioSourceNode | null = null;
 let channelData: Float32Array[] = [];
 
 const drawFunction = computed(() => {
-  return props.mode === 'frequency-bars' ? drawFrequencyBars : drawWaveforms;
+  switch (props.mode) {
+    case 'frequency-bars':
+      return drawFrequencyBars;
+    case 'fft':
+      return drawFft;
+    case 'fft-enhanced':
+      return drawFftEnhanced;
+    case 'waveform':
+    default:
+      return drawWaveforms;
+  }
 });
 
 const draw = () => {

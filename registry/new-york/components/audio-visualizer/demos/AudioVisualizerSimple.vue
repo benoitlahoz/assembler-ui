@@ -66,7 +66,7 @@ const selectedId = ref<string | null>(null);
           :context="context"
           :width="600"
           :height="200"
-          mode="frequency-bars"
+          mode="fft-enhanced"
         />
         <template v-if="errors && errors.length">
           <div class="text-red-500 text-xs mt-2">
