@@ -1,11 +1,13 @@
 /**
+ * A very simple composable that enforces the use of one and only one reactive AudioContext instance.
+ *
  * @type registry:hook
  * @category audio
  */
 
 import { onMounted, ref } from 'vue';
 
-let context: AudioContext | null = null;
+const context = ref<AudioContext | null>(null);
 
 export interface UseAudioContextOptions {
   latencyHint?: AudioContextLatencyCategory;
@@ -17,7 +19,7 @@ export const useAudioContext = (options: UseAudioContextOptions) => {
   const sampleRate = ref(options.sampleRate || 44100);
 
   const createContext = () => {
-    context = new AudioContext({
+    context.value = new AudioContext({
       latencyHint: latency.value,
       sampleRate: sampleRate.value,
     });
@@ -27,24 +29,24 @@ export const useAudioContext = (options: UseAudioContextOptions) => {
     latencyHint?: AudioContextLatencyCategory;
     sampleRate?: number;
   }) => {
-    if (context) {
-      context.close();
-      context = null;
+    if (context.value) {
+      context.value.close();
+      context.value = null;
     }
     createContext();
   };
 
-  if (!context) {
+  if (!context.value) {
     createContext();
   }
 
   onMounted(() => {
-    if (context && context.state === 'suspended') {
-      context.resume();
+    if (context.value && context.value.state === 'suspended') {
+      context.value.resume();
       return;
     }
 
-    if (!context) {
+    if (!context.value) {
       createContext();
     }
   });
