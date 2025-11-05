@@ -11,11 +11,80 @@ description:
   :::tabs-item{icon="i-lucide-code" label="Code"}
 ```vue
 <script setup lang="ts">
-import { MediaDevicesProvider } from "@/components/ui/media-devices-provider";
+import { ref } from "vue";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+  SelectItemText,
+} from "@/components/ui/select";
+import {
+  MediaDevicesProvider,
+  AudioDevice,
+} from "@/components/ui/media-devices-provider";
+import { AudioVisualizer } from "~~/registry/new-york/components/audio-visualizer";
+
+const selectedId = ref<string | null>(null);
 </script>
 
 <template>
-  <div>Audio</div>
+  <MediaDevicesProvider :open="true" v-slot="{ microphones, stopAll, errors }">
+    <FieldSet>
+      <FieldLegend>Audio Inputs</FieldLegend>
+      <FieldDescription>
+        Select an audio input from the list of available devices.
+      </FieldDescription>
+      <FieldGroup class="space-y-4">
+        <Field>
+          <Select :disabled="!microphones.length" v-model="selectedId">
+            <SelectTrigger class="w-full">
+              <SelectValue placeholder="Select an audio input" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <template v-if="microphones.length">
+                  <SelectItem
+                    v-for="microphone in microphones"
+                    :key="microphone.deviceId"
+                    :name="microphone.label"
+                    :value="microphone.deviceId"
+                    class="truncate"
+                  >
+                    <SelectItemText>
+                      {{ microphone.label || "Unnamed Device" }}
+                    </SelectItemText>
+                  </SelectItem>
+                </template>
+                <template v-else>
+                  <SelectLabel>No Devices Found</SelectLabel>
+                </template>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
+      </FieldGroup>
+    </FieldSet>
+
+    <AudioDevice
+      v-if="selectedId"
+      :device-id="selectedId ?? ''"
+      auto-start
+      v-slot="{ stream }"
+    >
+      <AudioVisualizer :stream="stream" :width="600" :height="200" />
+    </AudioDevice>
+  </MediaDevicesProvider>
 </template>
 ```
   :::
@@ -61,17 +130,24 @@ export { type AudioVisualizerProps } from "./AudioVisualizer.vue";
 
 ```vue [src/components/ui/audio-visualizer/AudioVisualizer.vue]
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from "vue";
+import { ref, onUnmounted, watch } from "vue";
 
 export interface AudioVisualizerProps {
-  stream: MediaStream;
+  stream?: MediaStream | null;
   width?: number;
   height?: number;
+  fftSize?: number;
+  lineWidth?: number;
+  background?: string;
+  colors?: string[];
 }
 
 const props = withDefaults(defineProps<AudioVisualizerProps>(), {
   width: 600,
   height: 200,
+  fftSize: 2048,
+  lineWidth: 2,
+  colors: () => ["#ff5252", "#448aff", "#43a047", "#ffd600"],
 });
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
@@ -85,21 +161,29 @@ const draw = () => {
   if (!analyser || !canvasRef.value) return;
   const ctx = canvasRef.value.getContext("2d");
   if (!ctx) return;
-  ctx.clearRect(0, 0, props.width, props.height);
+  ctx.save();
 
+  if (props.background) ctx.fillStyle = props.background;
+
+  ctx.fillRect(0, 0, props.width, props.height);
+  ctx.restore();
   const channels = analyser.channelCount || 1;
   for (let ch = 0; ch < channels; ch++) {
     if (!channelData[ch] || !(channelData[ch] instanceof Float32Array)) {
-      channelData[ch] = new Float32Array(analyser.fftSize);
+      channelData[ch] = new Float32Array(props.fftSize);
     }
     const data = channelData[ch] as Float32Array<ArrayBuffer>;
+
+    if (!data) continue;
+
     analyser.getFloatTimeDomainData(data);
     ctx.beginPath();
     const yOffset = (props.height / channels) * ch;
     for (let i = 0; i < data.length; i++) {
-      const value = data[i] && Number.isFinite(data[i]) ? data[i] : 0;
+      const value =
+        typeof data[i] === "number" && Number.isFinite(data[i]) ? data[i] : 0;
 
-      if (typeof value !== "number") continue;
+      if (!value) continue;
 
       const x = (i / data.length) * props.width;
       const y =
@@ -109,7 +193,16 @@ const draw = () => {
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
-    ctx.strokeStyle = `hsl(${ch * 60}, 80%, 60%)`;
+    const color =
+      Array.isArray(props.colors) &&
+      typeof props.colors[ch % props.colors.length] === "string"
+        ? props.colors[ch % props.colors.length]
+        : "#fff";
+
+    if (!color) continue;
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = props.lineWidth ?? 2;
     ctx.stroke();
   }
   animationId = requestAnimationFrame(draw);
@@ -117,29 +210,37 @@ const draw = () => {
 
 const setupAudio = () => {
   if (audioCtx) audioCtx.close();
-  audioCtx = new AudioContext();
+  if (!props.stream) return;
+
+  audioCtx = new window.AudioContext();
   source = audioCtx.createMediaStreamSource(props.stream);
   analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 2048;
+  analyser.fftSize = props.fftSize;
   source.connect(analyser);
   draw();
 };
 
-onMounted(() => {
-  setupAudio();
-});
+watch(
+  () => props.stream,
+  (newStream) => {
+    if (newStream) {
+      setupAudio();
+    } else {
+      if (animationId) cancelAnimationFrame(animationId);
+      if (audioCtx) audioCtx.close();
+      audioCtx = null;
+      analyser = null;
+      source = null;
+      channelData = [];
+    }
+  },
+  { immediate: true },
+);
 
 onUnmounted(() => {
   if (animationId) cancelAnimationFrame(animationId);
   if (audioCtx) audioCtx.close();
 });
-
-watch(
-  () => props.stream,
-  () => {
-    setupAudio();
-  },
-);
 </script>
 
 <template>
@@ -162,9 +263,13 @@ watch(
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `stream`{.primary .text-primary} | `MediaStream` | - |  |
+| `stream`{.primary .text-primary} | `MediaStream \| null` | - |  |
 | `width`{.primary .text-primary} | `number` | 600 |  |
 | `height`{.primary .text-primary} | `number` | 200 |  |
+| `fftSize`{.primary .text-primary} | `number` | 2048 |  |
+| `lineWidth`{.primary .text-primary} | `number` | 2 |  |
+| `background`{.primary .text-primary} | `string` | - |  |
+| `colors`{.primary .text-primary} | `string[]` | #ff5252,#448aff,#43a047,#ffd600 |  |
 
 ---
 

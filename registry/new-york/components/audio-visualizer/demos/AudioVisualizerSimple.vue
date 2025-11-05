@@ -1,15 +1,6 @@
 <script setup lang="ts">
-import { nextTick, ref } from 'vue';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-  FieldLegend,
-  FieldSet,
-} from '@/components/ui/field';
+import { ref } from 'vue';
+import { Field, FieldDescription, FieldGroup, FieldLegend, FieldSet } from '@/components/ui/field';
 import {
   Select,
   SelectContent,
@@ -20,7 +11,6 @@ import {
   SelectValue,
   SelectItemText,
 } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import {
   MediaDevicesProvider,
   AudioDevice,
@@ -67,6 +57,7 @@ const selectedId = ref<string | null>(null);
         </Field>
       </FieldGroup>
     </FieldSet>
+
     <AudioDevice v-if="selectedId" :device-id="selectedId ?? ''" auto-start v-slot="{ stream }">
       <AudioVisualizer :stream="stream" :width="600" :height="200" />
     </AudioDevice>
