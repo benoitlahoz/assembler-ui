@@ -1,10 +1,13 @@
 /**
  * A renderless provider component that supplies media devices information and handles permissions.
  *
- * This component uses the MediaDevices API to list available audio and video input devices.
+ * This component uses the MediaDevices API to list available audio and video input devices and cache their streams until they are stopped.
  * It manages user permissions and provides reactive access to device information.
  *
- * The demos below use different MediaDevicesProvider. In real world usage, you would typically wrap your application or a section of it with the MediaDevicesProvider component.
+ * The demos below use different MediaDevicesProvider. In real world usage, you may want to wrap your application or a section of it with the MediaDevicesProvider component.
+ *
+ * Note that if using both MediaDevicesProvider and provided devices components, you should prefer using the `start` and `stop` functions from the VideoDevice/AudioDevice slot props to ensure proper stream management.
+ * If you need to pass the functions to your custom components, you can do so via MediaDevicesProvider slots or provide/inject.
  *
  * @type registry:ui
  * @category devices

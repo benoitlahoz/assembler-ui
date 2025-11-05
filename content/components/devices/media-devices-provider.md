@@ -3,7 +3,7 @@ title: MediaDevicesProvider
 description: A renderless provider component that supplies media devices information and handles permissions.
 ---
 
-  <p class="text-pretty mt-4"><br>This component uses the MediaDevices API to list available audio and video input devices.<br>It manages user permissions and provides reactive access to device information.<br><br>The demos below use different MediaDevicesProvider. In real world usage, you would typically wrap your application or a section of it with the MediaDevicesProvider component.</p>
+  <p class="text-pretty mt-4"><br>This component uses the MediaDevices API to list available audio and video input devices and cache their streams until they are stopped.<br>It manages user permissions and provides reactive access to device information.<br><br>The demos below use different MediaDevicesProvider. In real world usage, you may want to wrap your application or a section of it with the MediaDevicesProvider component.<br><br>Note that if using both MediaDevicesProvider and provided devices components, you should prefer using the `start` and `stop` functions from the device slot props to ensure proper stream management.<br>If you need to pass the functions to your custom components, you can do so via MediaDevicesProvider slots or provide/inject.</p>
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
@@ -51,41 +51,15 @@ const microphonesSelect = ref<DeviceId[]>([]);
 const cameraRefs = ref<HTMLVideoElement[]>([]);
 const microphoneRefs = ref<HTMLAudioElement[]>([]);
 
-const onUpdateCamera = async (
-  deviceId: DeviceId,
-  start: (deviceId: string, constraints: MediaStreamConstraints) => void,
-  stop: (deviceId: string) => void,
-) => {
-  if (!camerasSelect.value.includes(deviceId)) {
-    await start(deviceId, { video: { deviceId: { exact: deviceId } } });
-  } else {
-    camerasSelect.value = camerasSelect.value.filter(
-      (camera) => camera !== deviceId,
-    );
-    stop(deviceId);
-  }
-};
-
-const onUpdateMicrophone = async (
-  deviceId: string,
-  start: (deviceId: string, constraints: MediaStreamConstraints) => void,
-  stop: (deviceId: string) => void,
-) => {
-  if (!microphonesSelect.value.includes(deviceId)) {
-    await start(deviceId, { audio: { deviceId: { exact: deviceId } } });
-  } else {
-    microphonesSelect.value = microphonesSelect.value.filter(
-      (mic) => mic !== deviceId,
-    );
-    stop(deviceId);
-  }
-};
-
 const handleVideoStream = (index: number, stream: MediaStream | null) => {
   nextTick(() => {
     const element = cameraRefs.value[index];
     if (element) {
-      element.srcObject = stream;
+      if (stream) {
+        element.srcObject = stream;
+      } else {
+        element.srcObject = null;
+      }
     }
   });
 };
@@ -94,7 +68,27 @@ const handleAudioStream = (index: number, stream: MediaStream | null) => {
   nextTick(() => {
     const element = microphoneRefs.value[index];
     if (element) {
-      element.srcObject = stream;
+      console.log(
+        "[DEBUG handleAudioStream] index:",
+        index,
+        "stream:",
+        stream,
+        "element:",
+        element,
+      );
+      if (stream) {
+        element.srcObject = stream;
+        console.log("[DEBUG handleAudioStream] srcObject attaché");
+      } else {
+        element.srcObject = null;
+        console.log("[DEBUG handleAudioStream] srcObject nettoyé");
+      }
+    } else {
+      console.log(
+        "[DEBUG handleAudioStream] Aucun élément audio DOM à cet index:",
+        index,
+      );
+      console.log("Refs audio actuels:", microphoneRefs.value);
     }
   });
 };
@@ -121,7 +115,7 @@ const handleAudioStream = (index: number, stream: MediaStream | null) => {
 
     <MediaDevicesProvider
       :open="enumerated"
-      v-slot="{ devices, cameras, microphones, errors, start, stop }"
+      v-slot="{ devices, cameras, microphones, errors }"
     >
       <template v-if="!devices.length">
         <div
@@ -156,7 +150,6 @@ const handleAudioStream = (index: number, stream: MediaStream | null) => {
                         :name="camera.label"
                         :value="camera.deviceId"
                         class="truncate"
-                        @select="onUpdateCamera(camera.deviceId, start, stop)"
                       >
                         <SelectItemText>
                           {{ camera.label || "Unnamed Device" }}
@@ -179,7 +172,11 @@ const handleAudioStream = (index: number, stream: MediaStream | null) => {
               devices.
             </FieldDescription>
             <Field>
-              <Select multiple :disabled="!microphones.length">
+              <Select
+                multiple
+                :disabled="!microphones.length"
+                v-model="microphonesSelect"
+              >
                 <SelectTrigger class="w-full">
                   <SelectValue placeholder="Select an audio input" />
                 </SelectTrigger>
@@ -192,9 +189,6 @@ const handleAudioStream = (index: number, stream: MediaStream | null) => {
                         :name="microphone.label"
                         :value="microphone.deviceId"
                         class="truncate"
-                        @select="
-                          onUpdateMicrophone(microphone.deviceId, start, stop)
-                        "
                       >
                         <SelectItemText>
                           {{ microphone.label || "Unnamed Device" }}
@@ -254,10 +248,10 @@ const handleAudioStream = (index: number, stream: MediaStream | null) => {
           <audio
             v-if="isActive"
             ref="microphoneRefs"
-            class="w-full h-auto rounded-md border border-border"
+            class="w-full h-16 rounded-md border border-border"
             autoplay
             playsinline
-            muted
+            controls
           ></audio>
         </AudioDevice>
       </div>
