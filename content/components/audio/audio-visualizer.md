@@ -89,7 +89,7 @@ const selectedId = ref<string | null>(null);
           :context="context"
           :width="600"
           :height="200"
-          mode="frequency-bars"
+          mode="fft-enhanced"
         />
         <template v-if="errors && errors.length">
           <div class="text-red-500 text-xs mt-2">
@@ -152,8 +152,14 @@ export { type AudioVisualizerProps } from "./AudioVisualizer.vue";
 import { ref, onUnmounted, watch, computed } from "vue";
 import { drawWaveforms } from "./visualizers/drawWaveform";
 import { drawFrequencyBars } from "./visualizers/drawFrequencyBars";
+import { drawFft } from "./visualizers/drawFft";
+import { drawFftEnhanced } from "./visualizers/drawFftEnhanced";
 
-export type AudioVisualizerMode = "waveform" | "frequency-bars";
+export type AudioVisualizerMode =
+  | "waveform"
+  | "frequency-bars"
+  | "fft"
+  | "fft-enhanced";
 
 export interface AudioVisualizerProps {
   mode?: AudioVisualizerMode;
@@ -184,7 +190,17 @@ let source: MediaStreamAudioSourceNode | null = null;
 let channelData: Float32Array[] = [];
 
 const drawFunction = computed(() => {
-  return props.mode === "frequency-bars" ? drawFrequencyBars : drawWaveforms;
+  switch (props.mode) {
+    case "frequency-bars":
+      return drawFrequencyBars;
+    case "fft":
+      return drawFft;
+    case "fft-enhanced":
+      return drawFftEnhanced;
+    case "waveform":
+    default:
+      return drawWaveforms;
+  }
 });
 
 const draw = () => {
@@ -221,6 +237,14 @@ watch(
   { immediate: true },
 );
 
+watch(
+  () => props.mode,
+  () => {
+    if (animationId.value) cancelAnimationFrame(animationId.value);
+    draw();
+  },
+);
+
 onUnmounted(() => {
   if (animationId.value) cancelAnimationFrame(animationId.value);
   analyser = null;
@@ -237,6 +261,168 @@ onUnmounted(() => {
     class="w-full border border-border"
   />
 </template>
+```
+
+```ts [src/components/ui/audio-visualizer/visualizers/drawFft.ts]
+import type { Ref } from "vue";
+import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
+
+export interface DrawFftParams {
+  analyser: AnalyserNode | null;
+  canvasRef: Ref<HTMLCanvasElement | null>;
+  props: AudioVisualizerProps;
+  channelData: Float32Array[];
+  animationIdRef: Ref<number | null>;
+}
+
+export function drawFft({
+  analyser,
+  canvasRef,
+  props,
+  channelData,
+  animationIdRef,
+}: DrawFftParams) {
+  if (!analyser || !canvasRef.value) return;
+  const ctx = canvasRef.value.getContext("2d");
+  if (!ctx) return;
+
+  const width = props.width ?? 600;
+  const height = props.height ?? 200;
+
+  ctx.clearRect(0, 0, width, height);
+  if (props.background) {
+    ctx.save();
+    ctx.fillStyle = props.background;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+  }
+
+  const bufferLength = analyser.frequencyBinCount;
+  const dataArray = new Float32Array(bufferLength);
+  analyser.getFloatFrequencyData(dataArray);
+
+  ctx.save();
+  ctx.beginPath();
+  for (let i = 0; i < bufferLength; i++) {
+    const value =
+      typeof dataArray[i] === "number" && Number.isFinite(dataArray[i])
+        ? dataArray[i]
+        : -100;
+
+    if (!value) continue;
+
+    const magnitude = Math.max(0, Math.min(1, (value + 100) / 100));
+    const x = (i / bufferLength) * width;
+    const y = height - magnitude * height;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  let strokeColor = "#fff";
+  if (
+    Array.isArray(props.colors) &&
+    props.colors.length > 0 &&
+    typeof props.colors[0] === "string"
+  ) {
+    strokeColor = props.colors[0] ?? "#fff";
+  }
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = props.lineWidth ?? 2;
+  ctx.stroke();
+  ctx.restore();
+
+  animationIdRef.value = requestAnimationFrame(() =>
+    drawFft({ analyser, canvasRef, props, channelData, animationIdRef }),
+  );
+}
+```
+
+```ts [src/components/ui/audio-visualizer/visualizers/drawFftEnhanced.ts]
+import type { Ref } from "vue";
+import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
+
+export interface DrawFftEnhancedParams {
+  analyser: AnalyserNode | null;
+  canvasRef: Ref<HTMLCanvasElement | null>;
+  props: AudioVisualizerProps;
+  channelData: Float32Array[];
+  animationIdRef: Ref<number | null>;
+}
+
+export function drawFftEnhanced({
+  analyser,
+  canvasRef,
+  props,
+  channelData,
+  animationIdRef,
+}: DrawFftEnhancedParams) {
+  if (!analyser || !canvasRef.value) return;
+  const ctx = canvasRef.value.getContext("2d");
+  if (!ctx) return;
+
+  const width = props.width ?? 600;
+  const height = props.height ?? 200;
+
+  ctx.clearRect(0, 0, width, height);
+  if (props.background) {
+    ctx.save();
+    ctx.fillStyle = props.background;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+  }
+
+  const bufferLength = analyser.frequencyBinCount;
+  const channels = analyser.channelCount || 1;
+  for (let ch = 0; ch < channels; ch++) {
+    const dataArray = new Float32Array(bufferLength);
+    analyser.getFloatFrequencyData(dataArray);
+
+    const yOffset = (height / channels) * ch;
+
+    ctx.save();
+    let glowColor = "#00eaff";
+    if (
+      Array.isArray(props.colors) &&
+      props.colors.length > 0 &&
+      typeof props.colors[ch % props.colors.length] === "string"
+    ) {
+      glowColor = props.colors[ch % props.colors.length] ?? "#00eaff";
+    }
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    for (let i = 0; i < bufferLength; i++) {
+      const value = Number.isFinite(dataArray[i]) ? dataArray[i] : -100;
+      const magnitude = Math.max(0, Math.min(1, (value + 100) / 100));
+      const x = (i / bufferLength) * width;
+      const y = yOffset + height / channels - magnitude * (height / channels);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+
+    ctx.lineTo(width, yOffset + height / channels);
+    ctx.lineTo(0, yOffset + height / channels);
+    ctx.closePath();
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = glowColor;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.strokeStyle = glowColor;
+    ctx.lineWidth = props.lineWidth ?? 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  animationIdRef.value = requestAnimationFrame(() =>
+    drawFftEnhanced({
+      analyser,
+      canvasRef,
+      props,
+      channelData,
+      animationIdRef,
+    }),
+  );
+}
 ```
 
 ```ts [src/components/ui/audio-visualizer/visualizers/drawFrequencyBars.ts]
@@ -263,14 +449,16 @@ export function drawFrequencyBars({
   if (!ctx) return;
   ctx.save();
 
-  if (props.background) ctx.fillStyle = props.background;
-
   const width = props.width ?? 600;
   const height = props.height ?? 200;
 
   ctx.clearRect(0, 0, width, height);
-  ctx.fillRect(0, 0, width, height);
-  ctx.restore();
+  if (props.background) {
+    ctx.save();
+    ctx.fillStyle = props.background;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+  }
 
   const bufferLength = analyser.frequencyBinCount;
   const dataArray = new Float32Array(bufferLength);
@@ -395,8 +583,14 @@ export { type AudioVisualizerProps } from "./AudioVisualizer.vue";
 import { ref, onUnmounted, watch, computed } from "vue";
 import { drawWaveforms } from "./visualizers/drawWaveform";
 import { drawFrequencyBars } from "./visualizers/drawFrequencyBars";
+import { drawFft } from "./visualizers/drawFft";
+import { drawFftEnhanced } from "./visualizers/drawFftEnhanced";
 
-export type AudioVisualizerMode = "waveform" | "frequency-bars";
+export type AudioVisualizerMode =
+  | "waveform"
+  | "frequency-bars"
+  | "fft"
+  | "fft-enhanced";
 
 export interface AudioVisualizerProps {
   mode?: AudioVisualizerMode;
@@ -427,7 +621,17 @@ let source: MediaStreamAudioSourceNode | null = null;
 let channelData: Float32Array[] = [];
 
 const drawFunction = computed(() => {
-  return props.mode === "frequency-bars" ? drawFrequencyBars : drawWaveforms;
+  switch (props.mode) {
+    case "frequency-bars":
+      return drawFrequencyBars;
+    case "fft":
+      return drawFft;
+    case "fft-enhanced":
+      return drawFftEnhanced;
+    case "waveform":
+    default:
+      return drawWaveforms;
+  }
 });
 
 const draw = () => {
@@ -464,6 +668,14 @@ watch(
   { immediate: true },
 );
 
+watch(
+  () => props.mode,
+  () => {
+    if (animationId.value) cancelAnimationFrame(animationId.value);
+    draw();
+  },
+);
+
 onUnmounted(() => {
   if (animationId.value) cancelAnimationFrame(animationId.value);
   analyser = null;
@@ -480,6 +692,168 @@ onUnmounted(() => {
     class="w-full border border-border"
   />
 </template>
+```
+
+```ts [src/components/ui/audio-visualizer/visualizers/drawFft.ts]
+import type { Ref } from "vue";
+import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
+
+export interface DrawFftParams {
+  analyser: AnalyserNode | null;
+  canvasRef: Ref<HTMLCanvasElement | null>;
+  props: AudioVisualizerProps;
+  channelData: Float32Array[];
+  animationIdRef: Ref<number | null>;
+}
+
+export function drawFft({
+  analyser,
+  canvasRef,
+  props,
+  channelData,
+  animationIdRef,
+}: DrawFftParams) {
+  if (!analyser || !canvasRef.value) return;
+  const ctx = canvasRef.value.getContext("2d");
+  if (!ctx) return;
+
+  const width = props.width ?? 600;
+  const height = props.height ?? 200;
+
+  ctx.clearRect(0, 0, width, height);
+  if (props.background) {
+    ctx.save();
+    ctx.fillStyle = props.background;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+  }
+
+  const bufferLength = analyser.frequencyBinCount;
+  const dataArray = new Float32Array(bufferLength);
+  analyser.getFloatFrequencyData(dataArray);
+
+  ctx.save();
+  ctx.beginPath();
+  for (let i = 0; i < bufferLength; i++) {
+    const value =
+      typeof dataArray[i] === "number" && Number.isFinite(dataArray[i])
+        ? dataArray[i]
+        : -100;
+
+    if (!value) continue;
+
+    const magnitude = Math.max(0, Math.min(1, (value + 100) / 100));
+    const x = (i / bufferLength) * width;
+    const y = height - magnitude * height;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  let strokeColor = "#fff";
+  if (
+    Array.isArray(props.colors) &&
+    props.colors.length > 0 &&
+    typeof props.colors[0] === "string"
+  ) {
+    strokeColor = props.colors[0] ?? "#fff";
+  }
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = props.lineWidth ?? 2;
+  ctx.stroke();
+  ctx.restore();
+
+  animationIdRef.value = requestAnimationFrame(() =>
+    drawFft({ analyser, canvasRef, props, channelData, animationIdRef }),
+  );
+}
+```
+
+```ts [src/components/ui/audio-visualizer/visualizers/drawFftEnhanced.ts]
+import type { Ref } from "vue";
+import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
+
+export interface DrawFftEnhancedParams {
+  analyser: AnalyserNode | null;
+  canvasRef: Ref<HTMLCanvasElement | null>;
+  props: AudioVisualizerProps;
+  channelData: Float32Array[];
+  animationIdRef: Ref<number | null>;
+}
+
+export function drawFftEnhanced({
+  analyser,
+  canvasRef,
+  props,
+  channelData,
+  animationIdRef,
+}: DrawFftEnhancedParams) {
+  if (!analyser || !canvasRef.value) return;
+  const ctx = canvasRef.value.getContext("2d");
+  if (!ctx) return;
+
+  const width = props.width ?? 600;
+  const height = props.height ?? 200;
+
+  ctx.clearRect(0, 0, width, height);
+  if (props.background) {
+    ctx.save();
+    ctx.fillStyle = props.background;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+  }
+
+  const bufferLength = analyser.frequencyBinCount;
+  const channels = analyser.channelCount || 1;
+  for (let ch = 0; ch < channels; ch++) {
+    const dataArray = new Float32Array(bufferLength);
+    analyser.getFloatFrequencyData(dataArray);
+
+    const yOffset = (height / channels) * ch;
+
+    ctx.save();
+    let glowColor = "#00eaff";
+    if (
+      Array.isArray(props.colors) &&
+      props.colors.length > 0 &&
+      typeof props.colors[ch % props.colors.length] === "string"
+    ) {
+      glowColor = props.colors[ch % props.colors.length] ?? "#00eaff";
+    }
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    for (let i = 0; i < bufferLength; i++) {
+      const value = Number.isFinite(dataArray[i]) ? dataArray[i] : -100;
+      const magnitude = Math.max(0, Math.min(1, (value + 100) / 100));
+      const x = (i / bufferLength) * width;
+      const y = yOffset + height / channels - magnitude * (height / channels);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+
+    ctx.lineTo(width, yOffset + height / channels);
+    ctx.lineTo(0, yOffset + height / channels);
+    ctx.closePath();
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = glowColor;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.strokeStyle = glowColor;
+    ctx.lineWidth = props.lineWidth ?? 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  animationIdRef.value = requestAnimationFrame(() =>
+    drawFftEnhanced({
+      analyser,
+      canvasRef,
+      props,
+      channelData,
+      animationIdRef,
+    }),
+  );
+}
 ```
 
 ```ts [src/components/ui/audio-visualizer/visualizers/drawFrequencyBars.ts]
@@ -506,14 +880,16 @@ export function drawFrequencyBars({
   if (!ctx) return;
   ctx.save();
 
-  if (props.background) ctx.fillStyle = props.background;
-
   const width = props.width ?? 600;
   const height = props.height ?? 200;
 
   ctx.clearRect(0, 0, width, height);
-  ctx.fillRect(0, 0, width, height);
-  ctx.restore();
+  if (props.background) {
+    ctx.save();
+    ctx.fillStyle = props.background;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+  }
 
   const bufferLength = analyser.frequencyBinCount;
   const dataArray = new Float32Array(bufferLength);

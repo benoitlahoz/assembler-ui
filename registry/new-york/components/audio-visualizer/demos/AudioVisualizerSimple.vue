@@ -19,45 +19,78 @@ import { AudioContextProvider } from '~~/registry/new-york/components/audio-cont
 import { AudioVisualizer } from '~~/registry/new-york/components/audio-visualizer';
 
 const selectedId = ref<string | null>(null);
+
+const visualizerModes = [
+  { value: 'fft', label: 'FFT' },
+  { value: 'fft-enhanced', label: 'Enhanced FFT' },
+  { value: 'waveform', label: 'Waveform' },
+  { value: 'frequency-bars', label: 'Bars' },
+];
+const selectedMode = ref<'fft' | 'fft-enhanced' | 'waveform' | 'frequency-bars'>('fft-enhanced');
 </script>
 
 <template>
   <MediaDevicesProvider :open="true" v-slot="{ microphones, stopAll, errors }">
-    <FieldSet>
-      <FieldLegend>Audio Inputs</FieldLegend>
-      <FieldDescription>
-        Select an audio input from the list of available devices.
-      </FieldDescription>
-      <FieldGroup class="space-y-4">
-        <Field>
-          <Select :disabled="!microphones.length" v-model="selectedId">
-            <SelectTrigger class="w-full">
-              <SelectValue placeholder="Select an audio input" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <template v-if="microphones.length">
-                  <SelectItem
-                    v-for="microphone in microphones"
-                    :key="microphone.deviceId"
-                    :name="microphone.label"
-                    :value="microphone.deviceId"
-                    class="truncate"
-                  >
-                    <SelectItemText>
-                      {{ microphone.label || 'Unnamed Device' }}
-                    </SelectItemText>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-8">
+      <!-- Colonne 1 : Sélection de l'audio -->
+      <FieldSet>
+        <FieldLegend>Audio Inputs</FieldLegend>
+        <FieldDescription>
+          Select an audio input from the list of available devices.
+        </FieldDescription>
+        <FieldGroup class="space-y-4">
+          <Field>
+            <Select :disabled="!microphones.length" v-model="selectedId">
+              <SelectTrigger class="w-full">
+                <SelectValue placeholder="Select an audio input" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <template v-if="microphones.length">
+                    <SelectItem
+                      v-for="microphone in microphones"
+                      :key="microphone.deviceId"
+                      :name="microphone.label"
+                      :value="microphone.deviceId"
+                      class="truncate"
+                    >
+                      <SelectItemText>
+                        {{ microphone.label || 'Unnamed Device' }}
+                      </SelectItemText>
+                    </SelectItem>
+                  </template>
+                  <template v-else>
+                    <SelectLabel>No Devices Found</SelectLabel>
+                  </template>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+        </FieldGroup>
+      </FieldSet>
+
+      <!-- Colonne 2 : Sélection du mode de visualisation -->
+      <FieldSet>
+        <FieldLegend>Visualization Mode</FieldLegend>
+        <FieldDescription> Choose the display mode for the audio visualizer. </FieldDescription>
+        <FieldGroup class="space-y-4">
+          <Field>
+            <Select v-model="selectedMode">
+              <SelectTrigger class="w-full">
+                <SelectValue placeholder="Select a mode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem v-for="mode in visualizerModes" :key="mode.value" :value="mode.value">
+                    <SelectItemText>{{ mode.label }}</SelectItemText>
                   </SelectItem>
-                </template>
-                <template v-else>
-                  <SelectLabel>No Devices Found</SelectLabel>
-                </template>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </Field>
-      </FieldGroup>
-    </FieldSet>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+        </FieldGroup>
+      </FieldSet>
+    </div>
 
     <AudioDevice v-if="selectedId" :device-id="selectedId ?? ''" auto-start v-slot="{ stream }">
       <AudioContextProvider v-slot="{ context, errors, state }">
@@ -66,7 +99,7 @@ const selectedId = ref<string | null>(null);
           :context="context"
           :width="600"
           :height="200"
-          mode="fft-enhanced"
+          :mode="selectedMode"
         />
         <template v-if="errors && errors.length">
           <div class="text-red-500 text-xs mt-2">

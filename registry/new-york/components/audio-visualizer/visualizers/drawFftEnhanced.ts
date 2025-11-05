@@ -44,7 +44,11 @@ export function drawFftEnhanced({
     // Effet glow
     ctx.save();
     let glowColor = '#00eaff';
-    if (Array.isArray(props.colors) && props.colors.length > 0 && typeof props.colors[ch % props.colors.length] === 'string') {
+    if (
+      Array.isArray(props.colors) &&
+      props.colors.length > 0 &&
+      typeof props.colors[ch % props.colors.length] === 'string'
+    ) {
       glowColor = props.colors[ch % props.colors.length] ?? '#00eaff';
     }
     ctx.shadowColor = glowColor;
@@ -52,15 +56,18 @@ export function drawFftEnhanced({
     ctx.beginPath();
     for (let i = 0; i < bufferLength; i++) {
       const value = Number.isFinite(dataArray[i]) ? dataArray[i] : -100;
+
+      if (!value) continue;
+
       const magnitude = Math.max(0, Math.min(1, (value + 100) / 100));
       const x = (i / bufferLength) * width;
-      const y = yOffset + (height / channels) - magnitude * (height / channels);
+      const y = yOffset + height / channels - magnitude * (height / channels);
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
     // Remplissage sous la courbe
-    ctx.lineTo(width, yOffset + (height / channels));
-    ctx.lineTo(0, yOffset + (height / channels));
+    ctx.lineTo(width, yOffset + height / channels);
+    ctx.lineTo(0, yOffset + height / channels);
     ctx.closePath();
     ctx.globalAlpha = 0.25;
     ctx.fillStyle = glowColor;
