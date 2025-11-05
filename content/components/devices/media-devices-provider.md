@@ -14,7 +14,7 @@ description: A renderless provider component that supplies media devices informa
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";
-import { createReusableTemplate } from "@vueuse/core";
+import { useTemplateRefsList } from "@vueuse/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,7 +23,6 @@ import {
   FieldGroup,
   FieldLabel,
   FieldLegend,
-  FieldSeparator,
   FieldSet,
 } from "@/components/ui/field";
 import {
@@ -36,24 +35,34 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { MediaDevicesProvider } from "@/components/ui/media-devices-provider";
+import {
+  MediaDevicesProvider,
+  AudioDevice,
+  VideoDevice,
+} from "@/components/ui/media-devices-provider";
+
+type DeviceId = string;
 
 const enumerated = ref(false);
 
-const camerasSelect = ref<string[]>([]);
-const microphonesSelect = ref<string[]>([]);
+const camerasSelect = ref<{ deviceId: DeviceId; label: string }[]>([]);
+const microphonesSelect = ref<{ deviceId: DeviceId; label: string }[]>([]);
 
-const [DefineSkeleton, FieldSkeleton] = createReusableTemplate();
+const cameraRefs = useTemplateRefsList<HTMLVideoElement>();
 
 const onUpdateCamera = async (
   deviceId: string,
   start: (deviceId: string, constraints: MediaStreamConstraints) => void,
   stop: (deviceId: string) => void,
 ) => {
-  if (!camerasSelect.value.includes(deviceId)) {
+  if (
+    !camerasSelect.value.map((camera) => camera.deviceId).includes(deviceId)
+  ) {
     await start(deviceId, { video: { deviceId: { exact: deviceId } } });
   } else {
-    camerasSelect.value = camerasSelect.value.filter((id) => id !== deviceId);
+    camerasSelect.value = camerasSelect.value.filter(
+      (camera) => camera.deviceId !== deviceId,
+    );
     stop(deviceId);
   }
 };
@@ -63,29 +72,25 @@ const onUpdateMicrophone = async (
   start: (deviceId: string, constraints: MediaStreamConstraints) => void,
   stop: (deviceId: string) => void,
 ) => {
-  if (!microphonesSelect.value.includes(deviceId)) {
+  if (!microphonesSelect.value.map((mic) => mic.deviceId).includes(deviceId)) {
     await start(deviceId, { audio: { deviceId: { exact: deviceId } } });
   } else {
     microphonesSelect.value = microphonesSelect.value.filter(
-      (id) => id !== deviceId,
+      (mic) => mic.deviceId !== deviceId,
     );
     stop(deviceId);
   }
 };
+
+const handleVideoStream = (index: number, stream: MediaStream | null) => {
+  const element = cameraRefs.value[index];
+  console.log(element);
+  if (element) {
+    element.srcObject = stream;
+  }
+};
 </script>
 <template>
-  <DefineSkeleton>
-    <FieldSet>
-      <FieldLabel class="h-4 w-32 bg-gray-300 rounded-md animate-pulse" />
-      <FieldDescription
-        class="mt-1 h-3 w-48 bg-gray-200 rounded-md animate-pulse"
-      />
-      <Field class="mt-2">
-        <div class="h-10 w-full bg-gray-300 rounded-md animate-pulse" />
-      </Field>
-    </FieldSet>
-  </DefineSkeleton>
-
   <div class="flex flex-col">
     <FieldSet>
       <FieldLegend>Get Available Devices</FieldLegend>
@@ -107,20 +112,13 @@ const onUpdateMicrophone = async (
 
     <MediaDevicesProvider
       :open="enumerated"
-      v-slot="{ isLoading, devices, cameras, microphones, errors, start, stop }"
+      v-slot="{ devices, cameras, microphones, errors, start, stop }"
     >
-      <template v-if="isLoading">
-        <FieldGroup class="grid grid-cols-2 gap-4">
-          <FieldSkeleton />
-          <FieldSkeleton />
-        </FieldGroup>
-      </template>
-
-      <template v-else-if="!devices.length">
+      <template v-if="!devices.length">
         <div
           class="flex items-center justify-center p-8 border-2 border-dashed border-border rounded-lg"
         >
-          <p class="text-lg text-gray-500">No device enumerated</p>
+          <p class="text-lg text-muted">No device enumerated</p>
         </div>
       </template>
 
@@ -206,32 +204,78 @@ const onUpdateMicrophone = async (
           </FieldSet>
         </FieldGroup>
       </template>
+
       <Separator class="my-4" />
+
+      <div class="grid grid-cols-2 gap-4">
+        <VideoDevice
+          v-for="(camera, index) in camerasSelect"
+          :key="camera.deviceId"
+          :device-id="camera.deviceId"
+          :width="1920"
+          :height="1080"
+          :frame-rate="30"
+          auto-start
+          @stream="
+            (stream: MediaStream | null) => handleVideoStream(index, stream)
+          "
+        >
+          <video
+            :ref="cameraRefs"
+            class="w-full h-auto rounded-md border border-border"
+            autoplay
+            playsinline
+            muted
+          ></video>
+          <div>{{ camera.label }}</div>
+        </VideoDevice>
+
+        <AudioDevice
+          v-for="microphone in microphonesSelect"
+          :key="microphone.deviceId"
+          :device-id="microphone.deviceId"
+          :echo-cancellation="true"
+          :noise-suppression="false"
+          :auto-gain-control="true"
+          auto-start
+          v-slot="{ stream }"
+        >
+          <audio
+            class="w-full h-auto rounded-md border border-border"
+            :srcObject="stream"
+            autoplay
+            playsinline
+            muted
+          ></audio>
+        </AudioDevice>
+      </div>
+
+      <Separator class="my-4" />
+
       <FieldGroup>
-        <template v-if="isLoading">
-          <FieldSkeleton />
-        </template>
-        <template v-else>
-          <FieldSet>
-            <Field>
-              <FieldLabel>Errors</FieldLabel>
-              <div class="flex space-x-2">
-                <template
-                  v-if="errors.length"
-                  v-for="(error, index) in errors"
-                  :key="index"
-                >
-                  <Badge variant="destructive">
-                    {{ error.message || (error as any).constraint || error }}
-                  </Badge>
-                </template>
-                <template v-else>
-                  <Badge variant="default">No Errors</Badge>
-                </template>
-              </div>
-            </Field>
-          </FieldSet>
-        </template>
+        <FieldSet>
+          <Field>
+            <FieldLabel>Errors</FieldLabel>
+            <div class="flex space-x-2">
+              <template
+                v-if="errors.length"
+                v-for="(error, index) in errors"
+                :key="index"
+              >
+                <Badge variant="destructive">
+                  {{
+                    error.message || (error as any).constraint
+                      ? `${error} (${(error as any).constraint})`
+                      : error
+                  }}
+                </Badge>
+              </template>
+              <template v-else>
+                <Badge variant="default">No Errors</Badge>
+              </template>
+            </div>
+          </Field>
+        </FieldSet>
       </FieldGroup>
     </MediaDevicesProvider>
   </div>
@@ -412,11 +456,17 @@ export interface MediaDevicesProviderProps {
   type?: MediaDeviceType;
 
   open?: boolean;
+
+  debug?: boolean;
+
+  debugLoadingDelay?: number;
 }
 
 const props = withDefaults(defineProps<MediaDevicesProviderProps>(), {
   type: "all",
   open: false,
+  debug: false,
+  debugLoadingDelay: 300,
 });
 
 const emit = defineEmits<{
@@ -449,6 +499,8 @@ const {
 } = useMediaDevices({
   type: toRef(props, "type"),
   open: toRef(props, "open"),
+  debug: toRef(props, "debug"),
+  debugLoadingDelay: props.debugLoadingDelay,
   onStreamStarted: (deviceId, stream) =>
     emit("streamStarted", deviceId, stream),
   onStreamStopped: (deviceId) => emit("streamStopped", deviceId),
@@ -1132,6 +1184,10 @@ export interface UseMediaDevicesOptions {
 
   open?: MaybeRef<boolean>;
 
+  debug?: MaybeRef<boolean>;
+
+  debugLoadingDelay?: number;
+
   onStreamStarted?: (deviceId: string, stream: MediaStream) => void;
 
   onStreamStopped?: (deviceId: string) => void;
@@ -1154,12 +1210,56 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
 
   const type = toRef(options.type ?? "all");
   const open = toRef(options.open ?? false);
+  const debug = toRef(options.debug ?? false);
+  const debugLoadingDelay = options.debugLoadingDelay ?? 300;
 
   const devices = ref<MediaDeviceInfo[]>([]);
 
   const errors = ref<Error[]>([]);
 
-  const isLoading = ref<boolean>(false);
+  const _isLoadingInternal = ref<boolean>(false);
+
+  let loadingDebounceTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  let loadingStartTime: number | null = null;
+
+  const isLoading = computed(() => {
+    return _isLoadingInternal.value;
+  });
+
+  const setLoading = (value: boolean) => {
+    if (debug.value) {
+      if (value === true) {
+        _isLoadingInternal.value = true;
+        loadingStartTime = Date.now();
+
+        if (loadingDebounceTimeout) {
+          clearTimeout(loadingDebounceTimeout);
+          loadingDebounceTimeout = null;
+        }
+      } else {
+        const elapsed = loadingStartTime ? Date.now() - loadingStartTime : 0;
+        const remainingTime = Math.max(0, debugLoadingDelay - elapsed);
+
+        if (remainingTime > 0) {
+          loadingDebounceTimeout = setTimeout(() => {
+            _isLoadingInternal.value = false;
+            loadingStartTime = null;
+          }, remainingTime);
+        } else {
+          _isLoadingInternal.value = false;
+          loadingStartTime = null;
+        }
+      }
+    } else {
+      if (loadingDebounceTimeout) {
+        clearTimeout(loadingDebounceTimeout);
+        loadingDebounceTimeout = null;
+      }
+      _isLoadingInternal.value = value;
+      loadingStartTime = null;
+    }
+  };
 
   const permissions = ref<MediaPermissions>({
     camera: "unknown",
@@ -1232,7 +1332,7 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
       const err = error as Error;
       errors.value.push(err);
       onError?.(err);
-      throw error;
+      throw err instanceof Error ? err : new Error(String(err));
     }
   };
 
@@ -1263,7 +1363,7 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
       return;
     }
 
-    isLoading.value = true;
+    setLoading(true);
     try {
       devices.value = await navigator.mediaDevices.enumerateDevices();
       onDevicesUpdated?.(devices.value);
@@ -1272,7 +1372,7 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
       errors.value.push(err);
       onError?.(err);
     } finally {
-      isLoading.value = false;
+      setLoading(false);
     }
   };
 
@@ -1350,6 +1450,10 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
 
   onBeforeUnmount(() => {
     stopAllStreams();
+
+    if (loadingDebounceTimeout) {
+      clearTimeout(loadingDebounceTimeout);
+    }
   });
 
   return {
@@ -1399,6 +1503,10 @@ The MediaDevicesProvider component provides a list of available media devices
 |------|------|---------|-------------|
 | `type`{.primary .text-primary} | `MediaDeviceType` | all | The type of media devices to request. |
 | `open`{.primary .text-primary} | `boolean` | false | Whether to automatically request media permissions and devices on mount. |
+| `debug`{.primary .text-primary} | `boolean` | false | Enable debug mode to debounce isLoading state changes.
+@default false |
+| `debugLoadingDelay`{.primary .text-primary} | `number` | 300 | Debounce delay in milliseconds for isLoading when debug mode is enabled.
+@default 300 |
 
   ### Slots
 | Name | Description |

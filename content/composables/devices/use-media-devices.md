@@ -73,6 +73,10 @@ export interface UseMediaDevicesOptions {
 
   open?: MaybeRef<boolean>;
 
+  debug?: MaybeRef<boolean>;
+
+  debugLoadingDelay?: number;
+
   onStreamStarted?: (deviceId: string, stream: MediaStream) => void;
 
   onStreamStopped?: (deviceId: string) => void;
@@ -95,12 +99,56 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
 
   const type = toRef(options.type ?? "all");
   const open = toRef(options.open ?? false);
+  const debug = toRef(options.debug ?? false);
+  const debugLoadingDelay = options.debugLoadingDelay ?? 300;
 
   const devices = ref<MediaDeviceInfo[]>([]);
 
   const errors = ref<Error[]>([]);
 
-  const isLoading = ref<boolean>(false);
+  const _isLoadingInternal = ref<boolean>(false);
+
+  let loadingDebounceTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  let loadingStartTime: number | null = null;
+
+  const isLoading = computed(() => {
+    return _isLoadingInternal.value;
+  });
+
+  const setLoading = (value: boolean) => {
+    if (debug.value) {
+      if (value === true) {
+        _isLoadingInternal.value = true;
+        loadingStartTime = Date.now();
+
+        if (loadingDebounceTimeout) {
+          clearTimeout(loadingDebounceTimeout);
+          loadingDebounceTimeout = null;
+        }
+      } else {
+        const elapsed = loadingStartTime ? Date.now() - loadingStartTime : 0;
+        const remainingTime = Math.max(0, debugLoadingDelay - elapsed);
+
+        if (remainingTime > 0) {
+          loadingDebounceTimeout = setTimeout(() => {
+            _isLoadingInternal.value = false;
+            loadingStartTime = null;
+          }, remainingTime);
+        } else {
+          _isLoadingInternal.value = false;
+          loadingStartTime = null;
+        }
+      }
+    } else {
+      if (loadingDebounceTimeout) {
+        clearTimeout(loadingDebounceTimeout);
+        loadingDebounceTimeout = null;
+      }
+      _isLoadingInternal.value = value;
+      loadingStartTime = null;
+    }
+  };
 
   const permissions = ref<MediaPermissions>({
     camera: "unknown",
@@ -173,7 +221,7 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
       const err = error as Error;
       errors.value.push(err);
       onError?.(err);
-      throw error;
+      throw err instanceof Error ? err : new Error(String(err));
     }
   };
 
@@ -204,7 +252,7 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
       return;
     }
 
-    isLoading.value = true;
+    setLoading(true);
     try {
       devices.value = await navigator.mediaDevices.enumerateDevices();
       onDevicesUpdated?.(devices.value);
@@ -213,7 +261,7 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
       errors.value.push(err);
       onError?.(err);
     } finally {
-      isLoading.value = false;
+      setLoading(false);
     }
   };
 
@@ -291,6 +339,10 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
 
   onBeforeUnmount(() => {
     stopAllStreams();
+
+    if (loadingDebounceTimeout) {
+      clearTimeout(loadingDebounceTimeout);
+    }
   });
 
   return {
@@ -346,7 +398,7 @@ The reactive state and methods for media devices.
 | `microphones`{.primary .text-primary} | `ComputedRef<any>` | Filtered list of audio input devices (microphones). |
 | `speakers`{.primary .text-primary} | `ComputedRef<any>` | Filtered list of audio output devices (speakers). |
 | `errors`{.primary .text-primary} | `Ref<Error[]>` | List of errors encountered during media operations. |
-| `isLoading`{.primary .text-primary} | `Ref<boolean>` | Indicates if device enumeration is in progress. |
+| `isLoading`{.primary .text-primary} | `ComputedRef<any>` | Indicates if device enumeration is in progress. |
 | `permissions`{.primary .text-primary} | `Ref<MediaPermissions>` | Permission states for camera and microphone. |
 | `activeStreams`{.primary .text-primary} | `Ref<Map<string, MediaStream>>` | Map of active streams indexed by deviceId (readonly). |
 | `startStream`{.primary .text-primary} | `MediaDevicesStartFn` | Function to start a media stream for a specific device. |

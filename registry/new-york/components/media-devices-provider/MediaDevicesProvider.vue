@@ -31,11 +31,23 @@ export interface MediaDevicesProviderProps {
    * Whether to automatically request media permissions and devices on mount.
    */
   open?: boolean;
+  /**
+   * Enable debug mode to debounce isLoading state changes.
+   * @default false
+   */
+  debug?: boolean;
+  /**
+   * Debounce delay in milliseconds for isLoading when debug mode is enabled.
+   * @default 300
+   */
+  debugLoadingDelay?: number;
 }
 
 const props = withDefaults(defineProps<MediaDevicesProviderProps>(), {
   type: 'all',
   open: false,
+  debug: false,
+  debugLoadingDelay: 300,
 });
 
 const emit = defineEmits<{
@@ -82,6 +94,8 @@ const {
 } = useMediaDevices({
   type: toRef(props, 'type'),
   open: toRef(props, 'open'),
+  debug: toRef(props, 'debug'),
+  debugLoadingDelay: props.debugLoadingDelay,
   onStreamStarted: (deviceId, stream) => emit('streamStarted', deviceId, stream),
   onStreamStopped: (deviceId) => emit('streamStopped', deviceId),
   onAllStreamsStopped: () => emit('allStreamsStopped'),

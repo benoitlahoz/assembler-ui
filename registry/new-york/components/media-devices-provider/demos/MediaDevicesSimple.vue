@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { createReusableTemplate } from '@vueuse/core';
+import { useTemplateRefsList } from '@vueuse/core';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,7 +9,6 @@ import {
   FieldGroup,
   FieldLabel,
   FieldLegend,
-  FieldSeparator,
   FieldSet,
 } from '@/components/ui/field';
 import {
@@ -22,24 +21,30 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { MediaDevicesProvider } from '~~/registry/new-york/components/media-devices-provider';
+import {
+  MediaDevicesProvider,
+  AudioDevice,
+  VideoDevice,
+} from '~~/registry/new-york/components/media-devices-provider';
+
+type DeviceId = string;
 
 const enumerated = ref(false);
 
-const camerasSelect = ref<string[]>([]);
-const microphonesSelect = ref<string[]>([]);
+const camerasSelect = ref<{ deviceId: DeviceId; label: string }[]>([]);
+const microphonesSelect = ref<{ deviceId: DeviceId; label: string }[]>([]);
 
-const [DefineSkeleton, FieldSkeleton] = createReusableTemplate();
+const cameraRefs = useTemplateRefsList<HTMLVideoElement>();
 
 const onUpdateCamera = async (
   deviceId: string,
   start: (deviceId: string, constraints: MediaStreamConstraints) => void,
   stop: (deviceId: string) => void
 ) => {
-  if (!camerasSelect.value.includes(deviceId)) {
+  if (!camerasSelect.value.map((camera) => camera.deviceId).includes(deviceId)) {
     await start(deviceId, { video: { deviceId: { exact: deviceId } } });
   } else {
-    camerasSelect.value = camerasSelect.value.filter((id) => id !== deviceId);
+    camerasSelect.value = camerasSelect.value.filter((camera) => camera.deviceId !== deviceId);
     stop(deviceId);
   }
 };
@@ -49,26 +54,23 @@ const onUpdateMicrophone = async (
   start: (deviceId: string, constraints: MediaStreamConstraints) => void,
   stop: (deviceId: string) => void
 ) => {
-  if (!microphonesSelect.value.includes(deviceId)) {
+  if (!microphonesSelect.value.map((mic) => mic.deviceId).includes(deviceId)) {
     await start(deviceId, { audio: { deviceId: { exact: deviceId } } });
   } else {
-    microphonesSelect.value = microphonesSelect.value.filter((id) => id !== deviceId);
+    microphonesSelect.value = microphonesSelect.value.filter((mic) => mic.deviceId !== deviceId);
     stop(deviceId);
+  }
+};
+
+const handleVideoStream = (index: number, stream: MediaStream | null) => {
+  const element = cameraRefs.value[index];
+  console.log(element);
+  if (element) {
+    element.srcObject = stream;
   }
 };
 </script>
 <template>
-  <!-- Reusable Skeleton for Fields -->
-  <DefineSkeleton>
-    <FieldSet>
-      <FieldLabel class="h-4 w-32 bg-gray-300 rounded-md animate-pulse" />
-      <FieldDescription class="mt-1 h-3 w-48 bg-gray-200 rounded-md animate-pulse" />
-      <Field class="mt-2">
-        <div class="h-10 w-full bg-gray-300 rounded-md animate-pulse" />
-      </Field>
-    </FieldSet>
-  </DefineSkeleton>
-
   <div class="flex flex-col">
     <FieldSet>
       <FieldLegend>Get Available Devices</FieldLegend>
@@ -86,16 +88,9 @@ const onUpdateMicrophone = async (
 
     <MediaDevicesProvider
       :open="enumerated"
-      v-slot="{ isLoading, devices, cameras, microphones, errors, start, stop }"
+      v-slot="{ devices, cameras, microphones, errors, start, stop }"
     >
-      <template v-if="isLoading">
-        <FieldGroup class="grid grid-cols-2 gap-4">
-          <FieldSkeleton />
-          <FieldSkeleton />
-        </FieldGroup>
-      </template>
-
-      <template v-else-if="!devices.length">
+      <template v-if="!devices.length">
         <div
           class="flex items-center justify-center p-8 border-2 border-dashed border-border rounded-lg"
         >
@@ -172,28 +167,72 @@ const onUpdateMicrophone = async (
           </FieldSet>
         </FieldGroup>
       </template>
+
       <Separator class="my-4" />
+
+      <div class="grid grid-cols-2 gap-4">
+        <VideoDevice
+          v-for="(camera, index) in camerasSelect"
+          :key="camera.deviceId"
+          :device-id="camera.deviceId"
+          :width="1920"
+          :height="1080"
+          :frame-rate="30"
+          auto-start
+          @stream="(stream: MediaStream | null) => handleVideoStream(index, stream)"
+        >
+          <video
+            :ref="cameraRefs"
+            class="w-full h-auto rounded-md border border-border"
+            autoplay
+            playsinline
+            muted
+          ></video>
+          <div>{{ camera.label }}</div>
+        </VideoDevice>
+
+        <AudioDevice
+          v-for="microphone in microphonesSelect"
+          :key="microphone.deviceId"
+          :device-id="microphone.deviceId"
+          :echo-cancellation="true"
+          :noise-suppression="false"
+          :auto-gain-control="true"
+          auto-start
+          v-slot="{ stream }"
+        >
+          <audio
+            class="w-full h-auto rounded-md border border-border"
+            :srcObject="stream"
+            autoplay
+            playsinline
+            muted
+          ></audio>
+        </AudioDevice>
+      </div>
+
+      <Separator class="my-4" />
+
       <FieldGroup>
-        <template v-if="isLoading">
-          <FieldSkeleton />
-        </template>
-        <template v-else>
-          <FieldSet>
-            <Field>
-              <FieldLabel>Errors</FieldLabel>
-              <div class="flex space-x-2">
-                <template v-if="errors.length" v-for="(error, index) in errors" :key="index">
-                  <Badge variant="destructive">
-                    {{ error.message || (error as any).constraint || error }}
-                  </Badge>
-                </template>
-                <template v-else>
-                  <Badge variant="default">No Errors</Badge>
-                </template>
-              </div>
-            </Field>
-          </FieldSet>
-        </template>
+        <FieldSet>
+          <Field>
+            <FieldLabel>Errors</FieldLabel>
+            <div class="flex space-x-2">
+              <template v-if="errors.length" v-for="(error, index) in errors" :key="index">
+                <Badge variant="destructive">
+                  {{
+                    error.message || (error as any).constraint
+                      ? `${error} (${(error as any).constraint})`
+                      : error
+                  }}
+                </Badge>
+              </template>
+              <template v-else>
+                <Badge variant="default">No Errors</Badge>
+              </template>
+            </div>
+          </Field>
+        </FieldSet>
       </FieldGroup>
     </MediaDevicesProvider>
   </div>
