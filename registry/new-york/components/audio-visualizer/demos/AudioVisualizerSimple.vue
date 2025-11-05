@@ -61,7 +61,13 @@ const selectedId = ref<string | null>(null);
 
     <AudioDevice v-if="selectedId" :device-id="selectedId ?? ''" auto-start v-slot="{ stream }">
       <AudioContextProvider v-slot="{ context, errors, state }">
-        <AudioVisualizer :stream="stream" :context="context" :width="600" :height="200" />
+        <AudioVisualizer
+          :stream="stream"
+          :context="context"
+          :width="600"
+          :height="200"
+          mode="frequency-bars"
+        />
         <template v-if="errors && errors.length">
           <div class="text-red-500 text-xs mt-2">
             <div v-for="(err, i) in errors" :key="i">{{ err.message }}</div>

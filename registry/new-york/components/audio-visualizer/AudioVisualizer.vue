@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import { ref, onUnmounted, watch } from 'vue';
+import { ref, onUnmounted, watch, computed } from 'vue';
+import { drawWaveforms } from './visualizers/drawWaveform';
+import { drawFrequencyBars } from './visualizers/drawFrequencyBars';
+
+export type AudioVisualizerMode = 'waveform' | 'frequency-bars';
 
 export interface AudioVisualizerProps {
+  mode?: AudioVisualizerMode;
   stream?: MediaStream | null;
   context?: AudioContext | null;
   width?: number;
@@ -13,6 +18,7 @@ export interface AudioVisualizerProps {
 }
 
 const props = withDefaults(defineProps<AudioVisualizerProps>(), {
+  mode: 'waveform',
   width: 600,
   height: 200,
   fftSize: 2048,
@@ -22,55 +28,17 @@ const props = withDefaults(defineProps<AudioVisualizerProps>(), {
 });
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
-let animationId: number | null = null;
+const animationId = ref<number | null>(null);
 let analyser: AnalyserNode | null = null;
 let source: MediaStreamAudioSourceNode | null = null;
 let channelData: Float32Array[] = [];
 
+const drawFunction = computed(() => {
+  return props.mode === 'frequency-bars' ? drawFrequencyBars : drawWaveforms;
+});
+
 const draw = () => {
-  if (!analyser || !canvasRef.value) return;
-  const ctx = canvasRef.value.getContext('2d');
-  if (!ctx) return;
-  ctx.save();
-
-  if (props.background) ctx.fillStyle = props.background;
-
-  ctx.fillRect(0, 0, props.width, props.height);
-  ctx.restore();
-  const channels = analyser.channelCount || 1;
-  for (let ch = 0; ch < channels; ch++) {
-    if (!channelData[ch] || !(channelData[ch] instanceof Float32Array)) {
-      channelData[ch] = new Float32Array(props.fftSize);
-    }
-    const data = channelData[ch] as Float32Array<ArrayBuffer>;
-
-    if (!data) continue;
-
-    analyser.getFloatTimeDomainData(data);
-    ctx.beginPath();
-    const yOffset = (props.height / channels) * ch;
-    for (let i = 0; i < data.length; i++) {
-      const value = typeof data[i] === 'number' && Number.isFinite(data[i]) ? data[i] : 0;
-
-      if (!value) continue;
-
-      const x = (i / data.length) * props.width;
-      const y = yOffset + (value * (props.height / channels)) / 2 + props.height / channels / 2;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    const color =
-      Array.isArray(props.colors) && typeof props.colors[ch % props.colors.length] === 'string'
-        ? props.colors[ch % props.colors.length]
-        : '#fff';
-
-    if (!color) continue;
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = props.lineWidth ?? 2;
-    ctx.stroke();
-  }
-  animationId = requestAnimationFrame(draw);
+  drawFunction.value({ analyser, canvasRef, props, channelData, animationIdRef: animationId });
 };
 
 const setupAudio = () => {
@@ -88,7 +56,7 @@ watch(
     if (audioContext && stream) {
       setupAudio();
     } else {
-      if (animationId) cancelAnimationFrame(animationId);
+      if (animationId.value) cancelAnimationFrame(animationId.value);
       analyser = null;
       source = null;
       channelData = [];
@@ -98,7 +66,7 @@ watch(
 );
 
 onUnmounted(() => {
-  if (animationId) cancelAnimationFrame(animationId);
+  if (animationId.value) cancelAnimationFrame(animationId.value);
   analyser = null;
   source = null;
   channelData = [];
