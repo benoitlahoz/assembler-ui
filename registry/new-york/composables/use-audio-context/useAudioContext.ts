@@ -17,23 +17,35 @@ export interface UseAudioContextOptions {
 export const useAudioContext = (options: UseAudioContextOptions) => {
   const latency = ref(options.latencyHint || 'interactive');
   const sampleRate = ref(options.sampleRate || 44100);
+  const errors = ref<Error[]>([]);
 
   const createContext = () => {
-    context.value = new AudioContext({
-      latencyHint: latency.value,
-      sampleRate: sampleRate.value,
-    });
+    try {
+      context.value = new AudioContext({
+        latencyHint: latency.value,
+        sampleRate: sampleRate.value,
+      });
+    } catch (err) {
+      errors.value.push(err as Error);
+      context.value = null;
+    }
   };
 
   const updateContext = (options: {
     latencyHint?: AudioContextLatencyCategory;
     sampleRate?: number;
   }) => {
-    if (context.value) {
-      context.value.close();
-      context.value = null;
+    try {
+      if (context.value) {
+        context.value.close();
+        context.value = null;
+      }
+      if (options.latencyHint) latency.value = options.latencyHint;
+      if (options.sampleRate) sampleRate.value = options.sampleRate;
+      createContext();
+    } catch (err) {
+      errors.value.push(err as Error);
     }
-    createContext();
   };
 
   if (!context.value) {
@@ -45,7 +57,6 @@ export const useAudioContext = (options: UseAudioContextOptions) => {
       context.value.resume();
       return;
     }
-
     if (!context.value) {
       createContext();
     }
@@ -54,5 +65,6 @@ export const useAudioContext = (options: UseAudioContextOptions) => {
   return {
     context,
     updateContext,
+    errors,
   };
 };
