@@ -41,7 +41,7 @@ export type DependencyMap = Record<string, DependencyMapEntry>;
  * @param folderPath - Chemin du dossier à parcourir
  * @param skipSubfolders - Liste des noms de sous-dossiers à ignorer
  */
-const getFilesInFolder = (folderPath: string, skipSubfolders: string[] = []): string[] => {
+const getFilesInFolderRecursive = (folderPath: string, skipSubfolders: string[] = []): string[] => {
   if (!fs.existsSync(folderPath)) return [];
 
   const allFiles: string[] = [];
@@ -57,13 +57,36 @@ const getFilesInFolder = (folderPath: string, skipSubfolders: string[] = []): st
         return; // Skip ce dossier
       }
       // Récursion dans les sous-dossiers
-      allFiles.push(...getFilesInFolder(itemPath, skipSubfolders));
+      allFiles.push(...getFilesInFolderRecursive(itemPath, skipSubfolders));
     } else if (/\.(vue|ts|js)$/.test(item) && !item.endsWith('.d.ts')) {
       allFiles.push(itemPath);
     }
   });
 
   return allFiles;
+};
+
+/**
+ * Récupère uniquement les fichiers .vue, .ts, .js du niveau actuel d'un dossier (NON récursif)
+ * @param folderPath - Chemin du dossier à parcourir
+ */
+const getFilesInFolder = (folderPath: string): string[] => {
+  if (!fs.existsSync(folderPath)) return [];
+
+  const files: string[] = [];
+  const items = fs.readdirSync(folderPath);
+
+  items.forEach((item) => {
+    const itemPath = path.join(folderPath, item);
+    const stat = fs.statSync(itemPath);
+
+    // Prendre uniquement les fichiers du niveau actuel, pas les sous-dossiers
+    if (!stat.isDirectory() && /\.(vue|ts|js)$/.test(item) && !item.endsWith('.d.ts')) {
+      files.push(itemPath);
+    }
+  });
+
+  return files;
 };
 
 /**
@@ -101,8 +124,8 @@ export function createDependencyMap(
     const folderName = path.basename(result.folder);
     const folderFullPath = path.resolve(process.cwd(), result.folder);
 
-    // Lire tous les fichiers du dossier avec leur code source
-    const files = getFilesInFolder(folderFullPath, skipSubfolders).map((filePath) => {
+    // Lire tous les fichiers du dossier RÉCURSIVEMENT (y compris les sous-dossiers)
+    const files = getFilesInFolderRecursive(folderFullPath, skipSubfolders).map((filePath) => {
       const fileName = path.basename(filePath);
       const source = readFileWithoutComments(filePath);
       const relativePath = path.relative(process.cwd(), filePath);
@@ -137,7 +160,7 @@ export function createDependencyMap(
         const depFolderName = path.basename(imp.path);
         if (!dependencyMap[depFolderName]) {
           const depFolderFullPath = path.resolve(process.cwd(), globalPath, imp.path);
-          const depFiles = getFilesInFolder(depFolderFullPath, skipSubfolders).map((filePath) => {
+          const depFiles = getFilesInFolderRecursive(depFolderFullPath, skipSubfolders).map((filePath) => {
             const fileName = path.basename(filePath);
             const source = readFileWithoutComments(filePath);
             const relativePath = path.relative(process.cwd(), filePath);

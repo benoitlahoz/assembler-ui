@@ -2096,6 +2096,652 @@ const handleControlClick = (control: ControlDefinition) => {
 }
 </style>
 ```
+
+```ts [src/composables/use-drag-drop/useDragDrop.ts]
+import { ref, computed, type Ref, onMounted } from "vue";
+import { useElementBounding } from "@vueuse/core";
+
+export interface DragDropItem<T = any> {
+  id: string;
+
+  width: number;
+
+  height: number;
+
+  data?: T;
+}
+
+export interface DragDropPosition {
+  x: number;
+
+  y: number;
+}
+
+export interface DragDropBounds {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
+export interface DragDropState<T = any> {
+  item: DragDropItem<T> | null;
+
+  fromContainer: boolean;
+
+  hoverPosition: DragDropPosition | null;
+
+  isValid: boolean;
+
+  isDragging: boolean;
+}
+
+export interface UseDragDropOptions {
+  containerRef?: Ref<HTMLElement | null>;
+
+  unitSize?: number;
+
+  gap?: number;
+
+  allowCollision?: boolean;
+
+  validatePlacement?: (
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    excludeId?: string,
+  ) => boolean;
+}
+
+export interface UseDragDropReturn<T = any> {
+  dragState: Ref<DragDropState<T>>;
+
+  dragOffset: Ref<{ x: number; y: number } | null>;
+
+  containerBounds?: ReturnType<typeof useElementBounding>;
+
+  startDrag: (
+    event: DragEvent,
+    item: DragDropItem<T>,
+    fromContainer?: boolean,
+  ) => void;
+
+  handleDragOver: (
+    event: DragEvent,
+    containerBounds: DragDropBounds,
+    getPosition: (bounds: DragDropBounds) => DragDropPosition | null,
+  ) => DragDropPosition | null;
+
+  handleDragOverSimple?: (
+    event: DragEvent,
+    getPosition: (
+      virtualBounds: DragDropBounds,
+      containerBounds: DragDropBounds,
+    ) => DragDropPosition | null,
+  ) => DragDropPosition | null;
+
+  endDrag: () => void;
+
+  getVirtualBounds: (clientX: number, clientY: number) => DragDropBounds | null;
+
+  getItemFromDataTransfer: (
+    dataTransfer: DataTransfer | null,
+  ) => DragDropItem<T> | null;
+}
+
+export function useDragDrop<T = any>(
+  options: UseDragDropOptions,
+): UseDragDropReturn<T> {
+  const {
+    containerRef,
+    unitSize,
+    gap = 0,
+    allowCollision = false,
+    validatePlacement,
+  } = options;
+
+  const dragState = ref<DragDropState<T>>({
+    item: null,
+    fromContainer: false,
+    hoverPosition: null,
+    isValid: false,
+    isDragging: false,
+  }) as Ref<DragDropState<T>>;
+
+  const dragOffset = ref<{ x: number; y: number } | null>(null);
+
+  const containerBounds = containerRef
+    ? useElementBounding(containerRef)
+    : undefined;
+
+  const startDrag = (
+    event: DragEvent,
+    item: DragDropItem<T>,
+    fromContainer = false,
+  ) => {
+    dragState.value.item = { ...item };
+    dragState.value.fromContainer = fromContainer;
+    dragState.value.isDragging = true;
+
+    if (event.target instanceof HTMLElement) {
+      const targetRect = event.target.getBoundingClientRect();
+
+      const offsetX = event.clientX - targetRect.left;
+      const offsetY = event.clientY - targetRect.top;
+
+      dragOffset.value = { x: offsetX, y: offsetY };
+    }
+
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("application/json", JSON.stringify(item));
+    }
+  };
+
+  const getVirtualBounds = (
+    clientX: number,
+    clientY: number,
+  ): DragDropBounds | null => {
+    if (!dragState.value.item) return null;
+
+    const itemWidth =
+      unitSize !== undefined
+        ? dragState.value.item.width * (unitSize + gap) - gap
+        : dragState.value.item.width;
+    const itemHeight =
+      unitSize !== undefined
+        ? dragState.value.item.height * (unitSize + gap) - gap
+        : dragState.value.item.height;
+
+    const offsetX = dragOffset.value?.x ?? itemWidth / 2;
+    const offsetY = dragOffset.value?.y ?? itemHeight / 2;
+
+    return {
+      left: clientX - offsetX,
+      top: clientY - offsetY,
+      right: clientX - offsetX + itemWidth,
+      bottom: clientY - offsetY + itemHeight,
+      width: itemWidth,
+      height: itemHeight,
+    };
+  };
+
+  const getItemFromDataTransfer = (
+    dataTransfer: DataTransfer | null,
+  ): DragDropItem<T> | null => {
+    if (!dataTransfer) return null;
+
+    try {
+      const data = dataTransfer.getData("application/json");
+      if (data) {
+        return JSON.parse(data) as DragDropItem<T>;
+      }
+    } catch (e) {
+      console.error("Erreur lors du parsing des données de drag:", e);
+    }
+
+    return null;
+  };
+
+  const handleDragOver = (
+    event: DragEvent,
+    containerBounds: DragDropBounds,
+    getPosition: (bounds: DragDropBounds) => DragDropPosition | null,
+  ): DragDropPosition | null => {
+    event.preventDefault();
+
+    if (!dragState.value.item) {
+      const item = getItemFromDataTransfer(event.dataTransfer);
+      if (item) {
+        dragState.value.item = item;
+      }
+    }
+
+    if (event.dataTransfer) {
+      const effect = event.dataTransfer.effectAllowed;
+      if (effect === "copy" || effect === "copyMove") {
+        event.dataTransfer.dropEffect = "copy";
+      } else {
+        event.dataTransfer.dropEffect = "move";
+      }
+    }
+
+    const virtualBounds = getVirtualBounds(event.clientX, event.clientY);
+    if (!virtualBounds) return null;
+
+    const pos = getPosition(virtualBounds);
+    if (!pos) return null;
+
+    if (!allowCollision && validatePlacement && dragState.value.item) {
+      const excludeId = dragState.value.fromContainer
+        ? dragState.value.item.id
+        : undefined;
+      const isValid = validatePlacement(
+        pos.x,
+        pos.y,
+        dragState.value.item.width,
+        dragState.value.item.height,
+        excludeId,
+      );
+
+      dragState.value.hoverPosition = pos;
+      dragState.value.isValid = isValid;
+
+      if (!isValid && event.dataTransfer) {
+        event.dataTransfer.dropEffect = "none";
+      }
+    } else {
+      dragState.value.hoverPosition = pos;
+      dragState.value.isValid = true;
+    }
+
+    return pos;
+  };
+
+  const endDrag = () => {
+    dragState.value.item = null;
+    dragState.value.fromContainer = false;
+    dragState.value.hoverPosition = null;
+    dragState.value.isValid = false;
+    dragState.value.isDragging = false;
+    dragOffset.value = null;
+  };
+
+  const handleDragOverSimple = containerBounds
+    ? (
+        event: DragEvent,
+        getPosition: (
+          virtualBounds: DragDropBounds,
+          containerBounds: DragDropBounds,
+        ) => DragDropPosition | null,
+      ): DragDropPosition | null => {
+        const bounds: DragDropBounds = {
+          left: containerBounds.left.value,
+          top: containerBounds.top.value,
+          right: containerBounds.right.value,
+          bottom: containerBounds.bottom.value,
+          width: containerBounds.width.value,
+          height: containerBounds.height.value,
+        };
+        return handleDragOver(event, bounds, (virtualBounds) =>
+          getPosition(virtualBounds, bounds),
+        );
+      }
+    : undefined;
+
+  const returnValue: UseDragDropReturn<T> = {
+    dragState,
+    dragOffset,
+    startDrag,
+    handleDragOver,
+    endDrag,
+    getVirtualBounds,
+    getItemFromDataTransfer,
+  };
+
+  if (containerBounds) {
+    returnValue.containerBounds = containerBounds;
+    returnValue.handleDragOverSimple = handleDragOverSimple;
+  }
+
+  return returnValue;
+}
+
+export class DragDropUtils {
+  static getPositionByIntersection(
+    elementBounds: DragDropBounds,
+    containerBounds: DragDropBounds,
+    unitSize: number,
+    gap: number,
+    columns: number,
+    rows: number,
+  ): DragDropPosition | null {
+    let maxIntersectionArea = 0;
+    let bestPosition = { x: 0, y: 0 };
+
+    const startX = Math.max(
+      0,
+      Math.floor(
+        (elementBounds.left - containerBounds.left - gap) / (unitSize + gap),
+      ),
+    );
+    const endX = Math.min(
+      columns - 1,
+      Math.ceil(
+        (elementBounds.right - containerBounds.left - gap) / (unitSize + gap),
+      ),
+    );
+    const startY = Math.max(
+      0,
+      Math.floor(
+        (elementBounds.top - containerBounds.top - gap) / (unitSize + gap),
+      ),
+    );
+    const endY = Math.min(
+      rows - 1,
+      Math.ceil(
+        (elementBounds.bottom - containerBounds.top - gap) / (unitSize + gap),
+      ),
+    );
+
+    for (let y = startY; y <= endY; y++) {
+      for (let x = startX; x <= endX; x++) {
+        const cellLeft = containerBounds.left + gap + x * (unitSize + gap);
+        const cellTop = containerBounds.top + gap + y * (unitSize + gap);
+        const cellRight = cellLeft + unitSize;
+        const cellBottom = cellTop + unitSize;
+
+        const intersectionLeft = Math.max(elementBounds.left, cellLeft);
+        const intersectionTop = Math.max(elementBounds.top, cellTop);
+        const intersectionRight = Math.min(elementBounds.right, cellRight);
+        const intersectionBottom = Math.min(elementBounds.bottom, cellBottom);
+
+        const intersectionWidth = Math.max(
+          0,
+          intersectionRight - intersectionLeft,
+        );
+        const intersectionHeight = Math.max(
+          0,
+          intersectionBottom - intersectionTop,
+        );
+        const intersectionArea = intersectionWidth * intersectionHeight;
+
+        if (intersectionArea > maxIntersectionArea) {
+          maxIntersectionArea = intersectionArea;
+          bestPosition = { x, y };
+        }
+      }
+    }
+
+    return maxIntersectionArea > 0 ? bestPosition : null;
+  }
+
+  static pixelToGrid(
+    pixelX: number,
+    pixelY: number,
+    unitSize: number,
+    gap: number,
+  ): DragDropPosition {
+    const x = Math.floor(pixelX / (unitSize + gap));
+    const y = Math.floor(pixelY / (unitSize + gap));
+    return { x, y };
+  }
+
+  static gridToPixel(
+    gridX: number,
+    gridY: number,
+    unitSize: number,
+    gap: number,
+  ): { x: number; y: number } {
+    const x = gridX * (unitSize + gap);
+    const y = gridY * (unitSize + gap);
+    return { x, y };
+  }
+}
+```
+
+```ts [src/composables/use-control-registry/useControlRegistry.ts]
+import { ref, shallowRef, type Component } from "vue";
+import type { GridItem, GridItemTemplate } from "../../components/control-grid";
+
+export interface ControlDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  component: Component;
+  defaultProps?: Record<string, any>;
+  defaultSize?: {
+    width: number;
+    height: number;
+  };
+  category?: string;
+  icon?: string;
+  color?: string;
+
+  label?: string;
+}
+
+export interface ControlInstance {
+  id: string;
+  controlId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  component: Component;
+  props?: Record<string, any>;
+  color?: string;
+}
+
+const registeredControls = ref<Map<string, ControlDefinition>>(new Map());
+const itemCounter = ref(0);
+
+export function useControlRegistry() {
+  const registerControl = (
+    definition: ControlDefinition | Component,
+    options?: Partial<Omit<ControlDefinition, "component">>,
+  ) => {
+    let controlDef: ControlDefinition;
+
+    if (
+      (typeof definition === "object" && "setup" in definition) ||
+      "render" in definition
+    ) {
+      if (!options?.id) {
+        console.error(
+          "Un ID est requis lors de l'enregistrement d'un composant brut",
+        );
+        return;
+      }
+
+      controlDef = {
+        id: options.id,
+        name: options.name || options.id,
+        description: options.description,
+        component: definition as Component,
+        defaultProps: options.defaultProps,
+        defaultSize: options.defaultSize || { width: 1, height: 1 },
+        category: options.category,
+        icon: options.icon,
+        color: options.color,
+        label: options.label || options.name || options.id,
+      };
+    } else {
+      controlDef = definition as ControlDefinition;
+    }
+
+    if (registeredControls.value.has(controlDef.id)) {
+      console.warn(
+        `Control with id "${controlDef.id}" is already registered. Overwriting.`,
+      );
+    }
+
+    registeredControls.value.set(controlDef.id, {
+      ...controlDef,
+      component: shallowRef(controlDef.component),
+      label: controlDef.label || controlDef.name,
+    });
+  };
+
+  const registerControls = (definitions: (ControlDefinition | Component)[]) => {
+    definitions.forEach((def) => {
+      if ("id" in def) {
+        registerControl(def);
+      } else {
+        console.warn(
+          "Impossible d'enregistrer un composant brut sans options. Utilisez registerControl avec options.",
+        );
+      }
+    });
+  };
+
+  const registerControlFromFile = async (
+    filePath: string,
+    options: Partial<Omit<ControlDefinition, "component">> & { id: string },
+  ): Promise<boolean> => {
+    try {
+      const module = await import(filePath);
+      const component = module.default || module;
+
+      if (!component) {
+        console.error(`Aucun composant trouvé dans ${filePath}`);
+        return false;
+      }
+
+      registerControl(component, options);
+      return true;
+    } catch (error) {
+      console.error(
+        `Erreur lors du chargement du composant depuis ${filePath}:`,
+        error,
+      );
+      return false;
+    }
+  };
+
+  const getControl = (id: string): ControlDefinition | undefined => {
+    return registeredControls.value.get(id);
+  };
+
+  const getAllControls = (): ControlDefinition[] => {
+    return Array.from(registeredControls.value.values());
+  };
+
+  const getControlsByCategory = (category: string): ControlDefinition[] => {
+    return getAllControls().filter((control) => control.category === category);
+  };
+
+  const createControlInstance = (
+    controlId: string,
+    position?: { x: number; y: number },
+    customProps?: Record<string, any>,
+  ): Partial<ControlInstance> | null => {
+    const control = getControl(controlId);
+    if (!control) {
+      console.error(`Control with id "${controlId}" not found in registry`);
+      return null;
+    }
+
+    itemCounter.value++;
+    const instanceId = `${controlId}-${itemCounter.value}`;
+
+    return {
+      id: instanceId,
+      controlId: control.id,
+      x: position?.x ?? 0,
+      y: position?.y ?? 0,
+      width: control.defaultSize?.width ?? 1,
+      height: control.defaultSize?.height ?? 1,
+      component: control.component,
+      props: {
+        ...control.defaultProps,
+        ...customProps,
+        id: instanceId,
+      },
+      color: customProps?.color ?? control.color,
+    };
+  };
+
+  const createItemFromControl = (
+    controlId: string,
+  ): Omit<GridItem, "x" | "y"> | null => {
+    const control = getControl(controlId);
+    if (!control) {
+      console.error(`Control with id "${controlId}" not found in registry`);
+      return null;
+    }
+
+    itemCounter.value++;
+    const instanceId = `${controlId}-${itemCounter.value}`;
+
+    return {
+      id: instanceId,
+      width: control.defaultSize?.width ?? 1,
+      height: control.defaultSize?.height ?? 1,
+      component: control.component,
+      color: control.color,
+      ...control.defaultProps,
+    };
+  };
+
+  const controlToTemplate = (controlId: string): GridItemTemplate | null => {
+    const control = getControl(controlId);
+    if (!control) {
+      console.error(`Control with id "${controlId}" not found in registry`);
+      return null;
+    }
+
+    return {
+      id: control.id,
+      width: control.defaultSize?.width ?? 1,
+      height: control.defaultSize?.height ?? 1,
+      component: control.component,
+      color: control.color,
+      label: control.label || control.name,
+      icon: control.icon,
+      ...control.defaultProps,
+    };
+  };
+
+  const getAllTemplates = (): GridItemTemplate[] => {
+    return getAllControls().map((control) => ({
+      id: control.id,
+      width: control.defaultSize?.width ?? 1,
+      height: control.defaultSize?.height ?? 1,
+      component: control.component,
+      color: control.color,
+      label: control.label || control.name,
+      icon: control.icon,
+      ...control.defaultProps,
+    }));
+  };
+
+  const filterTemplatesBySize = (
+    maxWidth: number,
+    maxHeight: number,
+  ): GridItemTemplate[] => {
+    return getAllTemplates().filter(
+      (template) => template.width <= maxWidth && template.height <= maxHeight,
+    );
+  };
+
+  const unregisterControl = (id: string): boolean => {
+    return registeredControls.value.delete(id);
+  };
+
+  const clearRegistry = () => {
+    registeredControls.value.clear();
+  };
+
+  const hasControl = (id: string): boolean => {
+    return registeredControls.value.has(id);
+  };
+
+  return {
+    registerControl,
+    registerControls,
+    registerControlFromFile,
+
+    getControl,
+    getAllControls,
+    getControlsByCategory,
+    hasControl,
+
+    createControlInstance,
+    createItemFromControl,
+
+    controlToTemplate,
+    getAllTemplates,
+    filterTemplatesBySize,
+
+    unregisterControl,
+    clearRegistry,
+  };
+}
+```
 :::
 
 ## ControlGrid

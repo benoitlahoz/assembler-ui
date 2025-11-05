@@ -128,6 +128,7 @@ const main = () => {
       continue;
     }
 
+    // Obtenir uniquement les dossiers de premier niveau (pas les sous-dossiers)
     const folders = fs.readdirSync(fullPath).filter((item) => {
       const itemPath = path.join(fullPath, item);
       return fs.statSync(itemPath).isDirectory() && !SkipSubfolders.includes(item);
