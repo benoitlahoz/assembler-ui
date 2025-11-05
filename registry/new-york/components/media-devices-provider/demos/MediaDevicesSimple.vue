@@ -46,14 +46,13 @@ const microphonesSelect = ref<string[]>([]);
           <FieldLegend>Cameras</FieldLegend>
           <FieldDescription> Select from the list of available camera devices. </FieldDescription>
           <Field>
-            <Select multiple v-model="camerasSelect">
+            <Select multiple v-model="camerasSelect" :disabled="!cameras.length">
               <SelectTrigger class="w-[180px]">
                 <SelectValue placeholder="Select a camera" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
                   <template v-if="cameras.length">
-                    <SelectLabel>Available Cameras</SelectLabel>
                     <SelectItem
                       v-for="camera in cameras"
                       :key="camera.deviceId"
@@ -77,14 +76,13 @@ const microphonesSelect = ref<string[]>([]);
             Select from the list of available audio input devices.
           </FieldDescription>
           <Field>
-            <Select multiple v-model="microphonesSelect">
+            <Select multiple v-model="microphonesSelect" :disabled="!microphones.length">
               <SelectTrigger class="w-[180px]">
                 <SelectValue placeholder="Select an audio input" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
                   <template v-if="microphones.length">
-                    <SelectLabel>Available Microphones</SelectLabel>
                     <SelectItem
                       v-for="microphone in microphones"
                       :key="microphone.deviceId"

@@ -44,25 +44,35 @@ const microphonesSelect = ref<string[]>([]);
 </script>
 <template>
   <div class="flex flex-col">
-    <Button
-      :disabled="open"
-      variant="outline"
-      class="m-4 mb-2"
-      @click="open = true"
-      >List Devices</Button
-    >
+    <FieldSet>
+      <FieldLegend>Get Available Devices</FieldLegend>
+      <FieldDescription>
+        Click the button to enumerate available media devices (cameras,
+        microphones and speakers).
+      </FieldDescription>
+      <Field>
+        <Button :disabled="open" variant="outline" @click="open = true"
+          >Enumerate Devices</Button
+        >
+      </Field>
+    </FieldSet>
+    <Separator class="my-4" />
     <MediaDevicesProvider
       :open="open"
       v-slot="{ cameras, microphones, errors }"
     >
-      <FieldGroup class="flex gap-4">
+      <FieldGroup class="grid grid-cols-2 gap-4">
         <FieldSet>
           <FieldLegend>Cameras</FieldLegend>
           <FieldDescription>
             Select from the list of available camera devices.
           </FieldDescription>
           <Field>
-            <Select multiple v-model="camerasSelect">
+            <Select
+              multiple
+              v-model="camerasSelect"
+              :disabled="!cameras.length"
+            >
               <SelectTrigger class="w-[180px]">
                 <SelectValue placeholder="Select a camera" />
               </SelectTrigger>
