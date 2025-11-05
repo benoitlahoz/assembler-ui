@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useTemplateRefsList } from '@vueuse/core';
+import { nextTick, ref, useTemplateRef } from 'vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,25 +25,27 @@ import {
   AudioDevice,
   VideoDevice,
 } from '~~/registry/new-york/components/media-devices-provider';
+import SelectItemText from '~/components/ui/select/SelectItemText.vue';
 
 type DeviceId = string;
 
 const enumerated = ref(false);
 
-const camerasSelect = ref<{ deviceId: DeviceId; label: string }[]>([]);
-const microphonesSelect = ref<{ deviceId: DeviceId; label: string }[]>([]);
+const camerasSelect = ref<DeviceId[]>([]);
+const microphonesSelect = ref<DeviceId[]>([]);
 
-const cameraRefs = useTemplateRefsList<HTMLVideoElement>();
+const cameraRefs = ref<HTMLVideoElement[]>([]);
+const microphoneRefs = ref<HTMLAudioElement[]>([]);
 
 const onUpdateCamera = async (
-  deviceId: string,
+  deviceId: DeviceId,
   start: (deviceId: string, constraints: MediaStreamConstraints) => void,
   stop: (deviceId: string) => void
 ) => {
-  if (!camerasSelect.value.map((camera) => camera.deviceId).includes(deviceId)) {
+  if (!camerasSelect.value.includes(deviceId)) {
     await start(deviceId, { video: { deviceId: { exact: deviceId } } });
   } else {
-    camerasSelect.value = camerasSelect.value.filter((camera) => camera.deviceId !== deviceId);
+    camerasSelect.value = camerasSelect.value.filter((camera) => camera !== deviceId);
     stop(deviceId);
   }
 };
@@ -54,20 +55,30 @@ const onUpdateMicrophone = async (
   start: (deviceId: string, constraints: MediaStreamConstraints) => void,
   stop: (deviceId: string) => void
 ) => {
-  if (!microphonesSelect.value.map((mic) => mic.deviceId).includes(deviceId)) {
+  if (!microphonesSelect.value.includes(deviceId)) {
     await start(deviceId, { audio: { deviceId: { exact: deviceId } } });
   } else {
-    microphonesSelect.value = microphonesSelect.value.filter((mic) => mic.deviceId !== deviceId);
+    microphonesSelect.value = microphonesSelect.value.filter((mic) => mic !== deviceId);
     stop(deviceId);
   }
 };
 
 const handleVideoStream = (index: number, stream: MediaStream | null) => {
-  const element = cameraRefs.value[index];
-  console.log(element);
-  if (element) {
-    element.srcObject = stream;
-  }
+  nextTick(() => {
+    const element = cameraRefs.value[index];
+    if (element) {
+      element.srcObject = stream;
+    }
+  });
+};
+
+const handleAudioStream = (index: number, stream: MediaStream | null) => {
+  nextTick(() => {
+    const element = microphoneRefs.value[index];
+    if (element) {
+      element.srcObject = stream;
+    }
+  });
 };
 </script>
 <template>
@@ -106,7 +117,7 @@ const handleVideoStream = (index: number, stream: MediaStream | null) => {
               Select one or more cameras from the list of available devices.
             </FieldDescription>
             <Field>
-              <Select multiple v-model="camerasSelect" :disabled="!cameras.length">
+              <Select multiple :disabled="!cameras.length" v-model="camerasSelect">
                 <SelectTrigger class="w-full">
                   <SelectValue placeholder="Select a camera" />
                 </SelectTrigger>
@@ -116,11 +127,14 @@ const handleVideoStream = (index: number, stream: MediaStream | null) => {
                       <SelectItem
                         v-for="camera in cameras"
                         :key="camera.deviceId"
-                        :value="camera.label"
+                        :name="camera.label"
+                        :value="camera.deviceId"
                         class="truncate"
-                        @select="(e: CustomEvent) => onUpdateCamera(camera.deviceId, start, stop)"
+                        @select="onUpdateCamera(camera.deviceId, start, stop)"
                       >
-                        {{ camera.label || 'Unnamed Device' }}
+                        <SelectItemText>
+                          {{ camera.label || 'Unnamed Device' }}
+                        </SelectItemText>
                       </SelectItem>
                     </template>
                     <template v-else>
@@ -138,7 +152,7 @@ const handleVideoStream = (index: number, stream: MediaStream | null) => {
               Select one or more audio inputs from the list of available devices.
             </FieldDescription>
             <Field>
-              <Select multiple v-model="microphonesSelect" :disabled="!microphones.length">
+              <Select multiple :disabled="!microphones.length">
                 <SelectTrigger class="w-full">
                   <SelectValue placeholder="Select an audio input" />
                 </SelectTrigger>
@@ -148,13 +162,14 @@ const handleVideoStream = (index: number, stream: MediaStream | null) => {
                       <SelectItem
                         v-for="microphone in microphones"
                         :key="microphone.deviceId"
-                        :value="microphone.label"
+                        :name="microphone.label"
+                        :value="microphone.deviceId"
                         class="truncate"
-                        @select="
-                          (e: CustomEvent) => onUpdateMicrophone(microphone.deviceId, start, stop)
-                        "
+                        @select="onUpdateMicrophone(microphone.deviceId, start, stop)"
                       >
-                        {{ microphone.label || 'Unnamed Device' }}
+                        <SelectItemText>
+                          {{ microphone.label || 'Unnamed Device' }}
+                        </SelectItemText>
                       </SelectItem>
                     </template>
                     <template v-else>
@@ -172,38 +187,41 @@ const handleVideoStream = (index: number, stream: MediaStream | null) => {
 
       <div class="grid grid-cols-2 gap-4">
         <VideoDevice
-          v-for="(camera, index) in camerasSelect"
-          :key="camera.deviceId"
-          :device-id="camera.deviceId"
-          :width="1920"
-          :height="1080"
+          v-for="(deviceId, index) in camerasSelect"
+          :key="deviceId"
+          :device-id="deviceId"
+          :width="1280"
+          :height="720"
           :frame-rate="30"
           auto-start
           @stream="(stream: MediaStream | null) => handleVideoStream(index, stream)"
+          v-slot="{ isActive }"
         >
           <video
-            :ref="cameraRefs"
-            class="w-full h-auto rounded-md border border-border"
+            v-if="isActive"
+            ref="cameraRefs"
+            class="aspect-video w-full h-auto rounded-md border border-border"
             autoplay
             playsinline
             muted
           ></video>
-          <div>{{ camera.label }}</div>
         </VideoDevice>
 
         <AudioDevice
-          v-for="microphone in microphonesSelect"
-          :key="microphone.deviceId"
-          :device-id="microphone.deviceId"
+          v-for="(deviceId, index) in microphonesSelect"
+          :key="deviceId"
+          :device-id="deviceId"
           :echo-cancellation="true"
           :noise-suppression="false"
           :auto-gain-control="true"
           auto-start
-          v-slot="{ stream }"
+          @stream="(stream: MediaStream | null) => handleAudioStream(index, stream)"
+          v-slot="{ isActive }"
         >
           <audio
+            v-if="isActive"
+            ref="microphoneRefs"
             class="w-full h-auto rounded-md border border-border"
-            :srcObject="stream"
             autoplay
             playsinline
             muted
@@ -221,9 +239,11 @@ const handleVideoStream = (index: number, stream: MediaStream | null) => {
               <template v-if="errors.length" v-for="(error, index) in errors" :key="index">
                 <Badge variant="destructive">
                   {{
-                    error.message || (error as any).constraint
-                      ? `${error} (${(error as any).constraint})`
-                      : error
+                    error.message
+                      ? error.message
+                      : (error as any).constraint
+                        ? `${error} (${(error as any).constraint})`
+                        : error
                   }}
                 </Badge>
               </template>
