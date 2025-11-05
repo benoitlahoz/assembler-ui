@@ -16,6 +16,7 @@ import {
   MediaDevicesLoadingKey,
   MediaDevicesPermissionsKey,
   MediaDevicesActiveStreamsKey,
+  MediaDevicesErrorsKey,
   type MediaPermissions,
 } from '.';
 import type { MediaDevicesStartFn, MediaDevicesStopFn } from '.';
@@ -84,6 +85,7 @@ const providerActiveStreams = inject<Readonly<Ref<ReadonlyMap<string, MediaStrea
   MediaDevicesActiveStreamsKey,
   computed(() => new Map() as ReadonlyMap<string, MediaStream>)
 );
+const providerError = inject<Ref<Error[]>>(MediaDevicesErrorsKey, ref([] as Error[]));
 
 const stream = ref<MediaStream | null>(null);
 const error = ref<Error | null>(null);
@@ -171,6 +173,7 @@ const start = async () => {
     emit('started');
   } catch (err) {
     const errorObj = err as Error;
+    providerError.value.push(errorObj);
     error.value = errorObj;
     emit('error', errorObj);
   } finally {
