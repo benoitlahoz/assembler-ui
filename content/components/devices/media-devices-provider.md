@@ -3,7 +3,7 @@ title: MediaDevicesProvider
 description: A renderless provider component that supplies media devices information and handles permissions.
 ---
 
-  <p class="text-pretty mt-4"><br>This component uses the MediaDevices API to list available audio and video input devices and cache their streams until they are stopped.<br>It manages user permissions and provides reactive access to device information.<br><br>The demos below use different MediaDevicesProvider. In real world usage, you may want to wrap your application or a section of it with the MediaDevicesProvider component.<br><br>Note that if using both MediaDevicesProvider and provided devices components, you should prefer using the `start` and `stop` functions from the device slot props to ensure proper stream management.<br>If you need to pass the functions to your custom components, you can do so via MediaDevicesProvider slots or provide/inject.</p>
+  <p class="text-pretty mt-4"><br>This component uses the MediaDevices API to list available audio and video input devices and cache their streams until they are stopped.<br>It manages user permissions and provides reactive access to device information.<br><br>The demos below use different MediaDevicesProvider. In real world usage, you may want to wrap your application or a section of it with the MediaDevicesProvider component.<br><br>Note that if using both MediaDevicesProvider and provided devices components, you should prefer using the `start` and `stop` functions from the VideoDevice/AudioDevice slot props to ensure proper stream management.<br>If you need to pass the functions to your custom components, you can do so via MediaDevicesProvider slots or provide/inject.</p>
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
@@ -501,14 +501,10 @@ const {
   startStream,
   stopStream,
   stopAllStreams,
-  updateAvailableDevices,
-  ensurePermissions,
   initialize,
 } = useMediaDevices({
   type: toRef(props, "type"),
   open: toRef(props, "open"),
-  debug: toRef(props, "debug"),
-  debugLoadingDelay: props.debugLoadingDelay,
   onStreamStarted: (deviceId, stream) =>
     emit("streamStarted", deviceId, stream),
   onStreamStopped: (deviceId) => emit("streamStopped", deviceId),
@@ -1204,10 +1200,6 @@ export interface UseMediaDevicesOptions {
 
   open?: MaybeRef<boolean>;
 
-  debug?: MaybeRef<boolean>;
-
-  debugLoadingDelay?: number;
-
   onStreamStarted?: (deviceId: string, stream: MediaStream) => void;
 
   onStreamStopped?: (deviceId: string) => void;
@@ -1230,56 +1222,12 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
 
   const type = toRef(options.type ?? "all");
   const open = toRef(options.open ?? false);
-  const debug = toRef(options.debug ?? false);
-  const debugLoadingDelay = options.debugLoadingDelay ?? 300;
 
   const devices = ref<MediaDeviceInfo[]>([]);
 
   const errors = ref<Error[]>([]);
 
-  const _isLoadingInternal = ref<boolean>(false);
-
-  let loadingDebounceTimeout: ReturnType<typeof setTimeout> | null = null;
-
-  let loadingStartTime: number | null = null;
-
-  const isLoading = computed(() => {
-    return _isLoadingInternal.value;
-  });
-
-  const setLoading = (value: boolean) => {
-    if (debug.value) {
-      if (value === true) {
-        _isLoadingInternal.value = true;
-        loadingStartTime = Date.now();
-
-        if (loadingDebounceTimeout) {
-          clearTimeout(loadingDebounceTimeout);
-          loadingDebounceTimeout = null;
-        }
-      } else {
-        const elapsed = loadingStartTime ? Date.now() - loadingStartTime : 0;
-        const remainingTime = Math.max(0, debugLoadingDelay - elapsed);
-
-        if (remainingTime > 0) {
-          loadingDebounceTimeout = setTimeout(() => {
-            _isLoadingInternal.value = false;
-            loadingStartTime = null;
-          }, remainingTime);
-        } else {
-          _isLoadingInternal.value = false;
-          loadingStartTime = null;
-        }
-      }
-    } else {
-      if (loadingDebounceTimeout) {
-        clearTimeout(loadingDebounceTimeout);
-        loadingDebounceTimeout = null;
-      }
-      _isLoadingInternal.value = value;
-      loadingStartTime = null;
-    }
-  };
+  const isLoading = ref(false);
 
   const permissions = ref<MediaPermissions>({
     camera: "unknown",
@@ -1383,7 +1331,7 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
       return;
     }
 
-    setLoading(true);
+    isLoading.value = true;
     try {
       devices.value = await navigator.mediaDevices.enumerateDevices();
       onDevicesUpdated?.(devices.value);
@@ -1392,7 +1340,7 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
       errors.value.push(err);
       onError?.(err);
     } finally {
-      setLoading(false);
+      isLoading.value = false;
     }
   };
 
@@ -1470,10 +1418,6 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
 
   onBeforeUnmount(() => {
     stopAllStreams();
-
-    if (loadingDebounceTimeout) {
-      clearTimeout(loadingDebounceTimeout);
-    }
   });
 
   return {

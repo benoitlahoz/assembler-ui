@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, useTemplateRef } from 'vue';
+import { nextTick, ref } from 'vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +18,7 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
+  SelectItemText,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -25,7 +26,6 @@ import {
   AudioDevice,
   VideoDevice,
 } from '~~/registry/new-york/components/media-devices-provider';
-import SelectItemText from '~/components/ui/select/SelectItemText.vue';
 
 type DeviceId = string;
 
@@ -46,6 +46,8 @@ const handleVideoStream = (index: number, stream: MediaStream | null) => {
       } else {
         element.srcObject = null;
       }
+    } else {
+      throw new Error('Video element not found and cannot attach/detach stream');
     }
   });
 };
@@ -54,24 +56,13 @@ const handleAudioStream = (index: number, stream: MediaStream | null) => {
   nextTick(() => {
     const element = microphoneRefs.value[index];
     if (element) {
-      console.log(
-        '[DEBUG handleAudioStream] index:',
-        index,
-        'stream:',
-        stream,
-        'element:',
-        element
-      );
       if (stream) {
         element.srcObject = stream;
-        console.log('[DEBUG handleAudioStream] srcObject attaché');
       } else {
         element.srcObject = null;
-        console.log('[DEBUG handleAudioStream] srcObject nettoyé');
       }
     } else {
-      console.log('[DEBUG handleAudioStream] Aucun élément audio DOM à cet index:', index);
-      console.log('Refs audio actuels:', microphoneRefs.value);
+      throw new Error('Audio element not found and cannot attach/detach stream');
     }
   });
 };

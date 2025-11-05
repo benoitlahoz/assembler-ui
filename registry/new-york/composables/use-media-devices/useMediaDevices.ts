@@ -71,17 +71,6 @@ export interface UseMediaDevicesOptions {
    */
   open?: MaybeRef<boolean>;
   /**
-   * Enable debug mode to debounce isLoading state changes.
-   * Can be a static value or a reactive ref.
-   * @default false
-   */
-  debug?: MaybeRef<boolean>;
-  /**
-   * Debounce delay in milliseconds for isLoading when debug mode is enabled.
-   * @default 300
-   */
-  debugLoadingDelay?: number;
-  /**
    * Callback when a stream is started successfully.
    */
   onStreamStarted?: (deviceId: string, stream: MediaStream) => void;
@@ -110,8 +99,6 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
   // Convert type and open to refs for reactivity
   const type = toRef(options.type ?? 'all');
   const open = toRef(options.open ?? false);
-  const debug = toRef(options.debug ?? false);
-  const debugLoadingDelay = options.debugLoadingDelay ?? 300;
 
   /**
    * List of available media devices.
@@ -124,70 +111,9 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
   const errors = ref<Error[]>([]);
 
   /**
-   * Indicates if device enumeration is in progress (internal state).
+   * Indicates if device enumeration is in progress.
    */
-  const _isLoadingInternal = ref<boolean>(false);
-
-  /**
-   * Debounce timeout for isLoading in debug mode.
-   */
-  let loadingDebounceTimeout: ReturnType<typeof setTimeout> | null = null;
-
-  /**
-   * Timestamp when loading started (for debug mode minimum duration).
-   */
-  let loadingStartTime: number | null = null;
-
-  /**
-   * Public isLoading state with optional debouncing.
-   * In debug mode, we force isLoading to stay true for a minimum duration.
-   */
-  const isLoading = computed(() => {
-    return _isLoadingInternal.value;
-  });
-
-  /**
-   * Set loading state with optional minimum duration in debug mode.
-   */
-  const setLoading = (value: boolean) => {
-    if (debug.value) {
-      if (value === true) {
-        // Starting loading: set to true immediately and record start time
-        _isLoadingInternal.value = true;
-        loadingStartTime = Date.now();
-
-        // Clear any pending timeout
-        if (loadingDebounceTimeout) {
-          clearTimeout(loadingDebounceTimeout);
-          loadingDebounceTimeout = null;
-        }
-      } else {
-        // Ending loading: ensure minimum duration has elapsed
-        const elapsed = loadingStartTime ? Date.now() - loadingStartTime : 0;
-        const remainingTime = Math.max(0, debugLoadingDelay - elapsed);
-
-        if (remainingTime > 0) {
-          // Wait for the remaining time before setting to false
-          loadingDebounceTimeout = setTimeout(() => {
-            _isLoadingInternal.value = false;
-            loadingStartTime = null;
-          }, remainingTime);
-        } else {
-          // Minimum duration already elapsed, set to false immediately
-          _isLoadingInternal.value = false;
-          loadingStartTime = null;
-        }
-      }
-    } else {
-      // Normal mode: update immediately
-      if (loadingDebounceTimeout) {
-        clearTimeout(loadingDebounceTimeout);
-        loadingDebounceTimeout = null;
-      }
-      _isLoadingInternal.value = value;
-      loadingStartTime = null;
-    }
-  };
+  const isLoading = ref(false);
 
   /**
    * Permission states for camera and microphone.
@@ -323,7 +249,7 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
       return;
     }
 
-    setLoading(true);
+    isLoading.value = true;
     try {
       devices.value = await navigator.mediaDevices.enumerateDevices();
       onDevicesUpdated?.(devices.value);
@@ -332,7 +258,7 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
       errors.value.push(err);
       onError?.(err);
     } finally {
-      setLoading(false);
+      isLoading.value = false;
     }
   };
 
@@ -440,10 +366,6 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
    */
   onBeforeUnmount(() => {
     stopAllStreams();
-    // Clear any pending debounce timeout
-    if (loadingDebounceTimeout) {
-      clearTimeout(loadingDebounceTimeout);
-    }
   });
 
   /**
