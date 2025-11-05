@@ -13,10 +13,6 @@
 import { ref, computed, onBeforeUnmount, watch, toRef, type MaybeRef } from 'vue';
 import { useEventListener } from '@vueuse/core';
 
-// TEST
-import { foo } from './foo';
-import { bar } from './bar';
-
 /**
  * Supported media device types.
  */

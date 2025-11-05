@@ -23,10 +23,37 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { MediaDevicesProvider } from '~~/registry/new-york/components/media-devices-provider';
 
-const open = ref(false);
+const enumerated = ref(false);
 
 const camerasSelect = ref<string[]>([]);
 const microphonesSelect = ref<string[]>([]);
+
+const onUpdateCamera = async (
+  deviceId: string,
+  start: (deviceId: string, constraints: MediaStreamConstraints) => void,
+  stop: (deviceId: string) => void
+) => {
+  if (!camerasSelect.value.includes(deviceId)) {
+    await start(deviceId, { video: { deviceId: { exact: deviceId } } });
+  } else {
+    camerasSelect.value = camerasSelect.value.filter((id) => id !== deviceId);
+    stop(deviceId);
+  }
+  console.warn(camerasSelect.value);
+};
+
+const onUpdateMicrophone = async (
+  deviceId: string,
+  start: (deviceId: string, constraints: MediaStreamConstraints) => void,
+  stop: (deviceId: string) => void
+) => {
+  if (!microphonesSelect.value.includes(deviceId)) {
+    await start(deviceId, { audio: { deviceId: { exact: deviceId } } });
+  } else {
+    microphonesSelect.value = microphonesSelect.value.filter((id) => id !== deviceId);
+    stop(deviceId);
+  }
+};
 </script>
 <template>
   <div class="flex flex-col">
@@ -36,18 +63,22 @@ const microphonesSelect = ref<string[]>([]);
         Click the button to enumerate available media devices (cameras, microphones and speakers).
       </FieldDescription>
       <Field>
-        <Button :disabled="open" variant="outline" @click="open = true">Enumerate Devices</Button>
+        <Button :disabled="enumerated" variant="outline" @click="enumerated = true"
+          >Enumerate Devices</Button
+        >
       </Field>
     </FieldSet>
     <Separator class="my-4" />
-    <MediaDevicesProvider :open="open" v-slot="{ cameras, microphones, errors }">
+    <MediaDevicesProvider :open="enumerated" v-slot="{ cameras, microphones, errors, start, stop }">
       <FieldGroup class="grid grid-cols-2 gap-4">
-        <FieldSet>
+        <FieldSet class="min-w-0">
           <FieldLegend>Cameras</FieldLegend>
-          <FieldDescription> Select from the list of available camera devices. </FieldDescription>
+          <FieldDescription>
+            Select one or more cameras from the list of available devices.
+          </FieldDescription>
           <Field>
             <Select multiple v-model="camerasSelect" :disabled="!cameras.length">
-              <SelectTrigger class="w-[180px]">
+              <SelectTrigger class="w-full">
                 <SelectValue placeholder="Select a camera" />
               </SelectTrigger>
               <SelectContent>
@@ -56,7 +87,9 @@ const microphonesSelect = ref<string[]>([]);
                     <SelectItem
                       v-for="camera in cameras"
                       :key="camera.deviceId"
-                      :value="camera.deviceId"
+                      :value="camera.label"
+                      class="truncate"
+                      @select="(e: CustomEvent) => onUpdateCamera(camera.deviceId, start, stop)"
                     >
                       {{ camera.label || 'Unnamed Device' }}
                     </SelectItem>
@@ -70,14 +103,14 @@ const microphonesSelect = ref<string[]>([]);
           </Field>
         </FieldSet>
 
-        <FieldSet>
+        <FieldSet class="min-w-0">
           <FieldLegend>Audio Inputs</FieldLegend>
           <FieldDescription>
-            Select from the list of available audio input devices.
+            Select one or more audio inputs from the list of available devices.
           </FieldDescription>
           <Field>
             <Select multiple v-model="microphonesSelect" :disabled="!microphones.length">
-              <SelectTrigger class="w-[180px]">
+              <SelectTrigger class="w-full">
                 <SelectValue placeholder="Select an audio input" />
               </SelectTrigger>
               <SelectContent>
@@ -86,7 +119,11 @@ const microphonesSelect = ref<string[]>([]);
                     <SelectItem
                       v-for="microphone in microphones"
                       :key="microphone.deviceId"
-                      :value="microphone.deviceId"
+                      :value="microphone.label"
+                      class="truncate"
+                      @select="
+                        (e: CustomEvent) => onUpdateMicrophone(microphone.deviceId, start, stop)
+                      "
                     >
                       {{ microphone.label || 'Unnamed Device' }}
                     </SelectItem>
