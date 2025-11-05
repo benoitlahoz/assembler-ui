@@ -47,11 +47,12 @@ export const runWithSpinner = async ({
  * Display a summary of the generation process: number of files created and error details.
  * @param total Total number of files attempted
  * @param errors Array of errors with { dir, error }
+ * @param warnings Array of warning messages
  */
 export const displayGenerationSummary = (
   total: number,
   errors: { dir: string; error: any }[],
-  options?: { successMessage?: string; extraMessage?: string }
+  options?: { successMessage?: string; extraMessage?: string; warnings?: string[] }
 ) => {
   const created = total - errors.length;
   console.log('\n' + chalk.bold('Generation summary:'));
@@ -62,6 +63,12 @@ export const displayGenerationSummary = (
   }
   if (options?.extraMessage) {
     console.log(chalk.green(options.extraMessage));
+  }
+  if (options?.warnings && options.warnings.length > 0) {
+    console.log(chalk.yellow(`⚠ ${options.warnings.length} warning(s):`));
+    options.warnings.forEach((warning) => {
+      console.log(chalk.yellow(`  - ${warning}`));
+    });
   }
   if (errors.length > 0) {
     console.log(chalk.red(`✖ ${errors.length} error(s):`));

@@ -160,17 +160,19 @@ export function createDependencyMap(
         const depFolderName = path.basename(imp.path);
         if (!dependencyMap[depFolderName]) {
           const depFolderFullPath = path.resolve(process.cwd(), globalPath, imp.path);
-          const depFiles = getFilesInFolderRecursive(depFolderFullPath, skipSubfolders).map((filePath) => {
-            const fileName = path.basename(filePath);
-            const source = readFileWithoutComments(filePath);
-            const relativePath = path.relative(process.cwd(), filePath);
+          const depFiles = getFilesInFolderRecursive(depFolderFullPath, skipSubfolders).map(
+            (filePath) => {
+              const fileName = path.basename(filePath);
+              const source = readFileWithoutComments(filePath);
+              const relativePath = path.relative(process.cwd(), filePath);
 
-            return {
-              name: fileName,
-              path: relativePath,
-              source,
-            };
-          });
+              return {
+                name: fileName,
+                path: relativePath,
+                source,
+              };
+            }
+          );
 
           dependencyMap[depFolderName] = {
             dependsOn: [],

@@ -9,7 +9,10 @@ import {
   saveDependencyMap,
   displayDependencyMapStats,
 } from './parse-folder/common/create-dependency-map.js';
-import type { FolderAnalysisResult } from './parse-folder/common/create-dependency-map.js';
+import type {
+  FolderAnalysisResult,
+  DependencyMap,
+} from './parse-folder/common/create-dependency-map.js';
 import config from '../assembler-ui.config.js';
 
 const GlobalPath = config.globalPath || 'registry/new-york/';
@@ -19,7 +22,7 @@ const SkipSubfolders = config.skipSubfolders || [];
 /**
  * Analyse un dossier pour détecter ses dépendances
  */
-const analyzeFolderDependencies = (
+export const analyzeFolderDependencies = (
   folderPath: string,
   folderName: string
 ): FolderAnalysisResult => {
@@ -112,11 +115,10 @@ const analyzeFolderDependencies = (
 };
 
 /**
- * Script principal
+ * Construit la dependency map à partir des dossiers analysés
+ * Cette fonction est exportée pour être utilisée par generate-descriptions
  */
-const main = () => {
-  console.log('🔨 Building dependency map...\n');
-
+export const buildDependencyMap = (): DependencyMap => {
   const results: FolderAnalysisResult[] = [];
 
   // Parcourir tous les dossiers dans les paths configurés
@@ -136,18 +138,26 @@ const main = () => {
 
     for (const folder of folders) {
       const folderPath = path.join(fullPath, folder);
-      console.log(`📁 Analyzing: ${subPath}/${folder}`);
-
       const result = analyzeFolderDependencies(folderPath, folder);
       results.push(result);
     }
   }
 
   // Créer la carte de dépendances
-  console.log('\n📊 Creating dependency map...');
   const dependencyMap = createDependencyMap(results, GlobalPath, SkipSubfolders);
 
-  // Sauvegarder
+  return dependencyMap;
+};
+
+/**
+ * Script principal - conservé pour les tests
+ */
+const main = () => {
+  console.log('🔨 Building dependency map...\n');
+
+  const dependencyMap = buildDependencyMap();
+
+  // Sauvegarder (uniquement pour les tests)
   const outputPath = path.resolve(__dirname, 'dependency-map.json');
   saveDependencyMap(dependencyMap, outputPath);
 
@@ -157,4 +167,7 @@ const main = () => {
   displayDependencyMapStats(dependencyMap);
 };
 
-main();
+// Exécuter main uniquement si le script est exécuté directement
+if (require.main === module) {
+  main();
+}

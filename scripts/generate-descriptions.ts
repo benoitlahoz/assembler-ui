@@ -8,6 +8,7 @@ import {
 } from './utils/terminal-display';
 import config from '../assembler-ui.config.js';
 import type { DependencyMap } from './parse-folder/common/create-dependency-map';
+import { buildDependencyMap } from './build-dependency-map';
 
 const DEBUG_JSON = true;
 const GlobalPath = config.globalPath || 'registry/new-york/';
@@ -28,18 +29,6 @@ interface EnrichedResult {
   $schema?: string;
   install?: string;
 }
-
-/**
- * Loads the dependency map
- */
-const loadDependencyMap = (): DependencyMap => {
-  const mapPath = path.resolve(__dirname, 'dependency-map.json');
-  if (!fs.existsSync(mapPath)) {
-    console.warn('⚠️  Dependency map not found. Generating without optimization.');
-    return {};
-  }
-  return JSON.parse(fs.readFileSync(mapPath, 'utf-8'));
-};
 
 /**
  * Enriches the parseFolder result with dependency information
@@ -70,7 +59,11 @@ const enrichWithDependencies = (
 /**
  * Sorts folders in topological order (dependencies first)
  */
-const topologicalSort = (folders: string[], dependencyMap: DependencyMap): string[] => {
+const topologicalSort = (
+  folders: string[],
+  dependencyMap: DependencyMap,
+  warnings: string[]
+): string[] => {
   const sorted: string[] = [];
   const visited = new Set<string>();
   const visiting = new Set<string>();
@@ -79,7 +72,7 @@ const topologicalSort = (folders: string[], dependencyMap: DependencyMap): strin
     if (visited.has(folder)) return;
     if (visiting.has(folder)) {
       // Cycle detected, ignoring
-      console.warn(`⚠️  Dependency cycle detected for: ${folder}`);
+      warnings.push(`Dependency cycle detected for: ${folder}`);
       return;
     }
 
@@ -105,8 +98,22 @@ const topologicalSort = (folders: string[], dependencyMap: DependencyMap): strin
 export const main = async () => {
   console.log('🚀 Generating descriptions with dependency map\n');
 
-  // 1. Load the dependency map
-  const dependencyMap = loadDependencyMap();
+  // 1. Build the dependency map dynamically
+  let dependencyMap: DependencyMap = {};
+  const warnings: string[] = [];
+
+  await runWithSpinner({
+    message: 'Building dependency map',
+    action: async () => {
+      dependencyMap = buildDependencyMap();
+      return dependencyMap;
+    },
+    successMessage: (result) => {
+      const count = Object.keys(result || {}).length;
+      return `Dependency map built successfully (${count} entries)`;
+    },
+    failMessage: 'Failed to build dependency map',
+  });
 
   // 2. Get all folders to process
   const allFolders: string[] = [];
@@ -123,7 +130,7 @@ export const main = async () => {
   });
 
   // 3. Sort folders in topological order
-  const sortedFolders = topologicalSort(allFolders, dependencyMap);
+  const sortedFolders = topologicalSort(allFolders, dependencyMap, warnings);
 
   // 4. Generate descriptions
   const errors: { dir: string; error: any }[] = [];
@@ -279,6 +286,7 @@ export const main = async () => {
 
   displayGenerationSummary(total, errors, {
     successMessage: `✔ {count} file(s) generated successfully.`,
+    warnings,
   });
   console.log('');
 };
