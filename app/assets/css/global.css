@@ -66,6 +66,11 @@
   --shadow-2xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
+
+  /** Nuxt UI custom properties **/
+
+  /** Set the maximum width for the UI container (original: --container-7xl (80rem) **/
+  --ui-container: 100rem;
 }
 
 .dark {
