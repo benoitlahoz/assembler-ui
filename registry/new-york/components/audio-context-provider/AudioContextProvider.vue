@@ -1,6 +1,12 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, provide } from 'vue';
 import { useAudioContext } from '~~/registry/new-york/composables/use-audio-context/useAudioContext';
+import {
+  AudioContextInjectionKey,
+  AudioContextLatencyHintKey,
+  AudioContextSampleRateKey,
+  AudioContextUpdateInjectionKey,
+} from '.';
 
 export interface AudioContextProviderProps {
   latencyHint?: AudioContextLatencyCategory;
@@ -19,6 +25,11 @@ const { context, updateContext, errors, state } = useAudioContext({
 
 const latencyHint = ref(props.latencyHint);
 const sampleRate = ref(props.sampleRate);
+
+provide(AudioContextInjectionKey, context);
+provide(AudioContextUpdateInjectionKey, updateContext);
+provide(AudioContextLatencyHintKey, latencyHint);
+provide(AudioContextSampleRateKey, sampleRate);
 
 watch(
   () => [props.latencyHint, props.sampleRate],
@@ -48,7 +59,7 @@ defineExpose({
 
 <template>
   <slot
-    :audio-context="context"
+    :context="context"
     :update-context="updateContext"
     :latency-hint="latencyHint"
     :sample-rate="sampleRate"

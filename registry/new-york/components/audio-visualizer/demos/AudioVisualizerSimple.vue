@@ -15,6 +15,7 @@ import {
   MediaDevicesProvider,
   AudioDevice,
 } from '~~/registry/new-york/components/media-devices-provider';
+import { AudioContextProvider } from '~~/registry/new-york/components/audio-context-provider';
 import { AudioVisualizer } from '~~/registry/new-york/components/audio-visualizer';
 
 const selectedId = ref<string | null>(null);
@@ -59,7 +60,17 @@ const selectedId = ref<string | null>(null);
     </FieldSet>
 
     <AudioDevice v-if="selectedId" :device-id="selectedId ?? ''" auto-start v-slot="{ stream }">
-      <AudioVisualizer :stream="stream" :width="600" :height="200" />
+      <AudioContextProvider v-slot="{ context, errors, state }">
+        <AudioVisualizer :stream="stream" :context="context" :width="600" :height="200" />
+        <template v-if="errors && errors.length">
+          <div class="text-red-500 text-xs mt-2">
+            <div v-for="(err, i) in errors" :key="i">{{ err.message }}</div>
+          </div>
+        </template>
+        <template v-if="state !== 'running'">
+          <div class="text-yellow-500 text-xs mt-2">AudioContext non actif</div>
+        </template>
+      </AudioContextProvider>
     </AudioDevice>
   </MediaDevicesProvider>
 </template>

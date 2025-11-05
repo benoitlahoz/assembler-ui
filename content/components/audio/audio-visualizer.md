@@ -33,6 +33,7 @@ import {
   MediaDevicesProvider,
   AudioDevice,
 } from "@/components/ui/media-devices-provider";
+import { AudioContextProvider } from "~~/registry/new-york/components/audio-context-provider";
 import { AudioVisualizer } from "~~/registry/new-york/components/audio-visualizer";
 
 const selectedId = ref<string | null>(null);
@@ -82,7 +83,22 @@ const selectedId = ref<string | null>(null);
       auto-start
       v-slot="{ stream }"
     >
-      <AudioVisualizer :stream="stream" :width="600" :height="200" />
+      <AudioContextProvider v-slot="{ context, errors, state }">
+        <AudioVisualizer
+          :stream="stream"
+          :context="context"
+          :width="600"
+          :height="200"
+        />
+        <template v-if="errors && errors.length">
+          <div class="text-red-500 text-xs mt-2">
+            <div v-for="(err, i) in errors" :key="i">{{ err.message }}</div>
+          </div>
+        </template>
+        <template v-if="state !== 'running'">
+          <div class="text-yellow-500 text-xs mt-2">AudioContext non actif</div>
+        </template>
+      </AudioContextProvider>
     </AudioDevice>
   </MediaDevicesProvider>
 </template>
@@ -134,6 +150,7 @@ import { ref, onUnmounted, watch } from "vue";
 
 export interface AudioVisualizerProps {
   stream?: MediaStream | null;
+  context?: AudioContext | null;
   width?: number;
   height?: number;
   fftSize?: number;
@@ -148,11 +165,11 @@ const props = withDefaults(defineProps<AudioVisualizerProps>(), {
   fftSize: 2048,
   lineWidth: 2,
   colors: () => ["#ff5252", "#448aff", "#43a047", "#ffd600"],
+  audioContext: null,
 });
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 let animationId: number | null = null;
-let audioCtx: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
 let source: MediaStreamAudioSourceNode | null = null;
 let channelData: Float32Array[] = [];
@@ -209,26 +226,21 @@ const draw = () => {
 };
 
 const setupAudio = () => {
-  if (audioCtx) audioCtx.close();
-  if (!props.stream) return;
-
-  audioCtx = new window.AudioContext();
-  source = audioCtx.createMediaStreamSource(props.stream);
-  analyser = audioCtx.createAnalyser();
+  if (!props.context || !props.stream) return;
+  source = props.context.createMediaStreamSource(props.stream);
+  analyser = props.context.createAnalyser();
   analyser.fftSize = props.fftSize;
   source.connect(analyser);
   draw();
 };
 
 watch(
-  () => props.stream,
-  (newStream) => {
-    if (newStream) {
+  () => [props.context, props.stream],
+  ([audioContext, stream]) => {
+    if (audioContext && stream) {
       setupAudio();
     } else {
       if (animationId) cancelAnimationFrame(animationId);
-      if (audioCtx) audioCtx.close();
-      audioCtx = null;
       analyser = null;
       source = null;
       channelData = [];
@@ -239,7 +251,9 @@ watch(
 
 onUnmounted(() => {
   if (animationId) cancelAnimationFrame(animationId);
-  if (audioCtx) audioCtx.close();
+  analyser = null;
+  source = null;
+  channelData = [];
 });
 </script>
 
@@ -264,6 +278,7 @@ onUnmounted(() => {
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `stream`{.primary .text-primary} | `MediaStream \| null` | - |  |
+| `context`{.primary .text-primary} | `AudioContext \| null` | - |  |
 | `width`{.primary .text-primary} | `number` | 600 |  |
 | `height`{.primary .text-primary} | `number` | 200 |  |
 | `fftSize`{.primary .text-primary} | `number` | 2048 |  |

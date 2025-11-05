@@ -48,23 +48,44 @@ export interface UseAudioContextOptions {
 export const useAudioContext = (options: UseAudioContextOptions) => {
   const latency = ref(options.latencyHint || "interactive");
   const sampleRate = ref(options.sampleRate || 44100);
+  const errors = ref<Error[]>([]);
+  const state = ref<"suspended" | "running" | "closed" | "interrupted">(
+    "suspended",
+  );
 
   const createContext = () => {
-    context.value = new AudioContext({
-      latencyHint: latency.value,
-      sampleRate: sampleRate.value,
-    });
+    try {
+      context.value = new AudioContext({
+        latencyHint: latency.value,
+        sampleRate: sampleRate.value,
+      });
+      state.value = context.value.state;
+      context.value.onstatechange = () => {
+        state.value = context.value?.state ?? "closed";
+      };
+    } catch (err) {
+      errors.value.push(err as Error);
+      context.value = null;
+      state.value = "closed";
+    }
   };
 
   const updateContext = (options: {
     latencyHint?: AudioContextLatencyCategory;
     sampleRate?: number;
   }) => {
-    if (context.value) {
-      context.value.close();
-      context.value = null;
+    try {
+      if (context.value) {
+        context.value.close();
+        context.value = null;
+        state.value = "closed";
+      }
+      if (options.latencyHint) latency.value = options.latencyHint;
+      if (options.sampleRate) sampleRate.value = options.sampleRate;
+      createContext();
+    } catch (err) {
+      errors.value.push(err as Error);
     }
-    createContext();
   };
 
   if (!context.value) {
@@ -76,7 +97,6 @@ export const useAudioContext = (options: UseAudioContextOptions) => {
       context.value.resume();
       return;
     }
-
     if (!context.value) {
       createContext();
     }
@@ -85,6 +105,8 @@ export const useAudioContext = (options: UseAudioContextOptions) => {
   return {
     context,
     updateContext,
+    errors,
+    state,
   };
 };
 ```
@@ -105,6 +127,8 @@ export const useAudioContext = (options: UseAudioContextOptions) => {
 |----------|------|-------------|
 | `context`{.primary .text-primary} | `any` | — |
 | `updateContext`{.primary .text-primary} | `any` | — |
+| `errors`{.primary .text-primary} | `Ref<Error[]>` | — |
+| `state`{.primary .text-primary} | `Ref<'suspended' \| 'running' \| 'closed' \| 'interrupted'>` | — |
 
   ### Types
 | Name | Type | Description |
