@@ -236,7 +236,7 @@ export { VideoPresets, AudioPresets, MediaPresets } from "./presets";
 
 ```vue [src/components/ui/media-devices-provider/MediaDevicesProvider.vue]
 <script setup lang="ts">
-import { provide, watch, onMounted, type Ref } from "vue";
+import { provide, onMounted, toRef, type Ref } from "vue";
 import { useMediaDevices } from "~~/registry/new-york/composables/use-media-devices/useMediaDevices";
 import {
   MediaDevicesKey,
@@ -267,9 +267,13 @@ const props = withDefaults(defineProps<MediaDevicesProviderProps>(), {
 
 const emit = defineEmits<{
   streamStarted: [deviceId: string, stream: MediaStream];
+
   streamStopped: [deviceId: string];
+
   allStreamsStopped: [];
+
   devicesUpdated: [devices: MediaDeviceInfo[]];
+
   error: [error: Error];
 }>();
 
@@ -289,8 +293,8 @@ const {
   ensurePermissions,
   initialize,
 } = useMediaDevices({
-  type: props.type,
-  open: props.open,
+  type: toRef(props, "type"),
+  open: toRef(props, "open"),
   onStreamStarted: (deviceId, stream) =>
     emit("streamStarted", deviceId, stream),
   onStreamStopped: (deviceId) => emit("streamStopped", deviceId),
@@ -314,32 +318,6 @@ provide<MediaDevicesStartFn>(MediaDevicesStartKey, startStream);
 provide<MediaDevicesStopFn>(MediaDevicesStopKey, stopStream);
 
 provide<MediaDevicesStopAllFn>(MediaDevicesStopAllKey, stopAllStreams);
-
-watch(
-  () => [props.type, props.open] as const,
-  async ([newType, newOpen], oldValue) => {
-    const [oldType, oldOpen] = oldValue || [props.type, false];
-
-    if (newOpen && !oldOpen) {
-      await ensurePermissions();
-      await updateAvailableDevices();
-    } else if (!newOpen && oldOpen) {
-      stopAllStreams();
-    } else if (newOpen && newType !== oldType) {
-      const shouldStopAll =
-        oldType === "all" ||
-        (oldType === "camera" && newType === "microphone") ||
-        (oldType === "microphone" && newType === "camera");
-
-      if (shouldStopAll) {
-        stopAllStreams();
-      }
-
-      await ensurePermissions();
-      await updateAvailableDevices();
-    }
-  },
-);
 
 onMounted(async () => {
   await initialize();
@@ -970,7 +948,7 @@ export const MediaPresets = {
 ::
 
 The MediaDevicesProvider component provides a list of available media devices
-(cameras, microphones, etc.) to its child components via a scoped slot.
+(cameras, microphones, etc.) to its child components via provide/inject and a scoped slot.
 
 **API**: composition
 

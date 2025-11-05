@@ -38,7 +38,14 @@ Copy and paste these files into your project.
 :::code-tree{default-value="src/composables/use-media-devices/useMediaDevices.ts"}
 
 ```ts [src/composables/use-media-devices/useMediaDevices.ts]
-import { ref, computed, onBeforeUnmount } from "vue";
+import {
+  ref,
+  computed,
+  onBeforeUnmount,
+  watch,
+  toRef,
+  type MaybeRef,
+} from "vue";
 import { useEventListener } from "@vueuse/core";
 
 import { foo } from "./foo";
@@ -65,9 +72,9 @@ export type MediaDevicesStopFn = (deviceId: string) => void;
 export type MediaDevicesStopAllFn = () => void;
 
 export interface UseMediaDevicesOptions {
-  type?: MediaDeviceType;
+  type?: MaybeRef<MediaDeviceType>;
 
-  open?: boolean;
+  open?: MaybeRef<boolean>;
 
   onStreamStarted?: (deviceId: string, stream: MediaStream) => void;
 
@@ -82,14 +89,15 @@ export interface UseMediaDevicesOptions {
 
 export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
   const {
-    type = "all",
-    open = false,
     onStreamStarted,
     onStreamStopped,
     onAllStreamsStopped,
     onDevicesUpdated,
     onError,
   } = options;
+
+  const type = toRef(options.type ?? "all");
+  const open = toRef(options.open ?? false);
 
   const devices = ref<MediaDeviceInfo[]>([]);
 
@@ -112,7 +120,7 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
   const microphones = computed(() => filterDevicesByKind("audioinput"));
   const speakers = computed(() => filterDevicesByKind("audiooutput"));
 
-  const roActiveStreams = computed(
+  const readonlyActiveStreams = computed(
     () => activeStreams.value as ReadonlyMap<string, MediaStream>,
   );
 
@@ -217,8 +225,8 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
       return;
     }
 
-    const needsVideo = type === "camera" || type === "all";
-    const needsAudio = type === "microphone" || type === "all";
+    const needsVideo = type.value === "camera" || type.value === "all";
+    const needsAudio = type.value === "microphone" || type.value === "all";
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -239,7 +247,7 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
   };
 
   const ensurePermissions = async () => {
-    if (open) {
+    if (open.value) {
       await requestMediaIfNeeded();
     }
   };
@@ -247,13 +255,34 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
   const initialize = async () => {
     await updatePermissions();
 
-    if (open) {
+    if (open.value) {
       await ensurePermissions();
 
       await new Promise((resolve) => setTimeout(resolve, 100));
       await updateAvailableDevices();
     }
   };
+
+  watch([type, open], async ([newType, newOpen], [oldType, oldOpen]) => {
+    if (newOpen && !oldOpen) {
+      await ensurePermissions();
+      await updateAvailableDevices();
+    } else if (!newOpen && oldOpen) {
+      stopAllStreams();
+    } else if (newOpen && newType !== oldType) {
+      const shouldStopAll =
+        oldType === "all" ||
+        (oldType === "camera" && newType === "microphone") ||
+        (oldType === "microphone" && newType === "camera");
+
+      if (shouldStopAll) {
+        stopAllStreams();
+      }
+
+      await ensurePermissions();
+      await updateAvailableDevices();
+    }
+  });
 
   if (typeof navigator !== "undefined" && navigator.mediaDevices) {
     useEventListener(
@@ -282,7 +311,7 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
 
     permissions,
 
-    activeStreams: roActiveStreams,
+    activeStreams: readonlyActiveStreams,
 
     startStream,
 

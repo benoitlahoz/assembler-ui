@@ -10,7 +10,7 @@
  * -- Media Devices Hook
  */
 
-import { ref, computed, onBeforeUnmount } from 'vue';
+import { ref, computed, onBeforeUnmount, watch, toRef, type MaybeRef } from 'vue';
 import { useEventListener } from '@vueuse/core';
 
 // TEST
@@ -64,14 +64,16 @@ export type MediaDevicesStopAllFn = () => void;
 export interface UseMediaDevicesOptions {
   /**
    * The type of media devices to request.
+   * Can be a static value or a reactive ref.
    * @default 'all'
    */
-  type?: MediaDeviceType;
+  type?: MaybeRef<MediaDeviceType>;
   /**
    * Whether to automatically request media permissions and devices on initialization.
+   * Can be a static value or a reactive ref.
    * @default false
    */
-  open?: boolean;
+  open?: MaybeRef<boolean>;
   /**
    * Callback when a stream is started successfully.
    */
@@ -95,15 +97,12 @@ export interface UseMediaDevicesOptions {
 }
 
 export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
-  const {
-    type = 'all',
-    open = false,
-    onStreamStarted,
-    onStreamStopped,
-    onAllStreamsStopped,
-    onDevicesUpdated,
-    onError,
-  } = options;
+  const { onStreamStarted, onStreamStopped, onAllStreamsStopped, onDevicesUpdated, onError } =
+    options;
+
+  // Convert type and open to refs for reactivity
+  const type = toRef(options.type ?? 'all');
+  const open = toRef(options.open ?? false);
 
   /**
    * List of available media devices.
@@ -150,7 +149,9 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
   /**
    * Readonly version of active streams for safe exposure.
    */
-  const roActiveStreams = computed(() => activeStreams.value as ReadonlyMap<string, MediaStream>);
+  const readonlyActiveStreams = computed(
+    () => activeStreams.value as ReadonlyMap<string, MediaStream>
+  );
 
   /**
    * Check permission state for a specific media type.
@@ -275,8 +276,8 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
       return;
     }
 
-    const needsVideo = type === 'camera' || type === 'all';
-    const needsAudio = type === 'microphone' || type === 'all';
+    const needsVideo = type.value === 'camera' || type.value === 'all';
+    const needsAudio = type.value === 'microphone' || type.value === 'all';
 
     try {
       // Always request getUserMedia to ensure device labels are available
@@ -306,7 +307,7 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
    * Ensure permissions are requested if open is true.
    */
   const ensurePermissions = async () => {
-    if (open) {
+    if (open.value) {
       await requestMediaIfNeeded();
     }
   };
@@ -318,13 +319,44 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
     // Check initial permissions state
     await updatePermissions();
 
-    if (open) {
+    if (open.value) {
       await ensurePermissions();
       // Wait a bit for Firefox to update device info after stopping tracks
       await new Promise((resolve) => setTimeout(resolve, 100));
       await updateAvailableDevices();
     }
   };
+
+  /**
+   * Watch for changes in type and open props to handle state updates.
+   */
+  watch([type, open], async ([newType, newOpen], [oldType, oldOpen]) => {
+    // If open changes from false to true, request permissions and update devices
+    if (newOpen && !oldOpen) {
+      await ensurePermissions();
+      await updateAvailableDevices();
+    }
+    // If open changes from true to false, stop all active streams
+    else if (!newOpen && oldOpen) {
+      stopAllStreams();
+    }
+    // If type changes while open is true, handle stream cleanup intelligently
+    else if (newOpen && newType !== oldType) {
+      // Stop all streams only if going from 'all' to a specific type
+      // or switching between incompatible types (camera <-> microphone)
+      const shouldStopAll =
+        oldType === 'all' || // Going from 'all' to something specific
+        (oldType === 'camera' && newType === 'microphone') || // Camera to mic
+        (oldType === 'microphone' && newType === 'camera'); // Mic to camera
+
+      if (shouldStopAll) {
+        stopAllStreams();
+      }
+
+      await ensurePermissions();
+      await updateAvailableDevices();
+    }
+  });
 
   /**
    * Listen for device changes if in browser environment.
@@ -359,7 +391,7 @@ export function useMediaDevices(options: UseMediaDevicesOptions = {}) {
     /** Permission states for camera and microphone. */
     permissions,
     /** Map of active streams indexed by deviceId (readonly). */
-    activeStreams: roActiveStreams,
+    activeStreams: readonlyActiveStreams,
     /** Function to start a media stream for a specific device. */
     startStream,
     /** Function to stop a media stream for a specific device. */

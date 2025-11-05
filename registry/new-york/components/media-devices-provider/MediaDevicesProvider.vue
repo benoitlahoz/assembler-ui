@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
  * The MediaDevicesProvider component provides a list of available media devices
- * (cameras, microphones, etc.) to its child components via a scoped slot.
+ * (cameras, microphones, etc.) to its child components via provide/inject and a scoped slot.
  */
 
-import { provide, watch, onMounted, type Ref } from 'vue';
+import { provide, onMounted, toRef, type Ref } from 'vue';
 import { useMediaDevices } from '~~/registry/new-york/composables/use-media-devices/useMediaDevices';
 import {
   MediaDevicesKey,
@@ -39,10 +39,25 @@ const props = withDefaults(defineProps<MediaDevicesProviderProps>(), {
 });
 
 const emit = defineEmits<{
+  /**
+   * Emitted when a media stream is started for a device.
+   */
   streamStarted: [deviceId: string, stream: MediaStream];
+  /**
+   * Emitted when a media stream is stopped for a device.
+   */
   streamStopped: [deviceId: string];
+  /**
+   * Emitted when all media streams are stopped.
+   */
   allStreamsStopped: [];
+  /**
+   * Emitted when the list of available media devices is updated.
+   */
   devicesUpdated: [devices: MediaDeviceInfo[]];
+  /**
+   * Emitted when an error occurs during media operations.
+   */
   error: [error: Error];
 }>();
 
@@ -65,8 +80,8 @@ const {
   ensurePermissions,
   initialize,
 } = useMediaDevices({
-  type: props.type,
-  open: props.open,
+  type: toRef(props, 'type'),
+  open: toRef(props, 'open'),
   onStreamStarted: (deviceId, stream) => emit('streamStarted', deviceId, stream),
   onStreamStopped: (deviceId) => emit('streamStopped', deviceId),
   onAllStreamsStopped: () => emit('allStreamsStopped'),
@@ -101,42 +116,6 @@ provide<MediaDevicesStopFn>(MediaDevicesStopKey, stopStream);
 
 /** Stop all active media streams. */
 provide<MediaDevicesStopAllFn>(MediaDevicesStopAllKey, stopAllStreams);
-
-/**
- * Watch for changes in props and update accordingly.
- */
-watch(
-  () => [props.type, props.open] as const,
-  async ([newType, newOpen], oldValue) => {
-    const [oldType, oldOpen] = oldValue || [props.type, false];
-
-    // If open changes from false to true, request permissions and update devices
-    if (newOpen && !oldOpen) {
-      await ensurePermissions();
-      await updateAvailableDevices();
-    }
-    // If open changes from true to false, stop all active streams
-    else if (!newOpen && oldOpen) {
-      stopAllStreams();
-    }
-    // If type changes while open is true, handle stream cleanup intelligently
-    else if (newOpen && newType !== oldType) {
-      // Stop all streams only if going from 'all' to a specific type
-      // or switching between incompatible types (camera <-> microphone)
-      const shouldStopAll =
-        oldType === 'all' || // Going from 'all' to something specific
-        (oldType === 'camera' && newType === 'microphone') || // Camera to mic
-        (oldType === 'microphone' && newType === 'camera'); // Mic to camera
-
-      if (shouldStopAll) {
-        stopAllStreams();
-      }
-
-      await ensurePermissions();
-      await updateAvailableDevices();
-    }
-  }
-);
 
 /**
  * Initialize on mount.
