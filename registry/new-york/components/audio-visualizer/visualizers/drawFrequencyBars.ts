@@ -23,15 +23,16 @@ export function drawFrequencyBars({
   if (!ctx) return;
   ctx.save();
 
-  if (props.background) ctx.fillStyle = props.background;
-
   const width = props.width ?? 600;
   const height = props.height ?? 200;
-  const fftSize = props.fftSize ?? 2048;
 
   ctx.clearRect(0, 0, width, height);
-  ctx.fillRect(0, 0, width, height);
-  ctx.restore();
+  if (props.background) {
+    ctx.save();
+    ctx.fillStyle = props.background;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+  }
 
   const bufferLength = analyser.frequencyBinCount;
   const dataArray = new Float32Array(bufferLength);
@@ -43,6 +44,9 @@ export function drawFrequencyBars({
     // On normalise pour obtenir une hauteur entre 0 et height
     const value =
       typeof dataArray[i] === 'number' && Number.isFinite(dataArray[i]) ? dataArray[i] : -100;
+
+    if (!value) continue;
+
     const magnitude = Math.max(0, Math.min(1, (value + 100) / 100));
     const barHeight = magnitude * height;
     const x = i * barWidth;

@@ -65,6 +65,14 @@ watch(
   { immediate: true }
 );
 
+watch(
+  () => props.mode,
+  () => {
+    if (animationId.value) cancelAnimationFrame(animationId.value);
+    draw();
+  }
+);
+
 onUnmounted(() => {
   if (animationId.value) cancelAnimationFrame(animationId.value);
   analyser = null;
