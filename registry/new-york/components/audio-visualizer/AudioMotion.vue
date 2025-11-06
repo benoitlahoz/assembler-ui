@@ -14,7 +14,7 @@ import {
 } from 'vue';
 import { AudioContextInjectionKey } from '~~/registry/new-york/components/audio-context-provider';
 import { useTypedElementSearch } from '~~/registry/new-york/composables/use-typed-element-search/useTypedElementSearch';
-import { useTailwindClassParser } from '~~/registry/new-york/composables/use-tailwind-class-parser/useTailwindClassParser';
+import { gradientFromClasses } from '.';
 
 export interface AudioMotionAnalyzerProps {
   class?: HTMLAttributes['class'];
@@ -30,7 +30,6 @@ const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
 });
 
 const { getTypedElementAmongSiblings, getContainer } = useTypedElementSearch();
-const { getTailwindBaseCssValues, parseLinearGradient } = useTailwindClassParser();
 
 const noDisplayElement = useTemplateRef('noDisplayRef');
 const injectedContext = inject<Ref<AudioContext | null>>(AudioContextInjectionKey, ref(null));
@@ -116,12 +115,14 @@ const setupAudio = async () => {
         barSpace: 0.6,
         ledBars: true,
         connectSpeakers: false,
+        overlay: true,
       });
 
-      const computedGradient = handleGradientClass();
+      const computedGradient = gradientFromClasses(props.class);
       if (computedGradient) {
         analyzer.registerGradient('custom', computedGradient as any);
         analyzer.gradient = 'custom';
+        analyzer.showBgColor = false;
       }
       analyzer.connectInput(source);
     } else {
@@ -160,37 +161,6 @@ const cleanUp = () => {
     source.disconnect();
     source = null;
   }
-};
-
-const handleGradientClass = () => {
-  const el = document.createElement('div');
-  el.className = props.class || '';
-  el.style.position = 'absolute';
-  el.style.visibility = 'hidden';
-  el.style.zIndex = '-9999';
-  document.body.appendChild(el);
-  const computedClass = getTailwindBaseCssValues(el, ['background-image']);
-  console.warn('Computed Class:', computedClass);
-  const computedGradient =
-    computedClass['background-image'] && computedClass['background-image'] !== 'none'
-      ? parseLinearGradient(computedClass['background-image'])
-      : null;
-
-  let gradient: {
-    dir?: 'h' | 'v' | undefined;
-    colorStops: Array<{ color: string; pos: number }>;
-  } | null = null;
-
-  if (computedGradient) {
-    gradient = { dir: 'v', colorStops: [] };
-    gradient.dir =
-      computedGradient.direction.includes('bottom') || computedGradient.direction.includes('top')
-        ? 'v'
-        : 'h';
-    gradient.colorStops = computedGradient.stops;
-  }
-  document.body.removeChild(el);
-  return gradient;
 };
 
 watch(

@@ -54,9 +54,11 @@ export const useTailwindClassParser = () => {
       orientation: 'unknown',
       stops: [] as Array<{ color: string; pos: number }>,
     };
+
     // Nouveau parsing plus robuste
     const gradientContent = gradientStr
       .replace(/^linear-gradient\(|\)$/gi, '')
+      .replace(/^gradient\(|\)$/gi, '')
       .replace(/^in\s+(\w+)\s*,\s*(.*)$/gi, '');
 
     // Sépare direction et stops
@@ -130,6 +132,7 @@ export const useTailwindClassParser = () => {
         result.stops.push({ color: stopMatch[1].trim(), pos: value });
       }
     }
+
     return result;
   };
 

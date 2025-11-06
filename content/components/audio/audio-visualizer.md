@@ -141,7 +141,7 @@ const visualizerModes = [
       <AudioContextProvider v-slot="{ errors, state }">
         <AudioMotion
           :stream="stream"
-          class="bg-linear-to-b from-foreground to-primary"
+          class="bg-linear-to-b from-pink-400 from-40% via-blue-500 via-60% to-red-700"
         >
           <canvas width="600" height="400" />
         </AudioMotion>
@@ -197,6 +197,7 @@ Copy and paste these files into your project.
 ```ts [src/components/ui/audio-visualizer/index.ts]
 import type { VariantProps } from "class-variance-authority";
 import { cva } from "class-variance-authority";
+import { useTailwindClassParser } from "~~/registry/new-york/composables/use-tailwind-class-parser/useTailwindClassParser";
 
 export { default as AudioVisualizer } from "./AudioVisualizer.vue";
 export { default as AudioMotion } from "./AudioMotion.vue";
@@ -221,6 +222,45 @@ export type AudioMotionVariants = VariantProps<typeof motionVariants>;
 export { type AudioVisualizerMode } from "./AudioVisualizer.vue";
 
 export { type AudioVisualizerProps } from "./AudioVisualizer.vue";
+
+export const gradientFromClasses = (classes: string = "") => {
+  const { getTailwindBaseCssValues, parseLinearGradient } =
+    useTailwindClassParser();
+
+  const el = document.createElement("div");
+  el.className = classes;
+  el.style.position = "absolute";
+  el.style.visibility = "hidden";
+  el.style.zIndex = "-9999";
+  document.body.appendChild(el);
+
+  const computedClass = getTailwindBaseCssValues(el, ["background-image"]);
+
+  const computedGradient =
+    computedClass["background-image"] &&
+    computedClass["background-image"] !== "none"
+      ? parseLinearGradient(computedClass["background-image"])
+      : null;
+
+  let gradient: {
+    bgColor: string;
+    dir?: "h" | "v" | undefined;
+    colorStops: Array<{ color: string; pos: number }>;
+  } | null = null;
+
+  if (computedGradient) {
+    gradient = { bgColor: "rgba(0, 0, 0, 0, 0)", dir: "v", colorStops: [] };
+    gradient.dir =
+      computedGradient.direction.includes("bottom") ||
+      computedGradient.direction.includes("top")
+        ? "v"
+        : "h";
+    gradient.colorStops = computedGradient.stops;
+  }
+
+  document.body.removeChild(el);
+  return gradient;
+};
 ```
 
 ```vue [src/components/ui/audio-visualizer/AudioVisualizer.vue]
@@ -380,7 +420,7 @@ import {
 } from "vue";
 import { AudioContextInjectionKey } from "@/components/ui/audio-context-provider";
 import { useTypedElementSearch } from "~~/registry/new-york/composables/use-typed-element-search/useTypedElementSearch";
-import { useTailwindClassParser } from "~~/registry/new-york/composables/use-tailwind-class-parser/useTailwindClassParser";
+import { gradientFromClasses } from ".";
 
 export interface AudioMotionAnalyzerProps {
   class?: HTMLAttributes["class"];
@@ -396,8 +436,6 @@ const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
 });
 
 const { getTypedElementAmongSiblings, getContainer } = useTypedElementSearch();
-const { getTailwindBaseCssValues, parseLinearGradient } =
-  useTailwindClassParser();
 
 const noDisplayElement = useTemplateRef("noDisplayRef");
 const injectedContext = inject<Ref<AudioContext | null>>(
@@ -487,12 +525,14 @@ const setupAudio = async () => {
         barSpace: 0.6,
         ledBars: true,
         connectSpeakers: false,
+        overlay: true,
       });
 
-      const computedGradient = handleGradientClass();
+      const computedGradient = gradientFromClasses(props.class);
       if (computedGradient) {
         analyzer.registerGradient("custom", computedGradient as any);
         analyzer.gradient = "custom";
+        analyzer.showBgColor = false;
       }
       analyzer.connectInput(source);
     } else {
@@ -531,39 +571,6 @@ const cleanUp = () => {
     source.disconnect();
     source = null;
   }
-};
-
-const handleGradientClass = () => {
-  const el = document.createElement("div");
-  el.className = props.class || "";
-  el.style.position = "absolute";
-  el.style.visibility = "hidden";
-  el.style.zIndex = "-9999";
-  document.body.appendChild(el);
-  const computedClass = getTailwindBaseCssValues(el, ["background-image"]);
-  console.warn("Computed Class:", computedClass);
-  const computedGradient =
-    computedClass["background-image"] &&
-    computedClass["background-image"] !== "none"
-      ? parseLinearGradient(computedClass["background-image"])
-      : null;
-
-  let gradient: {
-    dir?: "h" | "v" | undefined;
-    colorStops: Array<{ color: string; pos: number }>;
-  } | null = null;
-
-  if (computedGradient) {
-    gradient = { dir: "v", colorStops: [] };
-    gradient.dir =
-      computedGradient.direction.includes("bottom") ||
-      computedGradient.direction.includes("top")
-        ? "v"
-        : "h";
-    gradient.colorStops = computedGradient.stops;
-  }
-  document.body.removeChild(el);
-  return gradient;
 };
 
 watch(
@@ -1426,132 +1433,10 @@ export const useTypedElementSearch = () => {
 };
 ```
 
-```ts [src/composables/use-tailwind-class-parser/useTailwindClassParser.ts]
-export const useTailwindClassParser = () => {
-  const parseTailwindClasses = (classes: string): string[] => {
-    return classes
-      .split(" ")
-      .map((cls) => cls.trim())
-      .filter((cls) => cls.length > 0);
-  };
-
-  const getTailwindBaseCssValues = (
-    el: HTMLElement,
-    properties?: string[],
-  ): Record<string, string> => {
-    const computed = window.getComputedStyle(el);
-    const result: Record<string, string> = {};
-    if (properties && properties.length > 0) {
-      for (const prop of properties) {
-        result[prop] = computed.getPropertyValue(prop);
-      }
-    } else {
-      for (let i = 0; i < computed.length; i++) {
-        const prop = computed.item(i);
-        if (typeof prop === "string") {
-          result[prop] = computed.getPropertyValue(prop);
-        }
-      }
-    }
-
-    return result;
-  };
-
-  const parseLinearGradient = (gradientStr: string) => {
-    const result = {
-      direction: "",
-      orientation: "unknown",
-      stops: [] as Array<{ color: string; pos: number }>,
-    };
-
-    const gradientContent = gradientStr
-      .replace(/^linear-gradient\(|\)$/gi, "")
-      .replace(/^in\s+(\w+)\s*,\s*(.*)$/gi, "");
-
-    let direction = "";
-    let stopsPart = "";
-
-    const firstComma = gradientContent.indexOf(",");
-    if (firstComma !== -1) {
-      const firstPart = gradientContent.slice(0, firstComma).trim();
-      if (
-        /^(to\s+(right|left|top|bottom)(\s+(right|left|top|bottom))?|[0-9.]+deg)$/.test(
-          firstPart,
-        )
-      ) {
-        direction = firstPart;
-        stopsPart = gradientContent.slice(firstComma + 1);
-      } else {
-        direction = "to bottom";
-        stopsPart = gradientContent;
-      }
-    } else {
-      direction = gradientContent.trim();
-    }
-    result.direction = direction;
-
-    if (/to\s+right\b/.test(direction) && /to\s+bottom\b/.test(direction)) {
-      result.orientation = "diagonal";
-    } else if (/to\s+right\b/.test(direction)) {
-      result.orientation = "horizontal";
-    } else if (/to\s+left\b/.test(direction)) {
-      result.orientation = "horizontal";
-    } else if (/to\s+bottom\b/.test(direction)) {
-      result.orientation = "vertical";
-    } else if (/to\s+top\b/.test(direction)) {
-      result.orientation = "vertical";
-    } else if (/deg$/.test(direction)) {
-      result.orientation = "angle";
-    }
-
-    const stops = [];
-    let buffer = "";
-    let parenLevel = 0;
-    for (let i = 0; i < stopsPart.length; i++) {
-      const char = stopsPart[i];
-      if (char === "(") parenLevel++;
-      if (char === ")") parenLevel--;
-      if (char === "," && parenLevel === 0) {
-        if (buffer.trim()) stops.push(buffer.trim());
-        buffer = "";
-      } else {
-        buffer += char;
-      }
-    }
-    if (buffer.trim()) stops.push(buffer.trim());
-
-    for (const stop of stops) {
-      const stopMatch = stop.match(
-        /((?:#(?:[0-9a-fA-F]{3,8})|oklch\([^)]*\)|rgba?\([^)]*\)|hsla?\([^)]*\)|[a-zA-Z]+))\s*(\d+%|0|1)?$/,
-      );
-      if (stopMatch && stopMatch[1]) {
-        let value = 0;
-        const pos = stopMatch[2] ?? "";
-        if (pos.endsWith("%")) {
-          value = parseFloat(pos) / 100;
-        } else if (pos === "1") {
-          value = 1;
-        } else if (pos === "0") {
-          value = 0;
-        }
-
-        result.stops.push({ color: stopMatch[1].trim(), pos: value });
-      }
-    }
-    return result;
-  };
-
-  return {
-    parseTailwindClasses,
-    getTailwindBaseCssValues,
-    parseLinearGradient,
-  };
-};
-```
-
 ```ts [src/components/ui/audio-visualizer/index.ts]
 import type { VariantProps } from "class-variance-authority";
 import { cva } from "class-variance-authority";
+import { useTailwindClassParser } from "~~/registry/new-york/composables/use-tailwind-class-parser/useTailwindClassParser";
 
 export { default as AudioVisualizer } from "./AudioVisualizer.vue";
 export { default as AudioMotion } from "./AudioMotion.vue";
@@ -1576,6 +1461,45 @@ export type AudioMotionVariants = VariantProps<typeof motionVariants>;
 export { type AudioVisualizerMode } from "./AudioVisualizer.vue";
 
 export { type AudioVisualizerProps } from "./AudioVisualizer.vue";
+
+export const gradientFromClasses = (classes: string = "") => {
+  const { getTailwindBaseCssValues, parseLinearGradient } =
+    useTailwindClassParser();
+
+  const el = document.createElement("div");
+  el.className = classes;
+  el.style.position = "absolute";
+  el.style.visibility = "hidden";
+  el.style.zIndex = "-9999";
+  document.body.appendChild(el);
+
+  const computedClass = getTailwindBaseCssValues(el, ["background-image"]);
+
+  const computedGradient =
+    computedClass["background-image"] &&
+    computedClass["background-image"] !== "none"
+      ? parseLinearGradient(computedClass["background-image"])
+      : null;
+
+  let gradient: {
+    bgColor: string;
+    dir?: "h" | "v" | undefined;
+    colorStops: Array<{ color: string; pos: number }>;
+  } | null = null;
+
+  if (computedGradient) {
+    gradient = { bgColor: "rgba(0, 0, 0, 0, 0)", dir: "v", colorStops: [] };
+    gradient.dir =
+      computedGradient.direction.includes("bottom") ||
+      computedGradient.direction.includes("top")
+        ? "v"
+        : "h";
+    gradient.colorStops = computedGradient.stops;
+  }
+
+  document.body.removeChild(el);
+  return gradient;
+};
 ```
 
 ```vue [src/components/ui/audio-visualizer/AudioVisualizer.vue]
@@ -1735,7 +1659,7 @@ import {
 } from "vue";
 import { AudioContextInjectionKey } from "@/components/ui/audio-context-provider";
 import { useTypedElementSearch } from "~~/registry/new-york/composables/use-typed-element-search/useTypedElementSearch";
-import { useTailwindClassParser } from "~~/registry/new-york/composables/use-tailwind-class-parser/useTailwindClassParser";
+import { gradientFromClasses } from ".";
 
 export interface AudioMotionAnalyzerProps {
   class?: HTMLAttributes["class"];
@@ -1751,8 +1675,6 @@ const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
 });
 
 const { getTypedElementAmongSiblings, getContainer } = useTypedElementSearch();
-const { getTailwindBaseCssValues, parseLinearGradient } =
-  useTailwindClassParser();
 
 const noDisplayElement = useTemplateRef("noDisplayRef");
 const injectedContext = inject<Ref<AudioContext | null>>(
@@ -1842,12 +1764,14 @@ const setupAudio = async () => {
         barSpace: 0.6,
         ledBars: true,
         connectSpeakers: false,
+        overlay: true,
       });
 
-      const computedGradient = handleGradientClass();
+      const computedGradient = gradientFromClasses(props.class);
       if (computedGradient) {
         analyzer.registerGradient("custom", computedGradient as any);
         analyzer.gradient = "custom";
+        analyzer.showBgColor = false;
       }
       analyzer.connectInput(source);
     } else {
@@ -1886,39 +1810,6 @@ const cleanUp = () => {
     source.disconnect();
     source = null;
   }
-};
-
-const handleGradientClass = () => {
-  const el = document.createElement("div");
-  el.className = props.class || "";
-  el.style.position = "absolute";
-  el.style.visibility = "hidden";
-  el.style.zIndex = "-9999";
-  document.body.appendChild(el);
-  const computedClass = getTailwindBaseCssValues(el, ["background-image"]);
-  console.warn("Computed Class:", computedClass);
-  const computedGradient =
-    computedClass["background-image"] &&
-    computedClass["background-image"] !== "none"
-      ? parseLinearGradient(computedClass["background-image"])
-      : null;
-
-  let gradient: {
-    dir?: "h" | "v" | undefined;
-    colorStops: Array<{ color: string; pos: number }>;
-  } | null = null;
-
-  if (computedGradient) {
-    gradient = { dir: "v", colorStops: [] };
-    gradient.dir =
-      computedGradient.direction.includes("bottom") ||
-      computedGradient.direction.includes("top")
-        ? "v"
-        : "h";
-    gradient.colorStops = computedGradient.stops;
-  }
-  document.body.removeChild(el);
-  return gradient;
 };
 
 watch(
@@ -2616,6 +2507,131 @@ export function drawWaveforms({
     drawWaveforms({ analyser, canvasRef, props, channelData, animationIdRef }),
   );
 }
+```
+
+```ts [src/composables/use-tailwind-class-parser/useTailwindClassParser.ts]
+export const useTailwindClassParser = () => {
+  const parseTailwindClasses = (classes: string): string[] => {
+    return classes
+      .split(" ")
+      .map((cls) => cls.trim())
+      .filter((cls) => cls.length > 0);
+  };
+
+  const getTailwindBaseCssValues = (
+    el: HTMLElement,
+    properties?: string[],
+  ): Record<string, string> => {
+    const computed = window.getComputedStyle(el);
+    const result: Record<string, string> = {};
+    if (properties && properties.length > 0) {
+      for (const prop of properties) {
+        result[prop] = computed.getPropertyValue(prop);
+      }
+    } else {
+      for (let i = 0; i < computed.length; i++) {
+        const prop = computed.item(i);
+        if (typeof prop === "string") {
+          result[prop] = computed.getPropertyValue(prop);
+        }
+      }
+    }
+
+    return result;
+  };
+
+  const parseLinearGradient = (gradientStr: string) => {
+    const result = {
+      direction: "",
+      orientation: "unknown",
+      stops: [] as Array<{ color: string; pos: number }>,
+    };
+
+    const gradientContent = gradientStr
+      .replace(/^linear-gradient\(|\)$/gi, "")
+      .replace(/^gradient\(|\)$/gi, "")
+      .replace(/^in\s+(\w+)\s*,\s*(.*)$/gi, "");
+
+    let direction = "";
+    let stopsPart = "";
+
+    const firstComma = gradientContent.indexOf(",");
+    if (firstComma !== -1) {
+      const firstPart = gradientContent.slice(0, firstComma).trim();
+      if (
+        /^(to\s+(right|left|top|bottom)(\s+(right|left|top|bottom))?|[0-9.]+deg)$/.test(
+          firstPart,
+        )
+      ) {
+        direction = firstPart;
+        stopsPart = gradientContent.slice(firstComma + 1);
+      } else {
+        direction = "to bottom";
+        stopsPart = gradientContent;
+      }
+    } else {
+      direction = gradientContent.trim();
+    }
+    result.direction = direction;
+
+    if (/to\s+right\b/.test(direction) && /to\s+bottom\b/.test(direction)) {
+      result.orientation = "diagonal";
+    } else if (/to\s+right\b/.test(direction)) {
+      result.orientation = "horizontal";
+    } else if (/to\s+left\b/.test(direction)) {
+      result.orientation = "horizontal";
+    } else if (/to\s+bottom\b/.test(direction)) {
+      result.orientation = "vertical";
+    } else if (/to\s+top\b/.test(direction)) {
+      result.orientation = "vertical";
+    } else if (/deg$/.test(direction)) {
+      result.orientation = "angle";
+    }
+
+    const stops = [];
+    let buffer = "";
+    let parenLevel = 0;
+    for (let i = 0; i < stopsPart.length; i++) {
+      const char = stopsPart[i];
+      if (char === "(") parenLevel++;
+      if (char === ")") parenLevel--;
+      if (char === "," && parenLevel === 0) {
+        if (buffer.trim()) stops.push(buffer.trim());
+        buffer = "";
+      } else {
+        buffer += char;
+      }
+    }
+    if (buffer.trim()) stops.push(buffer.trim());
+
+    for (const stop of stops) {
+      const stopMatch = stop.match(
+        /((?:#(?:[0-9a-fA-F]{3,8})|oklch\([^)]*\)|rgba?\([^)]*\)|hsla?\([^)]*\)|[a-zA-Z]+))\s*(\d+%|0|1)?$/,
+      );
+      if (stopMatch && stopMatch[1]) {
+        let value = 0;
+        const pos = stopMatch[2] ?? "";
+        if (pos.endsWith("%")) {
+          value = parseFloat(pos) / 100;
+        } else if (pos === "1") {
+          value = 1;
+        } else if (pos === "0") {
+          value = 0;
+        }
+
+        result.stops.push({ color: stopMatch[1].trim(), pos: value });
+      }
+    }
+
+    return result;
+  };
+
+  return {
+    parseTailwindClasses,
+    getTailwindBaseCssValues,
+    parseLinearGradient,
+  };
+};
 ```
 :::
 

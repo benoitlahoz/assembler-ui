@@ -75,6 +75,7 @@ export const useTailwindClassParser = () => {
 
     const gradientContent = gradientStr
       .replace(/^linear-gradient\(|\)$/gi, "")
+      .replace(/^gradient\(|\)$/gi, "")
       .replace(/^in\s+(\w+)\s*,\s*(.*)$/gi, "");
 
     let direction = "";
@@ -147,6 +148,7 @@ export const useTailwindClassParser = () => {
         result.stops.push({ color: stopMatch[1].trim(), pos: value });
       }
     }
+
     return result;
   };
 
