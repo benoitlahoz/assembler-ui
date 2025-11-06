@@ -16,7 +16,7 @@ import {
   AudioDevice,
 } from '~~/registry/new-york/components/media-devices-provider';
 import { AudioContextProvider } from '~~/registry/new-york/components/audio-context-provider';
-import { AudioVisualizer } from '~~/registry/new-york/components/audio-visualizer';
+import { AudioMotion } from '~~/registry/new-york/components/audio-visualizer';
 
 const selectedId = ref<string | null>(null);
 
@@ -109,21 +109,23 @@ const visualizerModes = [
       </FieldSet>
     </div>
 
-    <AudioDevice v-if="selectedId" :device-id="selectedId ?? ''" auto-start v-slot="{ stream }">
-      <AudioContextProvider v-slot="{ context, errors, state }">
-        <AudioVisualizer
-          :stream="stream"
-          :context="context"
-          :width="600"
-          :height="400"
-          :mode="selectedMode"
-          :colors="['#00ff00', '#00eaff', '#ffea00', '#ff00ea']"
-          :background="'#111'"
-          :barCount="32"
-          :ledRows="12"
-          :spacing="2"
-          :ledRadius="6"
-        />
+    <AudioDevice
+      v-if="selectedId"
+      :device-id="selectedId ?? ''"
+      auto-start
+      echo-cancellation
+      v-slot="{ stream }"
+    >
+      <AudioContextProvider v-slot="{ errors, state }">
+        <!-- If you prefere to provide a conainer and let AudioMotion create the canvas <div class="w-full h-[400px] min-h-[400px]"> -->
+        <AudioMotion :stream="stream">
+          <canvas
+            width="600"
+            height="400"
+            class="w-full border border-border mt-4 bg-linear-to-b from-blue-500 via-purple-500 to-pink-500"
+          />
+        </AudioMotion>
+        <!-- </div> -->
         <template v-if="errors && errors.length">
           <div class="text-red-500 text-xs mt-2">
             <div v-for="(err, i) in errors" :key="i">{{ err.message }}</div>

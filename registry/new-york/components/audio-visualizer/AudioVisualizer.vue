@@ -4,8 +4,24 @@ import { drawWaveforms } from './visualizers/drawWaveform';
 import { drawFrequencyBars } from './visualizers/drawFrequencyBars';
 import { drawFft } from './visualizers/drawFft';
 import { drawFftEnhanced } from './visualizers/drawFftEnhanced';
+import { drawMirroredSpectrum } from './visualizers/drawMirroredSpectrum';
+import { drawPeakHold } from './visualizers/drawPeakHold';
+import { drawSpectrogram } from './visualizers/drawSpectrogram';
+import { drawScopeXY } from './visualizers/drawScopeXY';
+import { drawWaterfall } from './visualizers/drawWaterfall';
+import { drawLedBars } from './visualizers/drawLedBars';
 
-export type AudioVisualizerMode = 'waveform' | 'frequency-bars' | 'fft' | 'fft-enhanced';
+export type AudioVisualizerMode =
+  | 'waveform'
+  | 'frequency-bars'
+  | 'fft'
+  | 'fft-enhanced'
+  | 'mirrored-spectrum'
+  | 'peak-hold'
+  | 'spectrogram'
+  | 'scope-xy'
+  | 'waterfall'
+  | 'led-bars';
 
 export interface AudioVisualizerProps {
   mode?: AudioVisualizerMode;
@@ -43,6 +59,18 @@ const drawFunction = computed(() => {
       return drawFft;
     case 'fft-enhanced':
       return drawFftEnhanced;
+    case 'mirrored-spectrum':
+      return drawMirroredSpectrum;
+    case 'peak-hold':
+      return drawPeakHold;
+    case 'spectrogram':
+      return drawSpectrogram;
+    case 'scope-xy':
+      return drawScopeXY;
+    case 'waterfall':
+      return drawWaterfall;
+    case 'led-bars':
+      return drawLedBars;
     case 'waveform':
     default:
       return drawWaveforms;

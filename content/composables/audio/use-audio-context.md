@@ -45,9 +45,9 @@ export interface UseAudioContextOptions {
   sampleRate?: number;
 }
 
-export const useAudioContext = (options: UseAudioContextOptions) => {
-  const latency = ref(options.latencyHint || "interactive");
-  const sampleRate = ref(options.sampleRate || 44100);
+export const useAudioContext = (options?: UseAudioContextOptions) => {
+  const latency = ref(options?.latencyHint || "interactive");
+  const sampleRate = ref(options?.sampleRate || 44100);
   const errors = ref<Error[]>([]);
   const state = ref<"suspended" | "running" | "closed" | "interrupted">(
     "suspended",
