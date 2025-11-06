@@ -117,13 +117,9 @@ const visualizerModes = [
       v-slot="{ stream }"
     >
       <AudioContextProvider v-slot="{ errors, state }">
-        <!-- If you prefere to provide a conainer and let AudioMotion create the canvas <div class="w-full h-[400px] min-h-[400px]"> -->
-        <AudioMotion :stream="stream">
-          <canvas
-            width="600"
-            height="400"
-            class="w-full border border-border mt-4 bg-linear-to-b from-blue-500 via-purple-500 to-pink-500"
-          />
+        <!-- If you prefer to provide a container and let AudioMotion create the canvas <div class="w-full h-[400px] min-h-[400px]"> -->
+        <AudioMotion :stream="stream" class="bg-linear-to-b from-primary to-background">
+          <canvas width="600" height="400" />
         </AudioMotion>
         <!-- </div> -->
         <template v-if="errors && errors.length">

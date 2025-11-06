@@ -1,5 +1,5 @@
 /**
- * Parses tailwind classes.
+ * Utility to parse tailwind classes and get their CSS values.
  *
  * @type registry:hook
  * @category styling
@@ -39,6 +39,7 @@ export const useTailwindClassParser = () => {
         }
       }
     }
+
     return result;
   };
 
@@ -51,10 +52,13 @@ export const useTailwindClassParser = () => {
     const result = {
       direction: '',
       orientation: 'unknown',
-      stops: [] as Array<{ color: string; pos: string }>,
+      stops: [] as Array<{ color: string; pos: number }>,
     };
     // Nouveau parsing plus robuste
-    const gradientContent = gradientStr.replace(/^linear-gradient\(|\)$/gi, '');
+    const gradientContent = gradientStr
+      .replace(/^linear-gradient\(|\)$/gi, '')
+      .replace(/^in\s+(\w+)\s*,\s*(.*)$/gi, '');
+
     // Sépare direction et stops
     let direction = '';
     let stopsPart = '';
@@ -96,10 +100,22 @@ export const useTailwindClassParser = () => {
       .map((s) => s.trim())
       .filter(Boolean);
     for (const stop of stops) {
-      // Sépare couleur et position si possible
-      const stopMatch = stop.match(/(.+?)\s*(\d+%|0|1)?$/);
+      // Expression régulière améliorée pour capturer tous les types de couleurs CSS
+      const stopMatch = stop.match(
+        /((?:#(?:[0-9a-fA-F]{3,8})|oklch\([^)]*\)|rgba?\([^)]*\)|hsla?\([^)]*\)|[a-zA-Z]+))\s*(\d+%|0|1)?$/
+      );
       if (stopMatch && stopMatch[1]) {
-        result.stops.push({ color: stopMatch[1].trim(), pos: stopMatch[2] ?? '' });
+        let value = 0;
+        const pos = stopMatch[2] ?? '';
+        if (pos.endsWith('%')) {
+          value = parseFloat(pos) / 100;
+        } else if (pos === '1') {
+          value = 1;
+        } else if (pos === '0') {
+          value = 0;
+        }
+        console.warn('Parsed stop:', { color: stopMatch[1].trim(), pos: value });
+        result.stops.push({ color: stopMatch[1].trim(), pos: value });
       }
     }
     return result;

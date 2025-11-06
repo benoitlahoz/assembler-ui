@@ -12,16 +12,18 @@ import { cva } from 'class-variance-authority';
 export { default as AudioVisualizer } from './AudioVisualizer.vue';
 export { default as AudioMotion } from './AudioMotion.vue';
 
-export const motionVariants = cva({
+export const motionVariants = cva('', {
   variants: {
     gradient: {
-      default: 'bg-gradient-to-b from-blue-500 via-purple-500 to-pink-500',
-      fire: 'bg-gradient-to-b from-yellow-400 via-red-500 to-pink-600',
-      ocean: 'bg-gradient-to-b from-teal-400 via-blue-500 to-indigo-600',
+      classic: 'classic',
+      orangered: 'orangered',
+      prism: 'prism',
+      rainbow: 'rainbow',
+      steelblue: 'steelblue',
     },
   },
   defaultVariants: {
-    gradient: 'default',
+    gradient: 'classic',
   },
 });
 

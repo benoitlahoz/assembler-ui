@@ -1,25 +1,38 @@
 <script setup lang="ts">
 import AudioMotionAnalyzer from 'audiomotion-analyzer';
-import { type Ref, inject, ref, watch, nextTick, useTemplateRef, unref, onUnmounted } from 'vue';
+import {
+  type Ref,
+  type HTMLAttributes,
+  inject,
+  ref,
+  watch,
+  nextTick,
+  useTemplateRef,
+  unref,
+  onUnmounted,
+  computed,
+} from 'vue';
 import { AudioContextInjectionKey } from '~~/registry/new-york/components/audio-context-provider';
 import { useTypedElementSearch } from '~~/registry/new-york/composables/use-typed-element-search/useTypedElementSearch';
 import { useTailwindClassParser } from '~~/registry/new-york/composables/use-tailwind-class-parser/useTailwindClassParser';
 
 export interface AudioMotionAnalyzerProps {
+  class?: HTMLAttributes['class'];
   stream?: MediaStream | null;
   audio?: HTMLAudioElement | Ref<HTMLAudioElement | null> | null;
+  gradient?: 'classic' | 'orangered' | 'prism' | 'rainbow' | 'steelblue';
 }
 
 const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
   stream: undefined,
   audio: undefined,
+  gradient: 'classic',
 });
 
 const { getTypedElementAmongSiblings, getContainer } = useTypedElementSearch();
 const { getTailwindBaseCssValues, parseLinearGradient } = useTailwindClassParser();
 
 const noDisplayElement = useTemplateRef('noDisplayRef');
-
 const injectedContext = inject<Ref<AudioContext | null>>(AudioContextInjectionKey, ref(null));
 
 let analyzer: AudioMotionAnalyzer | null = null;
@@ -44,7 +57,7 @@ const setupAudio = async () => {
           source: audioElement,
           width,
           height,
-          gradient: 'prism',
+          gradient: props.gradient,
           mode: 3,
           barSpace: 0.6,
           ledBars: true,
@@ -56,7 +69,7 @@ const setupAudio = async () => {
           canvas: canvas,
           width: canvas.width,
           height: canvas.height,
-          gradient: 'prism',
+          gradient: props.gradient,
           mode: 3,
           barSpace: 0.6,
           ledBars: true,
@@ -83,7 +96,7 @@ const setupAudio = async () => {
         audioCtx: context,
         width,
         height,
-        gradient: 'prism',
+        gradient: props.gradient,
         mode: 3,
         barSpace: 0.6,
         ledBars: true,
@@ -91,25 +104,25 @@ const setupAudio = async () => {
       });
       analyzer.connectInput(source);
     } else if (canvas) {
-      const gradient = getTailwindBaseCssValues(canvas, ['background-image']);
-      console.log('Gradient CSS from Tailwind:', gradient); //
-      const obj = parseLinearGradient(gradient['background-image'] || '');
-
-      console.log('Parsed gradient:', obj);
-
-      const width = canvas.clientWidth;
-      const height = canvas.clientHeight;
+      const width = canvas.width;
+      const height = canvas.height;
       analyzer = new AudioMotionAnalyzer({
         audioCtx: context,
         canvas,
         width,
         height,
-        gradient: 'prism',
+        gradient: props.gradient,
         mode: 3,
         barSpace: 0.6,
         ledBars: true,
         connectSpeakers: false,
       });
+
+      const computedGradient = handleGradientClass();
+      if (computedGradient) {
+        analyzer.registerGradient('custom', computedGradient as any);
+        analyzer.gradient = 'custom';
+      }
       analyzer.connectInput(source);
     } else {
       console.error(
@@ -149,8 +162,39 @@ const cleanUp = () => {
   }
 };
 
+const handleGradientClass = () => {
+  const el = document.createElement('div');
+  el.className = props.class || '';
+  el.style.position = 'absolute';
+  el.style.visibility = 'hidden';
+  el.style.zIndex = '-9999';
+  document.body.appendChild(el);
+  const computedClass = getTailwindBaseCssValues(el, ['background-image']);
+  console.warn('Computed Class:', computedClass);
+  const computedGradient =
+    computedClass['background-image'] && computedClass['background-image'] !== 'none'
+      ? parseLinearGradient(computedClass['background-image'])
+      : null;
+
+  let gradient: {
+    dir?: 'h' | 'v' | undefined;
+    colorStops: Array<{ color: string; pos: number }>;
+  } | null = null;
+
+  if (computedGradient) {
+    gradient = { dir: 'v', colorStops: [] };
+    gradient.dir =
+      computedGradient.direction.includes('bottom') || computedGradient.direction.includes('top')
+        ? 'v'
+        : 'h';
+    gradient.colorStops = computedGradient.stops;
+  }
+  document.body.removeChild(el);
+  return gradient;
+};
+
 watch(
-  () => [props.stream, props.audio, injectedContext.value],
+  () => [props.stream, props.audio, props.class, injectedContext.value],
   () => {
     nextTick(async () => {
       await setupAudio();
