@@ -94,11 +94,23 @@ export const useTailwindClassParser = () => {
     } else if (/deg$/.test(direction)) {
       result.orientation = 'angle';
     }
-    // Color stops
-    const stops = stopsPart
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
+    // Découpe robuste des stops (ignore les virgules à l'intérieur des parenthèses)
+    const stops = [];
+    let buffer = '';
+    let parenLevel = 0;
+    for (let i = 0; i < stopsPart.length; i++) {
+      const char = stopsPart[i];
+      if (char === '(') parenLevel++;
+      if (char === ')') parenLevel--;
+      if (char === ',' && parenLevel === 0) {
+        if (buffer.trim()) stops.push(buffer.trim());
+        buffer = '';
+      } else {
+        buffer += char;
+      }
+    }
+    if (buffer.trim()) stops.push(buffer.trim());
+
     for (const stop of stops) {
       // Expression régulière améliorée pour capturer tous les types de couleurs CSS
       const stopMatch = stop.match(
@@ -114,7 +126,7 @@ export const useTailwindClassParser = () => {
         } else if (pos === '0') {
           value = 0;
         }
-        console.warn('Parsed stop:', { color: stopMatch[1].trim(), pos: value });
+        // console.warn('Parsed stop:', { color: stopMatch[1].trim(), pos: value });
         result.stops.push({ color: stopMatch[1].trim(), pos: value });
       }
     }

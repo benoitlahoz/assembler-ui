@@ -113,10 +113,22 @@ export const useTailwindClassParser = () => {
       result.orientation = "angle";
     }
 
-    const stops = stopsPart
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const stops = [];
+    let buffer = "";
+    let parenLevel = 0;
+    for (let i = 0; i < stopsPart.length; i++) {
+      const char = stopsPart[i];
+      if (char === "(") parenLevel++;
+      if (char === ")") parenLevel--;
+      if (char === "," && parenLevel === 0) {
+        if (buffer.trim()) stops.push(buffer.trim());
+        buffer = "";
+      } else {
+        buffer += char;
+      }
+    }
+    if (buffer.trim()) stops.push(buffer.trim());
+
     for (const stop of stops) {
       const stopMatch = stop.match(
         /((?:#(?:[0-9a-fA-F]{3,8})|oklch\([^)]*\)|rgba?\([^)]*\)|hsla?\([^)]*\)|[a-zA-Z]+))\s*(\d+%|0|1)?$/,
@@ -131,10 +143,7 @@ export const useTailwindClassParser = () => {
         } else if (pos === "0") {
           value = 0;
         }
-        console.warn("Parsed stop:", {
-          color: stopMatch[1].trim(),
-          pos: value,
-        });
+
         result.stops.push({ color: stopMatch[1].trim(), pos: value });
       }
     }
