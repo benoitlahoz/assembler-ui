@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import AudioMotionAnalyzer from 'audiomotion-analyzer';
+import AudioMotion from 'audiomotion-analyzer';
 import {
   type Ref,
   type HTMLAttributes,
@@ -10,11 +10,15 @@ import {
   useTemplateRef,
   unref,
   onUnmounted,
-  computed,
+  provide,
 } from 'vue';
 import { AudioContextInjectionKey } from '~~/registry/new-york/components/audio-context-provider';
 import { useTypedElementSearch } from '~~/registry/new-york/composables/use-typed-element-search/useTypedElementSearch';
-import { gradientFromClasses } from '.';
+import {
+  gradientFromClasses,
+  AudioMotionGradientsKey,
+  type AudioMotionGradientDefinition,
+} from '.';
 
 export interface AudioMotionAnalyzerProps {
   class?: HTMLAttributes['class'];
@@ -34,7 +38,10 @@ const { getTypedElementAmongSiblings, getContainer } = useTypedElementSearch();
 const noDisplayElement = useTemplateRef('noDisplayRef');
 const injectedContext = inject<Ref<AudioContext | null>>(AudioContextInjectionKey, ref(null));
 
-let analyzer: AudioMotionAnalyzer | null = null;
+const gradients = ref<AudioMotionGradientDefinition[]>([]);
+provide<Ref<AudioMotionGradientDefinition[]>>(AudioMotionGradientsKey, gradients);
+
+let analyzer: AudioMotion | null = null;
 let source: MediaStreamAudioSourceNode | null = null;
 
 const setupAudio = async () => {
@@ -52,7 +59,7 @@ const setupAudio = async () => {
       if (!canvas && container) {
         const width = container.clientWidth;
         const height = container.clientHeight;
-        analyzer = new AudioMotionAnalyzer(container, {
+        analyzer = new AudioMotion(container, {
           source: audioElement,
           width,
           height,
@@ -63,7 +70,7 @@ const setupAudio = async () => {
           connectSpeakers: false,
         });
       } else if (canvas) {
-        analyzer = new AudioMotionAnalyzer({
+        analyzer = new AudioMotion({
           source: audioElement,
           canvas: canvas,
           width: canvas.width,
@@ -91,7 +98,7 @@ const setupAudio = async () => {
     if (!canvas && container) {
       const width = container.clientWidth;
       const height = container.clientHeight;
-      analyzer = new AudioMotionAnalyzer(container, {
+      analyzer = new AudioMotion(container, {
         audioCtx: context,
         width,
         height,
@@ -105,7 +112,7 @@ const setupAudio = async () => {
     } else if (canvas) {
       const width = canvas.width;
       const height = canvas.height;
-      analyzer = new AudioMotionAnalyzer({
+      analyzer = new AudioMotion({
         audioCtx: context,
         canvas,
         width,
@@ -167,6 +174,14 @@ watch(
   () => [props.stream, props.audio, props.class, injectedContext.value],
   () => {
     nextTick(async () => {
+      const el = unref(noDisplayElement);
+      if (!el) return;
+      const gradients = getTypedElementAmongSiblings(
+        el,
+        (el): el is HTMLDivElement =>
+          el instanceof HTMLDivElement && el.dataset.slot === 'audio-motion-gradient'
+      );
+      console.log('gradients', gradients);
       await setupAudio();
     });
   },
@@ -181,5 +196,5 @@ onUnmounted(() => {
 <template>
   <!-- Hacky way to get content from this renderless component without forcing the user to set explicit width and height to its canvas -->
   <div ref="noDisplayRef" class="hidden z-[-9999]" />
-  <slot />
+  <slot data-slot="audio-motion-analyzer" />
 </template>

@@ -1,5 +1,5 @@
 ---
-title: AudioVisualizer
+title: AudioMotionAnalyzer
 description: 
 ---
 
@@ -34,7 +34,10 @@ import {
   AudioDevice,
 } from "@/components/ui/media-devices-provider";
 import { AudioContextProvider } from "~~/registry/new-york/components/audio-context-provider";
-import { AudioMotion } from "~~/registry/new-york/components/audio-visualizer";
+import {
+  AudioMotionAnalyzer,
+  AudioMotionGradient,
+} from "~~/registry/new-york/components/audio-motion-analyzer";
 
 const selectedId = ref<string | null>(null);
 
@@ -139,15 +142,20 @@ const visualizerModes = [
       v-slot="{ stream }"
     >
       <AudioContextProvider v-slot="{ errors, state }">
-        <AudioMotion
+        <AudioMotionAnalyzer
           :stream="stream"
           class="bg-linear-to-b from-pink-400 from-40% via-blue-500 via-60% to-red-700"
         >
+          <AudioMotionGradient
+            name="complex-gradient"
+            class="bg-linear-to-b from-purple-700 via-pink-400 via-30% via-blue-500 via-60% to-yellow-400 to-90%"
+            style="background: linear-gradient(to bottom)"
+          />
           <canvas width="600" height="400" />
-        </AudioMotion>
+        </AudioMotionAnalyzer>
 
         <template v-if="errors && errors.length">
-          <div class="text-red-500 text-xs mt-2">
+          <div class="text-red-500 text-xs mt-2" style="">
             <div v-for="(err, i) in errors" :key="i">{{ err.message }}</div>
           </div>
         </template>
@@ -170,19 +178,19 @@ This will install the component in the path defined by your `components.json` fi
 
 :::code-group{.w-full}
 ```bash [yarn]
-  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/audio-visualizer.json"
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/audio-motion-analyzer.json"
   ```
 
 ```bash [npm]
-  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/audio-visualizer.json"
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/audio-motion-analyzer.json"
   ```
 
 ```bash [pnpm]
-  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/audio-visualizer.json"
+  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/audio-motion-analyzer.json"
   ```
 
 ```bash [bun]
-  bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/audio-visualizer.json"
+  bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/audio-motion-analyzer.json"
   ```
 :::
 
@@ -192,15 +200,16 @@ This will install the component in the path defined by your `components.json` fi
 
 Copy and paste these files into your project.
 
-:::code-tree{default-value="src/components/ui/audio-visualizer/index.ts"}
+:::code-tree{default-value="src/components/ui/audio-motion-analyzer/index.ts"}
 
-```ts [src/components/ui/audio-visualizer/index.ts]
+```ts [src/components/ui/audio-motion-analyzer/index.ts]
 import type { VariantProps } from "class-variance-authority";
 import { cva } from "class-variance-authority";
 import { useTailwindClassParser } from "~~/registry/new-york/composables/use-tailwind-class-parser/useTailwindClassParser";
 
 export { default as AudioVisualizer } from "./AudioVisualizer.vue";
-export { default as AudioMotion } from "./AudioMotion.vue";
+export { default as AudioMotionAnalyzer } from "./AudioMotionAnalyzer.vue";
+export { default as AudioMotionGradient } from "./AudioMotionGradient.vue";
 
 export const motionVariants = cva("", {
   variants: {
@@ -219,13 +228,14 @@ export const motionVariants = cva("", {
 
 export type AudioMotionVariants = VariantProps<typeof motionVariants>;
 
-export { type AudioVisualizerMode } from "./AudioVisualizer.vue";
+export type { AudioMotionAnalyzerProps } from "./AudioMotionAnalyzer.vue";
+export type { AudioMotionGradientProps } from "./AudioMotionGradient.vue";
 
+export { type AudioVisualizerMode } from "./AudioVisualizer.vue";
 export { type AudioVisualizerProps } from "./AudioVisualizer.vue";
 
 export const gradientFromClasses = (classes: string = "") => {
-  const { getTailwindBaseCssValues, parseLinearGradient } =
-    useTailwindClassParser();
+  const { getTailwindBaseCssValues, parseGradient } = useTailwindClassParser();
 
   const el = document.createElement("div");
   el.className = classes;
@@ -235,11 +245,14 @@ export const gradientFromClasses = (classes: string = "") => {
   document.body.appendChild(el);
 
   const computedClass = getTailwindBaseCssValues(el, ["background-image"]);
-
+  console.log(
+    "COMPUTED CLASS",
+    `background-image: ${computedClass["background-image"]}`,
+  );
   const computedGradient =
     computedClass["background-image"] &&
     computedClass["background-image"] !== "none"
-      ? parseLinearGradient(computedClass["background-image"])
+      ? parseGradient(`background: ${computedClass["background-image"]}`)
       : null;
 
   let gradient: {
@@ -261,9 +274,286 @@ export const gradientFromClasses = (classes: string = "") => {
   document.body.removeChild(el);
   return gradient;
 };
+
+export const gradientFromElement = (el: HTMLElement | null) => {
+  const classes = el?.className || "";
+  const styles = el?.getAttribute("style");
+
+  if (styles) {
+    console.log("STYLES", styles);
+
+    const { parseGradient } = useTailwindClassParser();
+    let result,
+      rGradientEnclosedInBrackets =
+        /.*gradient\s*\(((?:\([^\)]*\)|[^\)\(]*)*)\)/,
+      match = rGradientEnclosedInBrackets.exec(styles);
+
+    if (match && match[1]) {
+      result = parseGradient(match[1]);
+      console.warn(result);
+    }
+  }
+
+  return gradientFromClasses(classes);
+};
 ```
 
-```vue [src/components/ui/audio-visualizer/AudioVisualizer.vue]
+```vue [src/components/ui/audio-motion-analyzer/AudioMotionAnalyzer.vue]
+<script setup lang="ts">
+import AudioMotion from "audiomotion-analyzer";
+import {
+  type Ref,
+  type HTMLAttributes,
+  inject,
+  ref,
+  watch,
+  nextTick,
+  useTemplateRef,
+  unref,
+  onUnmounted,
+} from "vue";
+import { AudioContextInjectionKey } from "@/components/ui/audio-context-provider";
+import { useTypedElementSearch } from "~~/registry/new-york/composables/use-typed-element-search/useTypedElementSearch";
+import { gradientFromClasses } from ".";
+
+export interface AudioMotionAnalyzerProps {
+  class?: HTMLAttributes["class"];
+  stream?: MediaStream | null;
+  audio?: HTMLAudioElement | Ref<HTMLAudioElement | null> | null;
+  gradient?: "classic" | "orangered" | "prism" | "rainbow" | "steelblue";
+}
+
+const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
+  stream: undefined,
+  audio: undefined,
+  gradient: "classic",
+});
+
+const { getTypedElementAmongSiblings, getContainer } = useTypedElementSearch();
+
+const noDisplayElement = useTemplateRef("noDisplayRef");
+const injectedContext = inject<Ref<AudioContext | null>>(
+  AudioContextInjectionKey,
+  ref(null),
+);
+
+let analyzer: AudioMotion | null = null;
+let source: MediaStreamAudioSourceNode | null = null;
+
+const setupAudio = async () => {
+  if (analyzer) {
+    analyzer.destroy();
+    analyzer = null;
+  }
+
+  const canvas: HTMLCanvasElement | null = searchCanvas();
+  const container: HTMLElement | null = searchContainer();
+
+  if (props.audio) {
+    const audioElement =
+      props.audio instanceof HTMLAudioElement ? props.audio : props.audio.value;
+    if (audioElement) {
+      if (!canvas && container) {
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        analyzer = new AudioMotion(container, {
+          source: audioElement,
+          width,
+          height,
+          gradient: props.gradient,
+          mode: 3,
+          barSpace: 0.6,
+          ledBars: true,
+          connectSpeakers: false,
+        });
+      } else if (canvas) {
+        analyzer = new AudioMotion({
+          source: audioElement,
+          canvas: canvas,
+          width: canvas.width,
+          height: canvas.height,
+          gradient: props.gradient,
+          mode: 3,
+          barSpace: 0.6,
+          ledBars: true,
+          connectSpeakers: false,
+        });
+      } else {
+        console.error(
+          "No valid container or canvas found for AudioMotionAnalyzer with audio element.",
+        );
+      }
+    }
+  } else if (props.stream) {
+    if (source) {
+      source.disconnect();
+      source = null;
+    }
+    const context = injectedContext.value || new AudioContext();
+    source = context.createMediaStreamSource(props.stream);
+
+    if (!canvas && container) {
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      analyzer = new AudioMotion(container, {
+        audioCtx: context,
+        width,
+        height,
+        gradient: props.gradient,
+        mode: 3,
+        barSpace: 0.6,
+        ledBars: true,
+        connectSpeakers: false,
+      });
+      analyzer.connectInput(source);
+    } else if (canvas) {
+      const width = canvas.width;
+      const height = canvas.height;
+      analyzer = new AudioMotion({
+        audioCtx: context,
+        canvas,
+        width,
+        height,
+        gradient: props.gradient,
+        mode: 3,
+        barSpace: 0.6,
+        ledBars: true,
+        connectSpeakers: false,
+        overlay: true,
+      });
+
+      const computedGradient = gradientFromClasses(props.class);
+      if (computedGradient) {
+        analyzer.registerGradient("custom", computedGradient as any);
+        analyzer.gradient = "custom";
+        analyzer.showBgColor = false;
+      }
+      analyzer.connectInput(source);
+    } else {
+      console.error(
+        "No valid container or canvas found for AudioMotionAnalyzer with media stream.",
+      );
+    }
+  } else {
+    console.error(
+      "No audio source (audio element or media stream) provided to AudioMotionAnalyzer.",
+    );
+  }
+};
+
+const searchCanvas = (): HTMLCanvasElement | null => {
+  const el = unref(noDisplayElement);
+  return el
+    ? getTypedElementAmongSiblings(
+        el,
+        (el): el is HTMLCanvasElement => el instanceof HTMLCanvasElement,
+      )
+    : null;
+};
+
+const searchContainer = (): HTMLElement | null => {
+  const el = unref(noDisplayElement);
+  return el ? getContainer(el) : null;
+};
+
+const cleanUp = () => {
+  if (analyzer) {
+    analyzer.destroy();
+    analyzer = null;
+  }
+  if (source) {
+    source.disconnect();
+    source = null;
+  }
+};
+
+watch(
+  () => [props.stream, props.audio, props.class, injectedContext.value],
+  () => {
+    nextTick(async () => {
+      const el = unref(noDisplayElement);
+      if (!el) return;
+      const gradients = getTypedElementAmongSiblings(
+        el,
+        (el): el is HTMLDivElement =>
+          el instanceof HTMLDivElement &&
+          el.dataset.slot === "audio-motion-gradient",
+      );
+      console.log("gradients", gradients);
+      await setupAudio();
+    });
+  },
+  { immediate: true },
+);
+
+onUnmounted(() => {
+  cleanUp();
+});
+</script>
+
+<template>
+  <div ref="noDisplayRef" class="hidden z-[-9999]" />
+  <slot data-slot="audio-motion-analyzer" />
+</template>
+```
+
+```vue [src/components/ui/audio-motion-analyzer/AudioMotionGradient.vue]
+<script setup lang="ts">
+import {
+  nextTick,
+  unref,
+  useTemplateRef,
+  watch,
+  type HTMLAttributes,
+} from "vue";
+import { type GradientOptions } from "audiomotion-analyzer";
+import { cn } from "@/lib/utils";
+import { gradientFromClasses, gradientFromElement } from ".";
+
+export interface AudioMotionGradientDef {
+  name: string;
+  gradient: GradientOptions;
+}
+
+export interface AudioMotionGradientProps {
+  name: string;
+  class?: HTMLAttributes["class"];
+  style?: HTMLAttributes["style"];
+  gradient?: GradientOptions;
+}
+
+const props = defineProps<AudioMotionGradientProps>();
+
+const gradientRef = useTemplateRef("gradientRef");
+
+watch(
+  () => [props.name, props.class, props.style],
+  ([newName, newClass, newStyle]) => {
+    nextTick(() => {
+      const el = unref(gradientRef);
+      console.log("Gradient element:", el);
+      if (el && (newClass || newStyle)) {
+        const gradient = gradientFromElement(el);
+        console.log("Applying gradient:", gradient);
+        console.log("Gradient:", { name: newName, gradient });
+      }
+    });
+  },
+  { immediate: true },
+);
+</script>
+
+<template>
+  <div
+    ref="gradientRef"
+    data-slot="audio-motion-gradient"
+    :class="cn('hidden', props.class)"
+    :style="props.style"
+  ></div>
+</template>
+```
+
+```vue [src/components/ui/audio-motion-analyzer/AudioVisualizer.vue]
 <script setup lang="ts">
 import { ref, onUnmounted, watch, computed } from "vue";
 import { drawWaveforms } from "./visualizers/drawWaveform";
@@ -403,198 +693,7 @@ onUnmounted(() => {
 </template>
 ```
 
-```vue [src/components/ui/audio-visualizer/AudioMotion.vue]
-<script setup lang="ts">
-import AudioMotionAnalyzer from "audiomotion-analyzer";
-import {
-  type Ref,
-  type HTMLAttributes,
-  inject,
-  ref,
-  watch,
-  nextTick,
-  useTemplateRef,
-  unref,
-  onUnmounted,
-  computed,
-} from "vue";
-import { AudioContextInjectionKey } from "@/components/ui/audio-context-provider";
-import { useTypedElementSearch } from "~~/registry/new-york/composables/use-typed-element-search/useTypedElementSearch";
-import { gradientFromClasses } from ".";
-
-export interface AudioMotionAnalyzerProps {
-  class?: HTMLAttributes["class"];
-  stream?: MediaStream | null;
-  audio?: HTMLAudioElement | Ref<HTMLAudioElement | null> | null;
-  gradient?: "classic" | "orangered" | "prism" | "rainbow" | "steelblue";
-}
-
-const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
-  stream: undefined,
-  audio: undefined,
-  gradient: "classic",
-});
-
-const { getTypedElementAmongSiblings, getContainer } = useTypedElementSearch();
-
-const noDisplayElement = useTemplateRef("noDisplayRef");
-const injectedContext = inject<Ref<AudioContext | null>>(
-  AudioContextInjectionKey,
-  ref(null),
-);
-
-let analyzer: AudioMotionAnalyzer | null = null;
-let source: MediaStreamAudioSourceNode | null = null;
-
-const setupAudio = async () => {
-  if (analyzer) {
-    analyzer.destroy();
-    analyzer = null;
-  }
-
-  const canvas: HTMLCanvasElement | null = searchCanvas();
-  const container: HTMLElement | null = searchContainer();
-
-  if (props.audio) {
-    const audioElement =
-      props.audio instanceof HTMLAudioElement ? props.audio : props.audio.value;
-    if (audioElement) {
-      if (!canvas && container) {
-        const width = container.clientWidth;
-        const height = container.clientHeight;
-        analyzer = new AudioMotionAnalyzer(container, {
-          source: audioElement,
-          width,
-          height,
-          gradient: props.gradient,
-          mode: 3,
-          barSpace: 0.6,
-          ledBars: true,
-          connectSpeakers: false,
-        });
-      } else if (canvas) {
-        analyzer = new AudioMotionAnalyzer({
-          source: audioElement,
-          canvas: canvas,
-          width: canvas.width,
-          height: canvas.height,
-          gradient: props.gradient,
-          mode: 3,
-          barSpace: 0.6,
-          ledBars: true,
-          connectSpeakers: false,
-        });
-      } else {
-        console.error(
-          "No valid container or canvas found for AudioMotionAnalyzer with audio element.",
-        );
-      }
-    }
-  } else if (props.stream) {
-    if (source) {
-      source.disconnect();
-      source = null;
-    }
-    const context = injectedContext.value || new AudioContext();
-    source = context.createMediaStreamSource(props.stream);
-
-    if (!canvas && container) {
-      const width = container.clientWidth;
-      const height = container.clientHeight;
-      analyzer = new AudioMotionAnalyzer(container, {
-        audioCtx: context,
-        width,
-        height,
-        gradient: props.gradient,
-        mode: 3,
-        barSpace: 0.6,
-        ledBars: true,
-        connectSpeakers: false,
-      });
-      analyzer.connectInput(source);
-    } else if (canvas) {
-      const width = canvas.width;
-      const height = canvas.height;
-      analyzer = new AudioMotionAnalyzer({
-        audioCtx: context,
-        canvas,
-        width,
-        height,
-        gradient: props.gradient,
-        mode: 3,
-        barSpace: 0.6,
-        ledBars: true,
-        connectSpeakers: false,
-        overlay: true,
-      });
-
-      const computedGradient = gradientFromClasses(props.class);
-      if (computedGradient) {
-        analyzer.registerGradient("custom", computedGradient as any);
-        analyzer.gradient = "custom";
-        analyzer.showBgColor = false;
-      }
-      analyzer.connectInput(source);
-    } else {
-      console.error(
-        "No valid container or canvas found for AudioMotionAnalyzer with media stream.",
-      );
-    }
-  } else {
-    console.error(
-      "No audio source (audio element or media stream) provided to AudioMotionAnalyzer.",
-    );
-  }
-};
-
-const searchCanvas = (): HTMLCanvasElement | null => {
-  const el = unref(noDisplayElement);
-  return el
-    ? getTypedElementAmongSiblings(
-        el,
-        (el): el is HTMLCanvasElement => el instanceof HTMLCanvasElement,
-      )
-    : null;
-};
-
-const searchContainer = (): HTMLElement | null => {
-  const el = unref(noDisplayElement);
-  return el ? getContainer(el) : null;
-};
-
-const cleanUp = () => {
-  if (analyzer) {
-    analyzer.destroy();
-    analyzer = null;
-  }
-  if (source) {
-    source.disconnect();
-    source = null;
-  }
-};
-
-watch(
-  () => [props.stream, props.audio, props.class, injectedContext.value],
-  () => {
-    nextTick(async () => {
-      await setupAudio();
-    });
-  },
-  { immediate: true },
-);
-
-onUnmounted(() => {
-  cleanUp();
-});
-</script>
-
-<template>
-  <div ref="noDisplayRef" class="hidden z-[-9999]" />
-  <slot />
-</template>
-```
-
-```ts [src/components/ui/audio-visualizer/visualizers/drawFft.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawFft.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -667,7 +766,7 @@ export function drawFft({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawFftEnhanced.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawFftEnhanced.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -759,7 +858,7 @@ export function drawFftEnhanced({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawFrequencyBars.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawFrequencyBars.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -830,7 +929,7 @@ export function drawFrequencyBars({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawLedBars.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawLedBars.ts]
 import type { Ref } from "vue";
 
 export function drawLedBars({
@@ -903,7 +1002,7 @@ export function drawLedBars({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawMirroredSpectrum.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawMirroredSpectrum.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -958,7 +1057,7 @@ export function drawMirroredSpectrum({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawPeakHold.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawPeakHold.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -1015,7 +1114,7 @@ export function drawPeakHold({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawScopeXY.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawScopeXY.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -1070,7 +1169,7 @@ export function drawScopeXY({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawSpectrogram.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawSpectrogram.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -1136,7 +1235,7 @@ export function drawSpectrogram({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawWaterfall.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawWaterfall.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -1196,7 +1295,7 @@ export function drawWaterfall({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawWaveform.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawWaveform.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -1433,13 +1532,14 @@ export const useTypedElementSearch = () => {
 };
 ```
 
-```ts [src/components/ui/audio-visualizer/index.ts]
+```ts [src/components/ui/audio-motion-analyzer/index.ts]
 import type { VariantProps } from "class-variance-authority";
 import { cva } from "class-variance-authority";
 import { useTailwindClassParser } from "~~/registry/new-york/composables/use-tailwind-class-parser/useTailwindClassParser";
 
 export { default as AudioVisualizer } from "./AudioVisualizer.vue";
-export { default as AudioMotion } from "./AudioMotion.vue";
+export { default as AudioMotionAnalyzer } from "./AudioMotionAnalyzer.vue";
+export { default as AudioMotionGradient } from "./AudioMotionGradient.vue";
 
 export const motionVariants = cva("", {
   variants: {
@@ -1458,13 +1558,14 @@ export const motionVariants = cva("", {
 
 export type AudioMotionVariants = VariantProps<typeof motionVariants>;
 
-export { type AudioVisualizerMode } from "./AudioVisualizer.vue";
+export type { AudioMotionAnalyzerProps } from "./AudioMotionAnalyzer.vue";
+export type { AudioMotionGradientProps } from "./AudioMotionGradient.vue";
 
+export { type AudioVisualizerMode } from "./AudioVisualizer.vue";
 export { type AudioVisualizerProps } from "./AudioVisualizer.vue";
 
 export const gradientFromClasses = (classes: string = "") => {
-  const { getTailwindBaseCssValues, parseLinearGradient } =
-    useTailwindClassParser();
+  const { getTailwindBaseCssValues, parseGradient } = useTailwindClassParser();
 
   const el = document.createElement("div");
   el.className = classes;
@@ -1474,11 +1575,14 @@ export const gradientFromClasses = (classes: string = "") => {
   document.body.appendChild(el);
 
   const computedClass = getTailwindBaseCssValues(el, ["background-image"]);
-
+  console.log(
+    "COMPUTED CLASS",
+    `background-image: ${computedClass["background-image"]}`,
+  );
   const computedGradient =
     computedClass["background-image"] &&
     computedClass["background-image"] !== "none"
-      ? parseLinearGradient(computedClass["background-image"])
+      ? parseGradient(`background: ${computedClass["background-image"]}`)
       : null;
 
   let gradient: {
@@ -1500,9 +1604,286 @@ export const gradientFromClasses = (classes: string = "") => {
   document.body.removeChild(el);
   return gradient;
 };
+
+export const gradientFromElement = (el: HTMLElement | null) => {
+  const classes = el?.className || "";
+  const styles = el?.getAttribute("style");
+
+  if (styles) {
+    console.log("STYLES", styles);
+
+    const { parseGradient } = useTailwindClassParser();
+    let result,
+      rGradientEnclosedInBrackets =
+        /.*gradient\s*\(((?:\([^\)]*\)|[^\)\(]*)*)\)/,
+      match = rGradientEnclosedInBrackets.exec(styles);
+
+    if (match && match[1]) {
+      result = parseGradient(match[1]);
+      console.warn(result);
+    }
+  }
+
+  return gradientFromClasses(classes);
+};
 ```
 
-```vue [src/components/ui/audio-visualizer/AudioVisualizer.vue]
+```vue [src/components/ui/audio-motion-analyzer/AudioMotionAnalyzer.vue]
+<script setup lang="ts">
+import AudioMotion from "audiomotion-analyzer";
+import {
+  type Ref,
+  type HTMLAttributes,
+  inject,
+  ref,
+  watch,
+  nextTick,
+  useTemplateRef,
+  unref,
+  onUnmounted,
+} from "vue";
+import { AudioContextInjectionKey } from "@/components/ui/audio-context-provider";
+import { useTypedElementSearch } from "~~/registry/new-york/composables/use-typed-element-search/useTypedElementSearch";
+import { gradientFromClasses } from ".";
+
+export interface AudioMotionAnalyzerProps {
+  class?: HTMLAttributes["class"];
+  stream?: MediaStream | null;
+  audio?: HTMLAudioElement | Ref<HTMLAudioElement | null> | null;
+  gradient?: "classic" | "orangered" | "prism" | "rainbow" | "steelblue";
+}
+
+const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
+  stream: undefined,
+  audio: undefined,
+  gradient: "classic",
+});
+
+const { getTypedElementAmongSiblings, getContainer } = useTypedElementSearch();
+
+const noDisplayElement = useTemplateRef("noDisplayRef");
+const injectedContext = inject<Ref<AudioContext | null>>(
+  AudioContextInjectionKey,
+  ref(null),
+);
+
+let analyzer: AudioMotion | null = null;
+let source: MediaStreamAudioSourceNode | null = null;
+
+const setupAudio = async () => {
+  if (analyzer) {
+    analyzer.destroy();
+    analyzer = null;
+  }
+
+  const canvas: HTMLCanvasElement | null = searchCanvas();
+  const container: HTMLElement | null = searchContainer();
+
+  if (props.audio) {
+    const audioElement =
+      props.audio instanceof HTMLAudioElement ? props.audio : props.audio.value;
+    if (audioElement) {
+      if (!canvas && container) {
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        analyzer = new AudioMotion(container, {
+          source: audioElement,
+          width,
+          height,
+          gradient: props.gradient,
+          mode: 3,
+          barSpace: 0.6,
+          ledBars: true,
+          connectSpeakers: false,
+        });
+      } else if (canvas) {
+        analyzer = new AudioMotion({
+          source: audioElement,
+          canvas: canvas,
+          width: canvas.width,
+          height: canvas.height,
+          gradient: props.gradient,
+          mode: 3,
+          barSpace: 0.6,
+          ledBars: true,
+          connectSpeakers: false,
+        });
+      } else {
+        console.error(
+          "No valid container or canvas found for AudioMotionAnalyzer with audio element.",
+        );
+      }
+    }
+  } else if (props.stream) {
+    if (source) {
+      source.disconnect();
+      source = null;
+    }
+    const context = injectedContext.value || new AudioContext();
+    source = context.createMediaStreamSource(props.stream);
+
+    if (!canvas && container) {
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      analyzer = new AudioMotion(container, {
+        audioCtx: context,
+        width,
+        height,
+        gradient: props.gradient,
+        mode: 3,
+        barSpace: 0.6,
+        ledBars: true,
+        connectSpeakers: false,
+      });
+      analyzer.connectInput(source);
+    } else if (canvas) {
+      const width = canvas.width;
+      const height = canvas.height;
+      analyzer = new AudioMotion({
+        audioCtx: context,
+        canvas,
+        width,
+        height,
+        gradient: props.gradient,
+        mode: 3,
+        barSpace: 0.6,
+        ledBars: true,
+        connectSpeakers: false,
+        overlay: true,
+      });
+
+      const computedGradient = gradientFromClasses(props.class);
+      if (computedGradient) {
+        analyzer.registerGradient("custom", computedGradient as any);
+        analyzer.gradient = "custom";
+        analyzer.showBgColor = false;
+      }
+      analyzer.connectInput(source);
+    } else {
+      console.error(
+        "No valid container or canvas found for AudioMotionAnalyzer with media stream.",
+      );
+    }
+  } else {
+    console.error(
+      "No audio source (audio element or media stream) provided to AudioMotionAnalyzer.",
+    );
+  }
+};
+
+const searchCanvas = (): HTMLCanvasElement | null => {
+  const el = unref(noDisplayElement);
+  return el
+    ? getTypedElementAmongSiblings(
+        el,
+        (el): el is HTMLCanvasElement => el instanceof HTMLCanvasElement,
+      )
+    : null;
+};
+
+const searchContainer = (): HTMLElement | null => {
+  const el = unref(noDisplayElement);
+  return el ? getContainer(el) : null;
+};
+
+const cleanUp = () => {
+  if (analyzer) {
+    analyzer.destroy();
+    analyzer = null;
+  }
+  if (source) {
+    source.disconnect();
+    source = null;
+  }
+};
+
+watch(
+  () => [props.stream, props.audio, props.class, injectedContext.value],
+  () => {
+    nextTick(async () => {
+      const el = unref(noDisplayElement);
+      if (!el) return;
+      const gradients = getTypedElementAmongSiblings(
+        el,
+        (el): el is HTMLDivElement =>
+          el instanceof HTMLDivElement &&
+          el.dataset.slot === "audio-motion-gradient",
+      );
+      console.log("gradients", gradients);
+      await setupAudio();
+    });
+  },
+  { immediate: true },
+);
+
+onUnmounted(() => {
+  cleanUp();
+});
+</script>
+
+<template>
+  <div ref="noDisplayRef" class="hidden z-[-9999]" />
+  <slot data-slot="audio-motion-analyzer" />
+</template>
+```
+
+```vue [src/components/ui/audio-motion-analyzer/AudioMotionGradient.vue]
+<script setup lang="ts">
+import {
+  nextTick,
+  unref,
+  useTemplateRef,
+  watch,
+  type HTMLAttributes,
+} from "vue";
+import { type GradientOptions } from "audiomotion-analyzer";
+import { cn } from "@/lib/utils";
+import { gradientFromClasses, gradientFromElement } from ".";
+
+export interface AudioMotionGradientDef {
+  name: string;
+  gradient: GradientOptions;
+}
+
+export interface AudioMotionGradientProps {
+  name: string;
+  class?: HTMLAttributes["class"];
+  style?: HTMLAttributes["style"];
+  gradient?: GradientOptions;
+}
+
+const props = defineProps<AudioMotionGradientProps>();
+
+const gradientRef = useTemplateRef("gradientRef");
+
+watch(
+  () => [props.name, props.class, props.style],
+  ([newName, newClass, newStyle]) => {
+    nextTick(() => {
+      const el = unref(gradientRef);
+      console.log("Gradient element:", el);
+      if (el && (newClass || newStyle)) {
+        const gradient = gradientFromElement(el);
+        console.log("Applying gradient:", gradient);
+        console.log("Gradient:", { name: newName, gradient });
+      }
+    });
+  },
+  { immediate: true },
+);
+</script>
+
+<template>
+  <div
+    ref="gradientRef"
+    data-slot="audio-motion-gradient"
+    :class="cn('hidden', props.class)"
+    :style="props.style"
+  ></div>
+</template>
+```
+
+```vue [src/components/ui/audio-motion-analyzer/AudioVisualizer.vue]
 <script setup lang="ts">
 import { ref, onUnmounted, watch, computed } from "vue";
 import { drawWaveforms } from "./visualizers/drawWaveform";
@@ -1642,198 +2023,7 @@ onUnmounted(() => {
 </template>
 ```
 
-```vue [src/components/ui/audio-visualizer/AudioMotion.vue]
-<script setup lang="ts">
-import AudioMotionAnalyzer from "audiomotion-analyzer";
-import {
-  type Ref,
-  type HTMLAttributes,
-  inject,
-  ref,
-  watch,
-  nextTick,
-  useTemplateRef,
-  unref,
-  onUnmounted,
-  computed,
-} from "vue";
-import { AudioContextInjectionKey } from "@/components/ui/audio-context-provider";
-import { useTypedElementSearch } from "~~/registry/new-york/composables/use-typed-element-search/useTypedElementSearch";
-import { gradientFromClasses } from ".";
-
-export interface AudioMotionAnalyzerProps {
-  class?: HTMLAttributes["class"];
-  stream?: MediaStream | null;
-  audio?: HTMLAudioElement | Ref<HTMLAudioElement | null> | null;
-  gradient?: "classic" | "orangered" | "prism" | "rainbow" | "steelblue";
-}
-
-const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
-  stream: undefined,
-  audio: undefined,
-  gradient: "classic",
-});
-
-const { getTypedElementAmongSiblings, getContainer } = useTypedElementSearch();
-
-const noDisplayElement = useTemplateRef("noDisplayRef");
-const injectedContext = inject<Ref<AudioContext | null>>(
-  AudioContextInjectionKey,
-  ref(null),
-);
-
-let analyzer: AudioMotionAnalyzer | null = null;
-let source: MediaStreamAudioSourceNode | null = null;
-
-const setupAudio = async () => {
-  if (analyzer) {
-    analyzer.destroy();
-    analyzer = null;
-  }
-
-  const canvas: HTMLCanvasElement | null = searchCanvas();
-  const container: HTMLElement | null = searchContainer();
-
-  if (props.audio) {
-    const audioElement =
-      props.audio instanceof HTMLAudioElement ? props.audio : props.audio.value;
-    if (audioElement) {
-      if (!canvas && container) {
-        const width = container.clientWidth;
-        const height = container.clientHeight;
-        analyzer = new AudioMotionAnalyzer(container, {
-          source: audioElement,
-          width,
-          height,
-          gradient: props.gradient,
-          mode: 3,
-          barSpace: 0.6,
-          ledBars: true,
-          connectSpeakers: false,
-        });
-      } else if (canvas) {
-        analyzer = new AudioMotionAnalyzer({
-          source: audioElement,
-          canvas: canvas,
-          width: canvas.width,
-          height: canvas.height,
-          gradient: props.gradient,
-          mode: 3,
-          barSpace: 0.6,
-          ledBars: true,
-          connectSpeakers: false,
-        });
-      } else {
-        console.error(
-          "No valid container or canvas found for AudioMotionAnalyzer with audio element.",
-        );
-      }
-    }
-  } else if (props.stream) {
-    if (source) {
-      source.disconnect();
-      source = null;
-    }
-    const context = injectedContext.value || new AudioContext();
-    source = context.createMediaStreamSource(props.stream);
-
-    if (!canvas && container) {
-      const width = container.clientWidth;
-      const height = container.clientHeight;
-      analyzer = new AudioMotionAnalyzer(container, {
-        audioCtx: context,
-        width,
-        height,
-        gradient: props.gradient,
-        mode: 3,
-        barSpace: 0.6,
-        ledBars: true,
-        connectSpeakers: false,
-      });
-      analyzer.connectInput(source);
-    } else if (canvas) {
-      const width = canvas.width;
-      const height = canvas.height;
-      analyzer = new AudioMotionAnalyzer({
-        audioCtx: context,
-        canvas,
-        width,
-        height,
-        gradient: props.gradient,
-        mode: 3,
-        barSpace: 0.6,
-        ledBars: true,
-        connectSpeakers: false,
-        overlay: true,
-      });
-
-      const computedGradient = gradientFromClasses(props.class);
-      if (computedGradient) {
-        analyzer.registerGradient("custom", computedGradient as any);
-        analyzer.gradient = "custom";
-        analyzer.showBgColor = false;
-      }
-      analyzer.connectInput(source);
-    } else {
-      console.error(
-        "No valid container or canvas found for AudioMotionAnalyzer with media stream.",
-      );
-    }
-  } else {
-    console.error(
-      "No audio source (audio element or media stream) provided to AudioMotionAnalyzer.",
-    );
-  }
-};
-
-const searchCanvas = (): HTMLCanvasElement | null => {
-  const el = unref(noDisplayElement);
-  return el
-    ? getTypedElementAmongSiblings(
-        el,
-        (el): el is HTMLCanvasElement => el instanceof HTMLCanvasElement,
-      )
-    : null;
-};
-
-const searchContainer = (): HTMLElement | null => {
-  const el = unref(noDisplayElement);
-  return el ? getContainer(el) : null;
-};
-
-const cleanUp = () => {
-  if (analyzer) {
-    analyzer.destroy();
-    analyzer = null;
-  }
-  if (source) {
-    source.disconnect();
-    source = null;
-  }
-};
-
-watch(
-  () => [props.stream, props.audio, props.class, injectedContext.value],
-  () => {
-    nextTick(async () => {
-      await setupAudio();
-    });
-  },
-  { immediate: true },
-);
-
-onUnmounted(() => {
-  cleanUp();
-});
-</script>
-
-<template>
-  <div ref="noDisplayRef" class="hidden z-[-9999]" />
-  <slot />
-</template>
-```
-
-```ts [src/components/ui/audio-visualizer/visualizers/drawFft.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawFft.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -1906,7 +2096,7 @@ export function drawFft({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawFftEnhanced.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawFftEnhanced.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -1998,7 +2188,7 @@ export function drawFftEnhanced({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawFrequencyBars.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawFrequencyBars.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -2069,7 +2259,7 @@ export function drawFrequencyBars({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawLedBars.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawLedBars.ts]
 import type { Ref } from "vue";
 
 export function drawLedBars({
@@ -2142,7 +2332,7 @@ export function drawLedBars({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawMirroredSpectrum.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawMirroredSpectrum.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -2197,7 +2387,7 @@ export function drawMirroredSpectrum({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawPeakHold.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawPeakHold.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -2254,7 +2444,7 @@ export function drawPeakHold({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawScopeXY.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawScopeXY.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -2309,7 +2499,7 @@ export function drawScopeXY({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawSpectrogram.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawSpectrogram.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -2375,7 +2565,7 @@ export function drawSpectrogram({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawWaterfall.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawWaterfall.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -2435,7 +2625,7 @@ export function drawWaterfall({
 }
 ```
 
-```ts [src/components/ui/audio-visualizer/visualizers/drawWaveform.ts]
+```ts [src/components/ui/audio-motion-analyzer/visualizers/drawWaveform.ts]
 import type { Ref } from "vue";
 import type { AudioVisualizerProps } from "../AudioVisualizer.vue";
 
@@ -2510,14 +2700,96 @@ export function drawWaveforms({
 ```
 
 ```ts [src/composables/use-tailwind-class-parser/useTailwindClassParser.ts]
-export const useTailwindClassParser = () => {
-  const parseTailwindClasses = (classes: string): string[] => {
-    return classes
-      .split(" ")
-      .map((cls) => cls.trim())
-      .filter((cls) => cls.length > 0);
-  };
+const combineRegExp = (regexpList: (RegExp[] | string)[], flags: string) => {
+  let i,
+    source = "";
+  for (i = 0; i < regexpList.length; i++) {
+    if (typeof regexpList[i] === "string") {
+      source += regexpList[i];
+    } else {
+      source += (regexpList[i] as any).source;
+    }
+  }
+  return new RegExp(source, flags);
+};
 
+const buildGradientRegExp = () => {
+  const searchFlags = "gi";
+  const rAngle = /(?:[+-]?\d*\.?\d+)(?:deg|grad|rad|turn)/;
+
+  const rSideCornerCapture =
+    /to\s+((?:left|right|top|bottom)(?:\s+(?:left|right|top|bottom))?)/;
+  const rComma = /\s*,\s*/;
+  const rColorHex = /\#(?:[a-f0-9]{6}|[a-f0-9]{3})/;
+  const rDigits3 = /\(\s*(?:\d{1,3}\s*,\s*){2}\d{1,3}\s*\)/;
+  const rDigits4 = /\(\s*(?:\d{1,3}\s*,\s*){2}\d{1,3}\s*,\s*\d*\.?\d+\)/;
+  const rValue = /(?:[+-]?\d*\.?\d+)(?:%|[a-z]+)?/;
+  const rKeyword = /[_a-z-][_a-z0-9-]*/;
+  const rColor = combineRegExp(
+    [
+      "(?:",
+      rColorHex.source,
+      "|",
+      "(?:rgb|hsl)",
+      rDigits3.source,
+      "|",
+      "(?:rgba|hsla)",
+      rDigits4.source,
+      "|",
+      rKeyword.source,
+      ")",
+    ],
+    "",
+  );
+  const rColorStop = combineRegExp(
+    [rColor.source, "(?:\\s+", rValue.source, "(?:\\s+", rValue.source, ")?)?"],
+    "",
+  );
+  const rColorStopList = combineRegExp(
+    ["(?:", rColorStop.source, rComma.source, ")*", rColorStop.source],
+    "",
+  );
+  const rLineCapture = combineRegExp(
+    ["(?:(", rAngle.source, ")|", rSideCornerCapture.source, ")"],
+    "",
+  );
+  const rGradientSearch = combineRegExp(
+    [
+      "(?:(",
+      rLineCapture.source,
+      ")",
+      rComma.source,
+      ")?(",
+      rColorStopList.source,
+      ")",
+    ],
+    searchFlags,
+  );
+  const rColorStopSearch = combineRegExp(
+    [
+      "\\s*(",
+      rColor.source,
+      ")",
+      "(?:\\s+",
+      "(",
+      rValue.source,
+      "))?",
+      "(?:",
+      rComma.source,
+      "\\s*)?",
+    ],
+    searchFlags,
+  );
+
+  return {
+    gradientSearch: rGradientSearch,
+    colorStopSearch: rColorStopSearch,
+  };
+};
+
+const RegExpLib = buildGradientRegExp();
+
+export const useTailwindClassParser = () => {
   const getTailwindBaseCssValues = (
     el: HTMLElement,
     properties?: string[],
@@ -2533,6 +2805,73 @@ export const useTailwindClassParser = () => {
         const prop = computed.item(i);
         if (typeof prop === "string") {
           result[prop] = computed.getPropertyValue(prop);
+        }
+      }
+    }
+
+    return result;
+  };
+
+  type GradientColorStop = {
+    color: string;
+    pos: number;
+  };
+
+  type GradientParseResult =
+    | {
+        stops: GradientColorStop[];
+        direction: string;
+      }
+    | undefined;
+
+  const parseGradient = function (input: string): GradientParseResult {
+    let result: GradientParseResult,
+      matchGradient: RegExpExecArray | null,
+      matchColorStop: RegExpExecArray | null,
+      stopResult: GradientColorStop;
+
+    RegExpLib.gradientSearch.lastIndex = 0;
+
+    matchGradient = RegExpLib.gradientSearch.exec(input);
+    if (matchGradient !== null) {
+      result = {
+        stops: [],
+        direction: "to bottom",
+      };
+
+      if (!!matchGradient[1]) {
+        result.direction = matchGradient[1] || "to bottom";
+      }
+
+      if (!!matchGradient[2]) {
+        result.direction = matchGradient[2];
+      }
+
+      if (!!matchGradient[3]) {
+        result.direction = matchGradient[3] || "to bottom";
+      }
+
+      RegExpLib.colorStopSearch.lastIndex = 0;
+
+      if (typeof matchGradient[4] === "string") {
+        matchColorStop = RegExpLib.colorStopSearch.exec(matchGradient[4]);
+        while (matchColorStop !== null) {
+          stopResult = {
+            color: matchColorStop[1] || "rgba(0,0,0,0)",
+            pos: 0,
+          };
+
+          if (!!matchColorStop[2]) {
+            let pos = matchColorStop[2];
+            if (pos && pos.endsWith("%")) {
+              stopResult.pos = parseFloat(pos) / 100;
+            } else {
+              stopResult.pos = Number(pos);
+            }
+          }
+          result.stops.push(stopResult);
+
+          matchColorStop = RegExpLib.colorStopSearch.exec(matchGradient[4]);
         }
       }
     }
@@ -2627,36 +2966,15 @@ export const useTailwindClassParser = () => {
   };
 
   return {
-    parseTailwindClasses,
     getTailwindBaseCssValues,
     parseLinearGradient,
+    parseGradient,
   };
 };
 ```
 :::
 
-## AudioVisualizer
-::hr-underline
-::
-
-**API**: composition
-
-  ### Props
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `mode`{.primary .text-primary} | `AudioVisualizerMode` | waveform |  |
-| `stream`{.primary .text-primary} | `MediaStream \| null` | - |  |
-| `context`{.primary .text-primary} | `AudioContext \| null` | - |  |
-| `width`{.primary .text-primary} | `number` | 600 |  |
-| `height`{.primary .text-primary} | `number` | 200 |  |
-| `fftSize`{.primary .text-primary} | `number` | 2048 |  |
-| `lineWidth`{.primary .text-primary} | `number` | 2 |  |
-| `background`{.primary .text-primary} | `string` | - |  |
-| `colors`{.primary .text-primary} | `string[]` | #ff5252,#448aff,#43a047,#ffd600 |  |
-
----
-
-## AudioMotion
+## AudioMotionAnalyzer
 ::hr-underline
 ::
 
@@ -2679,6 +2997,43 @@ export const useTailwindClassParser = () => {
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
 | `AudioContextInjectionKey`{.primary .text-primary} | `ref(null)` | `any` | — |
+
+---
+
+## AudioMotionGradient
+::hr-underline
+::
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `name`{.primary .text-primary} | `string` | - |  |
+| `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
+| `style`{.primary .text-primary} | `HTMLAttributes['style']` | - |  |
+| `gradient`{.primary .text-primary} | `GradientOptions` | - |  |
+
+---
+
+## AudioVisualizer
+::hr-underline
+::
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `mode`{.primary .text-primary} | `AudioVisualizerMode` | waveform |  |
+| `stream`{.primary .text-primary} | `MediaStream \| null` | - |  |
+| `context`{.primary .text-primary} | `AudioContext \| null` | - |  |
+| `width`{.primary .text-primary} | `number` | 600 |  |
+| `height`{.primary .text-primary} | `number` | 200 |  |
+| `fftSize`{.primary .text-primary} | `number` | 2048 |  |
+| `lineWidth`{.primary .text-primary} | `number` | 2 |  |
+| `background`{.primary .text-primary} | `string` | - |  |
+| `colors`{.primary .text-primary} | `string[]` | #ff5252,#448aff,#43a047,#ffd600 |  |
 
 ---
 
@@ -2717,7 +3072,7 @@ import {
   AudioDevice,
 } from "@/components/ui/media-devices-provider";
 import { AudioContextProvider } from "~~/registry/new-york/components/audio-context-provider";
-import { AudioVisualizer } from "~~/registry/new-york/components/audio-visualizer";
+import { AudioVisualizer } from "~~/registry/new-york/components/audio-motion-analyzer";
 
 const selectedId = ref<string | null>(null);
 

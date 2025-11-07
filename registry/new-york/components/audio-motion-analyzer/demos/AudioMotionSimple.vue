@@ -16,7 +16,10 @@ import {
   AudioDevice,
 } from '~~/registry/new-york/components/media-devices-provider';
 import { AudioContextProvider } from '~~/registry/new-york/components/audio-context-provider';
-import { AudioMotion } from '~~/registry/new-york/components/audio-visualizer';
+import {
+  AudioMotionAnalyzer,
+  AudioMotionGradient,
+} from '~~/registry/new-york/components/audio-motion-analyzer';
 
 const selectedId = ref<string | null>(null);
 
@@ -117,16 +120,29 @@ const visualizerModes = [
       v-slot="{ stream }"
     >
       <AudioContextProvider v-slot="{ errors, state }">
-        <!-- If you prefer to provide a container and let AudioMotion create the canvas <div class="w-full h-[400px] min-h-[400px]"> -->
-        <AudioMotion
+        <!-- If you prefer to provide a container and let AudioMotionAnalyzer create the canvas <div class="w-full h-[400px] min-h-[400px]"> -->
+        <AudioMotionAnalyzer
           :stream="stream"
           class="bg-linear-to-b from-pink-400 from-40% via-blue-500 via-60% to-red-700"
         >
+          <AudioMotionGradient
+            name="complex-gradient"
+            class="bg-linear-to-b from-purple-700 via-pink-400 via-30% via-blue-500 via-60% to-yellow-400 to-90%"
+            style="
+              background: linear-gradient(
+                to bottom,
+                #7e3ff2 0%,
+                #ec4899 30%,
+                #3b82f6 60%,
+                #fde047 90%
+              );
+            "
+          />
           <canvas width="600" height="400" />
-        </AudioMotion>
+        </AudioMotionAnalyzer>
         <!-- </div> -->
         <template v-if="errors && errors.length">
-          <div class="text-red-500 text-xs mt-2">
+          <div class="text-red-500 text-xs mt-2" style="">
             <div v-for="(err, i) in errors" :key="i">{{ err.message }}</div>
           </div>
         </template>

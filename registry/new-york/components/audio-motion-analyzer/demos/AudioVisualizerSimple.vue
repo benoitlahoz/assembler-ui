@@ -16,7 +16,7 @@ import {
   AudioDevice,
 } from '~~/registry/new-york/components/media-devices-provider';
 import { AudioContextProvider } from '~~/registry/new-york/components/audio-context-provider';
-import { AudioVisualizer } from '~~/registry/new-york/components/audio-visualizer';
+import { AudioVisualizer } from '~~/registry/new-york/components/audio-motion-analyzer';
 
 const selectedId = ref<string | null>(null);
 
