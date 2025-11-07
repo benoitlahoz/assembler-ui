@@ -37,6 +37,9 @@ import { AudioContextProvider } from "~~/registry/new-york/components/audio-cont
 import {
   AudioMotionAnalyzer,
   AudioMotionGradient,
+  AudioMotionMirror,
+  AudioMotionMode,
+  type AudioMotionGradientDefinition,
 } from "~~/registry/new-york/components/audio-motion-analyzer";
 
 const selectedId = ref<string | null>(null);
@@ -65,6 +68,22 @@ const visualizerModes = [
   { value: "waterfall", label: "Waterfall" },
   { value: "led-bars", label: "LED Bars" },
 ];
+
+const poppyGradient: AudioMotionGradientDefinition = {
+  name: "poppy",
+  gradient: {
+    bgColor: "rgba(0, 0, 0, 0, 0)",
+    dir: "v" as const,
+    colorStops: [
+      { color: "#ff0000", pos: 0 },
+      { color: "#ff8000", pos: 0.2 },
+      { color: "#ffff00", pos: 0.4 },
+      { color: "#80ff00", pos: 0.6 },
+      { color: "#00ff00", pos: 0.8 },
+      { color: "#00ffff", pos: 1 },
+    ],
+  },
+};
 </script>
 
 <template>
@@ -142,16 +161,40 @@ const visualizerModes = [
       v-slot="{ stream }"
     >
       <AudioContextProvider v-slot="{ errors, state }">
-        <AudioMotionAnalyzer :stream="stream" gradient="yellow">
+        <AudioMotionAnalyzer
+          :stream="stream"
+          :mode="AudioMotionMode.Graph"
+          gradient="sunset"
+          show-peaks
+          :mirror="AudioMotionMirror.None"
+        >
           <AudioMotionGradient
-            name="formose"
-            class="bg-linear-to-b from-purple-700 via-blue-500 to-yellow-400 to-90%"
+            name="sunset"
+            class="bg-linear-to-r from-red-500 to-orange-500"
             style="background: linear-gradient(to bottom)"
           />
+
           <AudioMotionGradient
-            name="yellow"
+            name="foreground"
+            style="
+              background: linear-gradient(
+                to bottom,
+                var(--color-foreground) 0%,
+                var(--color-foreground) 100%
+              );
+            "
+          />
+
+          <AudioMotionGradient
+            name="foreground-broken"
             class="bg-linear-to-b from-[--color-foreground] via-purple-400 to-[--color-background] to-90%"
           />
+
+          <AudioMotionGradient
+            :name="poppyGradient.name"
+            :gradient="poppyGradient.gradient"
+          />
+
           <canvas width="600" height="400" />
         </AudioMotionAnalyzer>
 
@@ -216,45 +259,6 @@ export { default as AudioVisualizer } from "./AudioVisualizer.vue";
 export { default as AudioMotionAnalyzer } from "./AudioMotionAnalyzer.vue";
 export { default as AudioMotionGradient } from "./AudioMotionGradient.vue";
 
-export const motionVariants = cva("", {
-  variants: {
-    gradient: {
-      classic: "classic",
-      orangered: "orangered",
-      prism: "prism",
-      rainbow: "rainbow",
-      steelblue: "steelblue",
-    },
-  },
-  defaultVariants: {
-    gradient: "classic",
-  },
-});
-
-export type AudioMotionVariants = VariantProps<typeof motionVariants>;
-
-export interface AudioMotionGradientDefinition {
-  name: string;
-  gradient: AudioMotionGradientProperties;
-}
-
-export interface AudioMotionGradientProperties {
-  bgColor: string;
-  dir?: "h" | "v" | undefined;
-  colorStops: GradientColorStop[];
-}
-
-export type { AudioMotionAnalyzerProps } from "./AudioMotionAnalyzer.vue";
-export type { AudioMotionGradientProps } from "./AudioMotionGradient.vue";
-
-export const AudioMotionGradientsKey: InjectionKey<
-  Ref<AudioMotionGradientDefinition[]>
-> = Symbol("AudioMotionGradients");
-
-export { type AudioVisualizerMode } from "./AudioVisualizer.vue";
-export { type AudioVisualizerProps } from "./AudioVisualizer.vue";
-export { type GradientOptions } from "audiomotion-analyzer";
-
 export const gradientFromClasses = (
   classes: string = "",
 ): AudioMotionGradientProperties | null => {
@@ -278,11 +282,12 @@ export const gradientFromClasses = (
 
   if (computedGradient) {
     gradient = { bgColor: "rgba(0, 0, 0, 0, 0)", dir: "v", colorStops: [] };
-    gradient.dir =
+    gradient.dir = (
       computedGradient.direction.includes("bottom") ||
       computedGradient.direction.includes("top")
         ? "v"
-        : "h";
+        : "h"
+    ) as "h" | "v";
     gradient.colorStops = computedGradient.stops;
   }
 
@@ -318,11 +323,88 @@ export const gradientFromElement = (
 
   return gradientFromClasses(classes);
 };
+
+export const motionVariants = cva("", {
+  variants: {
+    gradient: {
+      classic: "classic",
+      orangered: "orangered",
+      prism: "prism",
+      rainbow: "rainbow",
+      steelblue: "steelblue",
+    },
+  },
+  defaultVariants: {
+    gradient: "classic",
+  },
+});
+
+export type AudioMotionVariants = VariantProps<typeof motionVariants>;
+
+export enum AudioMotionMode {
+  Discrete = 0,
+  OctaveBands24th = 1,
+  OctaveBands12th = 2,
+  OctaveBands8th = 3,
+  OctaveBands6th = 4,
+  OctaveBands4th = 5,
+  OctaveBands3rd = 6,
+  HalfOctaveBands = 7,
+  FullOctaveBands = 8,
+  Graph = 10,
+}
+
+export enum AudioMotionMirror {
+  Left = -1,
+  None = 0,
+  Right = 1,
+}
+
+export enum AudioMotionFrequencyScale {
+  Bark = "bark",
+  Linear = "linear",
+  Log = "log",
+  Mel = "mel",
+}
+
+export type AudioMotionFftSize =
+  | 32
+  | 64
+  | 128
+  | 256
+  | 512
+  | 1024
+  | 2048
+  | 4096
+  | 8192
+  | 16384
+  | 32768;
+
+export interface AudioMotionGradientDefinition {
+  name: string;
+  gradient: AudioMotionGradientProperties;
+}
+
+export interface AudioMotionGradientProperties {
+  bgColor: string;
+  dir?: "h" | "v" | undefined;
+  colorStops: GradientColorStop[];
+}
+
+export type { AudioMotionAnalyzerProps } from "./AudioMotionAnalyzer.vue";
+export type { AudioMotionGradientProps } from "./AudioMotionGradient.vue";
+
+export const AudioMotionGradientsKey: InjectionKey<
+  Ref<AudioMotionGradientDefinition[]>
+> = Symbol("AudioMotionGradients");
+
+export { type AudioVisualizerMode } from "./AudioVisualizer.vue";
+export { type AudioVisualizerProps } from "./AudioVisualizer.vue";
 ```
 
 ```vue [src/components/ui/audio-motion-analyzer/AudioMotionAnalyzer.vue]
 <script setup lang="ts">
-import AudioMotion from "audiomotion-analyzer";
+import AudioMotion, { type FrequencyScale } from "audiomotion-analyzer";
 import {
   type Ref,
   type HTMLAttributes,
@@ -334,19 +416,35 @@ import {
   unref,
   onUnmounted,
   provide,
+  watchEffect,
 } from "vue";
 import { AudioContextInjectionKey } from "@/components/ui/audio-context-provider";
 import { useTypedElementSearch } from "~~/registry/new-york/composables/use-typed-element-search/useTypedElementSearch";
 import {
-  gradientFromClasses,
+  AudioMotionMode,
+  AudioMotionMirror,
   AudioMotionGradientsKey,
   type AudioMotionGradientDefinition,
+  type AudioMotionGradientProperties,
+  type AudioMotionFftSize,
 } from ".";
 
 export interface AudioMotionAnalyzerProps {
-  class?: HTMLAttributes["class"];
-  stream?: MediaStream | null;
+  ansiBands?: boolean;
+  alphaBars?: boolean;
   audio?: HTMLAudioElement | Ref<HTMLAudioElement | null> | null;
+  barSpace?: number;
+  channelLayout?:
+    | "single"
+    | "dual-combined"
+    | "dual-horizontal"
+    | "dual-vertical";
+  class?: HTMLAttributes["class"];
+  colorMode?: "gradient" | "bar-index" | "bar-level";
+  fadePeaks?: boolean;
+  fftSize?: AudioMotionFftSize;
+  fillAlpha?: number;
+  frequencyScale?: string;
   gradient?:
     | "classic"
     | "orangered"
@@ -354,12 +452,66 @@ export interface AudioMotionAnalyzerProps {
     | "rainbow"
     | "steelblue"
     | string;
+  gradientLeft?:
+    | "classic"
+    | "orangered"
+    | "prism"
+    | "rainbow"
+    | "steelblue"
+    | string;
+  gradientRight?:
+    | "classic"
+    | "orangered"
+    | "prism"
+    | "rainbow"
+    | "steelblue"
+    | string;
+  gravity?: number;
+  ledBars?: boolean;
+  linearAmplitude?: boolean;
+  linearBoost?: number;
+  lineWidth?: number;
+  lumiBars?: boolean;
+  maxFps?: number;
+  mirror?: number;
+  mode?: number;
+  radial?: boolean;
+  radialInvert?: boolean;
+  radius?: number;
+  showPeaks?: boolean;
+  showScaleX?: boolean;
+  showScaleY?: boolean;
+  stream?: MediaStream | null;
+  trueLeds?: boolean;
 }
 
 const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
-  stream: undefined,
   audio: undefined,
+  barSpace: 0.1,
+  channelLayout: "dual-combined",
+  colorMode: "gradient",
+  fadePeaks: false,
+  fftSize: 8192,
+  fillAlpha: 1,
+  frequencyScale: "log",
   gradient: "classic",
+  gravity: 3.8,
+  ledBars: false,
+  linearAmplitude: false,
+  linearBoost: 1,
+  lineWidth: 0,
+  lumiBars: false,
+  maxFps: 0,
+  mirror: 0,
+  mode: 3,
+  radial: false,
+  radialInvert: false,
+  radius: 0.3,
+  showPeaks: false,
+  showScaleX: false,
+  showScaleY: false,
+  stream: undefined,
+  trueLeds: false,
 });
 
 const { getTypedElementAmongSiblings, getContainer } = useTypedElementSearch();
@@ -381,19 +533,21 @@ let source: MediaStreamAudioSourceNode | null = null;
 
 const registerGradients = () => {
   if (analyzer) {
-    console.warn("Registering gradients:", gradients.value);
     for (const gradientDef of gradients.value) {
       const { name, gradient } = gradientDef;
       const safeGradient = {
         ...gradient,
-        dir: gradient.dir === ("h" as const) ? ("h" as const) : undefined,
+        dir: gradient.dir as "h" | "v" | undefined,
       };
-      analyzer.registerGradient(name, safeGradient);
+      analyzer.registerGradient(
+        name,
+        gradient as any & AudioMotionGradientProperties,
+      );
     }
   }
 };
 
-const setupAudio = async () => {
+const setupAnalyzer = async () => {
   if (analyzer) {
     analyzer.destroy();
     analyzer = null;
@@ -445,38 +599,57 @@ const setupAudio = async () => {
     const context = injectedContext.value || new AudioContext();
     source = context.createMediaStreamSource(props.stream);
 
-    if (!canvas && container) {
-      const width = container.clientWidth;
-      const height = container.clientHeight;
-      analyzer = new AudioMotion(container, {
-        audioCtx: context,
-        width,
-        height,
-        gradient: props.gradient,
-        mode: 3,
-        barSpace: 0.6,
-        ledBars: true,
-        connectSpeakers: false,
-      });
-      analyzer.connectInput(source);
-    } else if (canvas) {
-      const width = canvas.width;
-      const height = canvas.height;
-      analyzer = new AudioMotion({
-        audioCtx: context,
-        canvas,
-        width,
-        height,
-        mode: 3,
-        barSpace: 0.6,
-        ledBars: true,
-        connectSpeakers: false,
-        overlay: true,
-      });
-      analyzer.showBgColor = false;
+    const width = canvas ? canvas.width : container?.clientWidth;
+    const height = canvas ? canvas.height : container?.clientHeight;
+    const options = {
+      alphaBars: props.alphaBars,
+      ansiBands: props.ansiBands,
+      audioCtx: context,
+      barSpace: props.barSpace,
+      channelLayout: props.channelLayout,
+      colorMode: props.colorMode,
+      connectSpeakers: false,
+      fadePeaks: props.fadePeaks,
+      fftSize: props.fftSize,
+      fillAlpha: props.fillAlpha,
+      frequencyScale: props.frequencyScale as FrequencyScale,
+      gravity: props.gravity,
+      height,
+      ledBars: props.ledBars,
+      linearAmplitude: props.linearAmplitude,
+      linearBoost: Math.max(props.linearBoost, 1),
+      lineWidth: Math.max(props.lineWidth || 0, 0),
+      lumiBars: props.lumiBars,
+      maxFPS: props.maxFps,
+      mirror: props.mirror,
+      mode: props.mode,
+      overlay: true,
+      radial: props.radial,
+      radialInvert: props.radialInvert,
+      radius: props.radius,
+      showPeaks: props.showPeaks,
+      showScaleX: props.showScaleX,
+      showScaleY: props.showScaleY,
+      trueLeds: props.trueLeds,
+      width,
+      ...(canvas ? { canvas } : {}),
+    };
 
-      registerGradients();
+    analyzer = canvas
+      ? new AudioMotion(options)
+      : container
+        ? new AudioMotion(container, options)
+        : null;
+
+    if (analyzer) {
+      if (canvas) {
+        analyzer.showBgColor = false;
+        registerGradients();
+      }
       analyzer.gradient = props.gradient;
+      if (props.gradientLeft) analyzer.gradientLeft = props.gradientLeft;
+      if (props.gradientRight) analyzer.gradientRight = props.gradientRight;
+
       analyzer.connectInput(source);
     } else {
       console.error(
@@ -528,8 +701,7 @@ watch(
           el instanceof HTMLDivElement &&
           el.dataset.slot === "audio-motion-gradient",
       );
-      console.log("gradients", gradients);
-      await setupAudio();
+      await setupAnalyzer();
     });
   },
   { immediate: true },
@@ -538,12 +710,46 @@ watch(
 watch(
   () => gradients.value,
   async () => {
-    console.log("Gradients changed:", gradients.value);
     if (analyzer) {
       registerGradients();
     }
   },
   { immediate: true },
+);
+
+watchEffect(
+  () => {
+    if (analyzer) {
+      analyzer.alphaBars = !!props.alphaBars;
+      analyzer.ansiBands = !!props.ansiBands;
+      analyzer.barSpace = props.barSpace || 0.1;
+      analyzer.channelLayout = props.channelLayout;
+      analyzer.colorMode = props.colorMode || "gradient";
+      analyzer.fadePeaks = !!props.fadePeaks;
+      analyzer.fftSize = props.fftSize as AudioMotionFftSize;
+      analyzer.fillAlpha = props.fillAlpha || 1;
+      analyzer.frequencyScale = props.frequencyScale as FrequencyScale;
+      if (props.gradientLeft) analyzer.gradientLeft = props.gradientLeft;
+      if (props.gradientRight) analyzer.gradientRight = props.gradientRight;
+      analyzer.gravity = props.gravity || 3.8;
+      analyzer.ledBars = !!props.ledBars;
+      analyzer.linearAmplitude = !!props.linearAmplitude;
+      analyzer.linearBoost = Math.max(props.linearBoost, 1);
+      analyzer.lineWidth = Math.max(props.lineWidth || 0, 0);
+      analyzer.lumiBars = !!props.lumiBars;
+      analyzer.maxFPS = props.maxFps || 0;
+      analyzer.mirror = props.mirror || AudioMotionMirror.None;
+      analyzer.mode = props.mode || AudioMotionMode.OctaveBands8th;
+      analyzer.radial = props.radial || false;
+      analyzer.radialInvert = props.radialInvert || false;
+      analyzer.radius = props.radius || 0.3;
+      analyzer.showPeaks = !!props.showPeaks;
+      analyzer.showScaleX = !!props.showScaleX;
+      analyzer.showScaleY = !!props.showScaleY;
+      analyzer.trueLeds = !!props.trueLeds;
+    }
+  },
+  { flush: "post" },
 );
 
 onUnmounted(() => {
@@ -565,23 +771,23 @@ import {
   useTemplateRef,
   watch,
   inject,
+  ref,
   type HTMLAttributes,
   type Ref,
-  ref,
 } from "vue";
-import { type GradientOptions } from "audiomotion-analyzer";
 import { cn } from "@/lib/utils";
 import {
   AudioMotionGradientsKey,
   gradientFromElement,
   type AudioMotionGradientDefinition,
+  type AudioMotionGradientProperties,
 } from ".";
 
 export interface AudioMotionGradientProps {
   name: string;
   class?: HTMLAttributes["class"];
   style?: HTMLAttributes["style"];
-  gradient?: GradientOptions;
+  gradient?: AudioMotionGradientProperties | null;
 }
 
 const props = defineProps<AudioMotionGradientProps>();
@@ -607,32 +813,61 @@ const deepEqual = (a: any, b: any): boolean => {
   return true;
 };
 
+const addIfNotExisting = (
+  gradientDefinition: AudioMotionGradientDefinition,
+) => {
+  const existingIndex = gradients.value.findIndex(
+    (g) => g.name === gradientDefinition.name,
+  );
+  console.log("Got existing gradient index:", existingIndex);
+  if (existingIndex !== -1) {
+    const newGradient = gradientDefinition.gradient;
+    const existingGradient = gradients.value[existingIndex]!.gradient;
+
+    const isSame = deepEqual(newGradient, existingGradient);
+    if (!isSame) {
+      console.warn(
+        "Updating existing gradient:",
+        gradientDefinition.name,
+        gradientDefinition.gradient,
+      );
+      gradients.value[existingIndex]!.gradient = newGradient;
+    }
+  } else {
+    gradients.value.push({
+      name: props.name,
+      gradient: gradientDefinition.gradient,
+    });
+  }
+};
+
 const addGradient = () => {
+  const propsGradient: AudioMotionGradientProperties | null | undefined =
+    props.gradient;
+  if (propsGradient) {
+    addIfNotExisting({
+      name: props.name,
+      gradient: propsGradient,
+    });
+    return;
+  }
+
   const el = unref(gradientRef);
   if (el) {
-    const gradient = gradientFromElement(el);
-    if (gradient) {
-      const existingIndex = gradients.value.findIndex(
-        (g) => g.name === props.name,
-      );
-      if (existingIndex !== -1) {
-        const newGradient = gradient;
-        const existingGradient = gradients.value[existingIndex]!.gradient;
-
-        const isSame = deepEqual(newGradient, existingGradient);
-        if (!isSame) {
-          gradients.value[existingIndex]!.gradient = newGradient;
-        }
-      } else {
-        gradients.value.push({ name: props.name, gradient });
-      }
+    const gradientProperties: AudioMotionGradientProperties | null =
+      gradientFromElement(el);
+    if (gradientProperties) {
+      addIfNotExisting({
+        name: props.name,
+        gradient: gradientProperties,
+      });
     }
   }
 };
 
 watch(
-  () => [props.class, props.style],
-  ([newClass, newStyle]) => {
+  () => [props.gradient, props.class, props.style],
+  () => {
     nextTick(() => {
       addGradient();
     });
@@ -1643,45 +1878,6 @@ export { default as AudioVisualizer } from "./AudioVisualizer.vue";
 export { default as AudioMotionAnalyzer } from "./AudioMotionAnalyzer.vue";
 export { default as AudioMotionGradient } from "./AudioMotionGradient.vue";
 
-export const motionVariants = cva("", {
-  variants: {
-    gradient: {
-      classic: "classic",
-      orangered: "orangered",
-      prism: "prism",
-      rainbow: "rainbow",
-      steelblue: "steelblue",
-    },
-  },
-  defaultVariants: {
-    gradient: "classic",
-  },
-});
-
-export type AudioMotionVariants = VariantProps<typeof motionVariants>;
-
-export interface AudioMotionGradientDefinition {
-  name: string;
-  gradient: AudioMotionGradientProperties;
-}
-
-export interface AudioMotionGradientProperties {
-  bgColor: string;
-  dir?: "h" | "v" | undefined;
-  colorStops: GradientColorStop[];
-}
-
-export type { AudioMotionAnalyzerProps } from "./AudioMotionAnalyzer.vue";
-export type { AudioMotionGradientProps } from "./AudioMotionGradient.vue";
-
-export const AudioMotionGradientsKey: InjectionKey<
-  Ref<AudioMotionGradientDefinition[]>
-> = Symbol("AudioMotionGradients");
-
-export { type AudioVisualizerMode } from "./AudioVisualizer.vue";
-export { type AudioVisualizerProps } from "./AudioVisualizer.vue";
-export { type GradientOptions } from "audiomotion-analyzer";
-
 export const gradientFromClasses = (
   classes: string = "",
 ): AudioMotionGradientProperties | null => {
@@ -1705,11 +1901,12 @@ export const gradientFromClasses = (
 
   if (computedGradient) {
     gradient = { bgColor: "rgba(0, 0, 0, 0, 0)", dir: "v", colorStops: [] };
-    gradient.dir =
+    gradient.dir = (
       computedGradient.direction.includes("bottom") ||
       computedGradient.direction.includes("top")
         ? "v"
-        : "h";
+        : "h"
+    ) as "h" | "v";
     gradient.colorStops = computedGradient.stops;
   }
 
@@ -1745,11 +1942,88 @@ export const gradientFromElement = (
 
   return gradientFromClasses(classes);
 };
+
+export const motionVariants = cva("", {
+  variants: {
+    gradient: {
+      classic: "classic",
+      orangered: "orangered",
+      prism: "prism",
+      rainbow: "rainbow",
+      steelblue: "steelblue",
+    },
+  },
+  defaultVariants: {
+    gradient: "classic",
+  },
+});
+
+export type AudioMotionVariants = VariantProps<typeof motionVariants>;
+
+export enum AudioMotionMode {
+  Discrete = 0,
+  OctaveBands24th = 1,
+  OctaveBands12th = 2,
+  OctaveBands8th = 3,
+  OctaveBands6th = 4,
+  OctaveBands4th = 5,
+  OctaveBands3rd = 6,
+  HalfOctaveBands = 7,
+  FullOctaveBands = 8,
+  Graph = 10,
+}
+
+export enum AudioMotionMirror {
+  Left = -1,
+  None = 0,
+  Right = 1,
+}
+
+export enum AudioMotionFrequencyScale {
+  Bark = "bark",
+  Linear = "linear",
+  Log = "log",
+  Mel = "mel",
+}
+
+export type AudioMotionFftSize =
+  | 32
+  | 64
+  | 128
+  | 256
+  | 512
+  | 1024
+  | 2048
+  | 4096
+  | 8192
+  | 16384
+  | 32768;
+
+export interface AudioMotionGradientDefinition {
+  name: string;
+  gradient: AudioMotionGradientProperties;
+}
+
+export interface AudioMotionGradientProperties {
+  bgColor: string;
+  dir?: "h" | "v" | undefined;
+  colorStops: GradientColorStop[];
+}
+
+export type { AudioMotionAnalyzerProps } from "./AudioMotionAnalyzer.vue";
+export type { AudioMotionGradientProps } from "./AudioMotionGradient.vue";
+
+export const AudioMotionGradientsKey: InjectionKey<
+  Ref<AudioMotionGradientDefinition[]>
+> = Symbol("AudioMotionGradients");
+
+export { type AudioVisualizerMode } from "./AudioVisualizer.vue";
+export { type AudioVisualizerProps } from "./AudioVisualizer.vue";
 ```
 
 ```vue [src/components/ui/audio-motion-analyzer/AudioMotionAnalyzer.vue]
 <script setup lang="ts">
-import AudioMotion from "audiomotion-analyzer";
+import AudioMotion, { type FrequencyScale } from "audiomotion-analyzer";
 import {
   type Ref,
   type HTMLAttributes,
@@ -1761,19 +2035,35 @@ import {
   unref,
   onUnmounted,
   provide,
+  watchEffect,
 } from "vue";
 import { AudioContextInjectionKey } from "@/components/ui/audio-context-provider";
 import { useTypedElementSearch } from "~~/registry/new-york/composables/use-typed-element-search/useTypedElementSearch";
 import {
-  gradientFromClasses,
+  AudioMotionMode,
+  AudioMotionMirror,
   AudioMotionGradientsKey,
   type AudioMotionGradientDefinition,
+  type AudioMotionGradientProperties,
+  type AudioMotionFftSize,
 } from ".";
 
 export interface AudioMotionAnalyzerProps {
-  class?: HTMLAttributes["class"];
-  stream?: MediaStream | null;
+  ansiBands?: boolean;
+  alphaBars?: boolean;
   audio?: HTMLAudioElement | Ref<HTMLAudioElement | null> | null;
+  barSpace?: number;
+  channelLayout?:
+    | "single"
+    | "dual-combined"
+    | "dual-horizontal"
+    | "dual-vertical";
+  class?: HTMLAttributes["class"];
+  colorMode?: "gradient" | "bar-index" | "bar-level";
+  fadePeaks?: boolean;
+  fftSize?: AudioMotionFftSize;
+  fillAlpha?: number;
+  frequencyScale?: string;
   gradient?:
     | "classic"
     | "orangered"
@@ -1781,12 +2071,66 @@ export interface AudioMotionAnalyzerProps {
     | "rainbow"
     | "steelblue"
     | string;
+  gradientLeft?:
+    | "classic"
+    | "orangered"
+    | "prism"
+    | "rainbow"
+    | "steelblue"
+    | string;
+  gradientRight?:
+    | "classic"
+    | "orangered"
+    | "prism"
+    | "rainbow"
+    | "steelblue"
+    | string;
+  gravity?: number;
+  ledBars?: boolean;
+  linearAmplitude?: boolean;
+  linearBoost?: number;
+  lineWidth?: number;
+  lumiBars?: boolean;
+  maxFps?: number;
+  mirror?: number;
+  mode?: number;
+  radial?: boolean;
+  radialInvert?: boolean;
+  radius?: number;
+  showPeaks?: boolean;
+  showScaleX?: boolean;
+  showScaleY?: boolean;
+  stream?: MediaStream | null;
+  trueLeds?: boolean;
 }
 
 const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
-  stream: undefined,
   audio: undefined,
+  barSpace: 0.1,
+  channelLayout: "dual-combined",
+  colorMode: "gradient",
+  fadePeaks: false,
+  fftSize: 8192,
+  fillAlpha: 1,
+  frequencyScale: "log",
   gradient: "classic",
+  gravity: 3.8,
+  ledBars: false,
+  linearAmplitude: false,
+  linearBoost: 1,
+  lineWidth: 0,
+  lumiBars: false,
+  maxFps: 0,
+  mirror: 0,
+  mode: 3,
+  radial: false,
+  radialInvert: false,
+  radius: 0.3,
+  showPeaks: false,
+  showScaleX: false,
+  showScaleY: false,
+  stream: undefined,
+  trueLeds: false,
 });
 
 const { getTypedElementAmongSiblings, getContainer } = useTypedElementSearch();
@@ -1808,19 +2152,21 @@ let source: MediaStreamAudioSourceNode | null = null;
 
 const registerGradients = () => {
   if (analyzer) {
-    console.warn("Registering gradients:", gradients.value);
     for (const gradientDef of gradients.value) {
       const { name, gradient } = gradientDef;
       const safeGradient = {
         ...gradient,
-        dir: gradient.dir === ("h" as const) ? ("h" as const) : undefined,
+        dir: gradient.dir as "h" | "v" | undefined,
       };
-      analyzer.registerGradient(name, safeGradient);
+      analyzer.registerGradient(
+        name,
+        gradient as any & AudioMotionGradientProperties,
+      );
     }
   }
 };
 
-const setupAudio = async () => {
+const setupAnalyzer = async () => {
   if (analyzer) {
     analyzer.destroy();
     analyzer = null;
@@ -1872,38 +2218,57 @@ const setupAudio = async () => {
     const context = injectedContext.value || new AudioContext();
     source = context.createMediaStreamSource(props.stream);
 
-    if (!canvas && container) {
-      const width = container.clientWidth;
-      const height = container.clientHeight;
-      analyzer = new AudioMotion(container, {
-        audioCtx: context,
-        width,
-        height,
-        gradient: props.gradient,
-        mode: 3,
-        barSpace: 0.6,
-        ledBars: true,
-        connectSpeakers: false,
-      });
-      analyzer.connectInput(source);
-    } else if (canvas) {
-      const width = canvas.width;
-      const height = canvas.height;
-      analyzer = new AudioMotion({
-        audioCtx: context,
-        canvas,
-        width,
-        height,
-        mode: 3,
-        barSpace: 0.6,
-        ledBars: true,
-        connectSpeakers: false,
-        overlay: true,
-      });
-      analyzer.showBgColor = false;
+    const width = canvas ? canvas.width : container?.clientWidth;
+    const height = canvas ? canvas.height : container?.clientHeight;
+    const options = {
+      alphaBars: props.alphaBars,
+      ansiBands: props.ansiBands,
+      audioCtx: context,
+      barSpace: props.barSpace,
+      channelLayout: props.channelLayout,
+      colorMode: props.colorMode,
+      connectSpeakers: false,
+      fadePeaks: props.fadePeaks,
+      fftSize: props.fftSize,
+      fillAlpha: props.fillAlpha,
+      frequencyScale: props.frequencyScale as FrequencyScale,
+      gravity: props.gravity,
+      height,
+      ledBars: props.ledBars,
+      linearAmplitude: props.linearAmplitude,
+      linearBoost: Math.max(props.linearBoost, 1),
+      lineWidth: Math.max(props.lineWidth || 0, 0),
+      lumiBars: props.lumiBars,
+      maxFPS: props.maxFps,
+      mirror: props.mirror,
+      mode: props.mode,
+      overlay: true,
+      radial: props.radial,
+      radialInvert: props.radialInvert,
+      radius: props.radius,
+      showPeaks: props.showPeaks,
+      showScaleX: props.showScaleX,
+      showScaleY: props.showScaleY,
+      trueLeds: props.trueLeds,
+      width,
+      ...(canvas ? { canvas } : {}),
+    };
 
-      registerGradients();
+    analyzer = canvas
+      ? new AudioMotion(options)
+      : container
+        ? new AudioMotion(container, options)
+        : null;
+
+    if (analyzer) {
+      if (canvas) {
+        analyzer.showBgColor = false;
+        registerGradients();
+      }
       analyzer.gradient = props.gradient;
+      if (props.gradientLeft) analyzer.gradientLeft = props.gradientLeft;
+      if (props.gradientRight) analyzer.gradientRight = props.gradientRight;
+
       analyzer.connectInput(source);
     } else {
       console.error(
@@ -1955,8 +2320,7 @@ watch(
           el instanceof HTMLDivElement &&
           el.dataset.slot === "audio-motion-gradient",
       );
-      console.log("gradients", gradients);
-      await setupAudio();
+      await setupAnalyzer();
     });
   },
   { immediate: true },
@@ -1965,12 +2329,46 @@ watch(
 watch(
   () => gradients.value,
   async () => {
-    console.log("Gradients changed:", gradients.value);
     if (analyzer) {
       registerGradients();
     }
   },
   { immediate: true },
+);
+
+watchEffect(
+  () => {
+    if (analyzer) {
+      analyzer.alphaBars = !!props.alphaBars;
+      analyzer.ansiBands = !!props.ansiBands;
+      analyzer.barSpace = props.barSpace || 0.1;
+      analyzer.channelLayout = props.channelLayout;
+      analyzer.colorMode = props.colorMode || "gradient";
+      analyzer.fadePeaks = !!props.fadePeaks;
+      analyzer.fftSize = props.fftSize as AudioMotionFftSize;
+      analyzer.fillAlpha = props.fillAlpha || 1;
+      analyzer.frequencyScale = props.frequencyScale as FrequencyScale;
+      if (props.gradientLeft) analyzer.gradientLeft = props.gradientLeft;
+      if (props.gradientRight) analyzer.gradientRight = props.gradientRight;
+      analyzer.gravity = props.gravity || 3.8;
+      analyzer.ledBars = !!props.ledBars;
+      analyzer.linearAmplitude = !!props.linearAmplitude;
+      analyzer.linearBoost = Math.max(props.linearBoost, 1);
+      analyzer.lineWidth = Math.max(props.lineWidth || 0, 0);
+      analyzer.lumiBars = !!props.lumiBars;
+      analyzer.maxFPS = props.maxFps || 0;
+      analyzer.mirror = props.mirror || AudioMotionMirror.None;
+      analyzer.mode = props.mode || AudioMotionMode.OctaveBands8th;
+      analyzer.radial = props.radial || false;
+      analyzer.radialInvert = props.radialInvert || false;
+      analyzer.radius = props.radius || 0.3;
+      analyzer.showPeaks = !!props.showPeaks;
+      analyzer.showScaleX = !!props.showScaleX;
+      analyzer.showScaleY = !!props.showScaleY;
+      analyzer.trueLeds = !!props.trueLeds;
+    }
+  },
+  { flush: "post" },
 );
 
 onUnmounted(() => {
@@ -1992,23 +2390,23 @@ import {
   useTemplateRef,
   watch,
   inject,
+  ref,
   type HTMLAttributes,
   type Ref,
-  ref,
 } from "vue";
-import { type GradientOptions } from "audiomotion-analyzer";
 import { cn } from "@/lib/utils";
 import {
   AudioMotionGradientsKey,
   gradientFromElement,
   type AudioMotionGradientDefinition,
+  type AudioMotionGradientProperties,
 } from ".";
 
 export interface AudioMotionGradientProps {
   name: string;
   class?: HTMLAttributes["class"];
   style?: HTMLAttributes["style"];
-  gradient?: GradientOptions;
+  gradient?: AudioMotionGradientProperties | null;
 }
 
 const props = defineProps<AudioMotionGradientProps>();
@@ -2034,32 +2432,61 @@ const deepEqual = (a: any, b: any): boolean => {
   return true;
 };
 
+const addIfNotExisting = (
+  gradientDefinition: AudioMotionGradientDefinition,
+) => {
+  const existingIndex = gradients.value.findIndex(
+    (g) => g.name === gradientDefinition.name,
+  );
+  console.log("Got existing gradient index:", existingIndex);
+  if (existingIndex !== -1) {
+    const newGradient = gradientDefinition.gradient;
+    const existingGradient = gradients.value[existingIndex]!.gradient;
+
+    const isSame = deepEqual(newGradient, existingGradient);
+    if (!isSame) {
+      console.warn(
+        "Updating existing gradient:",
+        gradientDefinition.name,
+        gradientDefinition.gradient,
+      );
+      gradients.value[existingIndex]!.gradient = newGradient;
+    }
+  } else {
+    gradients.value.push({
+      name: props.name,
+      gradient: gradientDefinition.gradient,
+    });
+  }
+};
+
 const addGradient = () => {
+  const propsGradient: AudioMotionGradientProperties | null | undefined =
+    props.gradient;
+  if (propsGradient) {
+    addIfNotExisting({
+      name: props.name,
+      gradient: propsGradient,
+    });
+    return;
+  }
+
   const el = unref(gradientRef);
   if (el) {
-    const gradient = gradientFromElement(el);
-    if (gradient) {
-      const existingIndex = gradients.value.findIndex(
-        (g) => g.name === props.name,
-      );
-      if (existingIndex !== -1) {
-        const newGradient = gradient;
-        const existingGradient = gradients.value[existingIndex]!.gradient;
-
-        const isSame = deepEqual(newGradient, existingGradient);
-        if (!isSame) {
-          gradients.value[existingIndex]!.gradient = newGradient;
-        }
-      } else {
-        gradients.value.push({ name: props.name, gradient });
-      }
+    const gradientProperties: AudioMotionGradientProperties | null =
+      gradientFromElement(el);
+    if (gradientProperties) {
+      addIfNotExisting({
+        name: props.name,
+        gradient: gradientProperties,
+      });
     }
   }
 };
 
 watch(
-  () => [props.class, props.style],
-  ([newClass, newStyle]) => {
+  () => [props.gradient, props.class, props.style],
+  () => {
     nextTick(() => {
       addGradient();
     });
@@ -3103,10 +3530,37 @@ export const useTailwindClassParser = () => {
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
-| `stream`{.primary .text-primary} | `MediaStream \| null` | — |  |
+| `ansiBands`{.primary .text-primary} | `boolean` | - |  |
+| `alphaBars`{.primary .text-primary} | `boolean` | - |  |
 | `audio`{.primary .text-primary} | `HTMLAudioElement \| Ref<HTMLAudioElement \| null> \| null` | — |  |
+| `barSpace`{.primary .text-primary} | `number` | 0.1 |  |
+| `channelLayout`{.primary .text-primary} | `'single' \| 'dual-combined' \| 'dual-horizontal' \| 'dual-vertical'` | dual-combined |  |
+| `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
+| `colorMode`{.primary .text-primary} | `'gradient' \| 'bar-index' \| 'bar-level'` | gradient |  |
+| `fadePeaks`{.primary .text-primary} | `boolean` | false |  |
+| `fftSize`{.primary .text-primary} | `AudioMotionFftSize` | 8192 |  |
+| `fillAlpha`{.primary .text-primary} | `number` | 1 |  |
+| `frequencyScale`{.primary .text-primary} | `string` | log |  |
 | `gradient`{.primary .text-primary} | `'classic' \| 'orangered' \| 'prism' \| 'rainbow' \| 'steelblue' \| string` | classic |  |
+| `gradientLeft`{.primary .text-primary} | `'classic' \| 'orangered' \| 'prism' \| 'rainbow' \| 'steelblue' \| string` | - |  |
+| `gradientRight`{.primary .text-primary} | `'classic' \| 'orangered' \| 'prism' \| 'rainbow' \| 'steelblue' \| string` | - |  |
+| `gravity`{.primary .text-primary} | `number` | 3.8 |  |
+| `ledBars`{.primary .text-primary} | `boolean` | false |  |
+| `linearAmplitude`{.primary .text-primary} | `boolean` | false |  |
+| `linearBoost`{.primary .text-primary} | `number` | 1 |  |
+| `lineWidth`{.primary .text-primary} | `number` | 0 |  |
+| `lumiBars`{.primary .text-primary} | `boolean` | false |  |
+| `maxFps`{.primary .text-primary} | `number` | 0 |  |
+| `mirror`{.primary .text-primary} | `number` | 0 |  |
+| `mode`{.primary .text-primary} | `number` | 3 |  |
+| `radial`{.primary .text-primary} | `boolean` | false |  |
+| `radialInvert`{.primary .text-primary} | `boolean` | false |  |
+| `radius`{.primary .text-primary} | `number` | 0.3 |  |
+| `showPeaks`{.primary .text-primary} | `boolean` | false |  |
+| `showScaleX`{.primary .text-primary} | `boolean` | false |  |
+| `showScaleY`{.primary .text-primary} | `boolean` | false |  |
+| `stream`{.primary .text-primary} | `MediaStream \| null` | — |  |
+| `trueLeds`{.primary .text-primary} | `boolean` | false |  |
 
   ### Slots
 | Name | Description |
@@ -3137,7 +3591,7 @@ export const useTailwindClassParser = () => {
 | `name`{.primary .text-primary} | `string` | - |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 | `style`{.primary .text-primary} | `HTMLAttributes['style']` | - |  |
-| `gradient`{.primary .text-primary} | `GradientOptions` | - |  |
+| `gradient`{.primary .text-primary} | `AudioMotionGradientProperties \| null` | - |  |
 
   ### Inject
 | Key | Default | Type | Description |

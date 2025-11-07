@@ -5,23 +5,24 @@ import {
   useTemplateRef,
   watch,
   inject,
+  ref,
   type HTMLAttributes,
   type Ref,
-  ref,
 } from 'vue';
-import { type GradientOptions } from 'audiomotion-analyzer';
 import { cn } from '@/lib/utils';
 import {
   AudioMotionGradientsKey,
   gradientFromElement,
   type AudioMotionGradientDefinition,
+  type AudioMotionGradientProperties,
 } from '.';
 
+// TODO: Handle colorMode changes event outside of nuxt.
 export interface AudioMotionGradientProps {
   name: string;
   class?: HTMLAttributes['class'];
   style?: HTMLAttributes['style'];
-  gradient?: GradientOptions;
+  gradient?: AudioMotionGradientProperties | null;
 }
 
 const props = defineProps<AudioMotionGradientProps>();
@@ -44,30 +45,52 @@ const deepEqual = (a: any, b: any): boolean => {
   return true;
 };
 
+const addIfNotExisting = (gradientDefinition: AudioMotionGradientDefinition) => {
+  const existingIndex = gradients.value.findIndex((g) => g.name === gradientDefinition.name);
+  console.log('Got existing gradient index:', existingIndex);
+  if (existingIndex !== -1) {
+    const newGradient = gradientDefinition.gradient;
+    const existingGradient = gradients.value[existingIndex]!.gradient;
+
+    const isSame = deepEqual(newGradient, existingGradient);
+    if (!isSame) {
+      console.warn(
+        'Updating existing gradient:',
+        gradientDefinition.name,
+        gradientDefinition.gradient
+      );
+      gradients.value[existingIndex]!.gradient = newGradient;
+    }
+  } else {
+    gradients.value.push({ name: props.name, gradient: gradientDefinition.gradient });
+  }
+};
+
 const addGradient = () => {
+  const propsGradient: AudioMotionGradientProperties | null | undefined = props.gradient;
+  if (propsGradient) {
+    addIfNotExisting({
+      name: props.name,
+      gradient: propsGradient,
+    });
+    return;
+  }
+
   const el = unref(gradientRef);
   if (el) {
-    const gradient = gradientFromElement(el);
-    if (gradient) {
-      const existingIndex = gradients.value.findIndex((g) => g.name === props.name);
-      if (existingIndex !== -1) {
-        const newGradient = gradient;
-        const existingGradient = gradients.value[existingIndex]!.gradient;
-
-        const isSame = deepEqual(newGradient, existingGradient);
-        if (!isSame) {
-          gradients.value[existingIndex]!.gradient = newGradient;
-        }
-      } else {
-        gradients.value.push({ name: props.name, gradient });
-      }
+    const gradientProperties: AudioMotionGradientProperties | null = gradientFromElement(el);
+    if (gradientProperties) {
+      addIfNotExisting({
+        name: props.name,
+        gradient: gradientProperties,
+      });
     }
   }
 };
 
 watch(
-  () => [props.class, props.style],
-  ([newClass, newStyle]) => {
+  () => [props.gradient, props.class, props.style],
+  () => {
     nextTick(() => {
       addGradient();
     });

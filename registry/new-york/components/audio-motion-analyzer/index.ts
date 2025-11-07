@@ -18,44 +18,6 @@ export { default as AudioVisualizer } from './AudioVisualizer.vue';
 export { default as AudioMotionAnalyzer } from './AudioMotionAnalyzer.vue';
 export { default as AudioMotionGradient } from './AudioMotionGradient.vue';
 
-export const motionVariants = cva('', {
-  variants: {
-    gradient: {
-      classic: 'classic',
-      orangered: 'orangered',
-      prism: 'prism',
-      rainbow: 'rainbow',
-      steelblue: 'steelblue',
-    },
-  },
-  defaultVariants: {
-    gradient: 'classic',
-  },
-});
-
-export type AudioMotionVariants = VariantProps<typeof motionVariants>;
-
-export interface AudioMotionGradientDefinition {
-  name: string;
-  gradient: AudioMotionGradientProperties;
-}
-
-export interface AudioMotionGradientProperties {
-  bgColor: string;
-  dir?: 'h' | 'v' | undefined;
-  colorStops: GradientColorStop[];
-}
-
-export type { AudioMotionAnalyzerProps } from './AudioMotionAnalyzer.vue';
-export type { AudioMotionGradientProps } from './AudioMotionGradient.vue';
-
-export const AudioMotionGradientsKey: InjectionKey<Ref<AudioMotionGradientDefinition[]>> =
-  Symbol('AudioMotionGradients');
-
-export { type AudioVisualizerMode } from './AudioVisualizer.vue';
-export { type AudioVisualizerProps } from './AudioVisualizer.vue';
-export { type GradientOptions } from 'audiomotion-analyzer';
-
 export const gradientFromClasses = (classes: string = ''): AudioMotionGradientProperties | null => {
   const { getTailwindBaseCssValues, parseGradient } = useTailwindClassParser();
 
@@ -116,3 +78,79 @@ export const gradientFromElement = (
 
   return gradientFromClasses(classes);
 };
+
+export const motionVariants = cva('', {
+  variants: {
+    gradient: {
+      classic: 'classic',
+      orangered: 'orangered',
+      prism: 'prism',
+      rainbow: 'rainbow',
+      steelblue: 'steelblue',
+    },
+  },
+  defaultVariants: {
+    gradient: 'classic',
+  },
+});
+
+export type AudioMotionVariants = VariantProps<typeof motionVariants>;
+
+export enum AudioMotionMode {
+  Discrete = 0,
+  OctaveBands24th = 1,
+  OctaveBands12th = 2,
+  OctaveBands8th = 3,
+  OctaveBands6th = 4,
+  OctaveBands4th = 5,
+  OctaveBands3rd = 6,
+  HalfOctaveBands = 7,
+  FullOctaveBands = 8,
+  Graph = 10,
+}
+
+export enum AudioMotionMirror {
+  Left = -1,
+  None = 0,
+  Right = 1,
+}
+
+export enum AudioMotionFrequencyScale {
+  Bark = 'bark',
+  Linear = 'linear',
+  Log = 'log',
+  Mel = 'mel',
+}
+
+export type AudioMotionFftSize =
+  | 32
+  | 64
+  | 128
+  | 256
+  | 512
+  | 1024
+  | 2048
+  | 4096
+  | 8192
+  | 16384
+  | 32768;
+
+export interface AudioMotionGradientDefinition {
+  name: string;
+  gradient: AudioMotionGradientProperties;
+}
+
+export interface AudioMotionGradientProperties {
+  bgColor: string;
+  dir?: 'h' | 'v' | undefined;
+  colorStops: GradientColorStop[];
+}
+
+export type { AudioMotionAnalyzerProps } from './AudioMotionAnalyzer.vue';
+export type { AudioMotionGradientProps } from './AudioMotionGradient.vue';
+
+export const AudioMotionGradientsKey: InjectionKey<Ref<AudioMotionGradientDefinition[]>> =
+  Symbol('AudioMotionGradients');
+
+export { type AudioVisualizerMode } from './AudioVisualizer.vue';
+export { type AudioVisualizerProps } from './AudioVisualizer.vue';

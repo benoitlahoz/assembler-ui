@@ -19,6 +19,9 @@ import { AudioContextProvider } from '~~/registry/new-york/components/audio-cont
 import {
   AudioMotionAnalyzer,
   AudioMotionGradient,
+  AudioMotionMirror,
+  AudioMotionMode,
+  type AudioMotionGradientDefinition,
 } from '~~/registry/new-york/components/audio-motion-analyzer';
 
 const selectedId = ref<string | null>(null);
@@ -47,6 +50,22 @@ const visualizerModes = [
   { value: 'waterfall', label: 'Waterfall' },
   { value: 'led-bars', label: 'LED Bars' },
 ];
+
+const poppyGradient: AudioMotionGradientDefinition = {
+  name: 'poppy',
+  gradient: {
+    bgColor: 'rgba(0, 0, 0, 0, 0)',
+    dir: 'v' as const,
+    colorStops: [
+      { color: '#ff0000', pos: 0 },
+      { color: '#ff8000', pos: 0.2 },
+      { color: '#ffff00', pos: 0.4 },
+      { color: '#80ff00', pos: 0.6 },
+      { color: '#00ff00', pos: 0.8 },
+      { color: '#00ffff', pos: 1 },
+    ],
+  },
+};
 </script>
 
 <template>
@@ -121,11 +140,17 @@ const visualizerModes = [
     >
       <AudioContextProvider v-slot="{ errors, state }">
         <!-- If you prefer to provide a container and let AudioMotionAnalyzer create the canvas <div class="w-full h-[400px] min-h-[400px]"> -->
-        <AudioMotionAnalyzer :stream="stream" gradient="yellow">
+        <AudioMotionAnalyzer
+          :stream="stream"
+          :mode="AudioMotionMode.Graph"
+          gradient="sunset"
+          show-peaks
+          :mirror="AudioMotionMirror.None"
+        >
           <!-- If styles are defined inline, they will take precedence over the classes -->
           <AudioMotionGradient
-            name="formose"
-            class="bg-linear-to-b from-purple-700 via-blue-500 to-yellow-400 to-90%"
+            name="sunset"
+            class="bg-linear-to-r from-red-500 to-orange-500"
             style="
               background: linear-gradient(
                 to bottom,
@@ -136,10 +161,27 @@ const visualizerModes = [
               );
             "
           />
+
           <AudioMotionGradient
-            name="yellow"
+            name="foreground"
+            style="
+              background: linear-gradient(
+                to bottom,
+                var(--color-foreground) 0%,
+                var(--color-foreground) 100%
+              );
+            "
+          />
+
+          <!-- TODO: This one doesn't work as expected -> see parsing-->
+          <AudioMotionGradient
+            name="foreground-broken"
             class="bg-linear-to-b from-[--color-foreground] via-purple-400 to-[--color-background] to-90%"
           />
+
+          <!-- Gradient object takes precedence over class and styles -->
+          <AudioMotionGradient :name="poppyGradient.name" :gradient="poppyGradient.gradient" />
+
           <canvas width="600" height="400" />
         </AudioMotionAnalyzer>
         <!-- </div> -->
