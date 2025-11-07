@@ -76,10 +76,11 @@ export const gradientFromClasses = (classes: string = ''): AudioMotionGradientPr
 
   if (computedGradient) {
     gradient = { bgColor: 'rgba(0, 0, 0, 0, 0)', dir: 'v', colorStops: [] };
-    gradient.dir =
+    gradient.dir = (
       computedGradient.direction.includes('bottom') || computedGradient.direction.includes('top')
         ? 'v'
-        : 'h';
+        : 'h'
+    ) as 'h' | 'v';
     gradient.colorStops = computedGradient.stops;
   }
 

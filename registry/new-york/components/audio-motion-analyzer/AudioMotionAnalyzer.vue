@@ -18,6 +18,7 @@ import {
   gradientFromClasses,
   AudioMotionGradientsKey,
   type AudioMotionGradientDefinition,
+  type AudioMotionGradientProperties,
 } from '.';
 
 export interface AudioMotionAnalyzerProps {
@@ -46,15 +47,13 @@ let source: MediaStreamAudioSourceNode | null = null;
 
 const registerGradients = () => {
   if (analyzer) {
-    console.warn('Registering gradients:', gradients.value);
     for (const gradientDef of gradients.value) {
-      // Ensure dir is only "h" or undefined to match GradientOptions type
       const { name, gradient } = gradientDef;
       const safeGradient = {
         ...gradient,
-        dir: gradient.dir === ('h' as const) ? ('h' as const) : undefined,
+        dir: gradient.dir as 'h' | 'v' | undefined,
       };
-      analyzer.registerGradient(name, safeGradient);
+      analyzer.registerGradient(name, gradient as any & AudioMotionGradientProperties);
     }
   }
 };
