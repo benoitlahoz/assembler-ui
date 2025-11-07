@@ -9,8 +9,10 @@
 import type { VariantProps } from 'class-variance-authority';
 import { cva } from 'class-variance-authority';
 import type { InjectionKey, Ref } from 'vue';
-import { type GradientOptions } from 'audiomotion-analyzer';
-import { useTailwindClassParser } from '~~/registry/new-york/composables/use-tailwind-class-parser/useTailwindClassParser';
+import {
+  useTailwindClassParser,
+  type GradientColorStop,
+} from '~~/registry/new-york/composables/use-tailwind-class-parser/useTailwindClassParser';
 
 export { default as AudioVisualizer } from './AudioVisualizer.vue';
 export { default as AudioMotionAnalyzer } from './AudioMotionAnalyzer.vue';
@@ -32,9 +34,16 @@ export const motionVariants = cva('', {
 });
 
 export type AudioMotionVariants = VariantProps<typeof motionVariants>;
+
 export interface AudioMotionGradientDefinition {
   name: string;
-  gradient: GradientOptions;
+  gradient: AudioMotionGradientProperties;
+}
+
+export interface AudioMotionGradientProperties {
+  bgColor: string;
+  dir?: 'h' | 'v' | undefined;
+  colorStops: GradientColorStop[];
 }
 
 export type { AudioMotionAnalyzerProps } from './AudioMotionAnalyzer.vue';
@@ -45,8 +54,9 @@ export const AudioMotionGradientsKey: InjectionKey<Ref<AudioMotionGradientDefini
 
 export { type AudioVisualizerMode } from './AudioVisualizer.vue';
 export { type AudioVisualizerProps } from './AudioVisualizer.vue';
+export { type GradientOptions } from 'audiomotion-analyzer';
 
-export const gradientFromClasses = (classes: string = '') => {
+export const gradientFromClasses = (classes: string = ''): AudioMotionGradientProperties | null => {
   const { getTailwindBaseCssValues, parseGradient } = useTailwindClassParser();
 
   const el = document.createElement('div');
@@ -62,11 +72,7 @@ export const gradientFromClasses = (classes: string = '') => {
       ? parseGradient(computedClass['background-image'])
       : null;
 
-  let gradient: {
-    bgColor: string;
-    dir?: 'h' | 'v' | undefined;
-    colorStops: Array<{ color: string; pos: number }>;
-  } | null = null;
+  let gradient: AudioMotionGradientProperties | null = null;
 
   if (computedGradient) {
     gradient = { bgColor: 'rgba(0, 0, 0, 0, 0)', dir: 'v', colorStops: [] };
@@ -81,7 +87,9 @@ export const gradientFromClasses = (classes: string = '') => {
   return gradient;
 };
 
-export const gradientFromElement = (el: HTMLElement | null) => {
+export const gradientFromElement = (
+  el: HTMLElement | null
+): AudioMotionGradientProperties | null => {
   if (!el) return null;
 
   const classes = el?.className || '';
@@ -91,9 +99,15 @@ export const gradientFromElement = (el: HTMLElement | null) => {
     const { parseGradient } = useTailwindClassParser();
     const result = parseGradient(styles);
     if (result) {
-      const gradient = { bgColor: 'rgba(0, 0, 0, 0, 0)', dir: 'v', colorStops: [] as any[] };
+      const gradient = {
+        bgColor: 'rgba(0, 0, 0, 0, 0)',
+        dir: 'v' as 'h' | 'v',
+        colorStops: [] as any[],
+      };
       gradient.dir =
-        result.direction.includes('bottom') || result.direction.includes('top') ? 'v' : 'h';
+        result.direction.includes('bottom') || result.direction.includes('top')
+          ? ('v' as const)
+          : ('h' as const);
       gradient.colorStops = result.stops;
       return gradient;
     }

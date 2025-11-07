@@ -142,14 +142,15 @@ const visualizerModes = [
       v-slot="{ stream }"
     >
       <AudioContextProvider v-slot="{ errors, state }">
-        <AudioMotionAnalyzer
-          :stream="stream"
-          class="bg-linear-to-b from-pink-400 from-40% via-blue-500 via-60% to-red-700"
-        >
+        <AudioMotionAnalyzer :stream="stream" gradient="yellow">
           <AudioMotionGradient
-            name="complex-gradient"
-            class="bg-linear-to-b from-purple-700 via-pink-400 via-30% via-blue-500 via-60% to-yellow-400 to-90%"
+            name="formose"
+            class="bg-linear-to-b from-purple-700 via-blue-500 to-yellow-400 to-90%"
             style="background: linear-gradient(to bottom)"
+          />
+          <AudioMotionGradient
+            name="yellow"
+            class="bg-linear-to-b from-[--color-foreground] via-purple-400 to-[--color-background] to-90%"
           />
           <canvas width="600" height="400" />
         </AudioMotionAnalyzer>
@@ -205,7 +206,11 @@ Copy and paste these files into your project.
 ```ts [src/components/ui/audio-motion-analyzer/index.ts]
 import type { VariantProps } from "class-variance-authority";
 import { cva } from "class-variance-authority";
-import { useTailwindClassParser } from "~~/registry/new-york/composables/use-tailwind-class-parser/useTailwindClassParser";
+import type { InjectionKey, Ref } from "vue";
+import {
+  useTailwindClassParser,
+  type GradientColorStop,
+} from "~~/registry/new-york/composables/use-tailwind-class-parser/useTailwindClassParser";
 
 export { default as AudioVisualizer } from "./AudioVisualizer.vue";
 export { default as AudioMotionAnalyzer } from "./AudioMotionAnalyzer.vue";
@@ -228,13 +233,31 @@ export const motionVariants = cva("", {
 
 export type AudioMotionVariants = VariantProps<typeof motionVariants>;
 
+export interface AudioMotionGradientDefinition {
+  name: string;
+  gradient: AudioMotionGradientProperties;
+}
+
+export interface AudioMotionGradientProperties {
+  bgColor: string;
+  dir?: "h" | "v" | undefined;
+  colorStops: GradientColorStop[];
+}
+
 export type { AudioMotionAnalyzerProps } from "./AudioMotionAnalyzer.vue";
 export type { AudioMotionGradientProps } from "./AudioMotionGradient.vue";
 
+export const AudioMotionGradientsKey: InjectionKey<
+  Ref<AudioMotionGradientDefinition[]>
+> = Symbol("AudioMotionGradients");
+
 export { type AudioVisualizerMode } from "./AudioVisualizer.vue";
 export { type AudioVisualizerProps } from "./AudioVisualizer.vue";
+export { type GradientOptions } from "audiomotion-analyzer";
 
-export const gradientFromClasses = (classes: string = "") => {
+export const gradientFromClasses = (
+  classes: string = "",
+): AudioMotionGradientProperties | null => {
   const { getTailwindBaseCssValues, parseGradient } = useTailwindClassParser();
 
   const el = document.createElement("div");
@@ -245,21 +268,13 @@ export const gradientFromClasses = (classes: string = "") => {
   document.body.appendChild(el);
 
   const computedClass = getTailwindBaseCssValues(el, ["background-image"]);
-  console.log(
-    "COMPUTED CLASS",
-    `background-image: ${computedClass["background-image"]}`,
-  );
   const computedGradient =
     computedClass["background-image"] &&
     computedClass["background-image"] !== "none"
-      ? parseGradient(`background: ${computedClass["background-image"]}`)
+      ? parseGradient(computedClass["background-image"])
       : null;
 
-  let gradient: {
-    bgColor: string;
-    dir?: "h" | "v" | undefined;
-    colorStops: Array<{ color: string; pos: number }>;
-  } | null = null;
+  let gradient: AudioMotionGradientProperties | null = null;
 
   if (computedGradient) {
     gradient = { bgColor: "rgba(0, 0, 0, 0, 0)", dir: "v", colorStops: [] };
@@ -275,22 +290,29 @@ export const gradientFromClasses = (classes: string = "") => {
   return gradient;
 };
 
-export const gradientFromElement = (el: HTMLElement | null) => {
+export const gradientFromElement = (
+  el: HTMLElement | null,
+): AudioMotionGradientProperties | null => {
+  if (!el) return null;
+
   const classes = el?.className || "";
   const styles = el?.getAttribute("style");
 
   if (styles) {
-    console.log("STYLES", styles);
-
     const { parseGradient } = useTailwindClassParser();
-    let result,
-      rGradientEnclosedInBrackets =
-        /.*gradient\s*\(((?:\([^\)]*\)|[^\)\(]*)*)\)/,
-      match = rGradientEnclosedInBrackets.exec(styles);
-
-    if (match && match[1]) {
-      result = parseGradient(match[1]);
-      console.warn(result);
+    const result = parseGradient(styles);
+    if (result) {
+      const gradient = {
+        bgColor: "rgba(0, 0, 0, 0, 0)",
+        dir: "v" as "h" | "v",
+        colorStops: [] as any[],
+      };
+      gradient.dir =
+        result.direction.includes("bottom") || result.direction.includes("top")
+          ? ("v" as const)
+          : ("h" as const);
+      gradient.colorStops = result.stops;
+      return gradient;
     }
   }
 
@@ -311,16 +333,27 @@ import {
   useTemplateRef,
   unref,
   onUnmounted,
+  provide,
 } from "vue";
 import { AudioContextInjectionKey } from "@/components/ui/audio-context-provider";
 import { useTypedElementSearch } from "~~/registry/new-york/composables/use-typed-element-search/useTypedElementSearch";
-import { gradientFromClasses } from ".";
+import {
+  gradientFromClasses,
+  AudioMotionGradientsKey,
+  type AudioMotionGradientDefinition,
+} from ".";
 
 export interface AudioMotionAnalyzerProps {
   class?: HTMLAttributes["class"];
   stream?: MediaStream | null;
   audio?: HTMLAudioElement | Ref<HTMLAudioElement | null> | null;
-  gradient?: "classic" | "orangered" | "prism" | "rainbow" | "steelblue";
+  gradient?:
+    | "classic"
+    | "orangered"
+    | "prism"
+    | "rainbow"
+    | "steelblue"
+    | string;
 }
 
 const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
@@ -337,8 +370,28 @@ const injectedContext = inject<Ref<AudioContext | null>>(
   ref(null),
 );
 
+const gradients = ref<AudioMotionGradientDefinition[]>([]);
+provide<Ref<AudioMotionGradientDefinition[]>>(
+  AudioMotionGradientsKey,
+  gradients,
+);
+
 let analyzer: AudioMotion | null = null;
 let source: MediaStreamAudioSourceNode | null = null;
+
+const registerGradients = () => {
+  if (analyzer) {
+    console.warn("Registering gradients:", gradients.value);
+    for (const gradientDef of gradients.value) {
+      const { name, gradient } = gradientDef;
+      const safeGradient = {
+        ...gradient,
+        dir: gradient.dir === ("h" as const) ? ("h" as const) : undefined,
+      };
+      analyzer.registerGradient(name, safeGradient);
+    }
+  }
+};
 
 const setupAudio = async () => {
   if (analyzer) {
@@ -414,20 +467,16 @@ const setupAudio = async () => {
         canvas,
         width,
         height,
-        gradient: props.gradient,
         mode: 3,
         barSpace: 0.6,
         ledBars: true,
         connectSpeakers: false,
         overlay: true,
       });
+      analyzer.showBgColor = false;
 
-      const computedGradient = gradientFromClasses(props.class);
-      if (computedGradient) {
-        analyzer.registerGradient("custom", computedGradient as any);
-        analyzer.gradient = "custom";
-        analyzer.showBgColor = false;
-      }
+      registerGradients();
+      analyzer.gradient = props.gradient;
       analyzer.connectInput(source);
     } else {
       console.error(
@@ -486,6 +535,17 @@ watch(
   { immediate: true },
 );
 
+watch(
+  () => gradients.value,
+  async () => {
+    console.log("Gradients changed:", gradients.value);
+    if (analyzer) {
+      registerGradients();
+    }
+  },
+  { immediate: true },
+);
+
 onUnmounted(() => {
   cleanUp();
 });
@@ -504,16 +564,18 @@ import {
   unref,
   useTemplateRef,
   watch,
+  inject,
   type HTMLAttributes,
+  type Ref,
+  ref,
 } from "vue";
 import { type GradientOptions } from "audiomotion-analyzer";
 import { cn } from "@/lib/utils";
-import { gradientFromClasses, gradientFromElement } from ".";
-
-export interface AudioMotionGradientDef {
-  name: string;
-  gradient: GradientOptions;
-}
+import {
+  AudioMotionGradientsKey,
+  gradientFromElement,
+  type AudioMotionGradientDefinition,
+} from ".";
 
 export interface AudioMotionGradientProps {
   name: string;
@@ -524,19 +586,55 @@ export interface AudioMotionGradientProps {
 
 const props = defineProps<AudioMotionGradientProps>();
 
+const gradients = inject<Ref<AudioMotionGradientDefinition[]>>(
+  AudioMotionGradientsKey,
+  ref([]),
+);
+
 const gradientRef = useTemplateRef("gradientRef");
 
-watch(
-  () => [props.name, props.class, props.style],
-  ([newName, newClass, newStyle]) => {
-    nextTick(() => {
-      const el = unref(gradientRef);
-      console.log("Gradient element:", el);
-      if (el && (newClass || newStyle)) {
-        const gradient = gradientFromElement(el);
-        console.log("Applying gradient:", gradient);
-        console.log("Gradient:", { name: newName, gradient });
+const deepEqual = (a: any, b: any): boolean => {
+  if (a === b) return true;
+  if (typeof a !== typeof b) return false;
+  if (typeof a !== "object" || a === null || b === null) return false;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const key of aKeys) {
+    if (!bKeys.includes(key)) return false;
+    if (!deepEqual(a[key], b[key])) return false;
+  }
+  return true;
+};
+
+const addGradient = () => {
+  const el = unref(gradientRef);
+  if (el) {
+    const gradient = gradientFromElement(el);
+    if (gradient) {
+      const existingIndex = gradients.value.findIndex(
+        (g) => g.name === props.name,
+      );
+      if (existingIndex !== -1) {
+        const newGradient = gradient;
+        const existingGradient = gradients.value[existingIndex]!.gradient;
+
+        const isSame = deepEqual(newGradient, existingGradient);
+        if (!isSame) {
+          gradients.value[existingIndex]!.gradient = newGradient;
+        }
+      } else {
+        gradients.value.push({ name: props.name, gradient });
       }
+    }
+  }
+};
+
+watch(
+  () => [props.class, props.style],
+  ([newClass, newStyle]) => {
+    nextTick(() => {
+      addGradient();
     });
   },
   { immediate: true },
@@ -1535,7 +1633,11 @@ export const useTypedElementSearch = () => {
 ```ts [src/components/ui/audio-motion-analyzer/index.ts]
 import type { VariantProps } from "class-variance-authority";
 import { cva } from "class-variance-authority";
-import { useTailwindClassParser } from "~~/registry/new-york/composables/use-tailwind-class-parser/useTailwindClassParser";
+import type { InjectionKey, Ref } from "vue";
+import {
+  useTailwindClassParser,
+  type GradientColorStop,
+} from "~~/registry/new-york/composables/use-tailwind-class-parser/useTailwindClassParser";
 
 export { default as AudioVisualizer } from "./AudioVisualizer.vue";
 export { default as AudioMotionAnalyzer } from "./AudioMotionAnalyzer.vue";
@@ -1558,13 +1660,31 @@ export const motionVariants = cva("", {
 
 export type AudioMotionVariants = VariantProps<typeof motionVariants>;
 
+export interface AudioMotionGradientDefinition {
+  name: string;
+  gradient: AudioMotionGradientProperties;
+}
+
+export interface AudioMotionGradientProperties {
+  bgColor: string;
+  dir?: "h" | "v" | undefined;
+  colorStops: GradientColorStop[];
+}
+
 export type { AudioMotionAnalyzerProps } from "./AudioMotionAnalyzer.vue";
 export type { AudioMotionGradientProps } from "./AudioMotionGradient.vue";
 
+export const AudioMotionGradientsKey: InjectionKey<
+  Ref<AudioMotionGradientDefinition[]>
+> = Symbol("AudioMotionGradients");
+
 export { type AudioVisualizerMode } from "./AudioVisualizer.vue";
 export { type AudioVisualizerProps } from "./AudioVisualizer.vue";
+export { type GradientOptions } from "audiomotion-analyzer";
 
-export const gradientFromClasses = (classes: string = "") => {
+export const gradientFromClasses = (
+  classes: string = "",
+): AudioMotionGradientProperties | null => {
   const { getTailwindBaseCssValues, parseGradient } = useTailwindClassParser();
 
   const el = document.createElement("div");
@@ -1575,21 +1695,13 @@ export const gradientFromClasses = (classes: string = "") => {
   document.body.appendChild(el);
 
   const computedClass = getTailwindBaseCssValues(el, ["background-image"]);
-  console.log(
-    "COMPUTED CLASS",
-    `background-image: ${computedClass["background-image"]}`,
-  );
   const computedGradient =
     computedClass["background-image"] &&
     computedClass["background-image"] !== "none"
-      ? parseGradient(`background: ${computedClass["background-image"]}`)
+      ? parseGradient(computedClass["background-image"])
       : null;
 
-  let gradient: {
-    bgColor: string;
-    dir?: "h" | "v" | undefined;
-    colorStops: Array<{ color: string; pos: number }>;
-  } | null = null;
+  let gradient: AudioMotionGradientProperties | null = null;
 
   if (computedGradient) {
     gradient = { bgColor: "rgba(0, 0, 0, 0, 0)", dir: "v", colorStops: [] };
@@ -1605,22 +1717,29 @@ export const gradientFromClasses = (classes: string = "") => {
   return gradient;
 };
 
-export const gradientFromElement = (el: HTMLElement | null) => {
+export const gradientFromElement = (
+  el: HTMLElement | null,
+): AudioMotionGradientProperties | null => {
+  if (!el) return null;
+
   const classes = el?.className || "";
   const styles = el?.getAttribute("style");
 
   if (styles) {
-    console.log("STYLES", styles);
-
     const { parseGradient } = useTailwindClassParser();
-    let result,
-      rGradientEnclosedInBrackets =
-        /.*gradient\s*\(((?:\([^\)]*\)|[^\)\(]*)*)\)/,
-      match = rGradientEnclosedInBrackets.exec(styles);
-
-    if (match && match[1]) {
-      result = parseGradient(match[1]);
-      console.warn(result);
+    const result = parseGradient(styles);
+    if (result) {
+      const gradient = {
+        bgColor: "rgba(0, 0, 0, 0, 0)",
+        dir: "v" as "h" | "v",
+        colorStops: [] as any[],
+      };
+      gradient.dir =
+        result.direction.includes("bottom") || result.direction.includes("top")
+          ? ("v" as const)
+          : ("h" as const);
+      gradient.colorStops = result.stops;
+      return gradient;
     }
   }
 
@@ -1641,16 +1760,27 @@ import {
   useTemplateRef,
   unref,
   onUnmounted,
+  provide,
 } from "vue";
 import { AudioContextInjectionKey } from "@/components/ui/audio-context-provider";
 import { useTypedElementSearch } from "~~/registry/new-york/composables/use-typed-element-search/useTypedElementSearch";
-import { gradientFromClasses } from ".";
+import {
+  gradientFromClasses,
+  AudioMotionGradientsKey,
+  type AudioMotionGradientDefinition,
+} from ".";
 
 export interface AudioMotionAnalyzerProps {
   class?: HTMLAttributes["class"];
   stream?: MediaStream | null;
   audio?: HTMLAudioElement | Ref<HTMLAudioElement | null> | null;
-  gradient?: "classic" | "orangered" | "prism" | "rainbow" | "steelblue";
+  gradient?:
+    | "classic"
+    | "orangered"
+    | "prism"
+    | "rainbow"
+    | "steelblue"
+    | string;
 }
 
 const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
@@ -1667,8 +1797,28 @@ const injectedContext = inject<Ref<AudioContext | null>>(
   ref(null),
 );
 
+const gradients = ref<AudioMotionGradientDefinition[]>([]);
+provide<Ref<AudioMotionGradientDefinition[]>>(
+  AudioMotionGradientsKey,
+  gradients,
+);
+
 let analyzer: AudioMotion | null = null;
 let source: MediaStreamAudioSourceNode | null = null;
+
+const registerGradients = () => {
+  if (analyzer) {
+    console.warn("Registering gradients:", gradients.value);
+    for (const gradientDef of gradients.value) {
+      const { name, gradient } = gradientDef;
+      const safeGradient = {
+        ...gradient,
+        dir: gradient.dir === ("h" as const) ? ("h" as const) : undefined,
+      };
+      analyzer.registerGradient(name, safeGradient);
+    }
+  }
+};
 
 const setupAudio = async () => {
   if (analyzer) {
@@ -1744,20 +1894,16 @@ const setupAudio = async () => {
         canvas,
         width,
         height,
-        gradient: props.gradient,
         mode: 3,
         barSpace: 0.6,
         ledBars: true,
         connectSpeakers: false,
         overlay: true,
       });
+      analyzer.showBgColor = false;
 
-      const computedGradient = gradientFromClasses(props.class);
-      if (computedGradient) {
-        analyzer.registerGradient("custom", computedGradient as any);
-        analyzer.gradient = "custom";
-        analyzer.showBgColor = false;
-      }
+      registerGradients();
+      analyzer.gradient = props.gradient;
       analyzer.connectInput(source);
     } else {
       console.error(
@@ -1816,6 +1962,17 @@ watch(
   { immediate: true },
 );
 
+watch(
+  () => gradients.value,
+  async () => {
+    console.log("Gradients changed:", gradients.value);
+    if (analyzer) {
+      registerGradients();
+    }
+  },
+  { immediate: true },
+);
+
 onUnmounted(() => {
   cleanUp();
 });
@@ -1834,16 +1991,18 @@ import {
   unref,
   useTemplateRef,
   watch,
+  inject,
   type HTMLAttributes,
+  type Ref,
+  ref,
 } from "vue";
 import { type GradientOptions } from "audiomotion-analyzer";
 import { cn } from "@/lib/utils";
-import { gradientFromClasses, gradientFromElement } from ".";
-
-export interface AudioMotionGradientDef {
-  name: string;
-  gradient: GradientOptions;
-}
+import {
+  AudioMotionGradientsKey,
+  gradientFromElement,
+  type AudioMotionGradientDefinition,
+} from ".";
 
 export interface AudioMotionGradientProps {
   name: string;
@@ -1854,19 +2013,55 @@ export interface AudioMotionGradientProps {
 
 const props = defineProps<AudioMotionGradientProps>();
 
+const gradients = inject<Ref<AudioMotionGradientDefinition[]>>(
+  AudioMotionGradientsKey,
+  ref([]),
+);
+
 const gradientRef = useTemplateRef("gradientRef");
 
-watch(
-  () => [props.name, props.class, props.style],
-  ([newName, newClass, newStyle]) => {
-    nextTick(() => {
-      const el = unref(gradientRef);
-      console.log("Gradient element:", el);
-      if (el && (newClass || newStyle)) {
-        const gradient = gradientFromElement(el);
-        console.log("Applying gradient:", gradient);
-        console.log("Gradient:", { name: newName, gradient });
+const deepEqual = (a: any, b: any): boolean => {
+  if (a === b) return true;
+  if (typeof a !== typeof b) return false;
+  if (typeof a !== "object" || a === null || b === null) return false;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const key of aKeys) {
+    if (!bKeys.includes(key)) return false;
+    if (!deepEqual(a[key], b[key])) return false;
+  }
+  return true;
+};
+
+const addGradient = () => {
+  const el = unref(gradientRef);
+  if (el) {
+    const gradient = gradientFromElement(el);
+    if (gradient) {
+      const existingIndex = gradients.value.findIndex(
+        (g) => g.name === props.name,
+      );
+      if (existingIndex !== -1) {
+        const newGradient = gradient;
+        const existingGradient = gradients.value[existingIndex]!.gradient;
+
+        const isSame = deepEqual(newGradient, existingGradient);
+        if (!isSame) {
+          gradients.value[existingIndex]!.gradient = newGradient;
+        }
+      } else {
+        gradients.value.push({ name: props.name, gradient });
       }
+    }
+  }
+};
+
+watch(
+  () => [props.class, props.style],
+  ([newClass, newStyle]) => {
+    nextTick(() => {
+      addGradient();
     });
   },
   { immediate: true },
@@ -2700,6 +2895,16 @@ export function drawWaveforms({
 ```
 
 ```ts [src/composables/use-tailwind-class-parser/useTailwindClassParser.ts]
+export interface GradientColorStop {
+  color: string;
+  pos: number;
+}
+
+export interface GradientParseResult {
+  stops: GradientColorStop[];
+  direction: string;
+}
+
 const combineRegExp = (regexpList: (RegExp[] | string)[], flags: string) => {
   let i,
     source = "";
@@ -2721,6 +2926,7 @@ const buildGradientRegExp = () => {
     /to\s+((?:left|right|top|bottom)(?:\s+(?:left|right|top|bottom))?)/;
   const rComma = /\s*,\s*/;
   const rColorHex = /\#(?:[a-f0-9]{6}|[a-f0-9]{3})/;
+  const rColorOklch = /oklch\(\s*(?:[+-]?\d*\.?\d+\s*){3}\)/;
   const rDigits3 = /\(\s*(?:\d{1,3}\s*,\s*){2}\d{1,3}\s*\)/;
   const rDigits4 = /\(\s*(?:\d{1,3}\s*,\s*){2}\d{1,3}\s*,\s*\d*\.?\d+\)/;
   const rValue = /(?:[+-]?\d*\.?\d+)(?:%|[a-z]+)?/;
@@ -2735,6 +2941,8 @@ const buildGradientRegExp = () => {
       "|",
       "(?:rgba|hsla)",
       rDigits4.source,
+      "|",
+      rColorOklch.source,
       "|",
       rKeyword.source,
       ")",
@@ -2812,27 +3020,26 @@ export const useTailwindClassParser = () => {
     return result;
   };
 
-  type GradientColorStop = {
-    color: string;
-    pos: number;
-  };
+  const parseGradient = function (
+    input: string,
+  ): GradientParseResult | undefined {
+    const rGradientEnclosedInBrackets =
+      /.*gradient\s*\(((?:\([^\)]*\)|[^\)\(]*)*)\)/;
+    const matchGradientType = rGradientEnclosedInBrackets.exec(input);
 
-  type GradientParseResult =
-    | {
-        stops: GradientColorStop[];
-        direction: string;
-      }
-    | undefined;
+    let strToParse = input;
+    if (matchGradientType && matchGradientType[1]) {
+      strToParse = matchGradientType[1];
+    }
 
-  const parseGradient = function (input: string): GradientParseResult {
-    let result: GradientParseResult,
-      matchGradient: RegExpExecArray | null,
-      matchColorStop: RegExpExecArray | null,
-      stopResult: GradientColorStop;
+    let result: GradientParseResult | undefined;
+    let matchGradient: RegExpExecArray | null;
+    let matchColorStop: RegExpExecArray | null;
+    let stopResult: GradientColorStop;
 
     RegExpLib.gradientSearch.lastIndex = 0;
 
-    matchGradient = RegExpLib.gradientSearch.exec(input);
+    matchGradient = RegExpLib.gradientSearch.exec(strToParse);
     if (matchGradient !== null) {
       result = {
         stops: [],
@@ -2879,95 +3086,8 @@ export const useTailwindClassParser = () => {
     return result;
   };
 
-  const parseLinearGradient = (gradientStr: string) => {
-    const result = {
-      direction: "",
-      orientation: "unknown",
-      stops: [] as Array<{ color: string; pos: number }>,
-    };
-
-    const gradientContent = gradientStr
-      .replace(/^linear-gradient\(|\)$/gi, "")
-      .replace(/^gradient\(|\)$/gi, "")
-      .replace(/^in\s+(\w+)\s*,\s*(.*)$/gi, "");
-
-    let direction = "";
-    let stopsPart = "";
-
-    const firstComma = gradientContent.indexOf(",");
-    if (firstComma !== -1) {
-      const firstPart = gradientContent.slice(0, firstComma).trim();
-      if (
-        /^(to\s+(right|left|top|bottom)(\s+(right|left|top|bottom))?|[0-9.]+deg)$/.test(
-          firstPart,
-        )
-      ) {
-        direction = firstPart;
-        stopsPart = gradientContent.slice(firstComma + 1);
-      } else {
-        direction = "to bottom";
-        stopsPart = gradientContent;
-      }
-    } else {
-      direction = gradientContent.trim();
-    }
-    result.direction = direction;
-
-    if (/to\s+right\b/.test(direction) && /to\s+bottom\b/.test(direction)) {
-      result.orientation = "diagonal";
-    } else if (/to\s+right\b/.test(direction)) {
-      result.orientation = "horizontal";
-    } else if (/to\s+left\b/.test(direction)) {
-      result.orientation = "horizontal";
-    } else if (/to\s+bottom\b/.test(direction)) {
-      result.orientation = "vertical";
-    } else if (/to\s+top\b/.test(direction)) {
-      result.orientation = "vertical";
-    } else if (/deg$/.test(direction)) {
-      result.orientation = "angle";
-    }
-
-    const stops = [];
-    let buffer = "";
-    let parenLevel = 0;
-    for (let i = 0; i < stopsPart.length; i++) {
-      const char = stopsPart[i];
-      if (char === "(") parenLevel++;
-      if (char === ")") parenLevel--;
-      if (char === "," && parenLevel === 0) {
-        if (buffer.trim()) stops.push(buffer.trim());
-        buffer = "";
-      } else {
-        buffer += char;
-      }
-    }
-    if (buffer.trim()) stops.push(buffer.trim());
-
-    for (const stop of stops) {
-      const stopMatch = stop.match(
-        /((?:#(?:[0-9a-fA-F]{3,8})|oklch\([^)]*\)|rgba?\([^)]*\)|hsla?\([^)]*\)|[a-zA-Z]+))\s*(\d+%|0|1)?$/,
-      );
-      if (stopMatch && stopMatch[1]) {
-        let value = 0;
-        const pos = stopMatch[2] ?? "";
-        if (pos.endsWith("%")) {
-          value = parseFloat(pos) / 100;
-        } else if (pos === "1") {
-          value = 1;
-        } else if (pos === "0") {
-          value = 0;
-        }
-
-        result.stops.push({ color: stopMatch[1].trim(), pos: value });
-      }
-    }
-
-    return result;
-  };
-
   return {
     getTailwindBaseCssValues,
-    parseLinearGradient,
     parseGradient,
   };
 };
@@ -2986,12 +3106,17 @@ export const useTailwindClassParser = () => {
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 | `stream`{.primary .text-primary} | `MediaStream \| null` | — |  |
 | `audio`{.primary .text-primary} | `HTMLAudioElement \| Ref<HTMLAudioElement \| null> \| null` | — |  |
-| `gradient`{.primary .text-primary} | `'classic' \| 'orangered' \| 'prism' \| 'rainbow' \| 'steelblue'` | classic |  |
+| `gradient`{.primary .text-primary} | `'classic' \| 'orangered' \| 'prism' \| 'rainbow' \| 'steelblue' \| string` | classic |  |
 
   ### Slots
 | Name | Description |
 |------|-------------|
 | `default`{.primary .text-primary} | — |
+
+  ### Provide
+| Key | Value | Type | Description |
+|-----|-------|------|-------------|
+| `AudioMotionGradientsKey`{.primary .text-primary} | `gradients` | `Ref<AudioMotionGradientDefinition[]>` | — |
 
   ### Inject
 | Key | Default | Type | Description |
@@ -3013,6 +3138,11 @@ export const useTailwindClassParser = () => {
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 | `style`{.primary .text-primary} | `HTMLAttributes['style']` | - |  |
 | `gradient`{.primary .text-primary} | `GradientOptions` | - |  |
+
+  ### Inject
+| Key | Default | Type | Description |
+|-----|--------|------|-------------|
+| `AudioMotionGradientsKey`{.primary .text-primary} | `ref([])` | `any` | — |
 
 ---
 

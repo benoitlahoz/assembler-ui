@@ -24,7 +24,7 @@ export interface AudioMotionAnalyzerProps {
   class?: HTMLAttributes['class'];
   stream?: MediaStream | null;
   audio?: HTMLAudioElement | Ref<HTMLAudioElement | null> | null;
-  gradient?: 'classic' | 'orangered' | 'prism' | 'rainbow' | 'steelblue';
+  gradient?: 'classic' | 'orangered' | 'prism' | 'rainbow' | 'steelblue' | string;
 }
 
 const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
@@ -43,6 +43,21 @@ provide<Ref<AudioMotionGradientDefinition[]>>(AudioMotionGradientsKey, gradients
 
 let analyzer: AudioMotion | null = null;
 let source: MediaStreamAudioSourceNode | null = null;
+
+const registerGradients = () => {
+  if (analyzer) {
+    console.warn('Registering gradients:', gradients.value);
+    for (const gradientDef of gradients.value) {
+      // Ensure dir is only "h" or undefined to match GradientOptions type
+      const { name, gradient } = gradientDef;
+      const safeGradient = {
+        ...gradient,
+        dir: gradient.dir === ('h' as const) ? ('h' as const) : undefined,
+      };
+      analyzer.registerGradient(name, safeGradient);
+    }
+  }
+};
 
 const setupAudio = async () => {
   if (analyzer) {
@@ -117,20 +132,16 @@ const setupAudio = async () => {
         canvas,
         width,
         height,
-        gradient: props.gradient,
         mode: 3,
         barSpace: 0.6,
         ledBars: true,
         connectSpeakers: false,
         overlay: true,
       });
+      analyzer.showBgColor = false;
 
-      const computedGradient = gradientFromClasses(props.class);
-      if (computedGradient) {
-        analyzer.registerGradient('custom', computedGradient as any);
-        analyzer.gradient = 'custom';
-        analyzer.showBgColor = false;
-      }
+      registerGradients();
+      analyzer.gradient = props.gradient;
       analyzer.connectInput(source);
     } else {
       console.error(
@@ -184,6 +195,17 @@ watch(
       console.log('gradients', gradients);
       await setupAudio();
     });
+  },
+  { immediate: true }
+);
+
+watch(
+  () => gradients.value,
+  async () => {
+    console.log('Gradients changed:', gradients.value);
+    if (analyzer) {
+      registerGradients();
+    }
   },
   { immediate: true }
 );

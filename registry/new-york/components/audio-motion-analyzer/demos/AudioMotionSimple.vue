@@ -121,13 +121,11 @@ const visualizerModes = [
     >
       <AudioContextProvider v-slot="{ errors, state }">
         <!-- If you prefer to provide a container and let AudioMotionAnalyzer create the canvas <div class="w-full h-[400px] min-h-[400px]"> -->
-        <AudioMotionAnalyzer
-          :stream="stream"
-          class="bg-linear-to-b from-pink-400 from-40% via-blue-500 via-60% to-red-700"
-        >
+        <AudioMotionAnalyzer :stream="stream" gradient="yellow">
+          <!-- If styles are defined inline, they will take precedence over the classes -->
           <AudioMotionGradient
-            name="complex-gradient"
-            class="bg-linear-to-b from-purple-700 via-pink-400 via-30% via-blue-500 via-60% to-yellow-400 to-90%"
+            name="formose"
+            class="bg-linear-to-b from-purple-700 via-blue-500 to-yellow-400 to-90%"
             style="
               background: linear-gradient(
                 to bottom,
@@ -137,6 +135,10 @@ const visualizerModes = [
                 #fde047 90%
               );
             "
+          />
+          <AudioMotionGradient
+            name="yellow"
+            class="bg-linear-to-b from-[--color-foreground] via-purple-400 to-[--color-background] to-90%"
           />
           <canvas width="600" height="400" />
         </AudioMotionAnalyzer>

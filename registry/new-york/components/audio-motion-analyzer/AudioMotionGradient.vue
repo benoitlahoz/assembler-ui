@@ -1,13 +1,21 @@
 <script setup lang="ts">
-import { nextTick, unref, useTemplateRef, watch, inject, type HTMLAttributes } from 'vue';
+import {
+  nextTick,
+  unref,
+  useTemplateRef,
+  watch,
+  inject,
+  type HTMLAttributes,
+  type Ref,
+  ref,
+} from 'vue';
 import { type GradientOptions } from 'audiomotion-analyzer';
 import { cn } from '@/lib/utils';
-import { AudioMotionGradientsKey, gradientFromElement } from '.';
-
-export interface AudioMotionGradientDef {
-  name: string;
-  gradient: GradientOptions;
-}
+import {
+  AudioMotionGradientsKey,
+  gradientFromElement,
+  type AudioMotionGradientDefinition,
+} from '.';
 
 export interface AudioMotionGradientProps {
   name: string;
@@ -18,21 +26,50 @@ export interface AudioMotionGradientProps {
 
 const props = defineProps<AudioMotionGradientProps>();
 
-const gradients = inject<AudioMotionGradientDef[]>(AudioMotionGradientsKey, []);
+const gradients = inject<Ref<AudioMotionGradientDefinition[]>>(AudioMotionGradientsKey, ref([]));
 
 const gradientRef = useTemplateRef('gradientRef');
 
-watch(
-  () => [props.name, props.class, props.style],
-  ([newName, newClass, newStyle]) => {
-    nextTick(() => {
-      const el = unref(gradientRef);
-      console.log('Gradient element:', el);
-      if (el && (newClass || newStyle)) {
-        const gradient = gradientFromElement(el);
-        console.log('Applying gradient:', gradient);
-        console.log('Gradient:', { name: newName, gradient });
+const deepEqual = (a: any, b: any): boolean => {
+  if (a === b) return true;
+  if (typeof a !== typeof b) return false;
+  if (typeof a !== 'object' || a === null || b === null) return false;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const key of aKeys) {
+    if (!bKeys.includes(key)) return false;
+    if (!deepEqual(a[key], b[key])) return false;
+  }
+  return true;
+};
+
+const addGradient = () => {
+  const el = unref(gradientRef);
+  if (el) {
+    const gradient = gradientFromElement(el);
+    if (gradient) {
+      const existingIndex = gradients.value.findIndex((g) => g.name === props.name);
+      if (existingIndex !== -1) {
+        const newGradient = gradient;
+        const existingGradient = gradients.value[existingIndex]!.gradient;
+
+        const isSame = deepEqual(newGradient, existingGradient);
+        if (!isSame) {
+          gradients.value[existingIndex]!.gradient = newGradient;
+        }
+      } else {
+        gradients.value.push({ name: props.name, gradient });
       }
+    }
+  }
+};
+
+watch(
+  () => [props.class, props.style],
+  ([newClass, newStyle]) => {
+    nextTick(() => {
+      addGradient();
     });
   },
   { immediate: true }

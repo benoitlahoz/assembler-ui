@@ -36,6 +36,16 @@ Copy and paste these files into your project.
 :::code-tree{default-value="src/composables/use-tailwind-class-parser/useTailwindClassParser.ts"}
 
 ```ts [src/composables/use-tailwind-class-parser/useTailwindClassParser.ts]
+export interface GradientColorStop {
+  color: string;
+  pos: number;
+}
+
+export interface GradientParseResult {
+  stops: GradientColorStop[];
+  direction: string;
+}
+
 const combineRegExp = (regexpList: (RegExp[] | string)[], flags: string) => {
   let i,
     source = "";
@@ -57,6 +67,7 @@ const buildGradientRegExp = () => {
     /to\s+((?:left|right|top|bottom)(?:\s+(?:left|right|top|bottom))?)/;
   const rComma = /\s*,\s*/;
   const rColorHex = /\#(?:[a-f0-9]{6}|[a-f0-9]{3})/;
+  const rColorOklch = /oklch\(\s*(?:[+-]?\d*\.?\d+\s*){3}\)/;
   const rDigits3 = /\(\s*(?:\d{1,3}\s*,\s*){2}\d{1,3}\s*\)/;
   const rDigits4 = /\(\s*(?:\d{1,3}\s*,\s*){2}\d{1,3}\s*,\s*\d*\.?\d+\)/;
   const rValue = /(?:[+-]?\d*\.?\d+)(?:%|[a-z]+)?/;
@@ -71,6 +82,8 @@ const buildGradientRegExp = () => {
       "|",
       "(?:rgba|hsla)",
       rDigits4.source,
+      "|",
+      rColorOklch.source,
       "|",
       rKeyword.source,
       ")",
@@ -148,27 +161,26 @@ export const useTailwindClassParser = () => {
     return result;
   };
 
-  type GradientColorStop = {
-    color: string;
-    pos: number;
-  };
+  const parseGradient = function (
+    input: string,
+  ): GradientParseResult | undefined {
+    const rGradientEnclosedInBrackets =
+      /.*gradient\s*\(((?:\([^\)]*\)|[^\)\(]*)*)\)/;
+    const matchGradientType = rGradientEnclosedInBrackets.exec(input);
 
-  type GradientParseResult =
-    | {
-        stops: GradientColorStop[];
-        direction: string;
-      }
-    | undefined;
+    let strToParse = input;
+    if (matchGradientType && matchGradientType[1]) {
+      strToParse = matchGradientType[1];
+    }
 
-  const parseGradient = function (input: string): GradientParseResult {
-    let result: GradientParseResult,
-      matchGradient: RegExpExecArray | null,
-      matchColorStop: RegExpExecArray | null,
-      stopResult: GradientColorStop;
+    let result: GradientParseResult | undefined;
+    let matchGradient: RegExpExecArray | null;
+    let matchColorStop: RegExpExecArray | null;
+    let stopResult: GradientColorStop;
 
     RegExpLib.gradientSearch.lastIndex = 0;
 
-    matchGradient = RegExpLib.gradientSearch.exec(input);
+    matchGradient = RegExpLib.gradientSearch.exec(strToParse);
     if (matchGradient !== null) {
       result = {
         stops: [],
@@ -215,95 +227,8 @@ export const useTailwindClassParser = () => {
     return result;
   };
 
-  const parseLinearGradient = (gradientStr: string) => {
-    const result = {
-      direction: "",
-      orientation: "unknown",
-      stops: [] as Array<{ color: string; pos: number }>,
-    };
-
-    const gradientContent = gradientStr
-      .replace(/^linear-gradient\(|\)$/gi, "")
-      .replace(/^gradient\(|\)$/gi, "")
-      .replace(/^in\s+(\w+)\s*,\s*(.*)$/gi, "");
-
-    let direction = "";
-    let stopsPart = "";
-
-    const firstComma = gradientContent.indexOf(",");
-    if (firstComma !== -1) {
-      const firstPart = gradientContent.slice(0, firstComma).trim();
-      if (
-        /^(to\s+(right|left|top|bottom)(\s+(right|left|top|bottom))?|[0-9.]+deg)$/.test(
-          firstPart,
-        )
-      ) {
-        direction = firstPart;
-        stopsPart = gradientContent.slice(firstComma + 1);
-      } else {
-        direction = "to bottom";
-        stopsPart = gradientContent;
-      }
-    } else {
-      direction = gradientContent.trim();
-    }
-    result.direction = direction;
-
-    if (/to\s+right\b/.test(direction) && /to\s+bottom\b/.test(direction)) {
-      result.orientation = "diagonal";
-    } else if (/to\s+right\b/.test(direction)) {
-      result.orientation = "horizontal";
-    } else if (/to\s+left\b/.test(direction)) {
-      result.orientation = "horizontal";
-    } else if (/to\s+bottom\b/.test(direction)) {
-      result.orientation = "vertical";
-    } else if (/to\s+top\b/.test(direction)) {
-      result.orientation = "vertical";
-    } else if (/deg$/.test(direction)) {
-      result.orientation = "angle";
-    }
-
-    const stops = [];
-    let buffer = "";
-    let parenLevel = 0;
-    for (let i = 0; i < stopsPart.length; i++) {
-      const char = stopsPart[i];
-      if (char === "(") parenLevel++;
-      if (char === ")") parenLevel--;
-      if (char === "," && parenLevel === 0) {
-        if (buffer.trim()) stops.push(buffer.trim());
-        buffer = "";
-      } else {
-        buffer += char;
-      }
-    }
-    if (buffer.trim()) stops.push(buffer.trim());
-
-    for (const stop of stops) {
-      const stopMatch = stop.match(
-        /((?:#(?:[0-9a-fA-F]{3,8})|oklch\([^)]*\)|rgba?\([^)]*\)|hsla?\([^)]*\)|[a-zA-Z]+))\s*(\d+%|0|1)?$/,
-      );
-      if (stopMatch && stopMatch[1]) {
-        let value = 0;
-        const pos = stopMatch[2] ?? "";
-        if (pos.endsWith("%")) {
-          value = parseFloat(pos) / 100;
-        } else if (pos === "1") {
-          value = 1;
-        } else if (pos === "0") {
-          value = 0;
-        }
-
-        result.stops.push({ color: stopMatch[1].trim(), pos: value });
-      }
-    }
-
-    return result;
-  };
-
   return {
     getTailwindBaseCssValues,
-    parseLinearGradient,
     parseGradient,
   };
 };
@@ -321,14 +246,13 @@ Can be undefined if match not found.
 | Property | Type | Description |
 |----------|------|-------------|
 | `getTailwindBaseCssValues`{.primary .text-primary} | `any` | — |
-| `parseLinearGradient`{.primary .text-primary} | `any` | — |
 | `parseGradient`{.primary .text-primary} | `any` | — |
 
   ### Types
 | Name | Type | Description |
 |------|------|-------------|
-| `GradientColorStop`{.primary .text-primary} | `type` | — |
-| `GradientParseResult`{.primary .text-primary} | `type` | — |
+| `GradientColorStop`{.primary .text-primary} | `interface` | — |
+| `GradientParseResult`{.primary .text-primary} | `interface` | — |
 
 ---
 
