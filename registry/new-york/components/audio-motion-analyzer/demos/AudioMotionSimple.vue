@@ -142,13 +142,11 @@ const poppyGradient: AudioMotionGradientDefinition = {
         <!-- If you prefer to provide a container and let AudioMotionAnalyzer create the canvas <div class="w-full h-[400px] min-h-[400px]"> -->
         <AudioMotionAnalyzer
           :stream="stream"
-          :mode="AudioMotionMode.Graph"
           connect-speakers
           gradient="sunset"
           show-peaks
           overlay
-          radial
-          radial-invert
+          true-leds
           :mirror="AudioMotionMirror.None"
         >
           <!-- If styles are defined inline, they will take precedence over the classes -->

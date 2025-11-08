@@ -14,10 +14,6 @@ import {
   type GradientColorStop,
 } from '~~/registry/new-york/composables/use-tailwind-class-parser/useTailwindClassParser';
 
-export { default as AudioVisualizer } from './AudioVisualizer.vue';
-export { default as AudioMotionAnalyzer } from './AudioMotionAnalyzer.vue';
-export { default as AudioMotionGradient } from './AudioMotionGradient.vue';
-
 export const gradientFromClasses = (classes: string = ''): AudioMotionGradientProperties | null => {
   const { getTailwindBaseCssValues, parseGradient } = useTailwindClassParser();
 
@@ -145,6 +141,19 @@ export interface AudioMotionGradientProperties {
   dir?: 'h' | 'v' | undefined;
   colorStops: GradientColorStop[];
 }
+
+export enum AudioMotionWeightingFilter {
+  None = '',
+  A = 'A',
+  B = 'B',
+  C = 'C',
+  D = 'D',
+  ItuR468 = '468',
+}
+
+export { default as AudioVisualizer } from './AudioVisualizer.vue';
+export { default as AudioMotionAnalyzer } from './AudioMotionAnalyzer.vue';
+export { default as AudioMotionGradient } from './AudioMotionGradient.vue';
 
 export type { AudioMotionAnalyzerProps } from './AudioMotionAnalyzer.vue';
 export type { AudioMotionGradientProps } from './AudioMotionGradient.vue';

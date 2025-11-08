@@ -163,13 +163,11 @@ const poppyGradient: AudioMotionGradientDefinition = {
       <AudioContextProvider v-slot="{ errors, state }">
         <AudioMotionAnalyzer
           :stream="stream"
-          :mode="AudioMotionMode.Graph"
           connect-speakers
           gradient="sunset"
           show-peaks
           overlay
-          radial
-          radial-invert
+          true-leds
           :mirror="AudioMotionMirror.None"
         >
           <AudioMotionGradient
@@ -258,10 +256,6 @@ import {
   useTailwindClassParser,
   type GradientColorStop,
 } from "~~/registry/new-york/composables/use-tailwind-class-parser/useTailwindClassParser";
-
-export { default as AudioVisualizer } from "./AudioVisualizer.vue";
-export { default as AudioMotionAnalyzer } from "./AudioMotionAnalyzer.vue";
-export { default as AudioMotionGradient } from "./AudioMotionGradient.vue";
 
 export const gradientFromClasses = (
   classes: string = "",
@@ -395,6 +389,19 @@ export interface AudioMotionGradientProperties {
   colorStops: GradientColorStop[];
 }
 
+export enum AudioMotionWeightingFilter {
+  None = "",
+  A = "A",
+  B = "B",
+  C = "C",
+  D = "D",
+  ItuR468 = "468",
+}
+
+export { default as AudioVisualizer } from "./AudioVisualizer.vue";
+export { default as AudioMotionAnalyzer } from "./AudioMotionAnalyzer.vue";
+export { default as AudioMotionGradient } from "./AudioMotionGradient.vue";
+
 export type { AudioMotionAnalyzerProps } from "./AudioMotionAnalyzer.vue";
 export type { AudioMotionGradientProps } from "./AudioMotionGradient.vue";
 
@@ -428,6 +435,7 @@ import {
   AudioMotionMode,
   AudioMotionMirror,
   AudioMotionGradientsKey,
+  AudioMotionWeightingFilter,
   type AudioMotionGradientDefinition,
   type AudioMotionGradientProperties,
   type AudioMotionFftSize,
@@ -446,6 +454,7 @@ export interface AudioMotionAnalyzerProps {
   class?: HTMLAttributes["class"];
   colorMode?: "gradient" | "bar-index" | "bar-level";
   connectSpeakers?: boolean;
+  disableReflexFit?: boolean;
   fadePeaks?: boolean;
   fftSize?: AudioMotionFftSize;
   fillAlpha?: number;
@@ -493,11 +502,22 @@ export interface AudioMotionAnalyzerProps {
   radial?: boolean;
   radialInvert?: boolean;
   radius?: number;
+  reflexAlpha?: number;
+  reflexBright?: number;
+  reflexRatio?: number;
+  roundBars?: boolean;
+  showBgColor?: boolean;
+  showFPS?: boolean;
   showPeaks?: boolean;
   showScaleX?: boolean;
   showScaleY?: boolean;
+  smoothing?: number;
+  spinSpeed?: number;
+  splitGradient?: boolean;
   stream?: MediaStream | null;
   trueLeds?: boolean;
+  volume?: number;
+  weightingFilter?: string;
 }
 
 const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
@@ -506,6 +526,7 @@ const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
   channelLayout: "dual-combined",
   colorMode: "gradient",
   connectSpeakers: false,
+  disableReflexFit: false,
   fadePeaks: false,
   fftSize: 8192,
   fillAlpha: 1,
@@ -533,11 +554,22 @@ const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
   radial: false,
   radialInvert: false,
   radius: 0.3,
+  reflexAlpha: 0.15,
+  reflexBright: 1,
+  reflexRatio: 0,
+  roundBars: false,
+  showBgColor: false,
+  showFPS: false,
   showPeaks: false,
   showScaleX: false,
   showScaleY: false,
+  smoothing: 0.5,
+  spinSpeed: 0,
+  splitGradient: false,
   stream: undefined,
   trueLeds: false,
+  volume: 1,
+  weightingFilter: "",
 });
 
 const { getTypedElementAmongSiblings, getContainer } = useTypedElementSearch();
@@ -658,10 +690,22 @@ const setupAnalyzer = async () => {
       radial: props.radial,
       radialInvert: props.radialInvert,
       radius: props.radius,
+      reflexAlpha: Math.max(0, Math.min(props.reflexAlpha ?? 0, 1)),
+      reflexBright: Math.max(0, props.reflexBright ?? 1),
+      reflexFit: !props.disableReflexFit,
+      reflexRatio: Math.max(0, Math.min(props.reflexRatio ?? 0, 1)),
+      roundBars: props.roundBars,
+      showBgColor: props.showBgColor,
+      showFPS: props.showFPS,
       showPeaks: props.showPeaks,
       showScaleX: props.showScaleX,
       showScaleY: props.showScaleY,
-      trueLeds: props.trueLeds,
+      smoothing: Math.max(0, Math.min(props.smoothing ?? 0, 1)),
+      spinSpeed: props.spinSpeed || 0,
+      splitGradient: props.splitGradient || false,
+      trueLeds: props.trueLeds || false,
+      volume: Math.max(0, props.volume || 1),
+      weightingFilter: props.weightingFilter as AudioMotionWeightingFilter,
       width,
       ...(canvas ? { canvas } : {}),
     };
@@ -790,10 +834,23 @@ watchEffect(
       analyzer.radial = props.radial || false;
       analyzer.radialInvert = props.radialInvert || false;
       analyzer.radius = props.radius || 0.3;
+      analyzer.reflexAlpha = Math.max(0, Math.min(props.reflexAlpha ?? 0, 1));
+      analyzer.reflexBright = Math.max(0, props.reflexBright ?? 1);
+      analyzer.reflexFit = !props.disableReflexFit;
+      analyzer.reflexRatio = Math.max(0, Math.min(props.reflexRatio ?? 0, 1));
+      analyzer.roundBars = !!props.roundBars;
+      analyzer.showBgColor = !!props.showBgColor;
+      analyzer.showFPS = !!props.showFPS;
       analyzer.showPeaks = !!props.showPeaks;
       analyzer.showScaleX = !!props.showScaleX;
       analyzer.showScaleY = !!props.showScaleY;
+      analyzer.smoothing = Math.max(0, Math.min(props.smoothing ?? 0.5, 1));
+      analyzer.spinSpeed = props.spinSpeed || 0;
+      analyzer.splitGradient = !!props.splitGradient;
       analyzer.trueLeds = !!props.trueLeds;
+      analyzer.volume = Math.max(0, props.volume || 1);
+      analyzer.weightingFilter = (props.weightingFilter ||
+        "") as AudioMotionWeightingFilter;
     }
   },
   { flush: "post" },
@@ -1921,10 +1978,6 @@ import {
   type GradientColorStop,
 } from "~~/registry/new-york/composables/use-tailwind-class-parser/useTailwindClassParser";
 
-export { default as AudioVisualizer } from "./AudioVisualizer.vue";
-export { default as AudioMotionAnalyzer } from "./AudioMotionAnalyzer.vue";
-export { default as AudioMotionGradient } from "./AudioMotionGradient.vue";
-
 export const gradientFromClasses = (
   classes: string = "",
 ): AudioMotionGradientProperties | null => {
@@ -2057,6 +2110,19 @@ export interface AudioMotionGradientProperties {
   colorStops: GradientColorStop[];
 }
 
+export enum AudioMotionWeightingFilter {
+  None = "",
+  A = "A",
+  B = "B",
+  C = "C",
+  D = "D",
+  ItuR468 = "468",
+}
+
+export { default as AudioVisualizer } from "./AudioVisualizer.vue";
+export { default as AudioMotionAnalyzer } from "./AudioMotionAnalyzer.vue";
+export { default as AudioMotionGradient } from "./AudioMotionGradient.vue";
+
 export type { AudioMotionAnalyzerProps } from "./AudioMotionAnalyzer.vue";
 export type { AudioMotionGradientProps } from "./AudioMotionGradient.vue";
 
@@ -2090,6 +2156,7 @@ import {
   AudioMotionMode,
   AudioMotionMirror,
   AudioMotionGradientsKey,
+  AudioMotionWeightingFilter,
   type AudioMotionGradientDefinition,
   type AudioMotionGradientProperties,
   type AudioMotionFftSize,
@@ -2108,6 +2175,7 @@ export interface AudioMotionAnalyzerProps {
   class?: HTMLAttributes["class"];
   colorMode?: "gradient" | "bar-index" | "bar-level";
   connectSpeakers?: boolean;
+  disableReflexFit?: boolean;
   fadePeaks?: boolean;
   fftSize?: AudioMotionFftSize;
   fillAlpha?: number;
@@ -2155,11 +2223,22 @@ export interface AudioMotionAnalyzerProps {
   radial?: boolean;
   radialInvert?: boolean;
   radius?: number;
+  reflexAlpha?: number;
+  reflexBright?: number;
+  reflexRatio?: number;
+  roundBars?: boolean;
+  showBgColor?: boolean;
+  showFPS?: boolean;
   showPeaks?: boolean;
   showScaleX?: boolean;
   showScaleY?: boolean;
+  smoothing?: number;
+  spinSpeed?: number;
+  splitGradient?: boolean;
   stream?: MediaStream | null;
   trueLeds?: boolean;
+  volume?: number;
+  weightingFilter?: string;
 }
 
 const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
@@ -2168,6 +2247,7 @@ const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
   channelLayout: "dual-combined",
   colorMode: "gradient",
   connectSpeakers: false,
+  disableReflexFit: false,
   fadePeaks: false,
   fftSize: 8192,
   fillAlpha: 1,
@@ -2195,11 +2275,22 @@ const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
   radial: false,
   radialInvert: false,
   radius: 0.3,
+  reflexAlpha: 0.15,
+  reflexBright: 1,
+  reflexRatio: 0,
+  roundBars: false,
+  showBgColor: false,
+  showFPS: false,
   showPeaks: false,
   showScaleX: false,
   showScaleY: false,
+  smoothing: 0.5,
+  spinSpeed: 0,
+  splitGradient: false,
   stream: undefined,
   trueLeds: false,
+  volume: 1,
+  weightingFilter: "",
 });
 
 const { getTypedElementAmongSiblings, getContainer } = useTypedElementSearch();
@@ -2320,10 +2411,22 @@ const setupAnalyzer = async () => {
       radial: props.radial,
       radialInvert: props.radialInvert,
       radius: props.radius,
+      reflexAlpha: Math.max(0, Math.min(props.reflexAlpha ?? 0, 1)),
+      reflexBright: Math.max(0, props.reflexBright ?? 1),
+      reflexFit: !props.disableReflexFit,
+      reflexRatio: Math.max(0, Math.min(props.reflexRatio ?? 0, 1)),
+      roundBars: props.roundBars,
+      showBgColor: props.showBgColor,
+      showFPS: props.showFPS,
       showPeaks: props.showPeaks,
       showScaleX: props.showScaleX,
       showScaleY: props.showScaleY,
-      trueLeds: props.trueLeds,
+      smoothing: Math.max(0, Math.min(props.smoothing ?? 0, 1)),
+      spinSpeed: props.spinSpeed || 0,
+      splitGradient: props.splitGradient || false,
+      trueLeds: props.trueLeds || false,
+      volume: Math.max(0, props.volume || 1),
+      weightingFilter: props.weightingFilter as AudioMotionWeightingFilter,
       width,
       ...(canvas ? { canvas } : {}),
     };
@@ -2452,10 +2555,23 @@ watchEffect(
       analyzer.radial = props.radial || false;
       analyzer.radialInvert = props.radialInvert || false;
       analyzer.radius = props.radius || 0.3;
+      analyzer.reflexAlpha = Math.max(0, Math.min(props.reflexAlpha ?? 0, 1));
+      analyzer.reflexBright = Math.max(0, props.reflexBright ?? 1);
+      analyzer.reflexFit = !props.disableReflexFit;
+      analyzer.reflexRatio = Math.max(0, Math.min(props.reflexRatio ?? 0, 1));
+      analyzer.roundBars = !!props.roundBars;
+      analyzer.showBgColor = !!props.showBgColor;
+      analyzer.showFPS = !!props.showFPS;
       analyzer.showPeaks = !!props.showPeaks;
       analyzer.showScaleX = !!props.showScaleX;
       analyzer.showScaleY = !!props.showScaleY;
+      analyzer.smoothing = Math.max(0, Math.min(props.smoothing ?? 0.5, 1));
+      analyzer.spinSpeed = props.spinSpeed || 0;
+      analyzer.splitGradient = !!props.splitGradient;
       analyzer.trueLeds = !!props.trueLeds;
+      analyzer.volume = Math.max(0, props.volume || 1);
+      analyzer.weightingFilter = (props.weightingFilter ||
+        "") as AudioMotionWeightingFilter;
     }
   },
   { flush: "post" },
@@ -3628,6 +3744,7 @@ export const useTailwindClassParser = () => {
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 | `colorMode`{.primary .text-primary} | `'gradient' \| 'bar-index' \| 'bar-level'` | gradient |  |
 | `connectSpeakers`{.primary .text-primary} | `boolean` | false |  |
+| `disableReflexFit`{.primary .text-primary} | `boolean` | false |  |
 | `fadePeaks`{.primary .text-primary} | `boolean` | false |  |
 | `fftSize`{.primary .text-primary} | `AudioMotionFftSize` | 8192 |  |
 | `fillAlpha`{.primary .text-primary} | `number` | 1 |  |
@@ -3657,11 +3774,22 @@ export const useTailwindClassParser = () => {
 | `radial`{.primary .text-primary} | `boolean` | false |  |
 | `radialInvert`{.primary .text-primary} | `boolean` | false |  |
 | `radius`{.primary .text-primary} | `number` | 0.3 |  |
+| `reflexAlpha`{.primary .text-primary} | `number` | 0.15 |  |
+| `reflexBright`{.primary .text-primary} | `number` | 1 |  |
+| `reflexRatio`{.primary .text-primary} | `number` | 0 |  |
+| `roundBars`{.primary .text-primary} | `boolean` | false |  |
+| `showBgColor`{.primary .text-primary} | `boolean` | false |  |
+| `showFPS`{.primary .text-primary} | `boolean` | false |  |
 | `showPeaks`{.primary .text-primary} | `boolean` | false |  |
 | `showScaleX`{.primary .text-primary} | `boolean` | false |  |
 | `showScaleY`{.primary .text-primary} | `boolean` | false |  |
+| `smoothing`{.primary .text-primary} | `number` | 0.5 |  |
+| `spinSpeed`{.primary .text-primary} | `number` | 0 |  |
+| `splitGradient`{.primary .text-primary} | `boolean` | false |  |
 | `stream`{.primary .text-primary} | `MediaStream \| null` | — |  |
 | `trueLeds`{.primary .text-primary} | `boolean` | false |  |
+| `volume`{.primary .text-primary} | `number` | 1 |  |
+| `weightingFilter`{.primary .text-primary} | `string` | — |  |
 
   ### Slots
 | Name | Description |
