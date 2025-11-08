@@ -143,8 +143,12 @@ const poppyGradient: AudioMotionGradientDefinition = {
         <AudioMotionAnalyzer
           :stream="stream"
           :mode="AudioMotionMode.Graph"
+          connect-speakers
           gradient="sunset"
           show-peaks
+          overlay
+          radial
+          radial-invert
           :mirror="AudioMotionMirror.None"
         >
           <!-- If styles are defined inline, they will take precedence over the classes -->

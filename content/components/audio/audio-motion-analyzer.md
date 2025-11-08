@@ -164,8 +164,12 @@ const poppyGradient: AudioMotionGradientDefinition = {
         <AudioMotionAnalyzer
           :stream="stream"
           :mode="AudioMotionMode.Graph"
+          connect-speakers
           gradient="sunset"
           show-peaks
+          overlay
+          radial
+          radial-invert
           :mirror="AudioMotionMirror.None"
         >
           <AudioMotionGradient
@@ -430,8 +434,8 @@ import {
 } from ".";
 
 export interface AudioMotionAnalyzerProps {
-  ansiBands?: boolean;
   alphaBars?: boolean;
+  ansiBands?: boolean;
   audio?: HTMLAudioElement | Ref<HTMLAudioElement | null> | null;
   barSpace?: number;
   channelLayout?:
@@ -441,6 +445,7 @@ export interface AudioMotionAnalyzerProps {
     | "dual-vertical";
   class?: HTMLAttributes["class"];
   colorMode?: "gradient" | "bar-index" | "bar-level";
+  connectSpeakers?: boolean;
   fadePeaks?: boolean;
   fftSize?: AudioMotionFftSize;
   fillAlpha?: number;
@@ -472,9 +477,19 @@ export interface AudioMotionAnalyzerProps {
   linearBoost?: number;
   lineWidth?: number;
   lumiBars?: boolean;
+  maxDecibels?: number;
+  minDecibels?: number;
   maxFps?: number;
+  maxFreq?: number;
+  minFreq?: number;
   mirror?: number;
   mode?: number;
+  noteLabels?: boolean;
+  outlineBars?: boolean;
+  overlay?: boolean;
+  peakFadeTime?: number;
+  peakHoldTime?: number;
+  peakLine?: boolean;
   radial?: boolean;
   radialInvert?: boolean;
   radius?: number;
@@ -490,6 +505,7 @@ const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
   barSpace: 0.1,
   channelLayout: "dual-combined",
   colorMode: "gradient",
+  connectSpeakers: false,
   fadePeaks: false,
   fftSize: 8192,
   fillAlpha: 1,
@@ -501,9 +517,19 @@ const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
   linearBoost: 1,
   lineWidth: 0,
   lumiBars: false,
+  maxDecibels: -25,
+  minDecibels: -85,
   maxFps: 0,
+  maxFreq: 22000,
+  minFreq: 20,
   mirror: 0,
   mode: 3,
+  noteLabels: false,
+  outlineBars: false,
+  overlay: false,
+  peakFadeTime: 750,
+  peakHoldTime: 500,
+  peakLine: false,
   radial: false,
   radialInvert: false,
   radius: 0.3,
@@ -535,10 +561,6 @@ const registerGradients = () => {
   if (analyzer) {
     for (const gradientDef of gradients.value) {
       const { name, gradient } = gradientDef;
-      const safeGradient = {
-        ...gradient,
-        dir: gradient.dir as "h" | "v" | undefined,
-      };
       analyzer.registerGradient(
         name,
         gradient as any & AudioMotionGradientProperties,
@@ -608,7 +630,7 @@ const setupAnalyzer = async () => {
       barSpace: props.barSpace,
       channelLayout: props.channelLayout,
       colorMode: props.colorMode,
-      connectSpeakers: false,
+      connectSpeakers: props.connectSpeakers,
       fadePeaks: props.fadePeaks,
       fftSize: props.fftSize,
       fillAlpha: props.fillAlpha,
@@ -620,10 +642,19 @@ const setupAnalyzer = async () => {
       linearBoost: Math.max(props.linearBoost, 1),
       lineWidth: Math.max(props.lineWidth || 0, 0),
       lumiBars: props.lumiBars,
+      maxDecibels: props.maxDecibels,
+      minDecibels: props.minDecibels,
       maxFPS: props.maxFps,
+      maxFreq: Math.max(props.maxFreq, 1),
+      minFreq: Math.max(props.minFreq, 1),
       mirror: props.mirror,
       mode: props.mode,
-      overlay: true,
+      noteLabels: props.noteLabels,
+      outlineBars: props.outlineBars,
+      overlay: props.overlay,
+      peakFadeTime: props.peakFadeTime,
+      peakHoldTime: props.peakHoldTime,
+      peakLine: props.peakLine,
       radial: props.radial,
       radialInvert: props.radialInvert,
       radius: props.radius,
@@ -690,17 +721,9 @@ const cleanUp = () => {
 };
 
 watch(
-  () => [props.stream, props.audio, props.class, injectedContext.value],
+  () => [props.stream, props.audio, injectedContext.value],
   () => {
     nextTick(async () => {
-      const el = unref(noDisplayElement);
-      if (!el) return;
-      const gradients = getTypedElementAmongSiblings(
-        el,
-        (el): el is HTMLDivElement =>
-          el instanceof HTMLDivElement &&
-          el.dataset.slot === "audio-motion-gradient",
-      );
       await setupAnalyzer();
     });
   },
@@ -715,6 +738,20 @@ watch(
     }
   },
   { immediate: true },
+);
+
+watch(
+  () => props.connectSpeakers,
+  async () => {
+    if (analyzer) {
+      const ctx = analyzer.audioCtx;
+      const destination = ctx.destination;
+
+      props.connectSpeakers
+        ? analyzer.connectOutput()
+        : analyzer.disconnectOutput(destination);
+    }
+  },
 );
 
 watchEffect(
@@ -737,9 +774,19 @@ watchEffect(
       analyzer.linearBoost = Math.max(props.linearBoost, 1);
       analyzer.lineWidth = Math.max(props.lineWidth || 0, 0);
       analyzer.lumiBars = !!props.lumiBars;
+      analyzer.maxDecibels = props.maxDecibels;
+      analyzer.minDecibels = props.minDecibels;
       analyzer.maxFPS = props.maxFps || 0;
+      analyzer.maxFreq = Math.max(props.maxFreq, 1);
+      analyzer.minFreq = Math.max(props.minFreq, 1);
       analyzer.mirror = props.mirror || AudioMotionMirror.None;
       analyzer.mode = props.mode || AudioMotionMode.OctaveBands8th;
+      analyzer.noteLabels = !!props.noteLabels;
+      analyzer.outlineBars = !!props.outlineBars;
+      analyzer.overlay = props.overlay;
+      analyzer.peakFadeTime = props.peakFadeTime || 750;
+      analyzer.peakHoldTime = props.peakHoldTime || 500;
+      analyzer.peakLine = props.peakLine || false;
       analyzer.radial = props.radial || false;
       analyzer.radialInvert = props.radialInvert || false;
       analyzer.radius = props.radius || 0.3;
@@ -2049,8 +2096,8 @@ import {
 } from ".";
 
 export interface AudioMotionAnalyzerProps {
-  ansiBands?: boolean;
   alphaBars?: boolean;
+  ansiBands?: boolean;
   audio?: HTMLAudioElement | Ref<HTMLAudioElement | null> | null;
   barSpace?: number;
   channelLayout?:
@@ -2060,6 +2107,7 @@ export interface AudioMotionAnalyzerProps {
     | "dual-vertical";
   class?: HTMLAttributes["class"];
   colorMode?: "gradient" | "bar-index" | "bar-level";
+  connectSpeakers?: boolean;
   fadePeaks?: boolean;
   fftSize?: AudioMotionFftSize;
   fillAlpha?: number;
@@ -2091,9 +2139,19 @@ export interface AudioMotionAnalyzerProps {
   linearBoost?: number;
   lineWidth?: number;
   lumiBars?: boolean;
+  maxDecibels?: number;
+  minDecibels?: number;
   maxFps?: number;
+  maxFreq?: number;
+  minFreq?: number;
   mirror?: number;
   mode?: number;
+  noteLabels?: boolean;
+  outlineBars?: boolean;
+  overlay?: boolean;
+  peakFadeTime?: number;
+  peakHoldTime?: number;
+  peakLine?: boolean;
   radial?: boolean;
   radialInvert?: boolean;
   radius?: number;
@@ -2109,6 +2167,7 @@ const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
   barSpace: 0.1,
   channelLayout: "dual-combined",
   colorMode: "gradient",
+  connectSpeakers: false,
   fadePeaks: false,
   fftSize: 8192,
   fillAlpha: 1,
@@ -2120,9 +2179,19 @@ const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
   linearBoost: 1,
   lineWidth: 0,
   lumiBars: false,
+  maxDecibels: -25,
+  minDecibels: -85,
   maxFps: 0,
+  maxFreq: 22000,
+  minFreq: 20,
   mirror: 0,
   mode: 3,
+  noteLabels: false,
+  outlineBars: false,
+  overlay: false,
+  peakFadeTime: 750,
+  peakHoldTime: 500,
+  peakLine: false,
   radial: false,
   radialInvert: false,
   radius: 0.3,
@@ -2154,10 +2223,6 @@ const registerGradients = () => {
   if (analyzer) {
     for (const gradientDef of gradients.value) {
       const { name, gradient } = gradientDef;
-      const safeGradient = {
-        ...gradient,
-        dir: gradient.dir as "h" | "v" | undefined,
-      };
       analyzer.registerGradient(
         name,
         gradient as any & AudioMotionGradientProperties,
@@ -2227,7 +2292,7 @@ const setupAnalyzer = async () => {
       barSpace: props.barSpace,
       channelLayout: props.channelLayout,
       colorMode: props.colorMode,
-      connectSpeakers: false,
+      connectSpeakers: props.connectSpeakers,
       fadePeaks: props.fadePeaks,
       fftSize: props.fftSize,
       fillAlpha: props.fillAlpha,
@@ -2239,10 +2304,19 @@ const setupAnalyzer = async () => {
       linearBoost: Math.max(props.linearBoost, 1),
       lineWidth: Math.max(props.lineWidth || 0, 0),
       lumiBars: props.lumiBars,
+      maxDecibels: props.maxDecibels,
+      minDecibels: props.minDecibels,
       maxFPS: props.maxFps,
+      maxFreq: Math.max(props.maxFreq, 1),
+      minFreq: Math.max(props.minFreq, 1),
       mirror: props.mirror,
       mode: props.mode,
-      overlay: true,
+      noteLabels: props.noteLabels,
+      outlineBars: props.outlineBars,
+      overlay: props.overlay,
+      peakFadeTime: props.peakFadeTime,
+      peakHoldTime: props.peakHoldTime,
+      peakLine: props.peakLine,
       radial: props.radial,
       radialInvert: props.radialInvert,
       radius: props.radius,
@@ -2309,17 +2383,9 @@ const cleanUp = () => {
 };
 
 watch(
-  () => [props.stream, props.audio, props.class, injectedContext.value],
+  () => [props.stream, props.audio, injectedContext.value],
   () => {
     nextTick(async () => {
-      const el = unref(noDisplayElement);
-      if (!el) return;
-      const gradients = getTypedElementAmongSiblings(
-        el,
-        (el): el is HTMLDivElement =>
-          el instanceof HTMLDivElement &&
-          el.dataset.slot === "audio-motion-gradient",
-      );
       await setupAnalyzer();
     });
   },
@@ -2334,6 +2400,20 @@ watch(
     }
   },
   { immediate: true },
+);
+
+watch(
+  () => props.connectSpeakers,
+  async () => {
+    if (analyzer) {
+      const ctx = analyzer.audioCtx;
+      const destination = ctx.destination;
+
+      props.connectSpeakers
+        ? analyzer.connectOutput()
+        : analyzer.disconnectOutput(destination);
+    }
+  },
 );
 
 watchEffect(
@@ -2356,9 +2436,19 @@ watchEffect(
       analyzer.linearBoost = Math.max(props.linearBoost, 1);
       analyzer.lineWidth = Math.max(props.lineWidth || 0, 0);
       analyzer.lumiBars = !!props.lumiBars;
+      analyzer.maxDecibels = props.maxDecibels;
+      analyzer.minDecibels = props.minDecibels;
       analyzer.maxFPS = props.maxFps || 0;
+      analyzer.maxFreq = Math.max(props.maxFreq, 1);
+      analyzer.minFreq = Math.max(props.minFreq, 1);
       analyzer.mirror = props.mirror || AudioMotionMirror.None;
       analyzer.mode = props.mode || AudioMotionMode.OctaveBands8th;
+      analyzer.noteLabels = !!props.noteLabels;
+      analyzer.outlineBars = !!props.outlineBars;
+      analyzer.overlay = props.overlay;
+      analyzer.peakFadeTime = props.peakFadeTime || 750;
+      analyzer.peakHoldTime = props.peakHoldTime || 500;
+      analyzer.peakLine = props.peakLine || false;
       analyzer.radial = props.radial || false;
       analyzer.radialInvert = props.radialInvert || false;
       analyzer.radius = props.radius || 0.3;
@@ -3530,13 +3620,14 @@ export const useTailwindClassParser = () => {
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `ansiBands`{.primary .text-primary} | `boolean` | - |  |
 | `alphaBars`{.primary .text-primary} | `boolean` | - |  |
+| `ansiBands`{.primary .text-primary} | `boolean` | - |  |
 | `audio`{.primary .text-primary} | `HTMLAudioElement \| Ref<HTMLAudioElement \| null> \| null` | — |  |
 | `barSpace`{.primary .text-primary} | `number` | 0.1 |  |
 | `channelLayout`{.primary .text-primary} | `'single' \| 'dual-combined' \| 'dual-horizontal' \| 'dual-vertical'` | dual-combined |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 | `colorMode`{.primary .text-primary} | `'gradient' \| 'bar-index' \| 'bar-level'` | gradient |  |
+| `connectSpeakers`{.primary .text-primary} | `boolean` | false |  |
 | `fadePeaks`{.primary .text-primary} | `boolean` | false |  |
 | `fftSize`{.primary .text-primary} | `AudioMotionFftSize` | 8192 |  |
 | `fillAlpha`{.primary .text-primary} | `number` | 1 |  |
@@ -3550,9 +3641,19 @@ export const useTailwindClassParser = () => {
 | `linearBoost`{.primary .text-primary} | `number` | 1 |  |
 | `lineWidth`{.primary .text-primary} | `number` | 0 |  |
 | `lumiBars`{.primary .text-primary} | `boolean` | false |  |
+| `maxDecibels`{.primary .text-primary} | `number` | -25 |  |
+| `minDecibels`{.primary .text-primary} | `number` | -85 |  |
 | `maxFps`{.primary .text-primary} | `number` | 0 |  |
+| `maxFreq`{.primary .text-primary} | `number` | 22000 |  |
+| `minFreq`{.primary .text-primary} | `number` | 20 |  |
 | `mirror`{.primary .text-primary} | `number` | 0 |  |
 | `mode`{.primary .text-primary} | `number` | 3 |  |
+| `noteLabels`{.primary .text-primary} | `boolean` | false |  |
+| `outlineBars`{.primary .text-primary} | `boolean` | false |  |
+| `overlay`{.primary .text-primary} | `boolean` | false |  |
+| `peakFadeTime`{.primary .text-primary} | `number` | 750 |  |
+| `peakHoldTime`{.primary .text-primary} | `number` | 500 |  |
+| `peakLine`{.primary .text-primary} | `boolean` | false |  |
 | `radial`{.primary .text-primary} | `boolean` | false |  |
 | `radialInvert`{.primary .text-primary} | `boolean` | false |  |
 | `radius`{.primary .text-primary} | `number` | 0.3 |  |
