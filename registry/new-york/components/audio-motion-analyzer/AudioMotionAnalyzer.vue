@@ -155,10 +155,7 @@ const registerGradients = () => {
 };
 
 const setupAnalyzer = async () => {
-  if (analyzer) {
-    analyzer.destroy();
-    analyzer = null;
-  }
+  cleanUp();
 
   const canvas: HTMLCanvasElement | null = searchCanvas();
   const container: HTMLElement | null = searchContainer();
@@ -402,7 +399,7 @@ watchEffect(
       analyzer.weightingFilter = (props.weightingFilter || '') as AudioMotionWeightingFilter;
     }
   },
-  { flush: 'post' }
+  { flush: 'pre' }
 );
 
 onUnmounted(() => {

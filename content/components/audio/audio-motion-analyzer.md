@@ -167,6 +167,7 @@ const poppyGradient: AudioMotionGradientDefinition = {
           gradient="lime"
           show-peaks
           overlay
+          led-bars
           true-leds
           :mirror="AudioMotionMirror.None"
         >
@@ -189,7 +190,7 @@ const poppyGradient: AudioMotionGradientDefinition = {
 
           <AudioMotionGradient
             name="lime"
-            class="bg-linear-to-b from-teal-400 to-yellow-200"
+            class="bg-linear-to-b from-red-400 via-yellow-500 to-teal-700"
           />
 
           <AudioMotionGradient
@@ -398,6 +399,15 @@ export enum AudioMotionWeightingFilter {
   ItuR468 = "468",
 }
 
+export enum AudioMotionEnergyPreset {
+  Peak = "peak",
+  Bass = "bass",
+  LowMid = "lowMid",
+  Mid = "mid",
+  HighMid = "highMid",
+  Treble = "treble",
+}
+
 export { default as AudioVisualizer } from "./AudioVisualizer.vue";
 export { default as AudioMotionAnalyzer } from "./AudioMotionAnalyzer.vue";
 export { default as AudioMotionGradient } from "./AudioMotionGradient.vue";
@@ -602,10 +612,7 @@ const registerGradients = () => {
 };
 
 const setupAnalyzer = async () => {
-  if (analyzer) {
-    analyzer.destroy();
-    analyzer = null;
-  }
+  cleanUp();
 
   const canvas: HTMLCanvasElement | null = searchCanvas();
   const container: HTMLElement | null = searchContainer();
@@ -853,7 +860,7 @@ watchEffect(
         "") as AudioMotionWeightingFilter;
     }
   },
-  { flush: "post" },
+  { flush: "pre" },
 );
 
 onUnmounted(() => {
@@ -2119,6 +2126,15 @@ export enum AudioMotionWeightingFilter {
   ItuR468 = "468",
 }
 
+export enum AudioMotionEnergyPreset {
+  Peak = "peak",
+  Bass = "bass",
+  LowMid = "lowMid",
+  Mid = "mid",
+  HighMid = "highMid",
+  Treble = "treble",
+}
+
 export { default as AudioVisualizer } from "./AudioVisualizer.vue";
 export { default as AudioMotionAnalyzer } from "./AudioMotionAnalyzer.vue";
 export { default as AudioMotionGradient } from "./AudioMotionGradient.vue";
@@ -2323,10 +2339,7 @@ const registerGradients = () => {
 };
 
 const setupAnalyzer = async () => {
-  if (analyzer) {
-    analyzer.destroy();
-    analyzer = null;
-  }
+  cleanUp();
 
   const canvas: HTMLCanvasElement | null = searchCanvas();
   const container: HTMLElement | null = searchContainer();
@@ -2574,7 +2587,7 @@ watchEffect(
         "") as AudioMotionWeightingFilter;
     }
   },
-  { flush: "post" },
+  { flush: "pre" },
 );
 
 onUnmounted(() => {

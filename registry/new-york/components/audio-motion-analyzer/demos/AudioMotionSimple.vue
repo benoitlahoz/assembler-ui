@@ -146,6 +146,7 @@ const poppyGradient: AudioMotionGradientDefinition = {
           gradient="lime"
           show-peaks
           overlay
+          led-bars
           true-leds
           :mirror="AudioMotionMirror.None"
         >
@@ -175,7 +176,10 @@ const poppyGradient: AudioMotionGradientDefinition = {
             "
           />
 
-          <AudioMotionGradient name="lime" class="bg-linear-to-b from-teal-400 to-yellow-200" />
+          <AudioMotionGradient
+            name="lime"
+            class="bg-linear-to-b from-red-400 via-yellow-500 to-teal-700"
+          />
 
           <!-- Gradient object takes precedence over class and styles -->
           <AudioMotionGradient :name="poppyGradient.name" :gradient="poppyGradient.gradient" />
