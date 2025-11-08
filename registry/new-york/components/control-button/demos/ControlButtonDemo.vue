@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, shallowRef, h } from 'vue';
 import { ControlButton } from '~~/registry/new-york/components/control-button';
-import { ControlsGrid } from '~~/registry/new-york/components/control-grid';
+import { ControlGrid } from '~~/registry/new-york/components/control-grid';
 import { useControlRegistry } from '~~/registry/new-york/composables/use-control-registry/useControlRegistry';
 import type { ControlDefinition } from '~~/registry/new-york/composables/use-control-registry/useControlRegistry';
 
@@ -189,7 +189,7 @@ const handleItemRemoved = (id: string) => {
     <!-- Grille de contrôles -->
     <div class="space-y-2">
       <h4 class="text-sm font-medium">Grille de contrôles</h4>
-      <ControlsGrid
+      <ControlGrid
         v-model:items="gridItems"
         :cell-size="80"
         :gap="8"
