@@ -139,11 +139,11 @@ const poppyGradient: AudioMotionGradientDefinition = {
       v-slot="{ stream }"
     >
       <AudioContextProvider v-slot="{ errors, state }">
-        <!-- If you prefer to provide a container and let AudioMotionAnalyzer create the canvas <div class="w-full h-[400px] min-h-[400px]"> -->
+        <!-- If you prefer to provide a container and leave AudioMotionAnalyzer create the canvas <div class="w-full h-[400px] min-h-[400px]"> -->
         <AudioMotionAnalyzer
           :stream="stream"
           connect-speakers
-          gradient="sunset"
+          gradient="lime"
           show-peaks
           overlay
           true-leds
@@ -175,11 +175,7 @@ const poppyGradient: AudioMotionGradientDefinition = {
             "
           />
 
-          <!-- TODO: This one doesn't work as expected -> see parsing-->
-          <AudioMotionGradient
-            name="foreground-broken"
-            class="bg-linear-to-b from-[--color-foreground] via-purple-400 to-[--color-background] to-90%"
-          />
+          <AudioMotionGradient name="lime" class="bg-linear-to-b from-teal-400 to-yellow-200" />
 
           <!-- Gradient object takes precedence over class and styles -->
           <AudioMotionGradient :name="poppyGradient.name" :gradient="poppyGradient.gradient" />

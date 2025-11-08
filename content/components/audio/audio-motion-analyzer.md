@@ -164,7 +164,7 @@ const poppyGradient: AudioMotionGradientDefinition = {
         <AudioMotionAnalyzer
           :stream="stream"
           connect-speakers
-          gradient="sunset"
+          gradient="lime"
           show-peaks
           overlay
           true-leds
@@ -188,8 +188,8 @@ const poppyGradient: AudioMotionGradientDefinition = {
           />
 
           <AudioMotionGradient
-            name="foreground-broken"
-            class="bg-linear-to-b from-[--color-foreground] via-purple-400 to-[--color-background] to-90%"
+            name="lime"
+            class="bg-linear-to-b from-teal-400 to-yellow-200"
           />
 
           <AudioMotionGradient
