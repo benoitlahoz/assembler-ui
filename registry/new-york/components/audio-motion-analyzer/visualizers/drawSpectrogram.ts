@@ -34,7 +34,7 @@ export function drawSpectrogram({
   // Récupère les nouvelles données FFT
   const dataArray = new Uint8Array(bufferLength);
   analyser.getByteFrequencyData(dataArray);
-  // Ajoute la nouvelle colonne à droite
+  // Ajoute la nouvelle colonne à gauche
   for (let y = 0; y < height; y++) {
     const freqIdx = Math.floor((y / height) * bufferLength);
     const value = dataArray[freqIdx];

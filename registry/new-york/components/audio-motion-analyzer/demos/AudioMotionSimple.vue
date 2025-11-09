@@ -20,6 +20,7 @@ import {
   AudioMotionAnalyzer,
   AudioMotionGradient,
   AudioMotionLedParameters,
+  AudioMotionMode,
   AudioMotionMirror,
   type AudioMotionGradientDefinition,
   type AudioMotionAnalyzerInstance,
@@ -161,13 +162,13 @@ const onCanvasResize: OnCanvasResizeFunction = (
         <AudioMotionAnalyzer
           :stream="stream"
           connect-speakers
-          gradient="lime"
-          show-peaks
+          gradient="sunset"
+          alpha-bars
+          channel-layout="dual-combined"
+          :mode="AudioMotionMode.HalfOctaveBands"
           overlay
-          lumi-bars
-          led-preset="my-led-bars"
+          radial
           start
-          :mirror="AudioMotionMirror.None"
           :width="1200"
           :height="600"
           @canvas-draw="onCanvasDraw"
