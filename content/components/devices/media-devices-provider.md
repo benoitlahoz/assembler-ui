@@ -573,6 +573,8 @@ export interface AudioDeviceProps {
 
   deviceId: string;
 
+  channelCount?: number;
+
   echoCancellation?: boolean;
 
   noiseSuppression?: boolean;
@@ -588,6 +590,7 @@ export interface AudioDeviceProps {
 
 const props = withDefaults(defineProps<AudioDeviceProps>(), {
   autoStart: false,
+  channelCount: 2,
 });
 
 const emit = defineEmits<{
@@ -643,6 +646,9 @@ const buildConstraints = (): MediaStreamConstraints => {
       ? typeof props.sampleSize === "number"
         ? { ideal: props.sampleSize }
         : props.sampleSize
+      : undefined,
+    channelCount: props.channelCount
+      ? { ideal: props.channelCount }
       : undefined,
   };
 
@@ -1498,6 +1504,7 @@ start/stop functions to manage streams with device caching.
 |------|------|---------|-------------|
 | `autoStart`{.primary .text-primary} | `boolean` | false | Whether to automatically start the media stream on mount. |
 | `deviceId`{.primary .text-primary} | `string` | - | The exact device ID to use for the audio stream (REQUIRED). |
+| `channelCount`{.primary .text-primary} | `number` | 2 | Audio constraints |
 | `echoCancellation`{.primary .text-primary} | `boolean` | - | Enable echo cancellation for audio input. |
 | `noiseSuppression`{.primary .text-primary} | `boolean` | - | Enable noise suppression for audio input. |
 | `autoGainControl`{.primary .text-primary} | `boolean` | - | Enable automatic gain control for audio input. |

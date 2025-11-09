@@ -29,6 +29,8 @@ export interface AudioDeviceProps {
 
   // Audio constraints
 
+  channelCount?: number;
+
   /**
    * Enable echo cancellation for audio input.
    */
@@ -58,6 +60,7 @@ export interface AudioDeviceProps {
 
 const props = withDefaults(defineProps<AudioDeviceProps>(), {
   autoStart: false,
+  channelCount: 2,
 });
 
 const emit = defineEmits<{
@@ -113,6 +116,7 @@ const buildConstraints = (): MediaStreamConstraints => {
         ? { ideal: props.sampleSize }
         : props.sampleSize
       : undefined,
+    channelCount: props.channelCount ? { ideal: props.channelCount } : undefined,
   };
 
   return {
