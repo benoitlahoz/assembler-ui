@@ -19,9 +19,14 @@ import { AudioContextProvider } from '~~/registry/new-york/components/audio-cont
 import {
   AudioMotionAnalyzer,
   AudioMotionGradient,
+  AudioMotionLedParameters,
   AudioMotionMirror,
-  AudioMotionMode,
   type AudioMotionGradientDefinition,
+  type AudioMotionAnalyzerInstance,
+  type OnCanvasDrawFunction,
+  type CanvasDrawInfo,
+  type OnCanvasResizeFunction,
+  type CanvasResizeReason,
 } from '~~/registry/new-york/components/audio-motion-analyzer';
 
 const selectedId = ref<string | null>(null);
@@ -65,6 +70,20 @@ const poppyGradient: AudioMotionGradientDefinition = {
       { color: '#00ffff', pos: 1 },
     ],
   },
+};
+
+const onCanvasDraw: OnCanvasDrawFunction = (
+  _instance: AudioMotionAnalyzerInstance,
+  info: CanvasDrawInfo
+) => {
+  // console.log('Info from onCanvasDraw event:', info);
+};
+
+const onCanvasResize: OnCanvasResizeFunction = (
+  reason: CanvasResizeReason,
+  _instance: AudioMotionAnalyzerInstance
+) => {
+  console.log('Canvas resized due to:', reason);
 };
 </script>
 
@@ -139,16 +158,21 @@ const poppyGradient: AudioMotionGradientDefinition = {
       v-slot="{ stream }"
     >
       <AudioContextProvider v-slot="{ errors, state }">
-        <!-- If you prefer to provide a container and leave AudioMotionAnalyzer create the canvas <div class="w-full h-[400px] min-h-[400px]"> -->
         <AudioMotionAnalyzer
           :stream="stream"
           connect-speakers
           gradient="lime"
           show-peaks
           overlay
-          led-bars
-          true-leds
+          lumi-bars
+          led-preset="my-led-bars"
+          start
           :mirror="AudioMotionMirror.None"
+          :width="1200"
+          :height="600"
+          @canvas-draw="onCanvasDraw"
+          @canvas-resize="onCanvasResize"
+          v-slot="{ version }"
         >
           <!-- If styles are defined inline, they will take precedence over the classes -->
           <AudioMotionGradient
@@ -165,6 +189,7 @@ const poppyGradient: AudioMotionGradientDefinition = {
             "
           />
 
+          <!-- TODO: Parse vars -->
           <AudioMotionGradient
             name="foreground"
             style="
@@ -184,9 +209,13 @@ const poppyGradient: AudioMotionGradientDefinition = {
           <!-- Gradient object takes precedence over class and styles -->
           <AudioMotionGradient :name="poppyGradient.name" :gradient="poppyGradient.gradient" />
 
-          <canvas width="600" height="400" />
+          <AudioMotionLedParameters name="my-led-bars" :max-leds="64" :space-v="4" :space-h="2" />
+
+          <div class="mt-4 text-sm text-gray-500">
+            audio-motion-analyzer library version: {{ version }}
+          </div>
         </AudioMotionAnalyzer>
-        <!-- </div> -->
+
         <template v-if="errors && errors.length">
           <div class="text-red-500 text-xs mt-2" style="">
             <div v-for="(err, i) in errors" :key="i">{{ err.message }}</div>

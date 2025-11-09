@@ -1,5 +1,5 @@
 ---
-title: useTailwindClassParser
+title: useCssParser
 description: Utility to parse tailwind classes and get their CSS values.
 ---
 
@@ -11,19 +11,19 @@ This will install the composable in the path defined by your `components.json` f
 
 :::code-group{.w-full}
 ```bash [yarn]
-  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-tailwind-class-parser.json"
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-css-parser.json"
   ```
 
 ```bash [npm]
-  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-tailwind-class-parser.json"
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-css-parser.json"
   ```
 
 ```bash [pnpm]
-  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-tailwind-class-parser.json"
+  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-css-parser.json"
   ```
 
 ```bash [bun]
-  bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-tailwind-class-parser.json"
+  bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-css-parser.json"
   ```
 :::
 
@@ -33,9 +33,9 @@ This will install the composable in the path defined by your `components.json` f
 
 Copy and paste these files into your project.
 
-:::code-tree{default-value="src/composables/use-tailwind-class-parser/useTailwindClassParser.ts"}
+:::code-tree{default-value="src/composables/use-css-parser/useCssParser.ts"}
 
-```ts [src/composables/use-tailwind-class-parser/useTailwindClassParser.ts]
+```ts [src/composables/use-css-parser/useCssParser.ts]
 export interface GradientColorStop {
   color: string;
   pos: number;

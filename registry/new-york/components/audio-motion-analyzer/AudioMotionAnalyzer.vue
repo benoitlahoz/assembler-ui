@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import AudioMotion, { type FrequencyScale } from 'audiomotion-analyzer';
+import AudioMotion from 'audiomotion-analyzer';
 import {
   type Ref,
   type HTMLAttributes,
@@ -12,23 +12,29 @@ import {
   onUnmounted,
   provide,
   watchEffect,
+  computed,
+  version,
 } from 'vue';
+import { cn } from '@/lib/utils';
 import { AudioContextInjectionKey } from '~~/registry/new-york/components/audio-context-provider';
-import { useTypedElementSearch } from '~~/registry/new-york/composables/use-typed-element-search/useTypedElementSearch';
 import {
+  AudioMotionGradientsKey,
+  AudioMotionLedParametersKey,
   AudioMotionMode,
   AudioMotionMirror,
-  AudioMotionGradientsKey,
   AudioMotionWeightingFilter,
   type AudioMotionGradientDefinition,
   type AudioMotionGradientProperties,
   type AudioMotionFftSize,
+  type OnCanvasDrawFunction,
+  type OnCanvasResizeFunction,
+  type FrequencyScale,
+  type AudioMotionLedParametersDefinition,
 } from '.';
 
 export interface AudioMotionAnalyzerProps {
   alphaBars?: boolean;
   ansiBands?: boolean;
-  audio?: HTMLAudioElement | Ref<HTMLAudioElement | null> | null;
   barSpace?: number;
   channelLayout?: 'single' | 'dual-combined' | 'dual-horizontal' | 'dual-vertical';
   class?: HTMLAttributes['class'];
@@ -43,10 +49,14 @@ export interface AudioMotionAnalyzerProps {
   gradientLeft?: 'classic' | 'orangered' | 'prism' | 'rainbow' | 'steelblue' | string;
   gradientRight?: 'classic' | 'orangered' | 'prism' | 'rainbow' | 'steelblue' | string;
   gravity?: number;
+  // `headless = true` is like `useCanvas = false` in the original library
+  headless?: boolean;
+  height?: number;
   ledBars?: boolean;
   linearAmplitude?: boolean;
   linearBoost?: number;
   lineWidth?: number;
+  loRes?: boolean;
   lumiBars?: boolean;
   maxDecibels?: number;
   minDecibels?: number;
@@ -69,21 +79,33 @@ export interface AudioMotionAnalyzerProps {
   reflexRatio?: number;
   roundBars?: boolean;
   showBgColor?: boolean;
-  showFPS?: boolean;
+  showFps?: boolean;
   showPeaks?: boolean;
   showScaleX?: boolean;
   showScaleY?: boolean;
   smoothing?: number;
+  // HTMLMediaElement or AudioNode source.
+  source?: AudioNode | HTMLMediaElement | Ref<AudioNode | HTMLMediaElement> | null;
   spinSpeed?: number;
   splitGradient?: boolean;
+  start?: boolean;
+  // MediaStream source.
   stream?: MediaStream | null;
   trueLeds?: boolean;
   volume?: number;
   weightingFilter?: string;
+  width?: number;
+
+  // Events
+
+  onCanvasDraw?: OnCanvasDrawFunction;
+  onCanvasResize?: OnCanvasResizeFunction;
+
+  // Custom.
+  ledPreset?: string;
 }
 
 const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
-  audio: undefined,
   barSpace: 0.1,
   channelLayout: 'dual-combined',
   colorMode: 'gradient',
@@ -95,6 +117,7 @@ const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
   frequencyScale: 'log',
   gradient: 'classic',
   gravity: 3.8,
+  headless: false,
   ledBars: false,
   linearAmplitude: false,
   linearBoost: 1,
@@ -121,29 +144,55 @@ const props = withDefaults(defineProps<AudioMotionAnalyzerProps>(), {
   reflexRatio: 0,
   roundBars: false,
   showBgColor: false,
-  showFPS: false,
+  showFps: false,
   showPeaks: false,
   showScaleX: false,
   showScaleY: false,
   smoothing: 0.5,
+  source: undefined,
   spinSpeed: 0,
   splitGradient: false,
+  start: false,
   stream: undefined,
   trueLeds: false,
   volume: 1,
   weightingFilter: '',
 });
 
-const { getTypedElementAmongSiblings, getContainer } = useTypedElementSearch();
-
-const noDisplayElement = useTemplateRef('noDisplayRef');
+const containerRef = useTemplateRef('containerRef');
 const injectedContext = inject<Ref<AudioContext | null>>(AudioContextInjectionKey, ref(null));
-
 const gradients = ref<AudioMotionGradientDefinition[]>([]);
+const ledParams = ref<AudioMotionLedParametersDefinition[]>([]);
+
+const canvas = computed(() => analyzer?.canvas || null);
+const audioCtx = computed(() => analyzer?.audioCtx || null);
+const isAlphaBars = computed(() => (analyzer ? analyzer.isAlphaBars : false));
+const isBandsMode = computed(() => (analyzer ? analyzer.isBandsMode : false));
+const isDestroyed = computed(() => (analyzer ? analyzer.isDestroyed : true));
+const isFullscreen = computed(() => (analyzer ? analyzer.isFullscreen : false));
+const isLedBars = computed(() => (analyzer ? analyzer.isLedBars : false));
+const isLumiBars = computed(() => (analyzer ? analyzer.isLumiBars : false));
+const isOctaveBands = computed(() => (analyzer ? analyzer.isOctaveBands : false));
+const isOn = computed(() => (analyzer ? analyzer.isOn : false));
+const isOutlineBars = computed(() => (analyzer ? analyzer.isOutlineBars : false));
+const isRoundBars = computed(() => (analyzer ? analyzer.isRoundBars : false));
+const connectedSources = computed(() => (analyzer ? analyzer.connectedSources : []));
+
+const start = computed(() => (analyzer ? !analyzer.start : null));
+const stop = computed(() => (analyzer ? analyzer.stop : null));
+const connectInput = computed(() => (analyzer ? analyzer.connectInput : null));
+const disconnectInput = computed(() => (analyzer ? analyzer.disconnectInput : null));
+const disconnectOutput = computed(() => (analyzer ? analyzer.disconnectOutput : null));
+const getBars = computed(() => (analyzer ? analyzer.getBars : null));
+const getEnergy = computed(() => (analyzer ? analyzer.getEnergy : null));
+const getOptions = computed(() => (analyzer ? analyzer.getOptions : null));
+const setLedParams = computed(() => (analyzer ? analyzer.setLedParams : null));
+
 provide<Ref<AudioMotionGradientDefinition[]>>(AudioMotionGradientsKey, gradients);
+provide<Ref<AudioMotionLedParametersDefinition[]>>(AudioMotionLedParametersKey, ledParams);
 
 let analyzer: AudioMotion | null = null;
-let source: MediaStreamAudioSourceNode | null = null;
+let streamSource: MediaStreamAudioSourceNode | null = null;
 
 const registerGradients = () => {
   if (analyzer) {
@@ -157,53 +206,29 @@ const registerGradients = () => {
 const setupAnalyzer = async () => {
   cleanUp();
 
-  const canvas: HTMLCanvasElement | null = searchCanvas();
-  const container: HTMLElement | null = searchContainer();
+  const container = unref(containerRef);
+  if (!container) {
+    console.error('No container found for AudioMotionAnalyzer.');
+    return;
+  }
 
-  if (props.audio) {
-    const audioElement = props.audio instanceof HTMLAudioElement ? props.audio : props.audio.value;
-    if (audioElement) {
-      if (!canvas && container) {
-        const width = container.clientWidth;
-        const height = container.clientHeight;
-        analyzer = new AudioMotion(container, {
-          source: audioElement,
-          width,
-          height,
-          gradient: props.gradient,
-          mode: 3,
-          barSpace: 0.6,
-          ledBars: true,
-          connectSpeakers: false,
-        });
-      } else if (canvas) {
-        analyzer = new AudioMotion({
-          source: audioElement,
-          canvas: canvas,
-          width: canvas.width,
-          height: canvas.height,
-          gradient: props.gradient,
-          mode: 3,
-          barSpace: 0.6,
-          ledBars: true,
-          connectSpeakers: false,
-        });
-      } else {
-        console.error(
-          'No valid container or canvas found for AudioMotionAnalyzer with audio element.'
-        );
-      }
-    }
+  if (props.source) {
+    const source =
+      props.source instanceof HTMLMediaElement || props.source instanceof AudioNode
+        ? props.source
+        : props.source.value;
+    // TODO
   } else if (props.stream) {
-    if (source) {
-      source.disconnect();
-      source = null;
+    if (streamSource) {
+      streamSource.disconnect();
+      streamSource = null;
     }
     const context = injectedContext.value || new AudioContext();
-    source = context.createMediaStreamSource(props.stream);
+    streamSource = context.createMediaStreamSource(props.stream);
 
-    const width = canvas ? canvas.width : container?.clientWidth;
-    const height = canvas ? canvas.height : container?.clientHeight;
+    const width = props.width ? props.width / window.devicePixelRatio : undefined;
+    const height = props.height ? props.height / window.devicePixelRatio : undefined;
+
     const options = {
       alphaBars: props.alphaBars,
       ansiBands: props.ansiBands,
@@ -222,6 +247,7 @@ const setupAnalyzer = async () => {
       linearAmplitude: props.linearAmplitude,
       linearBoost: Math.max(props.linearBoost, 1),
       lineWidth: Math.max(props.lineWidth || 0, 0),
+      loRes: props.loRes,
       lumiBars: props.lumiBars,
       maxDecibels: props.maxDecibels,
       minDecibels: props.minDecibels,
@@ -245,36 +271,45 @@ const setupAnalyzer = async () => {
       reflexRatio: Math.max(0, Math.min(props.reflexRatio ?? 0, 1)),
       roundBars: props.roundBars,
       showBgColor: props.showBgColor,
-      showFPS: props.showFPS,
+      showFPS: props.showFps,
       showPeaks: props.showPeaks,
       showScaleX: props.showScaleX,
       showScaleY: props.showScaleY,
       smoothing: Math.max(0, Math.min(props.smoothing ?? 0, 1)),
       spinSpeed: props.spinSpeed || 0,
       splitGradient: props.splitGradient || false,
+      start: props.start || false,
       trueLeds: props.trueLeds || false,
+      useCanvas: !props.headless,
       volume: Math.max(0, props.volume || 1),
       weightingFilter: props.weightingFilter as AudioMotionWeightingFilter,
       width,
-      ...(canvas ? { canvas } : {}),
     };
 
-    analyzer = canvas
-      ? new AudioMotion(options)
-      : container
-        ? new AudioMotion(container, options)
-        : null;
+    analyzer = new AudioMotion(container, options);
 
     if (analyzer) {
-      if (canvas) {
-        analyzer.showBgColor = false;
-        registerGradients();
-      }
+      registerGradients();
+
       analyzer.gradient = props.gradient;
       if (props.gradientLeft) analyzer.gradientLeft = props.gradientLeft;
       if (props.gradientRight) analyzer.gradientRight = props.gradientRight;
 
-      analyzer.connectInput(source);
+      if (props.ledPreset) {
+        const params = ledParams.value.find((p) => p.name === props.ledPreset);
+        if (params) {
+          analyzer.setLedParams(params.params);
+        }
+      }
+
+      if (props.onCanvasDraw) {
+        analyzer.onCanvasDraw = props.onCanvasDraw;
+      }
+      if (props.onCanvasResize) {
+        analyzer.onCanvasResize = props.onCanvasResize;
+      }
+
+      analyzer.connectInput(streamSource);
     } else {
       console.error(
         'No valid container or canvas found for AudioMotionAnalyzer with media stream.'
@@ -287,34 +322,34 @@ const setupAnalyzer = async () => {
   }
 };
 
-const searchCanvas = (): HTMLCanvasElement | null => {
-  const el = unref(noDisplayElement);
-  return el
-    ? getTypedElementAmongSiblings(
-        el,
-        (el): el is HTMLCanvasElement => el instanceof HTMLCanvasElement
-      )
-    : null;
-};
-
-const searchContainer = (): HTMLElement | null => {
-  const el = unref(noDisplayElement);
-  return el ? getContainer(el) : null;
-};
-
 const cleanUp = () => {
   if (analyzer) {
     analyzer.destroy();
     analyzer = null;
   }
-  if (source) {
-    source.disconnect();
-    source = null;
+  if (streamSource) {
+    streamSource.disconnect();
+    streamSource = null;
   }
 };
 
 watch(
-  () => [props.stream, props.audio, injectedContext.value],
+  () => [props.onCanvasDraw, props.onCanvasResize],
+  ([newDrawHandler, newResizeHandler]) => {
+    nextTick(() => {
+      if (analyzer) {
+        analyzer.onCanvasDraw = newDrawHandler as OnCanvasDrawFunction | undefined;
+        analyzer.onCanvasResize = newResizeHandler as OnCanvasResizeFunction | undefined;
+      }
+    });
+  },
+  {
+    immediate: true,
+  }
+);
+
+watch(
+  () => [props.stream, props.source, injectedContext.value],
   () => {
     nextTick(async () => {
       await setupAnalyzer();
@@ -325,12 +360,27 @@ watch(
 
 watch(
   () => gradients.value,
-  async () => {
+  () => {
     if (analyzer) {
       registerGradients();
     }
   },
   { immediate: true }
+);
+
+watch(
+  () => [props.ledPreset, ledParams.value],
+  () => {
+    nextTick(() => {
+      if (analyzer) {
+        const params = ledParams.value.find((p) => p.name === props.ledPreset);
+        if (params) {
+          analyzer.setLedParams(params.params);
+        }
+      }
+    });
+  },
+  { immediate: true, deep: true }
 );
 
 watch(
@@ -360,10 +410,12 @@ watchEffect(
       if (props.gradientLeft) analyzer.gradientLeft = props.gradientLeft;
       if (props.gradientRight) analyzer.gradientRight = props.gradientRight;
       analyzer.gravity = props.gravity || 3.8;
+      if (props.height) analyzer.height = props.height / window.devicePixelRatio;
       analyzer.ledBars = !!props.ledBars;
       analyzer.linearAmplitude = !!props.linearAmplitude;
       analyzer.linearBoost = Math.max(props.linearBoost, 1);
       analyzer.lineWidth = Math.max(props.lineWidth || 0, 0);
+      analyzer.loRes = !!props.loRes;
       analyzer.lumiBars = !!props.lumiBars;
       analyzer.maxDecibels = props.maxDecibels;
       analyzer.minDecibels = props.minDecibels;
@@ -387,28 +439,84 @@ watchEffect(
       analyzer.reflexRatio = Math.max(0, Math.min(props.reflexRatio ?? 0, 1));
       analyzer.roundBars = !!props.roundBars;
       analyzer.showBgColor = !!props.showBgColor;
-      analyzer.showFPS = !!props.showFPS;
+      analyzer.showFPS = !!props.showFps;
       analyzer.showPeaks = !!props.showPeaks;
       analyzer.showScaleX = !!props.showScaleX;
       analyzer.showScaleY = !!props.showScaleY;
       analyzer.smoothing = Math.max(0, Math.min(props.smoothing ?? 0.5, 1));
       analyzer.spinSpeed = props.spinSpeed || 0;
       analyzer.splitGradient = !!props.splitGradient;
+      props.start ? analyzer.start() : analyzer.stop();
       analyzer.trueLeds = !!props.trueLeds;
       analyzer.volume = Math.max(0, props.volume || 1);
       analyzer.weightingFilter = (props.weightingFilter || '') as AudioMotionWeightingFilter;
+      if (props.width) analyzer.width = props.width / window.devicePixelRatio;
     }
   },
-  { flush: 'pre' }
+  { flush: 'post' }
 );
 
 onUnmounted(() => {
   cleanUp();
 });
+
+defineExpose({
+  instance: computed(() => analyzer),
+  version: computed(() => AudioMotion.version),
+  canvas,
+  audioCtx,
+  connectedSources,
+  isAlphaBars,
+  isBandsMode,
+  isDestroyed,
+  isFullscreen,
+  isLedBars,
+  isLumiBars,
+  isOctaveBands,
+  isOn,
+  isOutlineBars,
+  isRoundBars,
+
+  start,
+  stop,
+  connectInput,
+  disconnectInput,
+  disconnectOutput,
+  getBars,
+  getEnergy,
+  getOptions,
+  setLedParams,
+});
 </script>
 
 <template>
-  <!-- Hacky way to get content from this renderless component without forcing the user to set explicit width and height to its canvas -->
-  <div ref="noDisplayRef" class="hidden z-[-9999]" />
-  <slot data-slot="audio-motion-analyzer" />
+  <div ref="containerRef" :class="cn('w-full min-w-full', props.class)"></div>
+  <!-- Use this slot to create e.g. some `AudioMotionGradient`. See the Expose section to get the list of value and functions passed to the slot. -->
+  <slot
+    data-slot="audio-motion-analyzer"
+    :instance="analyzer"
+    :version="AudioMotion.version"
+    :canvas="canvas"
+    :audioCtx="audioCtx"
+    :connectedSources="connectedSources"
+    :isAlphaBars="isAlphaBars"
+    :isBandsMode="isBandsMode"
+    :isDestroyed="isDestroyed"
+    :isFullscreen="isFullscreen"
+    :isLedBars="isLedBars"
+    :isLumiBars="isLumiBars"
+    :isOctaveBands="isOctaveBands"
+    :isOn="isOn"
+    :isOutlineBars="isOutlineBars"
+    :isRoundBars="isRoundBars"
+    :start="start"
+    :stop="stop"
+    :connectInput="connectInput"
+    :disconnectInput="disconnectInput"
+    :disconnectOutput="disconnectOutput"
+    :getBars="getBars"
+    :getEnergy="getEnergy"
+    :getOptions="getOptions"
+    :setLedParams="setLedParams"
+  />
 </template>

@@ -1,18 +1,16 @@
 ---
 seo:
-  title: Write beautiful docs with Markdown
-  description: Ship fast, flexible, and SEO-optimized documentation with beautiful
-    design out of the box. Docus brings together the best of the Nuxt ecosystem.
-    Powered by Nuxt UI.
+  title: Create medias-based interfaces in a simple and elegant way.
+  description: AssemblerUI is a modern and modular UI component library to quickly create beautiful, consistent, and high-performance web applications based on medias.
 ---
 
 
 ::u-page-hero
 #title
-AssemblerUI: Build your interfaces with elegance
+Create medias-based interfaces in a simple and elegant way.
 
 #description
-A modern and modular UI component library to quickly create beautiful, consistent, and high-performance web applications.
+A modern and modular UI component library to quickly create beautiful, consistent, and high-performance web applications based on medias.
 
 AssemblerUI accelerates interface development with reusable components, modern design, and easy integration with Nuxt/Vue.
 
