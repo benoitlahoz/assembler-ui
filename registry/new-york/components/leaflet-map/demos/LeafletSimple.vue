@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { LeafletMap, LeafletTileLayer } from '~~/registry/new-york/components/leaflet-map';
+import {
+  LeafletMap,
+  LeafletTileLayer,
+  LeafletMarker,
+} from '~~/registry/new-york/components/leaflet-map';
 </script>
 
 <template>
@@ -12,6 +16,7 @@ import { LeafletMap, LeafletTileLayer } from '~~/registry/new-york/components/le
           url-template="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
+        <LeafletMarker />
       </LeafletMap>
     </div>
   </ClientOnly>

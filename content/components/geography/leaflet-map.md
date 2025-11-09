@@ -11,7 +11,11 @@ description:
   :::tabs-item{icon="i-lucide-code" label="Code"}
 ```vue
 <script setup lang="ts">
-import { LeafletMap, LeafletTileLayer } from "@/components/ui/leaflet-map";
+import {
+  LeafletMap,
+  LeafletTileLayer,
+  LeafletMarker,
+} from "@/components/ui/leaflet-map";
 </script>
 
 <template>
@@ -28,6 +32,7 @@ import { LeafletMap, LeafletTileLayer } from "@/components/ui/leaflet-map";
           url-template="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
+        <LeafletMarker />
       </LeafletMap>
     </div>
   </ClientOnly>
@@ -74,12 +79,17 @@ import type { Map, TileLayerOptions } from "leaflet";
 
 export { default as LeafletMap } from "./LeafletMap.vue";
 export { default as LeafletTileLayer } from "./LeafletTileLayer.vue";
+export { default as LeafletMarker } from "./LeafletMarker.vue";
 
 export const LeafletMapKey: InjectionKey<Ref<Map | null>> =
   Symbol("LeafletMap");
 export const LeafletTileLayersKey: InjectionKey<
   Ref<TileLayerOptions & { name: string } & { urlTemplate: string }>
 > = Symbol("LeafletTileLayerOptions");
+
+export type { LeafletMapProps } from "./LeafletMap.vue";
+export type { LeafletTileLayerProps } from "./LeafletTileLayer.vue";
+export type { LeafletMarkerProps } from "./LeafletMarker.vue";
 ```
 
 ```vue [src/components/ui/leaflet-map/LeafletMap.vue]
@@ -123,6 +133,8 @@ const map = ref<L.Map | null>(null);
 const tileLayers = ref<
   Array<L.TileLayerOptions & { name: string } & { urlTemplate: string }>
 >([]);
+const currentTileLayer = ref<L.TileLayer | null>(null);
+
 provide<Ref<L.Map | null>>(LeafletMapKey, map as any);
 provide<
   Ref<Array<L.TileLayerOptions & { name: string } & { urlTemplate: string }>>
@@ -162,25 +174,42 @@ watch(
 watch(
   () => props.tileLayer,
   () => {
-    if (!map.value) {
-      map.value = L.map(mapName.value).setView(
-        [centerLat.value, centerLng.value],
-        zoom.value,
-      );
-    }
-
     if (map.value) {
       const layerOptions = tileLayerForName();
       if (layerOptions) {
-        console.log("DD WATCH TILELAYER");
-        L.tileLayer(layerOptions.urlTemplate, layerOptions).addTo(
-          map.value as any,
-        );
+        if (currentTileLayer.value) {
+          currentTileLayer.value.remove();
+        }
+        currentTileLayer.value = L.tileLayer(
+          layerOptions.urlTemplate,
+          layerOptions,
+        ).addTo(map.value as any);
       }
     }
   },
   { immediate: true, deep: true },
 );
+
+onMounted(() => {
+  nextTick(() => {
+    map.value = L.map(mapName.value).setView(
+      [centerLat.value, centerLng.value],
+      zoom.value,
+    );
+    if (props.tileLayer) {
+      const layerOptions = tileLayerForName();
+      if (layerOptions) {
+        if (currentTileLayer.value) {
+          currentTileLayer.value.remove();
+        }
+        currentTileLayer.value = L.tileLayer(
+          layerOptions.urlTemplate,
+          layerOptions,
+        ).addTo(map.value as any);
+      }
+    }
+  });
+});
 </script>
 
 <template>
@@ -192,6 +221,65 @@ watch(
     <slot />
   </div>
 </template>
+```
+
+```vue [src/components/ui/leaflet-map/LeafletMarker.vue]
+<script setup lang="ts">
+import { inject, watch, ref, type Ref, nextTick } from "vue";
+import * as L from "leaflet";
+import { LeafletMapKey } from ".";
+
+export interface LeafletMarkerProps {
+  lat?: number | string;
+  lng?: number | string;
+}
+
+const props = withDefaults(defineProps<LeafletMarkerProps>(), {
+  lat: 43.280608,
+  lng: 5.350242,
+});
+
+const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
+
+const marker = ref(L.marker([Number(props.lat), Number(props.lng)]));
+
+watch(
+  () => [props.lat, props.lng],
+  ([newLat, newLng]) => {
+    nextTick(() => {
+      if (map.value && newLat && newLng) {
+        if (marker.value) {
+          marker.value.setLatLng([Number(newLat), Number(newLng)]);
+        } else {
+          marker.value = L.marker([Number(newLat), Number(newLng)]);
+          marker.value.addTo(map.value);
+        }
+      } else {
+        if (marker.value) {
+          marker.value.remove();
+          marker.value = null as any;
+        }
+      }
+    });
+  },
+  { immediate: true, deep: true, flush: "post" },
+);
+
+watch(
+  () => map.value,
+  (newMap) => {
+    if (newMap) {
+      if (!marker.value) {
+        marker.value = L.marker([Number(props.lat), Number(props.lng)]);
+      }
+      marker.value.addTo(newMap);
+    }
+  },
+  { immediate: true },
+);
+</script>
+
+<template><slot /></template>
 ```
 
 ```vue [src/components/ui/leaflet-map/LeafletTileLayer.vue]
@@ -269,6 +357,30 @@ watchEffect(() => {
 |-----|-------|------|-------------|
 | `LeafletMapKey`{.primary .text-primary} | `map as any` | `Ref<L.Map \| null>` | — |
 | `LeafletTileLayersKey`{.primary .text-primary} | `tileLayers as any` | `Ref<Array<L.TileLayerOptions & { name: string } & { urlTemplate: string }>>` | — |
+
+---
+
+## LeafletMarker
+::hr-underline
+::
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `lat`{.primary .text-primary} | `number \| string` | 43.280608 |  |
+| `lng`{.primary .text-primary} | `number \| string` | 5.350242 |  |
+
+  ### Slots
+| Name | Description |
+|------|-------------|
+| `default`{.primary .text-primary} | — |
+
+  ### Inject
+| Key | Default | Type | Description |
+|-----|--------|------|-------------|
+| `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
 
 ---
 
