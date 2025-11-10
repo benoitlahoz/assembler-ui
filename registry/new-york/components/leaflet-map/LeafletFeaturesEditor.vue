@@ -11,7 +11,7 @@ export interface DrawHandlerOptions {
 
 export interface LeafletFeaturesEditorProps {
   enabled?: boolean;
-  mode?: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | null;
+  mode?: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'move' | 'edit' | null;
   shapeOptions?: any;
   repeatMode?: boolean;
 }
@@ -32,7 +32,11 @@ const emit = defineEmits<{
   (e: 'draw:created', event: DrawEvent): void;
   (e: 'draw:drawstart', event: { layerType: string }): void;
   (e: 'draw:drawstop', event: { layerType: string }): void;
-  (e: 'mode-changed', mode: string | null): void;
+  (
+    e: 'mode-changed',
+    mode: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | null
+  ): void;
+  (e: 'edit-mode-changed', mode: 'move' | 'edit' | null): void;
 }>();
 
 const L = inject(LeafletModuleKey, ref());
@@ -553,7 +557,18 @@ watch(
       activeHandler.value = null;
     }
 
-    // Enable new handler
+    // Handle edit modes (move and edit)
+    if (newMode === 'move' || newMode === 'edit') {
+      emit('edit-mode-changed', newMode);
+      return;
+    }
+
+    // If switching away from edit modes
+    if (oldMode === 'move' || oldMode === 'edit') {
+      emit('edit-mode-changed', null);
+    }
+
+    // Enable new drawing handler
     if (newMode) {
       let handler = null;
       switch (newMode) {

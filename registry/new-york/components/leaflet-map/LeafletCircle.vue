@@ -18,6 +18,7 @@ export interface LeafletCircleProps {
   lng?: number | string;
   radius?: number | string;
   editable?: boolean;
+  draggable?: boolean;
   class?: HTMLAttributes['class'];
 }
 
@@ -26,6 +27,7 @@ const props = withDefaults(defineProps<LeafletCircleProps>(), {
   lng: 5.350242,
   radius: 100,
   editable: false,
+  draggable: false,
 });
 
 const emit = defineEmits<{
@@ -41,6 +43,11 @@ const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const circle = ref<L.Circle | null>(null);
 const centerMarker = ref<L.Marker | null>(null);
 const radiusMarker = ref<L.Marker | null>(null);
+
+// Drag state
+const isDragging = ref(false);
+let dragStartLatLng: any = null;
+let dragStartMousePoint: any = null;
 
 const getColors = () => {
   const classNames = props.class ? props.class.toString().split(' ') : [];
@@ -70,6 +77,74 @@ const clearEditMarkers = () => {
   }
 };
 
+const enableDragging = () => {
+  if (!circle.value || !L.value || !map.value) return;
+
+  const onMouseDown = (e: any) => {
+    if (!map.value || !circle.value) return;
+    isDragging.value = true;
+    dragStartLatLng = circle.value.getLatLng();
+    dragStartMousePoint = e.containerPoint;
+    L.value!.DomEvent.stopPropagation(e);
+    map.value.dragging.disable();
+    map.value.getContainer().style.cursor = 'move';
+  };
+
+  circle.value.on('mousedown', onMouseDown);
+};
+
+const disableDragging = () => {
+  if (!circle.value) return;
+  circle.value.off('mousedown');
+  isDragging.value = false;
+};
+
+const setupMapDragHandlers = () => {
+  if (!map.value || !L.value) return;
+
+  const onMouseMove = (e: any) => {
+    if (!isDragging.value || !map.value || !circle.value) return;
+
+    const currentPoint = e.containerPoint;
+    const dx = currentPoint.x - dragStartMousePoint.x;
+    const dy = currentPoint.y - dragStartMousePoint.y;
+
+    const startPoint = map.value.latLngToContainerPoint(dragStartLatLng);
+    const newPoint = L.value!.point(startPoint.x + dx, startPoint.y + dy);
+    const newLatLng = map.value.containerPointToLatLng(newPoint);
+
+    circle.value.setLatLng(newLatLng);
+
+    // Update radius marker if in edit mode
+    if (radiusMarker.value && props.editable) {
+      const radius = circle.value.getRadius();
+      const radiusLatLng = L.value!.latLng(
+        newLatLng.lat,
+        newLatLng.lng + radius / 111320 / Math.cos((newLatLng.lat * Math.PI) / 180)
+      );
+      radiusMarker.value.setLatLng(radiusLatLng);
+    }
+  };
+
+  const onMouseUp = () => {
+    if (!isDragging.value || !map.value || !circle.value) return;
+    isDragging.value = false;
+    const newLatLng = circle.value.getLatLng();
+    emit('update:lat', newLatLng.lat);
+    emit('update:lng', newLatLng.lng);
+    map.value.dragging.enable();
+    map.value.getContainer().style.cursor = '';
+  };
+
+  map.value.on('mousemove', onMouseMove);
+  map.value.on('mouseup', onMouseUp);
+
+  // Also handle mouseup on circle
+  if (circle.value) {
+    circle.value.on('mouseup', onMouseUp);
+  }
+};
+
 const enableEditing = () => {
   if (!circle.value || !L.value || !map.value) return;
 
@@ -78,68 +153,39 @@ const enableEditing = () => {
   const center = circle.value.getLatLng();
   const radius = circle.value.getRadius();
 
-  // Marqueur pour déplacer le centre
-  centerMarker.value = L.value
-    .marker(center, {
-      draggable: true,
-      icon: L.value.divIcon({
-        className: 'leaflet-editing-icon',
-        html: '<div style="width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #3388ff;"></div>',
-        iconSize: [10, 10],
-      }),
-    })
-    .addTo(map.value);
+  // Only create radius marker in edit mode
+  if (props.editable) {
+    const radiusLatLng = L.value.latLng(
+      center.lat,
+      center.lng + radius / 111320 / Math.cos((center.lat * Math.PI) / 180)
+    );
+    radiusMarker.value = L.value
+      .marker(radiusLatLng, {
+        draggable: true,
+        icon: L.value.divIcon({
+          className: 'leaflet-editing-icon',
+          html: '<div></div>',
+          iconSize: [8, 8],
+        }),
+      })
+      .addTo(map.value);
 
-  centerMarker.value.on('drag', () => {
-    const newCenter = centerMarker.value!.getLatLng();
-    circle.value!.setLatLng(newCenter);
-    if (radiusMarker.value) {
-      const bearing = 90; // Est
-      const radiusLatLng = L.value!.latLng(
-        newCenter.lat,
-        newCenter.lng + radius / 111320 / Math.cos((newCenter.lat * Math.PI) / 180)
-      );
-      radiusMarker.value.setLatLng(radiusLatLng);
-    }
-  });
+    radiusMarker.value.on('drag', () => {
+      const center = circle.value!.getLatLng();
+      const radiusPoint = radiusMarker.value!.getLatLng();
+      const newRadius = center.distanceTo(radiusPoint);
+      circle.value!.setRadius(newRadius);
+    });
 
-  centerMarker.value.on('dragend', () => {
-    const newCenter = centerMarker.value!.getLatLng();
-    emit('update:lat', newCenter.lat);
-    emit('update:lng', newCenter.lng);
-  });
-
-  // Marqueur pour modifier le rayon
-  const radiusLatLng = L.value.latLng(
-    center.lat,
-    center.lng + radius / 111320 / Math.cos((center.lat * Math.PI) / 180)
-  );
-  radiusMarker.value = L.value
-    .marker(radiusLatLng, {
-      draggable: true,
-      icon: L.value.divIcon({
-        className: 'leaflet-editing-icon',
-        html: '<div style="width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #3388ff;"></div>',
-        iconSize: [8, 8],
-      }),
-    })
-    .addTo(map.value);
-
-  radiusMarker.value.on('drag', () => {
-    const center = circle.value!.getLatLng();
-    const radiusPoint = radiusMarker.value!.getLatLng();
-    const newRadius = center.distanceTo(radiusPoint);
-    circle.value!.setRadius(newRadius);
-  });
-
-  radiusMarker.value.on('dragend', () => {
-    const newRadius = circle.value!.getRadius();
-    emit('update:radius', newRadius);
-  });
+    radiusMarker.value.on('dragend', () => {
+      const newRadius = circle.value!.getRadius();
+      emit('update:radius', newRadius);
+    });
+  }
 };
 
 watch(
-  () => [map.value, props.lat, props.lng, props.radius, props.editable],
+  () => [map.value, props.lat, props.lng, props.radius, props.editable, props.draggable],
   () => {
     nextTick(() => {
       if (
@@ -149,6 +195,7 @@ watch(
         !isNaN(Number(props.lng)) &&
         !isNaN(Number(props.radius))
       ) {
+        // Create or update circle
         if (circle.value) {
           circle.value.setLatLng([Number(props.lat), Number(props.lng)]);
           circle.value.setRadius(Number(props.radius));
@@ -157,7 +204,12 @@ watch(
             radius: Number(props.radius),
           });
           circle.value.addTo(map.value);
+
+          // Setup map-level drag handlers once
+          setupMapDragHandlers();
         }
+
+        // Apply colors
         const colors = getColors();
         circle.value.setStyle({
           color: colors.color,
@@ -165,9 +217,18 @@ watch(
           fillOpacity: colors.fillOpacity,
         });
 
-        if (props.editable) {
-          enableEditing();
+        // Handle draggable mode
+        if (props.draggable) {
+          enableDragging();
+          clearEditMarkers(); // No edit markers in drag mode
         } else {
+          disableDragging();
+        }
+
+        // Handle editable mode
+        if (props.editable && !props.draggable) {
+          enableEditing();
+        } else if (!props.draggable) {
           clearEditMarkers();
         }
       } else {

@@ -8,6 +8,7 @@ export interface LeafletPolylineProps {
   latlngs?: Array<[number, number]> | Array<{ lat: number; lng: number }>;
   weight?: number;
   editable?: boolean;
+  draggable?: boolean;
   class?: HTMLAttributes['class'];
 }
 
@@ -15,6 +16,7 @@ const props = withDefaults(defineProps<LeafletPolylineProps>(), {
   latlngs: () => [],
   weight: 3,
   editable: false,
+  draggable: false,
 });
 
 const emit = defineEmits<{
@@ -28,6 +30,11 @@ const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const polyline = ref<L.Polyline | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
 const midpointMarkers = ref<L.Marker[]>([]);
+const isDragging = ref(false);
+
+// Variables pour le drag
+let dragStartLatLngs: L.LatLng[] = [];
+let dragStartMousePoint: L.Point | null = null;
 
 const normalizeLatLngs = (
   latlngs: Array<[number, number]> | Array<{ lat: number; lng: number }>
@@ -173,8 +180,90 @@ const createMidpoints = () => {
   }
 };
 
+const enableDragging = () => {
+  if (!polyline.value || !map.value) return;
+
+  polyline.value.on('mousedown', (e: L.LeafletMouseEvent) => {
+    L.value!.DomEvent.stopPropagation(e);
+    isDragging.value = true;
+
+    // Sauvegarder les positions initiales
+    dragStartLatLngs = (polyline.value!.getLatLngs() as L.LatLng[]).map((ll) =>
+      L.value!.latLng(ll.lat, ll.lng)
+    );
+    dragStartMousePoint = map.value!.latLngToContainerPoint(e.latlng);
+
+    // Setup map handlers
+    setupMapDragHandlers();
+
+    // Curseur et désactiver le drag de la carte
+    if (map.value) {
+      map.value.getContainer().style.cursor = 'move';
+      map.value.dragging.disable();
+    }
+  });
+};
+
+const disableDragging = () => {
+  if (!polyline.value) return;
+  polyline.value.off('mousedown');
+};
+
+const setupMapDragHandlers = () => {
+  if (!map.value) return;
+
+  const onMouseMove = (e: L.LeafletMouseEvent) => {
+    if (!isDragging.value || !dragStartMousePoint || !map.value) return;
+
+    const currentPoint = map.value.latLngToContainerPoint(e.latlng);
+    const deltaX = currentPoint.x - dragStartMousePoint.x;
+    const deltaY = currentPoint.y - dragStartMousePoint.y;
+
+    // Calculer les nouvelles positions
+    const newLatLngs = dragStartLatLngs.map((startLatLng) => {
+      const startPoint = map.value!.latLngToContainerPoint(startLatLng);
+      const newPoint = L.value!.point(startPoint.x + deltaX, startPoint.y + deltaY);
+      return map.value!.containerPointToLatLng(newPoint);
+    });
+
+    // Mettre à jour la polyline
+    polyline.value!.setLatLngs(newLatLngs);
+  };
+
+  const onMouseUp = () => {
+    if (!isDragging.value) return;
+
+    isDragging.value = false;
+
+    // Réactiver le drag de la carte
+    if (map.value) {
+      map.value.getContainer().style.cursor = '';
+      map.value.dragging.enable();
+      map.value.off('mousemove', onMouseMove);
+      map.value.off('mouseup', onMouseUp);
+    }
+
+    // Émettre la mise à jour
+    if (polyline.value) {
+      const updatedLatLngs = (polyline.value.getLatLngs() as L.LatLng[]).map((ll) => [
+        ll.lat,
+        ll.lng,
+      ]) as Array<[number, number]>;
+      emit('update:latlngs', updatedLatLngs);
+    }
+  };
+
+  map.value.on('mousemove', onMouseMove);
+  map.value.on('mouseup', onMouseUp);
+
+  // Cleanup sur mouseup de la polyline aussi
+  if (polyline.value) {
+    polyline.value.once('mouseup', onMouseUp);
+  }
+};
+
 watch(
-  () => [map.value, props.latlngs, props.weight, props.editable],
+  () => [map.value, props.latlngs, props.weight, props.editable, props.draggable],
   () => {
     nextTick(() => {
       if (map.value && L.value && props.latlngs && props.latlngs.length > 0) {
@@ -198,10 +287,16 @@ watch(
           polyline.value.addTo(map.value);
         }
 
-        if (props.editable) {
+        // Gestion des modes : draggable OU editable, pas les deux
+        if (props.draggable && !props.editable) {
+          clearEditMarkers();
+          enableDragging();
+        } else if (props.editable && !props.draggable) {
+          disableDragging();
           enableEditing();
         } else {
           clearEditMarkers();
+          disableDragging();
         }
       } else {
         if (polyline.value) {

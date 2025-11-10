@@ -21,8 +21,13 @@ const mapRef = ref<LeafletMapExposed | null>(null);
 // Mode édition global
 const editMode = ref(false);
 
-// Current drawing mode
-const currentMode = ref<'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | null>(null);
+// Current drawing/editing mode
+const currentMode = ref<
+  'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'move' | 'edit' | null
+>(null);
+
+// Current edit mode (move or edit points)
+const currentEditMode = ref<'move' | 'edit' | null>(null);
 
 // Données pour les différentes shapes
 const markers = ref([
@@ -73,7 +78,15 @@ const rectangles = ref([
   },
 ]);
 
-// État d'édition
+// État d'édition - separate move and edit
+const moveableShapes = ref({
+  markers: false,
+  circles: false,
+  polylines: false,
+  polygons: false,
+  rectangles: false,
+});
+
 const editableShapes = ref({
   markers: false,
   circles: false,
@@ -84,21 +97,62 @@ const editableShapes = ref({
 
 // Synchroniser l'état d'édition des shapes avec le mode global
 watch(editMode, (enabled) => {
-  editableShapes.value.markers = enabled;
-  editableShapes.value.circles = enabled;
-  editableShapes.value.polylines = enabled;
-  editableShapes.value.polygons = enabled;
-  editableShapes.value.rectangles = enabled;
+  if (!enabled) {
+    // Reset all edit states when disabling edit mode
+    Object.keys(moveableShapes.value).forEach((key) => {
+      moveableShapes.value[key as keyof typeof moveableShapes.value] = false;
+    });
+    Object.keys(editableShapes.value).forEach((key) => {
+      editableShapes.value[key as keyof typeof editableShapes.value] = false;
+    });
+  }
 });
 
+// Watch edit mode changes from features editor
+const handleEditModeChanged = (mode: 'move' | 'edit' | null) => {
+  currentEditMode.value = mode;
+
+  if (mode === 'move') {
+    // Enable move (draggable) for all shapes
+    Object.keys(moveableShapes.value).forEach((key) => {
+      moveableShapes.value[key as keyof typeof moveableShapes.value] = true;
+    });
+    // Disable edit for all shapes
+    Object.keys(editableShapes.value).forEach((key) => {
+      editableShapes.value[key as keyof typeof editableShapes.value] = false;
+    });
+  } else if (mode === 'edit') {
+    // Disable move for all shapes
+    Object.keys(moveableShapes.value).forEach((key) => {
+      moveableShapes.value[key as keyof typeof moveableShapes.value] = false;
+    });
+    // Enable edit (points) for all shapes
+    Object.keys(editableShapes.value).forEach((key) => {
+      editableShapes.value[key as keyof typeof editableShapes.value] = true;
+    });
+  } else {
+    // Disable both move and edit
+    Object.keys(moveableShapes.value).forEach((key) => {
+      moveableShapes.value[key as keyof typeof moveableShapes.value] = false;
+    });
+    Object.keys(editableShapes.value).forEach((key) => {
+      editableShapes.value[key as keyof typeof editableShapes.value] = false;
+    });
+  }
+};
+
 // Handle mode selection from control
-const handleModeSelected = (mode: string | null) => {
-  currentMode.value = mode as 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | null;
+const handleModeSelected = (
+  mode: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'move' | 'edit' | null
+) => {
+  currentMode.value = mode;
 };
 
 // Handle mode change from editor (for sync)
-const handleModeChanged = (mode: string | null) => {
-  currentMode.value = mode as 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | null;
+const handleModeChanged = (
+  mode: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | null
+) => {
+  currentMode.value = mode;
 };
 
 // Gestion de la création de nouvelles formes
@@ -257,7 +311,9 @@ const onPolygonClosed = (id: number) => {
           position="topright"
           :edit-mode="editMode"
           :active-mode="currentMode"
-          :draw="{
+          :modes="{
+            move: true,
+            edit: true,
             marker: true,
             circle: true,
             polyline: true,
@@ -274,6 +330,7 @@ const onPolygonClosed = (id: number) => {
           :shape-options="{ color: '#3388ff', fillOpacity: 0.2 }"
           @draw:created="handleShapeCreated"
           @mode-changed="handleModeChanged"
+          @edit-mode-changed="handleEditModeChanged"
         />
 
         <LeafletMarker
@@ -281,6 +338,7 @@ const onPolygonClosed = (id: number) => {
           :key="`marker-${marker.id}`"
           :lat="marker.lat"
           :lng="marker.lng"
+          :draggable="moveableShapes.markers"
           :editable="editableShapes.markers"
           @update:lat="(lat) => updateMarker(marker.id, lat, marker.lng)"
           @update:lng="(lng) => updateMarker(marker.id, marker.lat, lng)"
@@ -293,6 +351,7 @@ const onPolygonClosed = (id: number) => {
           :lng="circle.lng"
           :radius="circle.radius"
           :class="circle.class"
+          :draggable="moveableShapes.circles"
           :editable="editableShapes.circles"
           @update:lat="(lat) => updateCircle(circle.id, { lat })"
           @update:lng="(lng) => updateCircle(circle.id, { lng })"
@@ -305,6 +364,7 @@ const onPolygonClosed = (id: number) => {
           :latlngs="polyline.latlngs"
           :weight="polyline.weight"
           :class="polyline.class"
+          :draggable="moveableShapes.polylines"
           :editable="editableShapes.polylines"
           @update:latlngs="(latlngs) => updatePolyline(polyline.id, latlngs)"
         />
@@ -314,8 +374,8 @@ const onPolygonClosed = (id: number) => {
           :key="`polygon-${polygon.id}`"
           :latlngs="polygon.latlngs"
           :class="polygon.class"
+          :draggable="moveableShapes.polygons"
           :editable="editableShapes.polygons"
-          :draggable="editableShapes.polygons"
           :auto-close="true"
           @update:latlngs="(latlngs) => updatePolygon(polygon.id, latlngs)"
           @closed="() => onPolygonClosed(polygon.id)"
@@ -326,8 +386,8 @@ const onPolygonClosed = (id: number) => {
           :key="`rectangle-${rectangle.id}`"
           :bounds="rectangle.bounds"
           :class="rectangle.class"
+          :draggable="moveableShapes.rectangles"
           :editable="editableShapes.rectangles"
-          :draggable="editableShapes.rectangles"
           @update:bounds="(bounds) => updateRectangle(rectangle.id, bounds)"
         />
       </LeafletMap>

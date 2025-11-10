@@ -391,6 +391,7 @@ export interface LeafletCircleProps {
   lng?: number | string;
   radius?: number | string;
   editable?: boolean;
+  draggable?: boolean;
   class?: HTMLAttributes["class"];
 }
 
@@ -399,6 +400,7 @@ const props = withDefaults(defineProps<LeafletCircleProps>(), {
   lng: 5.350242,
   radius: 100,
   editable: false,
+  draggable: false,
 });
 
 const emit = defineEmits<{
@@ -414,6 +416,10 @@ const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const circle = ref<L.Circle | null>(null);
 const centerMarker = ref<L.Marker | null>(null);
 const radiusMarker = ref<L.Marker | null>(null);
+
+const isDragging = ref(false);
+let dragStartLatLng: any = null;
+let dragStartMousePoint: any = null;
 
 const getColors = () => {
   const classNames = props.class ? props.class.toString().split(" ") : [];
@@ -447,6 +453,73 @@ const clearEditMarkers = () => {
   }
 };
 
+const enableDragging = () => {
+  if (!circle.value || !L.value || !map.value) return;
+
+  const onMouseDown = (e: any) => {
+    if (!map.value || !circle.value) return;
+    isDragging.value = true;
+    dragStartLatLng = circle.value.getLatLng();
+    dragStartMousePoint = e.containerPoint;
+    L.value!.DomEvent.stopPropagation(e);
+    map.value.dragging.disable();
+    map.value.getContainer().style.cursor = "move";
+  };
+
+  circle.value.on("mousedown", onMouseDown);
+};
+
+const disableDragging = () => {
+  if (!circle.value) return;
+  circle.value.off("mousedown");
+  isDragging.value = false;
+};
+
+const setupMapDragHandlers = () => {
+  if (!map.value || !L.value) return;
+
+  const onMouseMove = (e: any) => {
+    if (!isDragging.value || !map.value || !circle.value) return;
+
+    const currentPoint = e.containerPoint;
+    const dx = currentPoint.x - dragStartMousePoint.x;
+    const dy = currentPoint.y - dragStartMousePoint.y;
+
+    const startPoint = map.value.latLngToContainerPoint(dragStartLatLng);
+    const newPoint = L.value!.point(startPoint.x + dx, startPoint.y + dy);
+    const newLatLng = map.value.containerPointToLatLng(newPoint);
+
+    circle.value.setLatLng(newLatLng);
+
+    if (radiusMarker.value && props.editable) {
+      const radius = circle.value.getRadius();
+      const radiusLatLng = L.value!.latLng(
+        newLatLng.lat,
+        newLatLng.lng +
+          radius / 111320 / Math.cos((newLatLng.lat * Math.PI) / 180),
+      );
+      radiusMarker.value.setLatLng(radiusLatLng);
+    }
+  };
+
+  const onMouseUp = () => {
+    if (!isDragging.value || !map.value || !circle.value) return;
+    isDragging.value = false;
+    const newLatLng = circle.value.getLatLng();
+    emit("update:lat", newLatLng.lat);
+    emit("update:lng", newLatLng.lng);
+    map.value.dragging.enable();
+    map.value.getContainer().style.cursor = "";
+  };
+
+  map.value.on("mousemove", onMouseMove);
+  map.value.on("mouseup", onMouseUp);
+
+  if (circle.value) {
+    circle.value.on("mouseup", onMouseUp);
+  }
+};
+
 const enableEditing = () => {
   if (!circle.value || !L.value || !map.value) return;
 
@@ -455,67 +528,45 @@ const enableEditing = () => {
   const center = circle.value.getLatLng();
   const radius = circle.value.getRadius();
 
-  centerMarker.value = L.value
-    .marker(center, {
-      draggable: true,
-      icon: L.value.divIcon({
-        className: "leaflet-editing-icon",
-        html: '<div style="width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #3388ff;"></div>',
-        iconSize: [10, 10],
-      }),
-    })
-    .addTo(map.value);
+  if (props.editable) {
+    const radiusLatLng = L.value.latLng(
+      center.lat,
+      center.lng + radius / 111320 / Math.cos((center.lat * Math.PI) / 180),
+    );
+    radiusMarker.value = L.value
+      .marker(radiusLatLng, {
+        draggable: true,
+        icon: L.value.divIcon({
+          className: "leaflet-editing-icon",
+          html: "<div></div>",
+          iconSize: [8, 8],
+        }),
+      })
+      .addTo(map.value);
 
-  centerMarker.value.on("drag", () => {
-    const newCenter = centerMarker.value!.getLatLng();
-    circle.value!.setLatLng(newCenter);
-    if (radiusMarker.value) {
-      const bearing = 90;
-      const radiusLatLng = L.value!.latLng(
-        newCenter.lat,
-        newCenter.lng +
-          radius / 111320 / Math.cos((newCenter.lat * Math.PI) / 180),
-      );
-      radiusMarker.value.setLatLng(radiusLatLng);
-    }
-  });
+    radiusMarker.value.on("drag", () => {
+      const center = circle.value!.getLatLng();
+      const radiusPoint = radiusMarker.value!.getLatLng();
+      const newRadius = center.distanceTo(radiusPoint);
+      circle.value!.setRadius(newRadius);
+    });
 
-  centerMarker.value.on("dragend", () => {
-    const newCenter = centerMarker.value!.getLatLng();
-    emit("update:lat", newCenter.lat);
-    emit("update:lng", newCenter.lng);
-  });
-
-  const radiusLatLng = L.value.latLng(
-    center.lat,
-    center.lng + radius / 111320 / Math.cos((center.lat * Math.PI) / 180),
-  );
-  radiusMarker.value = L.value
-    .marker(radiusLatLng, {
-      draggable: true,
-      icon: L.value.divIcon({
-        className: "leaflet-editing-icon",
-        html: '<div style="width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #3388ff;"></div>',
-        iconSize: [8, 8],
-      }),
-    })
-    .addTo(map.value);
-
-  radiusMarker.value.on("drag", () => {
-    const center = circle.value!.getLatLng();
-    const radiusPoint = radiusMarker.value!.getLatLng();
-    const newRadius = center.distanceTo(radiusPoint);
-    circle.value!.setRadius(newRadius);
-  });
-
-  radiusMarker.value.on("dragend", () => {
-    const newRadius = circle.value!.getRadius();
-    emit("update:radius", newRadius);
-  });
+    radiusMarker.value.on("dragend", () => {
+      const newRadius = circle.value!.getRadius();
+      emit("update:radius", newRadius);
+    });
+  }
 };
 
 watch(
-  () => [map.value, props.lat, props.lng, props.radius, props.editable],
+  () => [
+    map.value,
+    props.lat,
+    props.lng,
+    props.radius,
+    props.editable,
+    props.draggable,
+  ],
   () => {
     nextTick(() => {
       if (
@@ -536,7 +587,10 @@ watch(
             },
           );
           circle.value.addTo(map.value);
+
+          setupMapDragHandlers();
         }
+
         const colors = getColors();
         circle.value.setStyle({
           color: colors.color,
@@ -544,9 +598,16 @@ watch(
           fillOpacity: colors.fillOpacity,
         });
 
-        if (props.editable) {
-          enableEditing();
+        if (props.draggable) {
+          enableDragging();
+          clearEditMarkers();
         } else {
+          disableDragging();
+        }
+
+        if (props.editable && !props.draggable) {
+          enableEditing();
+        } else if (!props.draggable) {
           clearEditMarkers();
         }
       } else {
@@ -1351,7 +1412,9 @@ export interface LeafletDrawControlProps {
   position?: ControlOptions["position"];
   editMode?: boolean;
   activeMode?: string | null;
-  draw?: {
+  modes?: {
+    move?: DrawButton | boolean;
+    edit?: DrawButton | boolean;
     marker?: DrawButton | boolean;
     circle?: DrawButton | boolean;
     polyline?: DrawButton | boolean;
@@ -1367,7 +1430,18 @@ const props = withDefaults(defineProps<LeafletDrawControlProps>(), {
 });
 
 const emit = defineEmits<{
-  (e: "mode-selected", mode: string | null): void;
+  (
+    e: "mode-selected",
+    mode:
+      | "marker"
+      | "circle"
+      | "polyline"
+      | "polygon"
+      | "rectangle"
+      | "move"
+      | "edit"
+      | null,
+  ): void;
 }>();
 
 const L = inject(LeafletModuleKey, ref());
@@ -1376,14 +1450,23 @@ const map = inject(LeafletMapKey, ref(null));
 const control = ref<any>(null);
 
 const shouldEnableButton = (type: string): boolean => {
-  if (!props.draw) return false;
-  const config = props.draw[type as keyof typeof props.draw];
+  if (!props.modes) return false;
+  const config = props.modes[type as keyof typeof props.modes];
   if (config === undefined) return false;
   if (typeof config === "boolean") return config;
   return config.enabled !== false;
 };
 
-const getIconSvg = (type: string): string => {
+const getIconSvg = (
+  type:
+    | "marker"
+    | "circle"
+    | "polyline"
+    | "polygon"
+    | "rectangle"
+    | "move"
+    | "edit",
+): string => {
   const color = "#333";
   const svgs: Record<string, string> = {
     marker: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}"/></svg>`,
@@ -1391,11 +1474,24 @@ const getIconSvg = (type: string): string => {
     polyline: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 17 L8 12 L13 15 L21 7" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="3" cy="17" r="2.5" fill="${color}"/><circle cx="8" cy="12" r="2.5" fill="${color}"/><circle cx="13" cy="15" r="2.5" fill="${color}"/><circle cx="21" cy="7" r="2.5" fill="${color}"/></svg>`,
     polygon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3 L21 8 L18 17 L6 17 L3 8 Z" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="12" cy="3" r="2.5" fill="${color}"/><circle cx="21" cy="8" r="2.5" fill="${color}"/><circle cx="18" cy="17" r="2.5" fill="${color}"/><circle cx="6" cy="17" r="2.5" fill="${color}"/><circle cx="3" cy="8" r="2.5" fill="${color}"/></svg>`,
     rectangle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="6" width="16" height="12" stroke="${color}" stroke-width="2.5" rx="1" fill="none"/></svg>`,
+    move: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 9L2 12L5 15M9 5L12 2L15 5M15 19L12 22L9 19M19 9L22 12L19 15" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="2" fill="${color}"/></svg>`,
+    edit: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 20 L4 16 L16 4 L20 8 L8 20 Z" fill="white" stroke="${color}" stroke-width="2" stroke-linejoin="round"/><path d="M15 5 L19 9" stroke="${color}" stroke-width="2" stroke-linecap="round"/></svg>`,
   };
   return svgs[type] || "";
 };
 
-const createButton = (container: HTMLElement, type: string, title: string) => {
+const createButton = (
+  container: HTMLElement,
+  type:
+    | "marker"
+    | "circle"
+    | "polyline"
+    | "polygon"
+    | "rectangle"
+    | "move"
+    | "edit",
+  title: string,
+) => {
   const button = L.value!.DomUtil.create(
     "div",
     "leaflet-draw-button",
@@ -1416,7 +1512,16 @@ const createButton = (container: HTMLElement, type: string, title: string) => {
   return button;
 };
 
-const toggleDrawMode = (type: string) => {
+const toggleDrawMode = (
+  type:
+    | "marker"
+    | "circle"
+    | "polyline"
+    | "polygon"
+    | "rectangle"
+    | "move"
+    | "edit",
+) => {
   if (props.activeMode === type) {
     emit("mode-selected", null);
   } else {
@@ -1459,7 +1564,13 @@ const createDrawControl = () => {
       L.value!.DomEvent.disableClickPropagation(container);
       L.value!.DomEvent.disableScrollPropagation(container);
 
-      if (props.draw) {
+      if (props.modes) {
+        if (shouldEnableButton("move")) {
+          createButton(container, "move", "Move shapes");
+        }
+        if (shouldEnableButton("edit")) {
+          createButton(container, "edit", "Edit points");
+        }
         if (shouldEnableButton("marker")) {
           createButton(container, "marker", "Draw a marker");
         }
@@ -1589,7 +1700,15 @@ export interface DrawHandlerOptions {
 
 export interface LeafletFeaturesEditorProps {
   enabled?: boolean;
-  mode?: "marker" | "circle" | "polyline" | "polygon" | "rectangle" | null;
+  mode?:
+    | "marker"
+    | "circle"
+    | "polyline"
+    | "polygon"
+    | "rectangle"
+    | "move"
+    | "edit"
+    | null;
   shapeOptions?: any;
   repeatMode?: boolean;
 }
@@ -1610,7 +1729,11 @@ const emit = defineEmits<{
   (e: "draw:created", event: DrawEvent): void;
   (e: "draw:drawstart", event: { layerType: string }): void;
   (e: "draw:drawstop", event: { layerType: string }): void;
-  (e: "mode-changed", mode: string | null): void;
+  (
+    e: "mode-changed",
+    mode: "marker" | "circle" | "polyline" | "polygon" | "rectangle" | null,
+  ): void;
+  (e: "edit-mode-changed", mode: "move" | "edit" | null): void;
 }>();
 
 const L = inject(LeafletModuleKey, ref());
@@ -2123,6 +2246,15 @@ watch(
       activeHandler.value = null;
     }
 
+    if (newMode === "move" || newMode === "edit") {
+      emit("edit-mode-changed", newMode);
+      return;
+    }
+
+    if (oldMode === "move" || oldMode === "edit") {
+      emit("edit-mode-changed", null);
+    }
+
     if (newMode) {
       let handler = null;
       switch (newMode) {
@@ -2373,9 +2505,11 @@ const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const polygon = ref<L.Polygon | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
 const midpointMarkers = ref<L.Marker[]>([]);
-const centerMarker = ref<L.Marker | null>(null);
 const firstPointMarker = ref<L.Marker | null>(null);
 const isDragging = ref(false);
+
+let dragStartLatLngs: L.LatLng[] = [];
+let dragStartMousePoint: L.Point | null = null;
 
 const normalizeLatLngs = (
   latlngs: Array<[number, number]> | Array<{ lat: number; lng: number }>,
@@ -2414,10 +2548,6 @@ const clearEditMarkers = () => {
   editMarkers.value = [];
   midpointMarkers.value.forEach((marker) => marker.remove());
   midpointMarkers.value = [];
-  if (centerMarker.value) {
-    centerMarker.value.remove();
-    centerMarker.value = null;
-  }
   if (firstPointMarker.value) {
     firstPointMarker.value.remove();
     firstPointMarker.value = null;
@@ -2473,10 +2603,6 @@ const enableEditing = () => {
   });
 
   createMidpoints();
-
-  if (props.draggable) {
-    createCenterMarker();
-  }
 };
 
 const createMidpoints = () => {
@@ -2499,8 +2625,8 @@ const createMidpoints = () => {
         draggable: true,
         icon: L.value.divIcon({
           className: "leaflet-editing-icon-midpoint",
-          html: '<div style="width:6px;height:6px;border-radius:50%;background:#fff;border:2px solid #3388ff;opacity:0.6;"></div>',
-          iconSize: [6, 6],
+          html: "<div></div>",
+          iconSize: [14, 14],
         }),
       })
       .addTo(map.value);
@@ -2550,78 +2676,80 @@ const createMidpoints = () => {
   }
 };
 
-const createCenterMarker = () => {
-  if (!polygon.value || !L.value || !map.value) return;
+const enableDragging = () => {
+  if (!polygon.value || !map.value) return;
 
-  const bounds = polygon.value.getBounds();
-  const center = bounds.getCenter();
+  polygon.value.on("mousedown", (e: L.LeafletMouseEvent) => {
+    L.value!.DomEvent.stopPropagation(e);
+    isDragging.value = true;
 
-  centerMarker.value = L.value
-    .marker(center, {
-      draggable: true,
-      icon: L.value.divIcon({
-        className: "leaflet-editing-icon-center",
-        html: '<div style="width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #ff8800;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
-        iconSize: [10, 10],
-      }),
-    })
-    .addTo(map.value);
-
-  let startLatLngs: L.LatLng[] = [];
-  let startCenter: L.LatLng | null = null;
-
-  centerMarker.value.on("dragstart", () => {
-    if (map.value) map.value.getContainer().style.cursor = "move";
-    startLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map((ll) =>
-      L.value!.latLng(ll.lat, ll.lng),
+    dragStartLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map(
+      (ll) => L.value!.latLng(ll.lat, ll.lng),
     );
-    startCenter = centerMarker.value!.getLatLng();
-  });
+    dragStartMousePoint = map.value!.latLngToContainerPoint(e.latlng);
 
-  centerMarker.value.on("drag", () => {
-    if (!startCenter) return;
+    setupMapDragHandlers();
 
-    const newCenter = centerMarker.value!.getLatLng();
-    const deltaLat = newCenter.lat - startCenter.lat;
-    const deltaLng = newCenter.lng - startCenter.lng;
-
-    const newLatLngs = startLatLngs.map((ll) =>
-      L.value!.latLng(ll.lat + deltaLat, ll.lng + deltaLng),
-    );
-
-    polygon.value!.setLatLngs([newLatLngs]);
-
-    editMarkers.value.forEach((marker, index) => {
-      if (newLatLngs[index]) marker.setLatLng(newLatLngs[index]);
-    });
-
-    midpointMarkers.value.forEach((marker, i) => {
-      const nextIndex = (i + 1) % newLatLngs.length;
-      if (newLatLngs[i] && newLatLngs[nextIndex]) {
-        const midLat = (newLatLngs[i].lat + newLatLngs[nextIndex].lat) / 2;
-        const midLng = (newLatLngs[i].lng + newLatLngs[nextIndex].lng) / 2;
-        marker.setLatLng(L.value!.latLng(midLat, midLng));
-      }
-    });
-  });
-
-  centerMarker.value.on("dragend", () => {
-    if (map.value) map.value.getContainer().style.cursor = "";
-    const updatedLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map(
-      (ll) => [ll.lat, ll.lng],
-    ) as Array<[number, number]>;
-    emit("update:latlngs", updatedLatLngs);
-  });
-
-  centerMarker.value.on("mouseover", () => {
-    if (map.value) map.value.getContainer().style.cursor = "move";
-  });
-
-  centerMarker.value.on("mouseout", () => {
     if (map.value) {
-      map.value.getContainer().style.cursor = "";
+      map.value.getContainer().style.cursor = "move";
+      map.value.dragging.disable();
     }
   });
+};
+
+const disableDragging = () => {
+  if (!polygon.value) return;
+  polygon.value.off("mousedown");
+};
+
+const setupMapDragHandlers = () => {
+  if (!map.value) return;
+
+  const onMouseMove = (e: L.LeafletMouseEvent) => {
+    if (!isDragging.value || !dragStartMousePoint || !map.value) return;
+
+    const currentPoint = map.value.latLngToContainerPoint(e.latlng);
+    const deltaX = currentPoint.x - dragStartMousePoint.x;
+    const deltaY = currentPoint.y - dragStartMousePoint.y;
+
+    const newLatLngs = dragStartLatLngs.map((startLatLng) => {
+      const startPoint = map.value!.latLngToContainerPoint(startLatLng);
+      const newPoint = L.value!.point(
+        startPoint.x + deltaX,
+        startPoint.y + deltaY,
+      );
+      return map.value!.containerPointToLatLng(newPoint);
+    });
+
+    polygon.value!.setLatLngs([newLatLngs]);
+  };
+
+  const onMouseUp = () => {
+    if (!isDragging.value) return;
+
+    isDragging.value = false;
+
+    if (map.value) {
+      map.value.getContainer().style.cursor = "";
+      map.value.dragging.enable();
+      map.value.off("mousemove", onMouseMove);
+      map.value.off("mouseup", onMouseUp);
+    }
+
+    if (polygon.value) {
+      const updatedLatLngs = (polygon.value.getLatLngs()[0] as L.LatLng[]).map(
+        (ll) => [ll.lat, ll.lng],
+      ) as Array<[number, number]>;
+      emit("update:latlngs", updatedLatLngs);
+    }
+  };
+
+  map.value.on("mousemove", onMouseMove);
+  map.value.on("mouseup", onMouseUp);
+
+  if (polygon.value) {
+    polygon.value.once("mouseup", onMouseUp);
+  }
 };
 
 watch(
@@ -2656,10 +2784,15 @@ watch(
           polygon.value.addTo(map.value);
         }
 
-        if (props.editable) {
+        if (props.draggable && !props.editable) {
+          clearEditMarkers();
+          enableDragging();
+        } else if (props.editable && !props.draggable) {
+          disableDragging();
           enableEditing();
         } else {
           clearEditMarkers();
+          disableDragging();
         }
       } else {
         if (polygon.value) {
@@ -2703,6 +2836,7 @@ export interface LeafletPolylineProps {
   latlngs?: Array<[number, number]> | Array<{ lat: number; lng: number }>;
   weight?: number;
   editable?: boolean;
+  draggable?: boolean;
   class?: HTMLAttributes["class"];
 }
 
@@ -2710,6 +2844,7 @@ const props = withDefaults(defineProps<LeafletPolylineProps>(), {
   latlngs: () => [],
   weight: 3,
   editable: false,
+  draggable: false,
 });
 
 const emit = defineEmits<{
@@ -2723,6 +2858,10 @@ const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const polyline = ref<L.Polyline | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
 const midpointMarkers = ref<L.Marker[]>([]);
+const isDragging = ref(false);
+
+let dragStartLatLngs: L.LatLng[] = [];
+let dragStartMousePoint: L.Point | null = null;
 
 const normalizeLatLngs = (
   latlngs: Array<[number, number]> | Array<{ lat: number; lng: number }>,
@@ -2813,8 +2952,8 @@ const createMidpoints = () => {
         draggable: true,
         icon: L.value.divIcon({
           className: "leaflet-editing-icon-midpoint",
-          html: '<div style="width:6px;height:6px;border-radius:50%;background:#fff;border:2px solid #3388ff;opacity:0.6;"></div>',
-          iconSize: [6, 6],
+          html: "<div></div>",
+          iconSize: [14, 14],
         }),
       })
       .addTo(map.value);
@@ -2864,8 +3003,90 @@ const createMidpoints = () => {
   }
 };
 
+const enableDragging = () => {
+  if (!polyline.value || !map.value) return;
+
+  polyline.value.on("mousedown", (e: L.LeafletMouseEvent) => {
+    L.value!.DomEvent.stopPropagation(e);
+    isDragging.value = true;
+
+    dragStartLatLngs = (polyline.value!.getLatLngs() as L.LatLng[]).map((ll) =>
+      L.value!.latLng(ll.lat, ll.lng),
+    );
+    dragStartMousePoint = map.value!.latLngToContainerPoint(e.latlng);
+
+    setupMapDragHandlers();
+
+    if (map.value) {
+      map.value.getContainer().style.cursor = "move";
+      map.value.dragging.disable();
+    }
+  });
+};
+
+const disableDragging = () => {
+  if (!polyline.value) return;
+  polyline.value.off("mousedown");
+};
+
+const setupMapDragHandlers = () => {
+  if (!map.value) return;
+
+  const onMouseMove = (e: L.LeafletMouseEvent) => {
+    if (!isDragging.value || !dragStartMousePoint || !map.value) return;
+
+    const currentPoint = map.value.latLngToContainerPoint(e.latlng);
+    const deltaX = currentPoint.x - dragStartMousePoint.x;
+    const deltaY = currentPoint.y - dragStartMousePoint.y;
+
+    const newLatLngs = dragStartLatLngs.map((startLatLng) => {
+      const startPoint = map.value!.latLngToContainerPoint(startLatLng);
+      const newPoint = L.value!.point(
+        startPoint.x + deltaX,
+        startPoint.y + deltaY,
+      );
+      return map.value!.containerPointToLatLng(newPoint);
+    });
+
+    polyline.value!.setLatLngs(newLatLngs);
+  };
+
+  const onMouseUp = () => {
+    if (!isDragging.value) return;
+
+    isDragging.value = false;
+
+    if (map.value) {
+      map.value.getContainer().style.cursor = "";
+      map.value.dragging.enable();
+      map.value.off("mousemove", onMouseMove);
+      map.value.off("mouseup", onMouseUp);
+    }
+
+    if (polyline.value) {
+      const updatedLatLngs = (polyline.value.getLatLngs() as L.LatLng[]).map(
+        (ll) => [ll.lat, ll.lng],
+      ) as Array<[number, number]>;
+      emit("update:latlngs", updatedLatLngs);
+    }
+  };
+
+  map.value.on("mousemove", onMouseMove);
+  map.value.on("mouseup", onMouseUp);
+
+  if (polyline.value) {
+    polyline.value.once("mouseup", onMouseUp);
+  }
+};
+
 watch(
-  () => [map.value, props.latlngs, props.weight, props.editable],
+  () => [
+    map.value,
+    props.latlngs,
+    props.weight,
+    props.editable,
+    props.draggable,
+  ],
   () => {
     nextTick(() => {
       if (map.value && L.value && props.latlngs && props.latlngs.length > 0) {
@@ -2889,10 +3110,15 @@ watch(
           polyline.value.addTo(map.value);
         }
 
-        if (props.editable) {
+        if (props.draggable && !props.editable) {
+          clearEditMarkers();
+          enableDragging();
+        } else if (props.editable && !props.draggable) {
+          disableDragging();
           enableEditing();
         } else {
           clearEditMarkers();
+          disableDragging();
         }
       } else {
         if (polyline.value) {
@@ -2958,8 +3184,10 @@ const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const rectangle = ref<L.Rectangle | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
-const centerMarker = ref<L.Marker | null>(null);
 const isDragging = ref(false);
+
+let dragStartBounds: L.LatLngBounds | null = null;
+let dragStartMousePoint: L.Point | null = null;
 
 const getColors = () => {
   const classNames = props.class ? props.class.toString().split(" ") : [];
@@ -2985,10 +3213,6 @@ const getColors = () => {
 const clearEditMarkers = () => {
   editMarkers.value.forEach((marker) => marker.remove());
   editMarkers.value = [];
-  if (centerMarker.value) {
-    centerMarker.value.remove();
-    centerMarker.value = null;
-  }
 };
 
 const enableEditing = () => {
@@ -3073,81 +3297,94 @@ const enableEditing = () => {
 
     editMarkers.value.push(marker);
   });
-
-  if (props.draggable) {
-    createCenterMarker();
-  }
 };
 
-const createCenterMarker = () => {
-  if (!rectangle.value || !L.value || !map.value) return;
+const enableDragging = () => {
+  if (!rectangle.value || !map.value) return;
 
-  const bounds = rectangle.value.getBounds();
-  const center = bounds.getCenter();
+  rectangle.value.on("mousedown", (e: L.LeafletMouseEvent) => {
+    L.value!.DomEvent.stopPropagation(e);
+    isDragging.value = true;
 
-  centerMarker.value = L.value
-    .marker(center, {
-      draggable: true,
-      icon: L.value.divIcon({
-        className: "leaflet-editing-icon-center",
-        html: '<div style="width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #ff8800;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
-        iconSize: [10, 10],
-      }),
-    })
-    .addTo(map.value);
+    dragStartBounds = rectangle.value!.getBounds();
+    dragStartMousePoint = map.value!.latLngToContainerPoint(e.latlng);
 
-  let startBounds: L.LatLngBounds | null = null;
-  let startCenter: L.LatLng | null = null;
+    setupMapDragHandlers();
 
-  centerMarker.value.on("dragstart", () => {
-    if (map.value) map.value.getContainer().style.cursor = "move";
-    startBounds = rectangle.value!.getBounds();
-    startCenter = centerMarker.value!.getLatLng();
-  });
-
-  centerMarker.value.on("drag", () => {
-    if (!startBounds || !startCenter) return;
-
-    const newCenter = centerMarker.value!.getLatLng();
-    const deltaLat = newCenter.lat - startCenter.lat;
-    const deltaLng = newCenter.lng - startCenter.lng;
-
-    const newBounds = L.value!.latLngBounds(
-      [startBounds.getSouth() + deltaLat, startBounds.getWest() + deltaLng],
-      [startBounds.getNorth() + deltaLat, startBounds.getEast() + deltaLng],
-    );
-
-    rectangle.value!.setBounds(newBounds);
-
-    const corners = [
-      newBounds.getSouthWest(),
-      newBounds.getNorthWest(),
-      newBounds.getNorthEast(),
-      newBounds.getSouthEast(),
-    ];
-    editMarkers.value.forEach((marker, i) => {
-      if (corners[i]) marker.setLatLng(corners[i]);
-    });
-  });
-
-  centerMarker.value.on("dragend", () => {
-    if (map.value) map.value.getContainer().style.cursor = "";
-    const updatedBounds = rectangle.value!.getBounds();
-    emit("update:bounds", [
-      [updatedBounds.getSouth(), updatedBounds.getWest()],
-      [updatedBounds.getNorth(), updatedBounds.getEast()],
-    ]);
-  });
-
-  centerMarker.value.on("mouseover", () => {
-    if (map.value) map.value.getContainer().style.cursor = "move";
-  });
-
-  centerMarker.value.on("mouseout", () => {
     if (map.value) {
-      map.value.getContainer().style.cursor = "";
+      map.value.getContainer().style.cursor = "move";
+      map.value.dragging.disable();
     }
   });
+};
+
+const disableDragging = () => {
+  if (!rectangle.value) return;
+  rectangle.value.off("mousedown");
+};
+
+const setupMapDragHandlers = () => {
+  if (!map.value) return;
+
+  const onMouseMove = (e: L.LeafletMouseEvent) => {
+    if (
+      !isDragging.value ||
+      !dragStartMousePoint ||
+      !dragStartBounds ||
+      !map.value
+    )
+      return;
+
+    const currentPoint = map.value.latLngToContainerPoint(e.latlng);
+    const deltaX = currentPoint.x - dragStartMousePoint.x;
+    const deltaY = currentPoint.y - dragStartMousePoint.y;
+
+    const swPoint = map.value.latLngToContainerPoint(
+      dragStartBounds.getSouthWest(),
+    );
+    const nePoint = map.value.latLngToContainerPoint(
+      dragStartBounds.getNorthEast(),
+    );
+
+    const newSW = map.value.containerPointToLatLng(
+      L.value!.point(swPoint.x + deltaX, swPoint.y + deltaY),
+    );
+    const newNE = map.value.containerPointToLatLng(
+      L.value!.point(nePoint.x + deltaX, nePoint.y + deltaY),
+    );
+
+    const newBounds = L.value!.latLngBounds(newSW, newNE);
+
+    rectangle.value!.setBounds(newBounds);
+  };
+
+  const onMouseUp = () => {
+    if (!isDragging.value) return;
+
+    isDragging.value = false;
+
+    if (map.value) {
+      map.value.getContainer().style.cursor = "";
+      map.value.dragging.enable();
+      map.value.off("mousemove", onMouseMove);
+      map.value.off("mouseup", onMouseUp);
+    }
+
+    if (rectangle.value) {
+      const updatedBounds = rectangle.value.getBounds();
+      emit("update:bounds", [
+        [updatedBounds.getSouth(), updatedBounds.getWest()],
+        [updatedBounds.getNorth(), updatedBounds.getEast()],
+      ]);
+    }
+  };
+
+  map.value.on("mousemove", onMouseMove);
+  map.value.on("mouseup", onMouseUp);
+
+  if (rectangle.value) {
+    rectangle.value.once("mouseup", onMouseUp);
+  }
 };
 
 watch(
@@ -3180,10 +3417,15 @@ watch(
           rectangle.value.addTo(map.value);
         }
 
-        if (props.editable) {
+        if (props.draggable && !props.editable) {
+          clearEditMarkers();
+          enableDragging();
+        } else if (props.editable && !props.draggable) {
+          disableDragging();
           enableEditing();
         } else {
           clearEditMarkers();
+          disableDragging();
         }
       } else {
         if (rectangle.value) {
@@ -3569,6 +3811,7 @@ export const useTailwindClassParser = () => {
 | `lng`{.primary .text-primary} | `number \| string` | 5.350242 |  |
 | `radius`{.primary .text-primary} | `number \| string` | 100 |  |
 | `editable`{.primary .text-primary} | `boolean` | false |  |
+| `draggable`{.primary .text-primary} | `boolean` | false |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
   ### Slots
@@ -3628,7 +3871,9 @@ export const useTailwindClassParser = () => {
 | `position`{.primary .text-primary} | `ControlOptions['position']` | topright |  |
 | `editMode`{.primary .text-primary} | `boolean` | false |  |
 | `activeMode`{.primary .text-primary} | `string \| null` |  |  |
-| `draw`{.primary .text-primary} | `{
+| `modes`{.primary .text-primary} | `{
+    move?: DrawButton \| boolean;
+    edit?: DrawButton \| boolean;
     marker?: DrawButton \| boolean;
     circle?: DrawButton \| boolean;
     polyline?: DrawButton \| boolean;
@@ -3659,7 +3904,7 @@ export const useTailwindClassParser = () => {
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `enabled`{.primary .text-primary} | `boolean` | false |  |
-| `mode`{.primary .text-primary} | `'marker' \| 'circle' \| 'polyline' \| 'polygon' \| 'rectangle' \| null` |  |  |
+| `mode`{.primary .text-primary} | `'marker' \| 'circle' \| 'polyline' \| 'polygon' \| 'rectangle' \| 'move' \| 'edit' \| null` |  |  |
 | `shapeOptions`{.primary .text-primary} | `any` | - |  |
 | `repeatMode`{.primary .text-primary} | `boolean` | false |  |
 
@@ -3670,6 +3915,7 @@ export const useTailwindClassParser = () => {
 | `draw:drawstart`{.primary .text-primary} | — |
 | `draw:drawstop`{.primary .text-primary} | — |
 | `mode-changed`{.primary .text-primary} | — |
+| `edit-mode-changed`{.primary .text-primary} | — |
 
   ### Inject
 | Key | Default | Type | Description |
@@ -3747,6 +3993,7 @@ export const useTailwindClassParser = () => {
 | `latlngs`{.primary .text-primary} | `Array<[number, number]> \| Array<{ lat: number; lng: number }>` |  |  |
 | `weight`{.primary .text-primary} | `number` | 3 |  |
 | `editable`{.primary .text-primary} | `boolean` | false |  |
+| `draggable`{.primary .text-primary} | `boolean` | false |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
   ### Slots
@@ -3869,8 +4116,17 @@ const mapRef = ref<LeafletMapExposed | null>(null);
 const editMode = ref(false);
 
 const currentMode = ref<
-  "marker" | "circle" | "polyline" | "polygon" | "rectangle" | null
+  | "marker"
+  | "circle"
+  | "polyline"
+  | "polygon"
+  | "rectangle"
+  | "move"
+  | "edit"
+  | null
 >(null);
+
+const currentEditMode = ref<"move" | "edit" | null>(null);
 
 const markers = ref([
   { id: 1, lat: 48.8566, lng: 2.3522, label: "Paris" },
@@ -3932,6 +4188,14 @@ const rectangles = ref([
   },
 ]);
 
+const moveableShapes = ref({
+  markers: false,
+  circles: false,
+  polylines: false,
+  polygons: false,
+  rectangles: false,
+});
+
 const editableShapes = ref({
   markers: false,
   circles: false,
@@ -3941,31 +4205,63 @@ const editableShapes = ref({
 });
 
 watch(editMode, (enabled) => {
-  editableShapes.value.markers = enabled;
-  editableShapes.value.circles = enabled;
-  editableShapes.value.polylines = enabled;
-  editableShapes.value.polygons = enabled;
-  editableShapes.value.rectangles = enabled;
+  if (!enabled) {
+    Object.keys(moveableShapes.value).forEach((key) => {
+      moveableShapes.value[key as keyof typeof moveableShapes.value] = false;
+    });
+    Object.keys(editableShapes.value).forEach((key) => {
+      editableShapes.value[key as keyof typeof editableShapes.value] = false;
+    });
+  }
 });
 
-const handleModeSelected = (mode: string | null) => {
-  currentMode.value = mode as
-    | "marker"
-    | "circle"
-    | "polyline"
-    | "polygon"
-    | "rectangle"
-    | null;
+const handleEditModeChanged = (mode: "move" | "edit" | null) => {
+  currentEditMode.value = mode;
+
+  if (mode === "move") {
+    Object.keys(moveableShapes.value).forEach((key) => {
+      moveableShapes.value[key as keyof typeof moveableShapes.value] = true;
+    });
+
+    Object.keys(editableShapes.value).forEach((key) => {
+      editableShapes.value[key as keyof typeof editableShapes.value] = false;
+    });
+  } else if (mode === "edit") {
+    Object.keys(moveableShapes.value).forEach((key) => {
+      moveableShapes.value[key as keyof typeof moveableShapes.value] = false;
+    });
+
+    Object.keys(editableShapes.value).forEach((key) => {
+      editableShapes.value[key as keyof typeof editableShapes.value] = true;
+    });
+  } else {
+    Object.keys(moveableShapes.value).forEach((key) => {
+      moveableShapes.value[key as keyof typeof moveableShapes.value] = false;
+    });
+    Object.keys(editableShapes.value).forEach((key) => {
+      editableShapes.value[key as keyof typeof editableShapes.value] = false;
+    });
+  }
 };
 
-const handleModeChanged = (mode: string | null) => {
-  currentMode.value = mode as
+const handleModeSelected = (
+  mode:
     | "marker"
     | "circle"
     | "polyline"
     | "polygon"
     | "rectangle"
-    | null;
+    | "move"
+    | "edit"
+    | null,
+) => {
+  currentMode.value = mode;
+};
+
+const handleModeChanged = (
+  mode: "marker" | "circle" | "polyline" | "polygon" | "rectangle" | null,
+) => {
+  currentMode.value = mode;
 };
 
 const handleShapeCreated = (event: DrawEvent) => {
@@ -4139,7 +4435,9 @@ const onPolygonClosed = (id: number) => {
           position="topright"
           :edit-mode="editMode"
           :active-mode="currentMode"
-          :draw="{
+          :modes="{
+            move: true,
+            edit: true,
             marker: true,
             circle: true,
             polyline: true,
@@ -4155,6 +4453,7 @@ const onPolygonClosed = (id: number) => {
           :shape-options="{ color: '#3388ff', fillOpacity: 0.2 }"
           @draw:created="handleShapeCreated"
           @mode-changed="handleModeChanged"
+          @edit-mode-changed="handleEditModeChanged"
         />
 
         <LeafletMarker
@@ -4162,6 +4461,7 @@ const onPolygonClosed = (id: number) => {
           :key="`marker-${marker.id}`"
           :lat="marker.lat"
           :lng="marker.lng"
+          :draggable="moveableShapes.markers"
           :editable="editableShapes.markers"
           @update:lat="(lat) => updateMarker(marker.id, lat, marker.lng)"
           @update:lng="(lng) => updateMarker(marker.id, marker.lat, lng)"
@@ -4174,6 +4474,7 @@ const onPolygonClosed = (id: number) => {
           :lng="circle.lng"
           :radius="circle.radius"
           :class="circle.class"
+          :draggable="moveableShapes.circles"
           :editable="editableShapes.circles"
           @update:lat="(lat) => updateCircle(circle.id, { lat })"
           @update:lng="(lng) => updateCircle(circle.id, { lng })"
@@ -4186,6 +4487,7 @@ const onPolygonClosed = (id: number) => {
           :latlngs="polyline.latlngs"
           :weight="polyline.weight"
           :class="polyline.class"
+          :draggable="moveableShapes.polylines"
           :editable="editableShapes.polylines"
           @update:latlngs="(latlngs) => updatePolyline(polyline.id, latlngs)"
         />
@@ -4195,8 +4497,8 @@ const onPolygonClosed = (id: number) => {
           :key="`polygon-${polygon.id}`"
           :latlngs="polygon.latlngs"
           :class="polygon.class"
+          :draggable="moveableShapes.polygons"
           :editable="editableShapes.polygons"
-          :draggable="editableShapes.polygons"
           :auto-close="true"
           @update:latlngs="(latlngs) => updatePolygon(polygon.id, latlngs)"
           @closed="() => onPolygonClosed(polygon.id)"
@@ -4207,8 +4509,8 @@ const onPolygonClosed = (id: number) => {
           :key="`rectangle-${rectangle.id}`"
           :bounds="rectangle.bounds"
           :class="rectangle.class"
+          :draggable="moveableShapes.rectangles"
           :editable="editableShapes.rectangles"
-          :draggable="editableShapes.rectangles"
           @update:bounds="(bounds) => updateRectangle(rectangle.id, bounds)"
         />
       </LeafletMap>

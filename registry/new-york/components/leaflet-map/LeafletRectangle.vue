@@ -30,8 +30,11 @@ const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const rectangle = ref<L.Rectangle | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
-const centerMarker = ref<L.Marker | null>(null);
 const isDragging = ref(false);
+
+// Variables pour le drag
+let dragStartBounds: L.LatLngBounds | null = null;
+let dragStartMousePoint: L.Point | null = null;
 
 const getColors = () => {
   const classNames = props.class ? props.class.toString().split(' ') : [];
@@ -53,10 +56,6 @@ const getColors = () => {
 const clearEditMarkers = () => {
   editMarkers.value.forEach((marker) => marker.remove());
   editMarkers.value = [];
-  if (centerMarker.value) {
-    centerMarker.value.remove();
-    centerMarker.value = null;
-  }
 };
 
 const enableEditing = () => {
@@ -136,83 +135,92 @@ const enableEditing = () => {
 
     editMarkers.value.push(marker);
   });
-
-  // Créer le marqueur central pour le drag
-  if (props.draggable) {
-    createCenterMarker();
-  }
 };
 
-const createCenterMarker = () => {
-  if (!rectangle.value || !L.value || !map.value) return;
+const enableDragging = () => {
+  if (!rectangle.value || !map.value) return;
 
-  const bounds = rectangle.value.getBounds();
-  const center = bounds.getCenter();
+  rectangle.value.on('mousedown', (e: L.LeafletMouseEvent) => {
+    L.value!.DomEvent.stopPropagation(e);
+    isDragging.value = true;
 
-  centerMarker.value = L.value
-    .marker(center, {
-      draggable: true,
-      icon: L.value.divIcon({
-        className: 'leaflet-editing-icon-center',
-        html: '<div style="width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #ff8800;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
-        iconSize: [10, 10],
-      }),
-    })
-    .addTo(map.value);
+    // Sauvegarder les positions initiales
+    dragStartBounds = rectangle.value!.getBounds();
+    dragStartMousePoint = map.value!.latLngToContainerPoint(e.latlng);
 
-  let startBounds: L.LatLngBounds | null = null;
-  let startCenter: L.LatLng | null = null;
+    // Setup map handlers
+    setupMapDragHandlers();
 
-  centerMarker.value.on('dragstart', () => {
-    if (map.value) map.value.getContainer().style.cursor = 'move';
-    startBounds = rectangle.value!.getBounds();
-    startCenter = centerMarker.value!.getLatLng();
-  });
-
-  centerMarker.value.on('drag', () => {
-    if (!startBounds || !startCenter) return;
-
-    const newCenter = centerMarker.value!.getLatLng();
-    const deltaLat = newCenter.lat - startCenter.lat;
-    const deltaLng = newCenter.lng - startCenter.lng;
-
-    const newBounds = L.value!.latLngBounds(
-      [startBounds.getSouth() + deltaLat, startBounds.getWest() + deltaLng],
-      [startBounds.getNorth() + deltaLat, startBounds.getEast() + deltaLng]
-    );
-
-    rectangle.value!.setBounds(newBounds);
-
-    // Mettre à jour les coins
-    const corners = [
-      newBounds.getSouthWest(),
-      newBounds.getNorthWest(),
-      newBounds.getNorthEast(),
-      newBounds.getSouthEast(),
-    ];
-    editMarkers.value.forEach((marker, i) => {
-      if (corners[i]) marker.setLatLng(corners[i]);
-    });
-  });
-
-  centerMarker.value.on('dragend', () => {
-    if (map.value) map.value.getContainer().style.cursor = '';
-    const updatedBounds = rectangle.value!.getBounds();
-    emit('update:bounds', [
-      [updatedBounds.getSouth(), updatedBounds.getWest()],
-      [updatedBounds.getNorth(), updatedBounds.getEast()],
-    ]);
-  });
-
-  centerMarker.value.on('mouseover', () => {
-    if (map.value) map.value.getContainer().style.cursor = 'move';
-  });
-
-  centerMarker.value.on('mouseout', () => {
+    // Curseur et désactiver le drag de la carte
     if (map.value) {
-      map.value.getContainer().style.cursor = '';
+      map.value.getContainer().style.cursor = 'move';
+      map.value.dragging.disable();
     }
   });
+};
+
+const disableDragging = () => {
+  if (!rectangle.value) return;
+  rectangle.value.off('mousedown');
+};
+
+const setupMapDragHandlers = () => {
+  if (!map.value) return;
+
+  const onMouseMove = (e: L.LeafletMouseEvent) => {
+    if (!isDragging.value || !dragStartMousePoint || !dragStartBounds || !map.value) return;
+
+    const currentPoint = map.value.latLngToContainerPoint(e.latlng);
+    const deltaX = currentPoint.x - dragStartMousePoint.x;
+    const deltaY = currentPoint.y - dragStartMousePoint.y;
+
+    // Calculer les nouvelles positions des coins
+    const swPoint = map.value.latLngToContainerPoint(dragStartBounds.getSouthWest());
+    const nePoint = map.value.latLngToContainerPoint(dragStartBounds.getNorthEast());
+
+    const newSW = map.value.containerPointToLatLng(
+      L.value!.point(swPoint.x + deltaX, swPoint.y + deltaY)
+    );
+    const newNE = map.value.containerPointToLatLng(
+      L.value!.point(nePoint.x + deltaX, nePoint.y + deltaY)
+    );
+
+    const newBounds = L.value!.latLngBounds(newSW, newNE);
+
+    // Mettre à jour le rectangle
+    rectangle.value!.setBounds(newBounds);
+  };
+
+  const onMouseUp = () => {
+    if (!isDragging.value) return;
+
+    isDragging.value = false;
+
+    // Réactiver le drag de la carte
+    if (map.value) {
+      map.value.getContainer().style.cursor = '';
+      map.value.dragging.enable();
+      map.value.off('mousemove', onMouseMove);
+      map.value.off('mouseup', onMouseUp);
+    }
+
+    // Émettre la mise à jour
+    if (rectangle.value) {
+      const updatedBounds = rectangle.value.getBounds();
+      emit('update:bounds', [
+        [updatedBounds.getSouth(), updatedBounds.getWest()],
+        [updatedBounds.getNorth(), updatedBounds.getEast()],
+      ]);
+    }
+  };
+
+  map.value.on('mousemove', onMouseMove);
+  map.value.on('mouseup', onMouseUp);
+
+  // Cleanup sur mouseup du rectangle aussi
+  if (rectangle.value) {
+    rectangle.value.once('mouseup', onMouseUp);
+  }
 };
 
 watch(
@@ -245,10 +253,16 @@ watch(
           rectangle.value.addTo(map.value);
         }
 
-        if (props.editable) {
+        // Gestion des modes : draggable OU editable, pas les deux
+        if (props.draggable && !props.editable) {
+          clearEditMarkers();
+          enableDragging();
+        } else if (props.editable && !props.draggable) {
+          disableDragging();
           enableEditing();
         } else {
           clearEditMarkers();
+          disableDragging();
         }
       } else {
         if (rectangle.value) {
