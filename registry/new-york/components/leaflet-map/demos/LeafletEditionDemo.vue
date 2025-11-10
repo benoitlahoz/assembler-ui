@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import { Button } from '@/components/ui/button';
 import {
   LeafletMap,
   LeafletTileLayer,
@@ -11,7 +12,7 @@ import {
   LeafletPolygon,
   LeafletRectangle,
   type LeafletMapExposed,
-} from '..';
+} from '~~/registry/new-york/components/leaflet-map';
 
 const mapRef = ref<LeafletMapExposed | null>(null);
 
@@ -211,18 +212,8 @@ const onPolygonClosed = (id: number) => {
 <template>
   <div class="w-full h-full flex flex-col gap-4">
     <!-- Info du mode actuel -->
-    <div class="p-4 bg-gray-100 rounded flex items-center justify-between">
-      <div>
-        <h3 class="font-semibold">Démonstration des formes Leaflet</h3>
-        <p class="text-sm text-gray-600">
-          {{
-            editMode
-              ? 'Mode édition activé - Modifiez et ajoutez des formes'
-              : "Mode visualisation - Activez l'édition pour interagir"
-          }}
-        </p>
-      </div>
-      <button
+    <div class="p-4 rounded flex items-center justify-between">
+      <Button
         @click="editMode = !editMode"
         class="px-4 py-2 rounded transition-colors"
         :class="
@@ -232,16 +223,7 @@ const onPolygonClosed = (id: number) => {
         "
       >
         {{ editMode ? 'Désactiver édition' : 'Activer édition' }}
-      </button>
-    </div>
-
-    <div
-      class="p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800"
-      v-if="editMode"
-    >
-      💡 <strong>Mode édition :</strong> Modifiez les formes existantes (déplacez les points bleus,
-      le point orange central) et utilisez les outils de dessin pour ajouter de nouvelles formes.
-      Les petits points semi-transparents permettent d'ajouter des points intermédiaires.
+      </Button>
     </div>
 
     <!-- Carte -->

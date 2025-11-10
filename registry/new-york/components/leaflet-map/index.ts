@@ -3,8 +3,7 @@
  * @category geography
  *
  * @demo LeafletSimple
- * @demo LeafletDrawDemo
- * @demo LeafletShapesDemo
+ * @demo LeafletEditionDemo
  */
 
 import type { InjectionKey, Ref } from 'vue';
