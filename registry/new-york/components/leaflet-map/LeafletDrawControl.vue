@@ -136,12 +136,12 @@ const getIconSvg = (type: string, color: string = '#333333'): string => {
 };
 
 const createButton = (container: HTMLElement, type: string, title: string) => {
-  const button = L.value!.DomUtil.create('a', 'leaflet-draw-button', container);
-  button.href = '#';
+  const button = L.value!.DomUtil.create('div', 'leaflet-draw-button', container);
   button.title = title;
   button.innerHTML = getIconSvg(type);
   button.setAttribute('role', 'button');
   button.setAttribute('aria-label', title);
+  button.setAttribute('tabindex', '0');
 
   L.value!.DomEvent.on(button, 'click', (e: Event) => {
     L.value!.DomEvent.preventDefault(e);
@@ -152,12 +152,12 @@ const createButton = (container: HTMLElement, type: string, title: string) => {
 };
 
 const createEditButton = (container: HTMLElement) => {
-  const button = L.value!.DomUtil.create('a', 'leaflet-draw-button leaflet-edit-button', container);
-  button.href = '#';
+  const button = L.value!.DomUtil.create('div', 'leaflet-draw-button leaflet-edit-button', container);
   button.title = 'Activer le mode Édition';
   button.innerHTML = getIconSvg('edit');
   button.setAttribute('role', 'button');
   button.setAttribute('aria-label', 'Mode Édition');
+  button.setAttribute('tabindex', '0');
 
   const updateButtonState = () => {
     if (editMode.value) {
@@ -727,19 +727,14 @@ onBeforeUnmount(() => {
 .leaflet-draw-button {
   width: 30px;
   height: 30px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  text-decoration: none;
-  color: #333;
   background: white;
   border-bottom: 1px solid #ccc;
   transition: all 0.2s ease;
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-  line-height: 1;
-  vertical-align: middle;
+  cursor: pointer;
+  user-select: none;
 }
 
 .leaflet-draw-button svg {
