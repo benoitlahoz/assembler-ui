@@ -19,6 +19,7 @@ const props = withDefaults(defineProps<LeafletMarkerProps>(), {
 const emit = defineEmits<{
   'update:lat': [lat: number];
   'update:lng': [lng: number];
+  click: [];
 }>();
 
 const L = inject(LeafletModuleKey, ref());
@@ -54,6 +55,11 @@ watch(
               emit('update:lng', latlng.lng);
             });
           }
+
+          // Add click event listener
+          marker.value.on('click', () => {
+            emit('click');
+          });
 
           marker.value.addTo(map.value);
         }

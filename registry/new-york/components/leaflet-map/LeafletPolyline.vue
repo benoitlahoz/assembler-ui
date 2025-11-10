@@ -21,6 +21,7 @@ const props = withDefaults(defineProps<LeafletPolylineProps>(), {
 
 const emit = defineEmits<{
   'update:latlngs': [latlngs: Array<[number, number]>];
+  click: [];
 }>();
 
 const { getLeafletLineColors } = useTailwindClassParser();
@@ -286,6 +287,11 @@ watch(
             opacity: colors.opacity,
           });
           polyline.value.addTo(map.value);
+
+          // Add click event listener
+          polyline.value.on('click', () => {
+            emit('click');
+          });
         }
 
         // Gestion des modes : draggable OU editable, pas les deux

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { Button } from '@/components/ui/button';
 import {
   LeafletMap,
@@ -7,6 +7,7 @@ import {
   LeafletZoomControl,
   LeafletDrawControl,
   LeafletFeaturesEditor,
+  LeafletBoundingBox,
   LeafletMarker,
   LeafletCircle,
   LeafletPolyline,
@@ -17,6 +18,12 @@ import {
 } from '~~/registry/new-york/components/leaflet-map';
 
 const mapRef = ref<LeafletMapExposed | null>(null);
+
+// Shape selection for bounding box
+const selectedShape = ref<{
+  type: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle';
+  id: number;
+} | null>(null);
 
 // Mode édition global
 const editMode = ref(false);
@@ -111,6 +118,11 @@ watch(editMode, (enabled) => {
 // Watch edit mode changes from features editor
 const handleEditModeChanged = (mode: 'select' | 'directSelect' | null) => {
   currentEditMode.value = mode;
+
+  // Clear selection when changing modes
+  if (mode !== 'select') {
+    selectedShape.value = null;
+  }
 
   if (mode === 'select') {
     // Enable select (draggable + transform) for all shapes
@@ -278,6 +290,142 @@ const updateRectangle = (id: number, bounds: [[number, number], [number, number]
 const onPolygonClosed = (id: number) => {
   editableShapes.value.polygons = false;
 };
+
+// Shape selection handlers
+const selectShape = (type: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle', id: number) => {
+  if (currentEditMode.value === 'select') {
+    selectedShape.value = { type, id };
+  }
+};
+
+// Computed bounding box
+const boundingBox = computed(() => {
+  if (!selectedShape.value || !mapRef.value?.map) return null;
+
+  const L = (window as any).L;
+  if (!L) return null;
+
+  const { type, id } = selectedShape.value;
+
+  try {
+    switch (type) {
+      case 'marker': {
+        const marker = markers.value.find((m) => m.id === id);
+        if (!marker) return null;
+        const point = L.latLng(marker.lat, marker.lng);
+        // Create a small bounds around the marker
+        const offset = 0.001;
+        return L.latLngBounds(
+          [marker.lat - offset, marker.lng - offset],
+          [marker.lat + offset, marker.lng + offset]
+        );
+      }
+      case 'circle': {
+        const circle = circles.value.find((c) => c.id === id);
+        if (!circle) return null;
+        const center = L.latLng(circle.lat, circle.lng);
+        const radiusInDegrees = circle.radius / 111320; // Approximate conversion
+        return L.latLngBounds(
+          [circle.lat - radiusInDegrees, circle.lng - radiusInDegrees],
+          [circle.lat + radiusInDegrees, circle.lng + radiusInDegrees]
+        );
+      }
+      case 'polyline': {
+        const polyline = polylines.value.find((p) => p.id === id);
+        if (!polyline || polyline.latlngs.length === 0) return null;
+        return L.latLngBounds(polyline.latlngs.map((ll) => L.latLng(ll[0], ll[1])));
+      }
+      case 'polygon': {
+        const polygon = polygons.value.find((p) => p.id === id);
+        if (!polygon || polygon.latlngs.length === 0) return null;
+        return L.latLngBounds(polygon.latlngs.map((ll) => L.latLng(ll[0], ll[1])));
+      }
+      case 'rectangle': {
+        const rectangle = rectangles.value.find((r) => r.id === id);
+        if (!rectangle) return null;
+        return L.latLngBounds(rectangle.bounds[0], rectangle.bounds[1]);
+      }
+    }
+  } catch (error) {
+    console.error('Error computing bounding box:', error);
+    return null;
+  }
+
+  return null;
+});
+
+// Handle bounding box updates (transform operations)
+const handleBoundingBoxUpdate = (newBounds: any) => {
+  if (!selectedShape.value) return;
+
+  const { type, id } = selectedShape.value;
+  const L = (window as any).L;
+  if (!L) return;
+
+  // Calculate transformation ratios
+  const oldBounds = boundingBox.value;
+  if (!oldBounds) return;
+
+  const scaleX = (newBounds.getEast() - newBounds.getWest()) / (oldBounds.getEast() - oldBounds.getWest());
+  const scaleY = (newBounds.getNorth() - newBounds.getSouth()) / (oldBounds.getNorth() - oldBounds.getSouth());
+  const centerOld = oldBounds.getCenter();
+  const centerNew = newBounds.getCenter();
+  const deltaLat = centerNew.lat - centerOld.lat;
+  const deltaLng = centerNew.lng - centerOld.lng;
+
+  // Apply transformation to the selected shape
+  switch (type) {
+    case 'marker': {
+      const marker = markers.value.find((m) => m.id === id);
+      if (marker) {
+        marker.lat = centerNew.lat;
+        marker.lng = centerNew.lng;
+      }
+      break;
+    }
+    case 'circle': {
+      const circle = circles.value.find((c) => c.id === id);
+      if (circle) {
+        circle.lat += deltaLat;
+        circle.lng += deltaLng;
+        circle.radius *= (scaleX + scaleY) / 2; // Average scale
+      }
+      break;
+    }
+    case 'polyline': {
+      const polyline = polylines.value.find((p) => p.id === id);
+      if (polyline) {
+        polyline.latlngs = polyline.latlngs.map((ll) => {
+          const relLat = (ll[0] - centerOld.lat) * scaleY;
+          const relLng = (ll[1] - centerOld.lng) * scaleX;
+          return [centerNew.lat + relLat, centerNew.lng + relLng] as [number, number];
+        });
+      }
+      break;
+    }
+    case 'polygon': {
+      const polygon = polygons.value.find((p) => p.id === id);
+      if (polygon) {
+        polygon.latlngs = polygon.latlngs.map((ll) => {
+          const relLat = (ll[0] - centerOld.lat) * scaleY;
+          const relLng = (ll[1] - centerOld.lng) * scaleX;
+          return [centerNew.lat + relLat, centerNew.lng + relLng] as [number, number];
+        });
+      }
+      break;
+    }
+    case 'rectangle': {
+      const rectangle = rectangles.value.find((r) => r.id === id);
+      if (rectangle) {
+        rectangle.bounds = [
+          [newBounds.getSouth(), newBounds.getWest()],
+          [newBounds.getNorth(), newBounds.getEast()],
+        ] as [[number, number], [number, number]];
+      }
+      break;
+    }
+  }
+};
 </script>
 
 <template>
@@ -341,6 +489,13 @@ const onPolygonClosed = (id: number) => {
           @edit-mode-changed="handleEditModeChanged"
         />
 
+        <!-- Bounding Box for selected shape in select mode -->
+        <LeafletBoundingBox
+          :bounds="boundingBox"
+          :visible="currentEditMode === 'select' && !!selectedShape"
+          @update:bounds="handleBoundingBoxUpdate"
+        />
+
         <LeafletMarker
           v-for="marker in markers"
           :key="`marker-${marker.id}`"
@@ -350,6 +505,7 @@ const onPolygonClosed = (id: number) => {
           :editable="editableShapes.markers"
           @update:lat="(lat) => updateMarker(marker.id, lat, marker.lng)"
           @update:lng="(lng) => updateMarker(marker.id, marker.lat, lng)"
+          @click="selectShape('marker', marker.id)"
         />
 
         <LeafletCircle
@@ -364,6 +520,7 @@ const onPolygonClosed = (id: number) => {
           @update:lat="(lat) => updateCircle(circle.id, { lat })"
           @update:lng="(lng) => updateCircle(circle.id, { lng })"
           @update:radius="(radius) => updateCircle(circle.id, { radius })"
+          @click="selectShape('circle', circle.id)"
         />
 
         <LeafletPolyline
@@ -375,6 +532,7 @@ const onPolygonClosed = (id: number) => {
           :draggable="moveableShapes.polylines"
           :editable="editableShapes.polylines"
           @update:latlngs="(latlngs) => updatePolyline(polyline.id, latlngs)"
+          @click="selectShape('polyline', polyline.id)"
         />
 
         <LeafletPolygon
@@ -387,6 +545,7 @@ const onPolygonClosed = (id: number) => {
           :auto-close="true"
           @update:latlngs="(latlngs) => updatePolygon(polygon.id, latlngs)"
           @closed="() => onPolygonClosed(polygon.id)"
+          @click="selectShape('polygon', polygon.id)"
         />
 
         <LeafletRectangle
@@ -397,6 +556,7 @@ const onPolygonClosed = (id: number) => {
           :draggable="moveableShapes.rectangles"
           :editable="editableShapes.rectangles"
           @update:bounds="(bounds) => updateRectangle(rectangle.id, bounds)"
+          @click="selectShape('rectangle', rectangle.id)"
         />
       </LeafletMap>
     </div>

@@ -130,6 +130,7 @@ export { default as LeafletMap } from "./LeafletMap.vue";
 export { default as LeafletZoomControl } from "./LeafletZoomControl.vue";
 export { default as LeafletDrawControl } from "./LeafletDrawControl.vue";
 export { default as LeafletFeaturesEditor } from "./LeafletFeaturesEditor.vue";
+export { default as LeafletBoundingBox } from "./LeafletBoundingBox.vue";
 export { default as LeafletTileLayer } from "./LeafletTileLayer.vue";
 export { default as LeafletMarker } from "./LeafletMarker.vue";
 export { default as LeafletCircle } from "./LeafletCircle.vue";
@@ -155,6 +156,7 @@ export type {
   LeafletFeaturesEditorProps,
   DrawEvent,
 } from "./LeafletFeaturesEditor.vue";
+export type { LeafletBoundingBoxProps } from "./LeafletBoundingBox.vue";
 export type { LeafletTileLayerProps } from "./LeafletTileLayer.vue";
 export type { LeafletMarkerProps } from "./LeafletMarker.vue";
 export type { LeafletCircleProps } from "./LeafletCircle.vue";
@@ -370,6 +372,389 @@ defineExpose<LeafletMapExposed>({
 </template>
 ```
 
+```vue [src/components/ui/leaflet-map/LeafletBoundingBox.vue]
+<script setup lang="ts">
+import { inject, watch, ref, type Ref, onBeforeUnmount } from "vue";
+import { LeafletMapKey, LeafletModuleKey } from ".";
+
+export interface LeafletBoundingBoxProps {
+  bounds?: L.LatLngBounds | null;
+  visible?: boolean;
+}
+
+const props = withDefaults(defineProps<LeafletBoundingBoxProps>(), {
+  bounds: null,
+  visible: false,
+});
+
+const emit = defineEmits<{
+  "update:bounds": [bounds: L.LatLngBounds];
+  rotate: [angle: number];
+  scale: [scaleX: number, scaleY: number];
+}>();
+
+const L = inject(LeafletModuleKey, ref());
+const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
+
+const boundingBox = ref<L.Rectangle | null>(null);
+const cornerHandles = ref<L.Marker[]>([]);
+const edgeHandles = ref<L.Marker[]>([]);
+const rotateHandle = ref<L.Marker | null>(null);
+
+const isDragging = ref(false);
+const isRotating = ref(false);
+const isScaling = ref(false);
+
+let dragStartBounds: L.LatLngBounds | null = null;
+let dragStartMousePoint: L.Point | null = null;
+let scaleStartBounds: L.LatLngBounds | null = null;
+let scaleCornerIndex = -1;
+
+const clearHandles = () => {
+  cornerHandles.value.forEach((h) => h.remove());
+  cornerHandles.value = [];
+  edgeHandles.value.forEach((h) => h.remove());
+  edgeHandles.value = [];
+  if (rotateHandle.value) {
+    rotateHandle.value.remove();
+    rotateHandle.value = null;
+  }
+  if (boundingBox.value) {
+    boundingBox.value.remove();
+    boundingBox.value = null;
+  }
+};
+
+const createBoundingBox = () => {
+  if (!props.bounds || !L.value || !map.value || !props.visible) {
+    clearHandles();
+    return;
+  }
+
+  clearHandles();
+
+  boundingBox.value = L.value
+    .rectangle(props.bounds, {
+      color: "#3388ff",
+      weight: 2,
+      fill: false,
+      dashArray: "5, 5",
+      interactive: false,
+    })
+    .addTo(map.value);
+
+  const corners = [
+    props.bounds.getSouthWest(),
+    props.bounds.getNorthWest(),
+    props.bounds.getNorthEast(),
+    props.bounds.getSouthEast(),
+  ];
+
+  const cornerCursors = [
+    "nwse-resize",
+    "nesw-resize",
+    "nwse-resize",
+    "nesw-resize",
+  ];
+
+  corners.forEach((corner, index) => {
+    const handle = L.value!.marker(corner, {
+      draggable: true,
+      icon: L.value!.divIcon({
+        className: "leaflet-bounding-box-handle leaflet-bounding-box-corner",
+        html: '<div style="width:8px;height:8px;background:#fff;border:2px solid #3388ff;border-radius:2px;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
+        iconSize: [8, 8],
+      }),
+    }).addTo(map.value!);
+
+    handle.on("mousedown", () => {
+      if (map.value && cornerCursors[index]) {
+        map.value.getContainer().style.cursor = cornerCursors[index];
+      }
+    });
+
+    handle.on("dragstart", () => {
+      isScaling.value = true;
+      scaleStartBounds = props.bounds;
+      scaleCornerIndex = index;
+      if (map.value) {
+        map.value.dragging.disable();
+      }
+    });
+
+    handle.on("drag", () => {
+      if (!isScaling.value || !scaleStartBounds) return;
+
+      const newCorner = handle.getLatLng();
+      let newBounds: L.LatLngBounds;
+
+      switch (index) {
+        case 0:
+          newBounds = L.value!.latLngBounds(
+            newCorner,
+            scaleStartBounds.getNorthEast(),
+          );
+          break;
+        case 1:
+          newBounds = L.value!.latLngBounds(
+            [scaleStartBounds.getSouth(), newCorner.lng],
+            [newCorner.lat, scaleStartBounds.getEast()],
+          );
+          break;
+        case 2:
+          newBounds = L.value!.latLngBounds(
+            scaleStartBounds.getSouthWest(),
+            newCorner,
+          );
+          break;
+        case 3:
+          newBounds = L.value!.latLngBounds(
+            [newCorner.lat, scaleStartBounds.getWest()],
+            [scaleStartBounds.getNorth(), newCorner.lng],
+          );
+          break;
+        default:
+          return;
+      }
+
+      if (boundingBox.value) {
+        boundingBox.value.setBounds(newBounds);
+      }
+
+      updateHandlePositions(newBounds);
+    });
+
+    handle.on("dragend", () => {
+      isScaling.value = false;
+      if (map.value) {
+        map.value.getContainer().style.cursor = "";
+        map.value.dragging.enable();
+      }
+      if (boundingBox.value) {
+        emit("update:bounds", boundingBox.value.getBounds());
+      }
+    });
+
+    cornerHandles.value.push(handle);
+  });
+
+  const edges = [
+    L.value!.latLng(
+      (props.bounds.getSouth() + props.bounds.getNorth()) / 2,
+      props.bounds.getWest(),
+    ),
+    L.value!.latLng(
+      props.bounds.getNorth(),
+      (props.bounds.getWest() + props.bounds.getEast()) / 2,
+    ),
+    L.value!.latLng(
+      (props.bounds.getSouth() + props.bounds.getNorth()) / 2,
+      props.bounds.getEast(),
+    ),
+    L.value!.latLng(
+      props.bounds.getSouth(),
+      (props.bounds.getWest() + props.bounds.getEast()) / 2,
+    ),
+  ];
+
+  const edgeCursors = ["ew-resize", "ns-resize", "ew-resize", "ns-resize"];
+
+  edges.forEach((edge, index) => {
+    const handle = L.value!.marker(edge, {
+      draggable: true,
+      icon: L.value!.divIcon({
+        className: "leaflet-bounding-box-handle leaflet-bounding-box-edge",
+        html: '<div style="width:8px;height:8px;background:#fff;border:2px solid #3388ff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
+        iconSize: [8, 8],
+      }),
+    }).addTo(map.value!);
+
+    handle.on("mousedown", () => {
+      if (map.value && edgeCursors[index]) {
+        map.value.getContainer().style.cursor = edgeCursors[index];
+      }
+    });
+
+    handle.on("dragstart", () => {
+      isScaling.value = true;
+      scaleStartBounds = props.bounds;
+      if (map.value) {
+        map.value.dragging.disable();
+      }
+    });
+
+    handle.on("drag", () => {
+      if (!isScaling.value || !scaleStartBounds) return;
+
+      const newPos = handle.getLatLng();
+      let newBounds: L.LatLngBounds = scaleStartBounds;
+
+      switch (index) {
+        case 0:
+          newBounds = L.value!.latLngBounds(
+            [scaleStartBounds.getSouth(), newPos.lng],
+            [scaleStartBounds.getNorth(), scaleStartBounds.getEast()],
+          );
+          break;
+        case 1:
+          newBounds = L.value!.latLngBounds(
+            [scaleStartBounds.getSouth(), scaleStartBounds.getWest()],
+            [newPos.lat, scaleStartBounds.getEast()],
+          );
+          break;
+        case 2:
+          newBounds = L.value!.latLngBounds(
+            [scaleStartBounds.getSouth(), scaleStartBounds.getWest()],
+            [scaleStartBounds.getNorth(), newPos.lng],
+          );
+          break;
+        case 3:
+          newBounds = L.value!.latLngBounds(
+            [newPos.lat, scaleStartBounds.getWest()],
+            [scaleStartBounds.getNorth(), scaleStartBounds.getEast()],
+          );
+          break;
+      }
+
+      if (boundingBox.value) {
+        boundingBox.value.setBounds(newBounds);
+      }
+
+      updateHandlePositions(newBounds);
+    });
+
+    handle.on("dragend", () => {
+      isScaling.value = false;
+      if (map.value) {
+        map.value.getContainer().style.cursor = "";
+        map.value.dragging.enable();
+      }
+      if (boundingBox.value) {
+        emit("update:bounds", boundingBox.value.getBounds());
+      }
+    });
+
+    edgeHandles.value.push(handle);
+  });
+
+  const centerTop = L.value!.latLng(
+    props.bounds.getNorth(),
+    (props.bounds.getWest() + props.bounds.getEast()) / 2,
+  );
+
+  const centerTopPoint = map.value.latLngToLayerPoint(centerTop);
+  const rotateHandlePoint = L.value!.point(
+    centerTopPoint.x,
+    centerTopPoint.y - 30,
+  );
+  const rotateHandleLatLng = map.value.layerPointToLatLng(rotateHandlePoint);
+
+  rotateHandle.value = L.value
+    .marker(rotateHandleLatLng, {
+      draggable: true,
+      icon: L.value.divIcon({
+        className: "leaflet-bounding-box-handle leaflet-bounding-box-rotate",
+        html: '<div style="width:12px;height:12px;background:#fff;border:2px solid #3388ff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);cursor:url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJzNC40OCAxMCAxMCAxMCAxMC00LjQ4IDEwLTEwUzE3LjUyIDIgMTIgMnptMCAxOGMtNC40MSAwLTgtMy41OS04LThzMy41OS04IDgtOCA4IDMuNTkgOCA4LTMuNTkgOC04IDh6IiBmaWxsPSIjMzM4OGZmIi8+PHBhdGggZD0iTTEyIDZWMTJsNCAyIiBzdHJva2U9IiMzMzg4ZmYiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==) 12 12, auto;"></div>',
+        iconSize: [12, 12],
+      }),
+    })
+    .addTo(map.value);
+
+  rotateHandle.value.on("dragstart", () => {
+    isRotating.value = true;
+    if (map.value) {
+      map.value.dragging.disable();
+    }
+  });
+
+  rotateHandle.value.on("drag", () => {
+    if (!isRotating.value || !props.bounds) return;
+
+    const center = props.bounds.getCenter();
+    const handlePos = rotateHandle.value!.getLatLng();
+
+    const dx = handlePos.lng - center.lng;
+    const dy = handlePos.lat - center.lat;
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+    emit("rotate", angle);
+  });
+
+  rotateHandle.value.on("dragend", () => {
+    isRotating.value = false;
+    if (map.value) {
+      map.value.getContainer().style.cursor = "";
+      map.value.dragging.enable();
+    }
+  });
+};
+
+const updateHandlePositions = (bounds: L.LatLngBounds) => {
+  if (!L.value || !map.value) return;
+
+  const corners = [
+    bounds.getSouthWest(),
+    bounds.getNorthWest(),
+    bounds.getNorthEast(),
+    bounds.getSouthEast(),
+  ];
+  cornerHandles.value.forEach((handle, i) => {
+    if (corners[i]) handle.setLatLng(corners[i]);
+  });
+
+  const edges = [
+    L.value.latLng(
+      (bounds.getSouth() + bounds.getNorth()) / 2,
+      bounds.getWest(),
+    ),
+    L.value.latLng(
+      bounds.getNorth(),
+      (bounds.getWest() + bounds.getEast()) / 2,
+    ),
+    L.value.latLng(
+      (bounds.getSouth() + bounds.getNorth()) / 2,
+      bounds.getEast(),
+    ),
+    L.value.latLng(
+      bounds.getSouth(),
+      (bounds.getWest() + bounds.getEast()) / 2,
+    ),
+  ];
+  edgeHandles.value.forEach((handle, i) => {
+    if (edges[i]) handle.setLatLng(edges[i]);
+  });
+
+  if (rotateHandle.value) {
+    const centerTop = L.value.latLng(
+      bounds.getNorth(),
+      (bounds.getWest() + bounds.getEast()) / 2,
+    );
+    const centerTopPoint = map.value.latLngToLayerPoint(centerTop);
+    const rotateHandlePoint = L.value.point(
+      centerTopPoint.x,
+      centerTopPoint.y - 30,
+    );
+    const rotateHandleLatLng = map.value.layerPointToLatLng(rotateHandlePoint);
+    rotateHandle.value.setLatLng(rotateHandleLatLng);
+  }
+};
+
+watch(
+  () => [props.bounds, props.visible],
+  () => {
+    createBoundingBox();
+  },
+  { immediate: true, deep: true },
+);
+
+onBeforeUnmount(() => {
+  clearHandles();
+});
+</script>
+
+<template><slot /></template>
+```
+
 ```vue [src/components/ui/leaflet-map/LeafletCircle.vue]
 <script setup lang="ts">
 import {
@@ -407,6 +792,7 @@ const emit = defineEmits<{
   "update:lat": [lat: number];
   "update:lng": [lng: number];
   "update:radius": [radius: number];
+  click: [];
 }>();
 
 const { getLeafletShapeColors } = useTailwindClassParser();
@@ -567,6 +953,10 @@ watch(
           );
           circle.value.addTo(map.value);
 
+          circle.value.on("click", () => {
+            emit("click");
+          });
+
           setupMapDragHandlers();
         }
 
@@ -627,8 +1017,8 @@ export interface LeafletDrawControlProps {
   editMode?: boolean;
   activeMode?: string | null;
   modes?: {
-    move?: DrawButton | boolean;
-    edit?: DrawButton | boolean;
+    select?: DrawButton | boolean;
+    directSelect?: DrawButton | boolean;
     marker?: DrawButton | boolean;
     circle?: DrawButton | boolean;
     polyline?: DrawButton | boolean;
@@ -652,8 +1042,8 @@ const emit = defineEmits<{
       | "polyline"
       | "polygon"
       | "rectangle"
-      | "move"
-      | "edit"
+      | "select"
+      | "directSelect"
       | null,
   ): void;
 }>();
@@ -678,8 +1068,8 @@ const getIconSvg = (
     | "polyline"
     | "polygon"
     | "rectangle"
-    | "move"
-    | "edit",
+    | "select"
+    | "directSelect",
 ): string => {
   const color = "#333";
   const svgs: Record<string, string> = {
@@ -688,8 +1078,8 @@ const getIconSvg = (
     polyline: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 17 L8 12 L13 15 L21 7" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="3" cy="17" r="2.5" fill="${color}"/><circle cx="8" cy="12" r="2.5" fill="${color}"/><circle cx="13" cy="15" r="2.5" fill="${color}"/><circle cx="21" cy="7" r="2.5" fill="${color}"/></svg>`,
     polygon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3 L21 8 L18 17 L6 17 L3 8 Z" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="12" cy="3" r="2.5" fill="${color}"/><circle cx="21" cy="8" r="2.5" fill="${color}"/><circle cx="18" cy="17" r="2.5" fill="${color}"/><circle cx="6" cy="17" r="2.5" fill="${color}"/><circle cx="3" cy="8" r="2.5" fill="${color}"/></svg>`,
     rectangle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="6" width="16" height="12" stroke="${color}" stroke-width="2.5" rx="1" fill="none"/></svg>`,
-    move: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 9L2 12L5 15M9 5L12 2L15 5M15 19L12 22L9 19M19 9L22 12L19 15" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="2" fill="${color}"/></svg>`,
-    edit: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 20 L4 16 L16 4 L20 8 L8 20 Z" fill="white" stroke="${color}" stroke-width="2" stroke-linejoin="round"/><path d="M15 5 L19 9" stroke="${color}" stroke-width="2" stroke-linecap="round"/></svg>`,
+    select: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 3 L3 15 L7 11 L10 16 L12 15 L9 10 L15 10 Z" fill="${color}" stroke="${color}" stroke-width="1" stroke-linejoin="round"/></svg>`,
+    directSelect: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 3 L3 15 L7 11 L10 16 L12 15 L9 10 L15 10 Z" fill="white" stroke="${color}" stroke-width="2" stroke-linejoin="round"/></svg>`,
   };
   return svgs[type] || "";
 };
@@ -702,8 +1092,8 @@ const createButton = (
     | "polyline"
     | "polygon"
     | "rectangle"
-    | "move"
-    | "edit",
+    | "select"
+    | "directSelect",
   title: string,
 ) => {
   const button = L.value!.DomUtil.create(
@@ -733,8 +1123,8 @@ const toggleDrawMode = (
     | "polyline"
     | "polygon"
     | "rectangle"
-    | "move"
-    | "edit",
+    | "select"
+    | "directSelect",
 ) => {
   if (props.activeMode === type) {
     emit("mode-selected", null);
@@ -779,11 +1169,11 @@ const createDrawControl = () => {
       L.value!.DomEvent.disableScrollPropagation(container);
 
       if (props.modes) {
-        if (shouldEnableButton("move")) {
-          createButton(container, "move", "Move shapes");
+        if (shouldEnableButton("select")) {
+          createButton(container, "select", "Selection Tool (V)");
         }
-        if (shouldEnableButton("edit")) {
-          createButton(container, "edit", "Edit points");
+        if (shouldEnableButton("directSelect")) {
+          createButton(container, "directSelect", "Direct Selection Tool (A)");
         }
         if (shouldEnableButton("marker")) {
           createButton(container, "marker", "Draw a marker");
@@ -920,8 +1310,8 @@ export interface LeafletFeaturesEditorProps {
     | "polyline"
     | "polygon"
     | "rectangle"
-    | "move"
-    | "edit"
+    | "select"
+    | "directSelect"
     | null;
   shapeOptions?: any;
   repeatMode?: boolean;
@@ -947,7 +1337,7 @@ const emit = defineEmits<{
     e: "mode-changed",
     mode: "marker" | "circle" | "polyline" | "polygon" | "rectangle" | null,
   ): void;
-  (e: "edit-mode-changed", mode: "move" | "edit" | null): void;
+  (e: "edit-mode-changed", mode: "select" | "directSelect" | null): void;
 }>();
 
 const L = inject(LeafletModuleKey, ref());
@@ -1460,12 +1850,12 @@ watch(
       activeHandler.value = null;
     }
 
-    if (newMode === "move" || newMode === "edit") {
+    if (newMode === "select" || newMode === "directSelect") {
       emit("edit-mode-changed", newMode);
       return;
     }
 
-    if (oldMode === "move" || oldMode === "edit") {
+    if (oldMode === "select" || oldMode === "directSelect") {
       emit("edit-mode-changed", null);
     }
 
@@ -1574,6 +1964,7 @@ const props = withDefaults(defineProps<LeafletMarkerProps>(), {
 const emit = defineEmits<{
   "update:lat": [lat: number];
   "update:lng": [lng: number];
+  click: [];
 }>();
 
 const L = inject(LeafletModuleKey, ref());
@@ -1609,6 +2000,10 @@ watch(
               emit("update:lng", latlng.lng);
             });
           }
+
+          marker.value.on("click", () => {
+            emit("click");
+          });
 
           marker.value.addTo(map.value);
         }
@@ -1710,6 +2105,7 @@ const props = withDefaults(defineProps<LeafletPolygonProps>(), {
 const emit = defineEmits<{
   "update:latlngs": [latlngs: Array<[number, number]>];
   closed: [];
+  click: [];
 }>();
 
 const { getLeafletShapeColors } = useTailwindClassParser();
@@ -1988,6 +2384,10 @@ watch(
             interactive: props.interactive,
           });
           polygon.value.addTo(map.value);
+
+          polygon.value.on("click", () => {
+            emit("click");
+          });
         }
 
         if (props.draggable && !props.editable) {
@@ -2055,6 +2455,7 @@ const props = withDefaults(defineProps<LeafletPolylineProps>(), {
 
 const emit = defineEmits<{
   "update:latlngs": [latlngs: Array<[number, number]>];
+  click: [];
 }>();
 
 const { getLeafletLineColors } = useTailwindClassParser();
@@ -2312,6 +2713,10 @@ watch(
             opacity: colors.opacity,
           });
           polyline.value.addTo(map.value);
+
+          polyline.value.on("click", () => {
+            emit("click");
+          });
         }
 
         if (props.draggable && !props.editable) {
@@ -2380,6 +2785,7 @@ const props = withDefaults(defineProps<LeafletRectangleProps>(), {
 
 const emit = defineEmits<{
   "update:bounds": [bounds: [[number, number], [number, number]]];
+  click: [];
 }>();
 
 const { getLeafletShapeColors } = useTailwindClassParser();
@@ -2598,6 +3004,10 @@ watch(
             fillOpacity: colors.fillOpacity,
           });
           rectangle.value.addTo(map.value);
+
+          rectangle.value.on("click", () => {
+            emit("click");
+          });
         }
 
         if (props.draggable && !props.editable) {
@@ -3078,6 +3488,31 @@ export const useTailwindClassParser = () => {
 
 ---
 
+## LeafletBoundingBox
+::hr-underline
+::
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `bounds`{.primary .text-primary} | `L.LatLngBounds \| null` |  |  |
+| `visible`{.primary .text-primary} | `boolean` | false |  |
+
+  ### Slots
+| Name | Description |
+|------|-------------|
+| `default`{.primary .text-primary} | — |
+
+  ### Inject
+| Key | Default | Type | Description |
+|-----|--------|------|-------------|
+| `LeafletModuleKey`{.primary .text-primary} | `ref()` | `any` | — |
+| `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
+
+---
+
 ## LeafletCircle
 ::hr-underline
 ::
@@ -3120,8 +3555,8 @@ export const useTailwindClassParser = () => {
 | `editMode`{.primary .text-primary} | `boolean` | false |  |
 | `activeMode`{.primary .text-primary} | `string \| null` |  |  |
 | `modes`{.primary .text-primary} | `{
-    move?: DrawButton \| boolean;
-    edit?: DrawButton \| boolean;
+    select?: DrawButton \| boolean; // Mode sélection (flèche noire) - transform avec bounding box
+    directSelect?: DrawButton \| boolean; // Mode édition directe (flèche blanche) - éditer les points
     marker?: DrawButton \| boolean;
     circle?: DrawButton \| boolean;
     polyline?: DrawButton \| boolean;
@@ -3152,7 +3587,14 @@ export const useTailwindClassParser = () => {
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `enabled`{.primary .text-primary} | `boolean` | false |  |
-| `mode`{.primary .text-primary} | `'marker' \| 'circle' \| 'polyline' \| 'polygon' \| 'rectangle' \| 'move' \| 'edit' \| null` |  |  |
+| `mode`{.primary .text-primary} | `\| 'marker'
+    \| 'circle'
+    \| 'polyline'
+    \| 'polygon'
+    \| 'rectangle'
+    \| 'select'
+    \| 'directSelect'
+    \| null` |  |  |
 | `shapeOptions`{.primary .text-primary} | `any` | - |  |
 | `repeatMode`{.primary .text-primary} | `boolean` | false |  |
 
@@ -3342,7 +3784,7 @@ export const useTailwindClassParser = () => {
   :::tabs-item{icon="i-lucide-code" label="Code"}
 ```vue
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import { Button } from "@/components/ui/button";
 import {
   LeafletMap,
@@ -3350,6 +3792,7 @@ import {
   LeafletZoomControl,
   LeafletDrawControl,
   LeafletFeaturesEditor,
+  LeafletBoundingBox,
   LeafletMarker,
   LeafletCircle,
   LeafletPolyline,
@@ -3361,6 +3804,11 @@ import {
 
 const mapRef = ref<LeafletMapExposed | null>(null);
 
+const selectedShape = ref<{
+  type: "marker" | "circle" | "polyline" | "polygon" | "rectangle";
+  id: number;
+} | null>(null);
+
 const editMode = ref(false);
 
 const currentMode = ref<
@@ -3369,12 +3817,12 @@ const currentMode = ref<
   | "polyline"
   | "polygon"
   | "rectangle"
-  | "move"
-  | "edit"
+  | "select"
+  | "directSelect"
   | null
 >(null);
 
-const currentEditMode = ref<"move" | "edit" | null>(null);
+const currentEditMode = ref<"select" | "directSelect" | null>(null);
 
 const markers = ref([
   { id: 1, lat: 48.8566, lng: 2.3522, label: "Paris" },
@@ -3463,10 +3911,14 @@ watch(editMode, (enabled) => {
   }
 });
 
-const handleEditModeChanged = (mode: "move" | "edit" | null) => {
+const handleEditModeChanged = (mode: "select" | "directSelect" | null) => {
   currentEditMode.value = mode;
 
-  if (mode === "move") {
+  if (mode !== "select") {
+    selectedShape.value = null;
+  }
+
+  if (mode === "select") {
     Object.keys(moveableShapes.value).forEach((key) => {
       moveableShapes.value[key as keyof typeof moveableShapes.value] = true;
     });
@@ -3474,7 +3926,7 @@ const handleEditModeChanged = (mode: "move" | "edit" | null) => {
     Object.keys(editableShapes.value).forEach((key) => {
       editableShapes.value[key as keyof typeof editableShapes.value] = false;
     });
-  } else if (mode === "edit") {
+  } else if (mode === "directSelect") {
     Object.keys(moveableShapes.value).forEach((key) => {
       moveableShapes.value[key as keyof typeof moveableShapes.value] = false;
     });
@@ -3499,8 +3951,8 @@ const handleModeSelected = (
     | "polyline"
     | "polygon"
     | "rectangle"
-    | "move"
-    | "edit"
+    | "select"
+    | "directSelect"
     | null,
 ) => {
   currentMode.value = mode;
@@ -3643,6 +4095,154 @@ const updateRectangle = (
 const onPolygonClosed = (id: number) => {
   editableShapes.value.polygons = false;
 };
+
+const selectShape = (
+  type: "marker" | "circle" | "polyline" | "polygon" | "rectangle",
+  id: number,
+) => {
+  if (currentEditMode.value === "select") {
+    selectedShape.value = { type, id };
+  }
+};
+
+const boundingBox = computed(() => {
+  if (!selectedShape.value || !mapRef.value?.map) return null;
+
+  const L = (window as any).L;
+  if (!L) return null;
+
+  const { type, id } = selectedShape.value;
+
+  try {
+    switch (type) {
+      case "marker": {
+        const marker = markers.value.find((m) => m.id === id);
+        if (!marker) return null;
+        const point = L.latLng(marker.lat, marker.lng);
+
+        const offset = 0.001;
+        return L.latLngBounds(
+          [marker.lat - offset, marker.lng - offset],
+          [marker.lat + offset, marker.lng + offset],
+        );
+      }
+      case "circle": {
+        const circle = circles.value.find((c) => c.id === id);
+        if (!circle) return null;
+        const center = L.latLng(circle.lat, circle.lng);
+        const radiusInDegrees = circle.radius / 111320;
+        return L.latLngBounds(
+          [circle.lat - radiusInDegrees, circle.lng - radiusInDegrees],
+          [circle.lat + radiusInDegrees, circle.lng + radiusInDegrees],
+        );
+      }
+      case "polyline": {
+        const polyline = polylines.value.find((p) => p.id === id);
+        if (!polyline || polyline.latlngs.length === 0) return null;
+        return L.latLngBounds(
+          polyline.latlngs.map((ll) => L.latLng(ll[0], ll[1])),
+        );
+      }
+      case "polygon": {
+        const polygon = polygons.value.find((p) => p.id === id);
+        if (!polygon || polygon.latlngs.length === 0) return null;
+        return L.latLngBounds(
+          polygon.latlngs.map((ll) => L.latLng(ll[0], ll[1])),
+        );
+      }
+      case "rectangle": {
+        const rectangle = rectangles.value.find((r) => r.id === id);
+        if (!rectangle) return null;
+        return L.latLngBounds(rectangle.bounds[0], rectangle.bounds[1]);
+      }
+    }
+  } catch (error) {
+    console.error("Error computing bounding box:", error);
+    return null;
+  }
+
+  return null;
+});
+
+const handleBoundingBoxUpdate = (newBounds: any) => {
+  if (!selectedShape.value) return;
+
+  const { type, id } = selectedShape.value;
+  const L = (window as any).L;
+  if (!L) return;
+
+  const oldBounds = boundingBox.value;
+  if (!oldBounds) return;
+
+  const scaleX =
+    (newBounds.getEast() - newBounds.getWest()) /
+    (oldBounds.getEast() - oldBounds.getWest());
+  const scaleY =
+    (newBounds.getNorth() - newBounds.getSouth()) /
+    (oldBounds.getNorth() - oldBounds.getSouth());
+  const centerOld = oldBounds.getCenter();
+  const centerNew = newBounds.getCenter();
+  const deltaLat = centerNew.lat - centerOld.lat;
+  const deltaLng = centerNew.lng - centerOld.lng;
+
+  switch (type) {
+    case "marker": {
+      const marker = markers.value.find((m) => m.id === id);
+      if (marker) {
+        marker.lat = centerNew.lat;
+        marker.lng = centerNew.lng;
+      }
+      break;
+    }
+    case "circle": {
+      const circle = circles.value.find((c) => c.id === id);
+      if (circle) {
+        circle.lat += deltaLat;
+        circle.lng += deltaLng;
+        circle.radius *= (scaleX + scaleY) / 2;
+      }
+      break;
+    }
+    case "polyline": {
+      const polyline = polylines.value.find((p) => p.id === id);
+      if (polyline) {
+        polyline.latlngs = polyline.latlngs.map((ll) => {
+          const relLat = (ll[0] - centerOld.lat) * scaleY;
+          const relLng = (ll[1] - centerOld.lng) * scaleX;
+          return [centerNew.lat + relLat, centerNew.lng + relLng] as [
+            number,
+            number,
+          ];
+        });
+      }
+      break;
+    }
+    case "polygon": {
+      const polygon = polygons.value.find((p) => p.id === id);
+      if (polygon) {
+        polygon.latlngs = polygon.latlngs.map((ll) => {
+          const relLat = (ll[0] - centerOld.lat) * scaleY;
+          const relLng = (ll[1] - centerOld.lng) * scaleX;
+          return [centerNew.lat + relLat, centerNew.lng + relLng] as [
+            number,
+            number,
+          ];
+        });
+      }
+      break;
+    }
+    case "rectangle": {
+      const rectangle = rectangles.value.find((r) => r.id === id);
+      if (rectangle) {
+        rectangle.bounds = [
+          [newBounds.getSouth(), newBounds.getWest()],
+          [newBounds.getNorth(), newBounds.getEast()],
+        ] as [[number, number], [number, number]];
+      }
+      break;
+    }
+  }
+};
 </script>
 
 <template>
@@ -3684,8 +4284,8 @@ const onPolygonClosed = (id: number) => {
           :edit-mode="editMode"
           :active-mode="currentMode"
           :modes="{
-            move: true,
-            edit: true,
+            select: true,
+            directSelect: true,
             marker: true,
             circle: true,
             polyline: true,
@@ -3704,6 +4304,12 @@ const onPolygonClosed = (id: number) => {
           @edit-mode-changed="handleEditModeChanged"
         />
 
+        <LeafletBoundingBox
+          :bounds="boundingBox"
+          :visible="currentEditMode === 'select' && !!selectedShape"
+          @update:bounds="handleBoundingBoxUpdate"
+        />
+
         <LeafletMarker
           v-for="marker in markers"
           :key="`marker-${marker.id}`"
@@ -3713,6 +4319,7 @@ const onPolygonClosed = (id: number) => {
           :editable="editableShapes.markers"
           @update:lat="(lat) => updateMarker(marker.id, lat, marker.lng)"
           @update:lng="(lng) => updateMarker(marker.id, marker.lat, lng)"
+          @click="selectShape('marker', marker.id)"
         />
 
         <LeafletCircle
@@ -3727,6 +4334,7 @@ const onPolygonClosed = (id: number) => {
           @update:lat="(lat) => updateCircle(circle.id, { lat })"
           @update:lng="(lng) => updateCircle(circle.id, { lng })"
           @update:radius="(radius) => updateCircle(circle.id, { radius })"
+          @click="selectShape('circle', circle.id)"
         />
 
         <LeafletPolyline
@@ -3738,6 +4346,7 @@ const onPolygonClosed = (id: number) => {
           :draggable="moveableShapes.polylines"
           :editable="editableShapes.polylines"
           @update:latlngs="(latlngs) => updatePolyline(polyline.id, latlngs)"
+          @click="selectShape('polyline', polyline.id)"
         />
 
         <LeafletPolygon
@@ -3750,6 +4359,7 @@ const onPolygonClosed = (id: number) => {
           :auto-close="true"
           @update:latlngs="(latlngs) => updatePolygon(polygon.id, latlngs)"
           @closed="() => onPolygonClosed(polygon.id)"
+          @click="selectShape('polygon', polygon.id)"
         />
 
         <LeafletRectangle
@@ -3760,6 +4370,7 @@ const onPolygonClosed = (id: number) => {
           :draggable="moveableShapes.rectangles"
           :editable="editableShapes.rectangles"
           @update:bounds="(bounds) => updateRectangle(rectangle.id, bounds)"
+          @click="selectShape('rectangle', rectangle.id)"
         />
       </LeafletMap>
     </div>

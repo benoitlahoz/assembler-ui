@@ -22,6 +22,7 @@ const props = withDefaults(defineProps<LeafletRectangleProps>(), {
 
 const emit = defineEmits<{
   'update:bounds': [bounds: [[number, number], [number, number]]];
+  click: [];
 }>();
 
 const { getLeafletShapeColors } = useTailwindClassParser();
@@ -234,6 +235,11 @@ watch(
             fillOpacity: colors.fillOpacity,
           });
           rectangle.value.addTo(map.value);
+
+          // Add click event listener
+          rectangle.value.on('click', () => {
+            emit('click');
+          });
         }
 
         // Gestion des modes : draggable OU editable, pas les deux

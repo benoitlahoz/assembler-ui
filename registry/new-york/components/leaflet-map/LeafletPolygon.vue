@@ -24,6 +24,7 @@ const props = withDefaults(defineProps<LeafletPolygonProps>(), {
 const emit = defineEmits<{
   'update:latlngs': [latlngs: Array<[number, number]>];
   closed: [];
+  click: [];
 }>();
 
 const { getLeafletShapeColors } = useTailwindClassParser();
@@ -310,6 +311,11 @@ watch(
             interactive: props.interactive,
           });
           polygon.value.addTo(map.value);
+
+          // Add click event listener
+          polygon.value.on('click', () => {
+            emit('click');
+          });
         }
 
         // Gestion des modes : draggable OU editable, pas les deux

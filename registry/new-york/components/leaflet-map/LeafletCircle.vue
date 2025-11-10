@@ -34,6 +34,7 @@ const emit = defineEmits<{
   'update:lat': [lat: number];
   'update:lng': [lng: number];
   'update:radius': [radius: number];
+  click: [];
 }>();
 
 const { getLeafletShapeColors } = useTailwindClassParser();
@@ -187,6 +188,11 @@ watch(
             radius: Number(props.radius),
           });
           circle.value.addTo(map.value);
+
+          // Add click event listener
+          circle.value.on('click', () => {
+            emit('click');
+          });
 
           // Setup map-level drag handlers once
           setupMapDragHandlers();

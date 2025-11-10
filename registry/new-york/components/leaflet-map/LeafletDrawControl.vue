@@ -57,14 +57,7 @@ const shouldEnableButton = (type: string): boolean => {
 };
 
 const getIconSvg = (
-  type:
-    | 'marker'
-    | 'circle'
-    | 'polyline'
-    | 'polygon'
-    | 'rectangle'
-    | 'select'
-    | 'directSelect'
+  type: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'select' | 'directSelect'
 ): string => {
   const color = '#333';
   const svgs: Record<string, string> = {
@@ -81,14 +74,7 @@ const getIconSvg = (
 
 const createButton = (
   container: HTMLElement,
-  type:
-    | 'marker'
-    | 'circle'
-    | 'polyline'
-    | 'polygon'
-    | 'rectangle'
-    | 'select'
-    | 'directSelect',
+  type: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'select' | 'directSelect',
   title: string
 ) => {
   const button = L.value!.DomUtil.create('div', 'leaflet-draw-button', container);
@@ -108,14 +94,7 @@ const createButton = (
 };
 
 const toggleDrawMode = (
-  type:
-    | 'marker'
-    | 'circle'
-    | 'polyline'
-    | 'polygon'
-    | 'rectangle'
-    | 'select'
-    | 'directSelect'
+  type: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'select' | 'directSelect'
 ) => {
   if (props.activeMode === type) {
     emit('mode-selected', null);
