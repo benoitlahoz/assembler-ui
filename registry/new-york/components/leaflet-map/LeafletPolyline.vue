@@ -121,8 +121,8 @@ const createMidpoints = () => {
         draggable: true,
         icon: L.value.divIcon({
           className: 'leaflet-editing-icon-midpoint',
-          html: '<div style="width:6px;height:6px;border-radius:50%;background:#fff;border:2px solid #3388ff;opacity:0.6;"></div>',
-          iconSize: [6, 6],
+          html: '<div></div>',
+          iconSize: [14, 14],
         }),
       })
       .addTo(map.value);

@@ -131,7 +131,9 @@ const handleShapeCreated = (event: DrawEvent) => {
       break;
     }
     case 'polyline': {
-      const latlngs = (layer as any).getLatLngs().map((ll: any) => [ll.lat, ll.lng] as [number, number]);
+      const latlngs = (layer as any)
+        .getLatLngs()
+        .map((ll: any) => [ll.lat, ll.lng] as [number, number]);
       const newId =
         polylines.value.length > 0 ? Math.max(...polylines.value.map((p) => p.id)) + 1 : 1;
       polylines.value.push({
@@ -143,7 +145,9 @@ const handleShapeCreated = (event: DrawEvent) => {
       break;
     }
     case 'polygon': {
-      const latlngs = (layer as any).getLatLngs()[0].map((ll: any) => [ll.lat, ll.lng] as [number, number]);
+      const latlngs = (layer as any)
+        .getLatLngs()[0]
+        .map((ll: any) => [ll.lat, ll.lng] as [number, number]);
       const newId =
         polygons.value.length > 0 ? Math.max(...polygons.value.map((p) => p.id)) + 1 : 1;
       polygons.value.push({
