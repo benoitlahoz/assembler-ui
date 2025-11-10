@@ -18,7 +18,6 @@ const className = computed(() => props.class);
 watch(
   () => [L.value, props.name, props.urlTemplate, props.attribution, className.value],
   () => {
-    console.warn('LeafletTileLayer watchEffect triggered', L);
     if (!L.value) return;
 
     const options: L.TileLayerOptions & { name: string } & { urlTemplate: string } = {

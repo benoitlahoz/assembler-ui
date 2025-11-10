@@ -6,6 +6,7 @@ import {
   LeafletMap,
   LeafletTileLayer,
   LeafletZoomControl,
+  LeafletDrawControl,
   LeafletMarker,
   LeafletCircle,
   type LeafletMapExposed,
@@ -42,8 +43,8 @@ const onLocationFound = (event: any) => {
         ref="mapRef"
         name="marseille"
         tile-layer="openstreetmap"
-        center-lat="44.280608"
-        center-lng="5.350242"
+        center-lat="43.3026"
+        center-lng="5.3691"
         :zoom="zoom"
         class="rounded-lg"
         @location:found="onLocationFound"
@@ -53,7 +54,10 @@ const onLocationFound = (event: any) => {
           url-template="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
+
         <LeafletZoomControl position="topleft" />
+
+        <LeafletDrawControl position="topright" />
 
         <!-- Adds a circle at location -->
         <LeafletCircle

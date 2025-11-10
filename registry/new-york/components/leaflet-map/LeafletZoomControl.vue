@@ -3,11 +3,11 @@ import { ref, inject, type Ref, watch, onBeforeUnmount } from 'vue';
 import { type ControlOptions } from 'leaflet';
 import { LeafletMapKey, LeafletModuleKey } from '.';
 
-export interface LeafletControlProps {
+export interface LeafletZoomControlProps {
   position?: ControlOptions['position'];
 }
 
-const props = withDefaults(defineProps<LeafletControlProps>(), {
+const props = withDefaults(defineProps<LeafletZoomControlProps>(), {
   position: 'topright',
 });
 

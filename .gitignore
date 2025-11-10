@@ -39,3 +39,6 @@ logs
 # Descriptions files
 assemblerjs.json
 .registry.json
+
+# Internal
+.private
