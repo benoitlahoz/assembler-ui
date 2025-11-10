@@ -2029,6 +2029,313 @@ export function drawWaveforms({
 }
 ```
 
+```ts [src/components/ui/audio-context-provider/index.ts]
+import type { InjectionKey, Ref } from "vue";
+
+export { default as AudioContextProvider } from "./AudioContextProvider.vue";
+
+export const AudioContextInjectionKey: InjectionKey<Ref<AudioContext | null>> =
+  Symbol("AudioContext");
+
+export const AudioContextUpdateInjectionKey: InjectionKey<
+  (options: {
+    latencyHint?: AudioContextLatencyCategory;
+    sampleRate?: number;
+  }) => void
+> = Symbol("AudioContextUpdate");
+
+export const AudioContextLatencyHintKey: InjectionKey<
+  Ref<AudioContextLatencyCategory>
+> = Symbol("AudioContextLatencyHint");
+
+export const AudioContextSampleRateKey: InjectionKey<Ref<number>> = Symbol(
+  "AudioContextSampleRate",
+);
+
+export { type AudioContextProviderProps } from "./AudioContextProvider.vue";
+```
+
+```vue [src/components/ui/audio-context-provider/AudioContextProvider.vue]
+<script setup lang="ts">
+import { ref, watch, computed, provide } from "vue";
+import { useAudioContext } from "~~/registry/new-york/composables/use-audio-context/useAudioContext";
+import {
+  AudioContextInjectionKey,
+  AudioContextLatencyHintKey,
+  AudioContextSampleRateKey,
+  AudioContextUpdateInjectionKey,
+} from ".";
+
+export interface AudioContextProviderProps {
+  latencyHint?: AudioContextLatencyCategory;
+  sampleRate?: number;
+}
+
+const props = withDefaults(defineProps<AudioContextProviderProps>(), {
+  latencyHint: "interactive",
+  sampleRate: 44100,
+});
+
+const { context, updateContext, errors, state } = useAudioContext({
+  latencyHint: props.latencyHint,
+  sampleRate: props.sampleRate,
+});
+
+const latencyHint = ref(props.latencyHint);
+const sampleRate = ref(props.sampleRate);
+
+provide(AudioContextInjectionKey, context);
+provide(AudioContextUpdateInjectionKey, updateContext);
+provide(AudioContextLatencyHintKey, latencyHint);
+provide(AudioContextSampleRateKey, sampleRate);
+
+watch(
+  () => [props.latencyHint, props.sampleRate],
+  ([newLatencyHint, newSampleRate], [oldLatencyHint, oldSampleRate]) => {
+    if (
+      newLatencyHint !== oldLatencyHint &&
+      typeof newLatencyHint === "string"
+    ) {
+      latencyHint.value = newLatencyHint as AudioContextLatencyCategory;
+    }
+    if (newSampleRate !== oldSampleRate && typeof newSampleRate === "number") {
+      sampleRate.value = newSampleRate;
+    }
+    updateContext({
+      latencyHint:
+        typeof latencyHint.value === "string" ? latencyHint.value : undefined,
+      sampleRate: sampleRate.value,
+    });
+  },
+);
+
+defineExpose({
+  context: computed(() => context.value),
+  updateContext,
+  latencyHint,
+  sampleRate,
+  errors: computed(() => errors.value),
+  state: computed(() => state.value),
+});
+</script>
+
+<template>
+  <slot
+    :context="context"
+    :update-context="updateContext"
+    :latency-hint="latencyHint"
+    :sample-rate="sampleRate"
+    :errors="errors"
+    :state="state"
+  />
+</template>
+
+<style scoped></style>
+```
+
+```ts [src/composables/use-css-parser/useCssParser.ts]
+export interface GradientColorStop {
+  color: string;
+  pos: number;
+}
+
+export interface GradientParseResult {
+  stops: GradientColorStop[];
+  direction: string;
+}
+
+const combineRegExp = (regexpList: (RegExp[] | string)[], flags: string) => {
+  let i,
+    source = "";
+  for (i = 0; i < regexpList.length; i++) {
+    if (typeof regexpList[i] === "string") {
+      source += regexpList[i];
+    } else {
+      source += (regexpList[i] as any).source;
+    }
+  }
+  return new RegExp(source, flags);
+};
+
+const buildGradientRegExp = () => {
+  const searchFlags = "gi";
+  const rAngle = /(?:[+-]?\d*\.?\d+)(?:deg|grad|rad|turn)/;
+
+  const rSideCornerCapture =
+    /to\s+((?:left|right|top|bottom)(?:\s+(?:left|right|top|bottom))?)/;
+  const rComma = /\s*,\s*/;
+  const rColorHex = /\#(?:[a-f0-9]{6}|[a-f0-9]{3})/;
+  const rColorOklch = /oklch\(\s*(?:[+-]?\d*\.?\d+\s*){3}\)/;
+  const rDigits3 = /\(\s*(?:\d{1,3}\s*,\s*){2}\d{1,3}\s*\)/;
+  const rDigits4 = /\(\s*(?:\d{1,3}\s*,\s*){2}\d{1,3}\s*,\s*\d*\.?\d+\)/;
+  const rValue = /(?:[+-]?\d*\.?\d+)(?:%|[a-z]+)?/;
+  const rKeyword = /[_a-z-][_a-z0-9-]*/;
+  const rColor = combineRegExp(
+    [
+      "(?:",
+      rColorHex.source,
+      "|",
+      "(?:rgb|hsl)",
+      rDigits3.source,
+      "|",
+      "(?:rgba|hsla)",
+      rDigits4.source,
+      "|",
+      rColorOklch.source,
+      "|",
+      rKeyword.source,
+      ")",
+    ],
+    "",
+  );
+  const rColorStop = combineRegExp(
+    [rColor.source, "(?:\\s+", rValue.source, "(?:\\s+", rValue.source, ")?)?"],
+    "",
+  );
+  const rColorStopList = combineRegExp(
+    ["(?:", rColorStop.source, rComma.source, ")*", rColorStop.source],
+    "",
+  );
+  const rLineCapture = combineRegExp(
+    ["(?:(", rAngle.source, ")|", rSideCornerCapture.source, ")"],
+    "",
+  );
+  const rGradientSearch = combineRegExp(
+    [
+      "(?:(",
+      rLineCapture.source,
+      ")",
+      rComma.source,
+      ")?(",
+      rColorStopList.source,
+      ")",
+    ],
+    searchFlags,
+  );
+  const rColorStopSearch = combineRegExp(
+    [
+      "\\s*(",
+      rColor.source,
+      ")",
+      "(?:\\s+",
+      "(",
+      rValue.source,
+      "))?",
+      "(?:",
+      rComma.source,
+      "\\s*)?",
+    ],
+    searchFlags,
+  );
+
+  return {
+    gradientSearch: rGradientSearch,
+    colorStopSearch: rColorStopSearch,
+  };
+};
+
+const RegExpLib = buildGradientRegExp();
+
+export const useTailwindClassParser = () => {
+  const getTailwindBaseCssValues = (
+    el: HTMLElement,
+    properties?: string[],
+  ): Record<string, string> => {
+    if (typeof window === "undefined") {
+      return {};
+    }
+
+    const computed = window.getComputedStyle(el);
+    const result: Record<string, string> = {};
+    if (properties && properties.length > 0) {
+      for (const prop of properties) {
+        result[prop] = computed.getPropertyValue(prop);
+      }
+    } else {
+      for (let i = 0; i < computed.length; i++) {
+        const prop = computed.item(i);
+        if (typeof prop === "string") {
+          result[prop] = computed.getPropertyValue(prop);
+        }
+      }
+    }
+
+    return result;
+  };
+
+  const parseGradient = function (
+    input: string,
+  ): GradientParseResult | undefined {
+    const rGradientEnclosedInBrackets =
+      /.*gradient\s*\(((?:\([^\)]*\)|[^\)\(]*)*)\)/;
+    const matchGradientType = rGradientEnclosedInBrackets.exec(input);
+
+    let strToParse = input;
+    if (matchGradientType && matchGradientType[1]) {
+      strToParse = matchGradientType[1];
+    }
+
+    let result: GradientParseResult | undefined;
+    let matchGradient: RegExpExecArray | null;
+    let matchColorStop: RegExpExecArray | null;
+    let stopResult: GradientColorStop;
+
+    RegExpLib.gradientSearch.lastIndex = 0;
+
+    matchGradient = RegExpLib.gradientSearch.exec(strToParse);
+    if (matchGradient !== null) {
+      result = {
+        stops: [],
+        direction: "to bottom",
+      };
+
+      if (!!matchGradient[1]) {
+        result.direction = matchGradient[1] || "to bottom";
+      }
+
+      if (!!matchGradient[2]) {
+        result.direction = matchGradient[2];
+      }
+
+      if (!!matchGradient[3]) {
+        result.direction = matchGradient[3] || "to bottom";
+      }
+
+      RegExpLib.colorStopSearch.lastIndex = 0;
+
+      if (typeof matchGradient[4] === "string") {
+        matchColorStop = RegExpLib.colorStopSearch.exec(matchGradient[4]);
+        while (matchColorStop !== null) {
+          stopResult = {
+            color: matchColorStop[1] || "rgba(0,0,0,0)",
+            pos: 0,
+          };
+
+          if (!!matchColorStop[2]) {
+            let pos = matchColorStop[2];
+            if (pos && pos.endsWith("%")) {
+              stopResult.pos = parseFloat(pos) / 100;
+            } else {
+              stopResult.pos = Number(pos);
+            }
+          }
+          result.stops.push(stopResult);
+
+          matchColorStop = RegExpLib.colorStopSearch.exec(matchGradient[4]);
+        }
+      }
+    }
+
+    return result;
+  };
+
+  return {
+    getTailwindBaseCssValues,
+    parseGradient,
+  };
+};
+```
+
 ```ts [src/components/ui/audio-motion-analyzer/index.ts]
 import type { InjectionKey, Ref } from "vue";
 import {

@@ -56,6 +56,7 @@ const onLocationFound = (event: any) => {
         <!-- Adds a circle at location -->
         <LeafletCircle
           v-if="locationCoords"
+          :key="`circle-${locationCoords.lat}-${locationCoords.lng}`"
           :lat="locationCoords.lat"
           :lng="locationCoords.lng"
           :radius="locationCoords.accuracy"

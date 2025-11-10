@@ -11,7 +11,6 @@ import {
   onBeforeUnmount,
 } from 'vue';
 import { cn } from '@/lib/utils';
-import 'leaflet/dist/leaflet.css';
 import { LeafletErrorsKey, LeafletMapKey, LeafletModuleKey, LeafletTileLayersKey } from '.';
 import type Leaflet from 'leaflet';
 import type { LeafletMouseEvent, Map } from 'leaflet';
@@ -93,8 +92,6 @@ const locate = () => {
 const onLocationFound = (event: Leaflet.LocationEvent) => {
   if (map.value && L) {
     emit('location:found', event);
-    const radius = event.accuracy;
-    L.circle(event.latlng, { radius }).addTo(map.value as any);
   }
 };
 
@@ -141,9 +138,12 @@ watch(
   { immediate: true, deep: true }
 );
 
-onMounted(() => {
+onMounted(async () => {
   if (typeof window === 'undefined') return;
 
+  // @ts-expect-error: Dynamic import of CSS
+  await import('leaflet/dist/leaflet.css');
+  L = await import('leaflet');
   nextTick(() => {
     if (!L) return;
 

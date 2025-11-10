@@ -26,11 +26,24 @@ type LeafletMapInstance = ComponentPublicInstance & LeafletMapExposed;
 
 const mapRef = ref<LeafletMapInstance | null>(null);
 
+const locationCoords = ref<{
+  lat: number;
+  lng: number;
+  accuracy: number;
+} | null>(null);
 const onLocate = () => {
-  console.log("Locate button clicked", mapRef.value, mapRef.value?.locate);
-  if (mapRef.value?.locate) {
-    mapRef.value.locate();
+  const locate = mapRef.value?.locate || mapRef.value?.$.exposed?.locate;
+  if (locate) {
+    locate();
   }
+};
+
+const onLocationFound = (event: any) => {
+  locationCoords.value = {
+    lat: event.latitude,
+    lng: event.longitude,
+    accuracy: event.accuracy,
+  };
 };
 </script>
 
@@ -45,6 +58,7 @@ const onLocate = () => {
         center-lat="44.280608"
         center-lng="5.350242"
         class="rounded-lg"
+        @location:found="onLocationFound"
       >
         <LeafletTileLayer
           name="openstreetmap"
@@ -52,11 +66,12 @@ const onLocate = () => {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
         <LeafletZoomControl position="topleft" />
-        <LeafletMarker lat="43.280608" lng="5.350242" />
+
         <LeafletCircle
-          lat="43.280608"
-          lng="5.350242"
-          radius="500"
+          v-if="locationCoords"
+          :lat="locationCoords.lat"
+          :lng="locationCoords.lng"
+          :radius="locationCoords.accuracy"
           class="bg-red-500 text-red-500 opacity-20"
         />
       </LeafletMap>
@@ -142,7 +157,6 @@ import {
   onBeforeUnmount,
 } from "vue";
 import { cn } from "@/lib/utils";
-import "leaflet/dist/leaflet.css";
 import {
   LeafletErrorsKey,
   LeafletMapKey,
@@ -179,6 +193,8 @@ const props = withDefaults(defineProps<LeafletMapProps>(), {
 
 const emit = defineEmits<{
   (e: "click", event: LeafletMouseEvent): void;
+  (e: "location:found", event: Leaflet.LocationEvent): void;
+  (e: "location:error", event: Leaflet.ErrorEvent): void;
 }>();
 
 let L: Leaflet | undefined;
@@ -218,19 +234,21 @@ const tileLayerForName = () => {
 };
 
 const locate = () => {
-  console.log("Shuld locate");
   if (map.value && map.value.locate) {
-    console.log("Will locate");
     return map.value.locate({ setView: true, maxZoom: zoom.value });
   }
   return null;
 };
 
-const onLocationFound = (event: L.LocationEvent) => {
+const onLocationFound = (event: Leaflet.LocationEvent) => {
   if (map.value && L) {
-    const radius = event.accuracy;
-    L.circle(event.latlng, { radius }).addTo(map.value as any);
+    emit("location:found", event);
   }
+};
+
+const onLocationError = (event: Leaflet.ErrorEvent) => {
+  emit("location:error", event);
+  errors.value.push(new Error(event.message));
 };
 
 watch(
@@ -272,9 +290,11 @@ watch(
   { immediate: true, deep: true },
 );
 
-onMounted(() => {
+onMounted(async () => {
   if (typeof window === "undefined") return;
 
+  await import("leaflet/dist/leaflet.css");
+  L = await import("leaflet");
   nextTick(() => {
     if (!L) return;
 
@@ -286,6 +306,8 @@ onMounted(() => {
     map.value.on("click", (event: LeafletMouseEvent) => {
       emit("click", event);
     });
+    map.value.on("locationfound", onLocationFound);
+    map.value.on("locationerror", onLocationError);
 
     if (props.tileLayer) {
       const layerOptions = tileLayerForName();
@@ -618,6 +640,209 @@ onBeforeUnmount(() => {
   <div>L</div>
 </template>
 ```
+
+```ts [src/composables/use-css-parser/useCssParser.ts]
+export interface GradientColorStop {
+  color: string;
+  pos: number;
+}
+
+export interface GradientParseResult {
+  stops: GradientColorStop[];
+  direction: string;
+}
+
+const combineRegExp = (regexpList: (RegExp[] | string)[], flags: string) => {
+  let i,
+    source = "";
+  for (i = 0; i < regexpList.length; i++) {
+    if (typeof regexpList[i] === "string") {
+      source += regexpList[i];
+    } else {
+      source += (regexpList[i] as any).source;
+    }
+  }
+  return new RegExp(source, flags);
+};
+
+const buildGradientRegExp = () => {
+  const searchFlags = "gi";
+  const rAngle = /(?:[+-]?\d*\.?\d+)(?:deg|grad|rad|turn)/;
+
+  const rSideCornerCapture =
+    /to\s+((?:left|right|top|bottom)(?:\s+(?:left|right|top|bottom))?)/;
+  const rComma = /\s*,\s*/;
+  const rColorHex = /\#(?:[a-f0-9]{6}|[a-f0-9]{3})/;
+  const rColorOklch = /oklch\(\s*(?:[+-]?\d*\.?\d+\s*){3}\)/;
+  const rDigits3 = /\(\s*(?:\d{1,3}\s*,\s*){2}\d{1,3}\s*\)/;
+  const rDigits4 = /\(\s*(?:\d{1,3}\s*,\s*){2}\d{1,3}\s*,\s*\d*\.?\d+\)/;
+  const rValue = /(?:[+-]?\d*\.?\d+)(?:%|[a-z]+)?/;
+  const rKeyword = /[_a-z-][_a-z0-9-]*/;
+  const rColor = combineRegExp(
+    [
+      "(?:",
+      rColorHex.source,
+      "|",
+      "(?:rgb|hsl)",
+      rDigits3.source,
+      "|",
+      "(?:rgba|hsla)",
+      rDigits4.source,
+      "|",
+      rColorOklch.source,
+      "|",
+      rKeyword.source,
+      ")",
+    ],
+    "",
+  );
+  const rColorStop = combineRegExp(
+    [rColor.source, "(?:\\s+", rValue.source, "(?:\\s+", rValue.source, ")?)?"],
+    "",
+  );
+  const rColorStopList = combineRegExp(
+    ["(?:", rColorStop.source, rComma.source, ")*", rColorStop.source],
+    "",
+  );
+  const rLineCapture = combineRegExp(
+    ["(?:(", rAngle.source, ")|", rSideCornerCapture.source, ")"],
+    "",
+  );
+  const rGradientSearch = combineRegExp(
+    [
+      "(?:(",
+      rLineCapture.source,
+      ")",
+      rComma.source,
+      ")?(",
+      rColorStopList.source,
+      ")",
+    ],
+    searchFlags,
+  );
+  const rColorStopSearch = combineRegExp(
+    [
+      "\\s*(",
+      rColor.source,
+      ")",
+      "(?:\\s+",
+      "(",
+      rValue.source,
+      "))?",
+      "(?:",
+      rComma.source,
+      "\\s*)?",
+    ],
+    searchFlags,
+  );
+
+  return {
+    gradientSearch: rGradientSearch,
+    colorStopSearch: rColorStopSearch,
+  };
+};
+
+const RegExpLib = buildGradientRegExp();
+
+export const useTailwindClassParser = () => {
+  const getTailwindBaseCssValues = (
+    el: HTMLElement,
+    properties?: string[],
+  ): Record<string, string> => {
+    if (typeof window === "undefined") {
+      return {};
+    }
+
+    const computed = window.getComputedStyle(el);
+    const result: Record<string, string> = {};
+    if (properties && properties.length > 0) {
+      for (const prop of properties) {
+        result[prop] = computed.getPropertyValue(prop);
+      }
+    } else {
+      for (let i = 0; i < computed.length; i++) {
+        const prop = computed.item(i);
+        if (typeof prop === "string") {
+          result[prop] = computed.getPropertyValue(prop);
+        }
+      }
+    }
+
+    return result;
+  };
+
+  const parseGradient = function (
+    input: string,
+  ): GradientParseResult | undefined {
+    const rGradientEnclosedInBrackets =
+      /.*gradient\s*\(((?:\([^\)]*\)|[^\)\(]*)*)\)/;
+    const matchGradientType = rGradientEnclosedInBrackets.exec(input);
+
+    let strToParse = input;
+    if (matchGradientType && matchGradientType[1]) {
+      strToParse = matchGradientType[1];
+    }
+
+    let result: GradientParseResult | undefined;
+    let matchGradient: RegExpExecArray | null;
+    let matchColorStop: RegExpExecArray | null;
+    let stopResult: GradientColorStop;
+
+    RegExpLib.gradientSearch.lastIndex = 0;
+
+    matchGradient = RegExpLib.gradientSearch.exec(strToParse);
+    if (matchGradient !== null) {
+      result = {
+        stops: [],
+        direction: "to bottom",
+      };
+
+      if (!!matchGradient[1]) {
+        result.direction = matchGradient[1] || "to bottom";
+      }
+
+      if (!!matchGradient[2]) {
+        result.direction = matchGradient[2];
+      }
+
+      if (!!matchGradient[3]) {
+        result.direction = matchGradient[3] || "to bottom";
+      }
+
+      RegExpLib.colorStopSearch.lastIndex = 0;
+
+      if (typeof matchGradient[4] === "string") {
+        matchColorStop = RegExpLib.colorStopSearch.exec(matchGradient[4]);
+        while (matchColorStop !== null) {
+          stopResult = {
+            color: matchColorStop[1] || "rgba(0,0,0,0)",
+            pos: 0,
+          };
+
+          if (!!matchColorStop[2]) {
+            let pos = matchColorStop[2];
+            if (pos && pos.endsWith("%")) {
+              stopResult.pos = parseFloat(pos) / 100;
+            } else {
+              stopResult.pos = Number(pos);
+            }
+          }
+          result.stops.push(stopResult);
+
+          matchColorStop = RegExpLib.colorStopSearch.exec(matchGradient[4]);
+        }
+      }
+    }
+
+    return result;
+  };
+
+  return {
+    getTailwindBaseCssValues,
+    parseGradient,
+  };
+};
+```
 :::
 
 ## LeafletMap
@@ -641,6 +866,8 @@ onBeforeUnmount(() => {
 | Name | Description |
 |------|-------------|
 | `click`{.primary .text-primary} | — |
+| `location:found`{.primary .text-primary} | — |
+| `location:error`{.primary .text-primary} | — |
 
   ### Slots
 | Name | Description |

@@ -85,23 +85,6 @@ watch(
   { immediate: true, flush: 'post' }
 );
 
-onMounted(() => {
-  if (map.value && L) {
-    if (!circle.value) {
-      circle.value = L.circle([Number(props.lat), Number(props.lng)], {
-        radius: Number(props.radius),
-      });
-    }
-    const colors = getColors();
-    circle.value.setStyle({
-      color: colors.color,
-      fillColor: colors.fillColor,
-      fillOpacity: colors.fillOpacity,
-    });
-    circle.value.addTo(map.value);
-  }
-});
-
 onBeforeUnmount(() => {
   if (circle.value) {
     circle.value.remove();
