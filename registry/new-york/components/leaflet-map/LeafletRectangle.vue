@@ -7,6 +7,7 @@ import './leaflet-editing.css';
 export interface LeafletRectangleProps {
   bounds?: [[number, number], [number, number]]; // [[latMin, lngMin], [latMax, lngMax]]
   editable?: boolean;
+  draggable?: boolean;
   class?: HTMLAttributes['class'];
 }
 
@@ -16,6 +17,7 @@ const props = withDefaults(defineProps<LeafletRectangleProps>(), {
     [0, 0],
   ],
   editable: false,
+  draggable: false,
 });
 
 const emit = defineEmits<{
@@ -28,6 +30,7 @@ const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const rectangle = ref<L.Rectangle | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
+const isDragging = ref(false);
 
 const getColors = () => {
   const classNames = props.class ? props.class.toString().split(' ') : [];
@@ -129,8 +132,50 @@ const enableEditing = () => {
   });
 };
 
+const enableDragging = () => {
+  if (!rectangle.value || !L.value || !map.value) return;
+
+  let startBounds: L.LatLngBounds | null = null;
+  let startMousePos: L.LatLng | null = null;
+
+  rectangle.value.on('mousedown', (e: any) => {
+    if (!props.draggable || props.editable) return; // Ne pas activer le drag si en mode édition
+    isDragging.value = true;
+    startBounds = rectangle.value!.getBounds();
+    startMousePos = e.latlng;
+    map.value!.dragging.disable();
+    e.originalEvent.stopPropagation();
+  });
+
+  map.value.on('mousemove', (e: any) => {
+    if (!isDragging.value || !startBounds || !startMousePos) return;
+
+    const deltaLat = e.latlng.lat - startMousePos.lat;
+    const deltaLng = e.latlng.lng - startMousePos.lng;
+
+    const newBounds = L.value!.latLngBounds(
+      [startBounds.getSouth() + deltaLat, startBounds.getWest() + deltaLng],
+      [startBounds.getNorth() + deltaLat, startBounds.getEast() + deltaLng]
+    );
+
+    rectangle.value!.setBounds(newBounds);
+  });
+
+  map.value.on('mouseup', () => {
+    if (!isDragging.value) return;
+    isDragging.value = false;
+    map.value!.dragging.enable();
+
+    const updatedBounds = rectangle.value!.getBounds();
+    emit('update:bounds', [
+      [updatedBounds.getSouth(), updatedBounds.getWest()],
+      [updatedBounds.getNorth(), updatedBounds.getEast()],
+    ]);
+  });
+};
+
 watch(
-  () => [map.value, props.bounds, props.editable],
+  () => [map.value, props.bounds, props.editable, props.draggable],
   () => {
     nextTick(() => {
       if (
@@ -163,6 +208,10 @@ watch(
           enableEditing();
         } else {
           clearEditMarkers();
+        }
+
+        if (props.draggable || props.editable) {
+          enableDragging();
         }
       } else {
         if (rectangle.value) {

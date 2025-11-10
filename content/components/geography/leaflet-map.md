@@ -1392,6 +1392,7 @@ import "./leaflet-editing.css";
 export interface LeafletPolygonProps {
   latlngs?: Array<[number, number]> | Array<{ lat: number; lng: number }>;
   editable?: boolean;
+  draggable?: boolean;
   interactive?: boolean;
   autoClose?: boolean;
   class?: HTMLAttributes["class"];
@@ -1400,6 +1401,7 @@ export interface LeafletPolygonProps {
 const props = withDefaults(defineProps<LeafletPolygonProps>(), {
   latlngs: () => [],
   editable: false,
+  draggable: false,
   interactive: true,
   autoClose: true,
 });
@@ -1416,6 +1418,7 @@ const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const polygon = ref<L.Polygon | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
 const firstPointMarker = ref<L.Marker | null>(null);
+const isDragging = ref(false);
 
 const normalizeLatLngs = (
   latlngs: Array<[number, number]> | Array<{ lat: number; lng: number }>,
@@ -1505,8 +1508,56 @@ const enableEditing = () => {
   });
 };
 
+const enableDragging = () => {
+  if (!polygon.value || !L.value || !map.value) return;
+
+  let startLatLngs: L.LatLng[] = [];
+  let startMousePos: L.LatLng | null = null;
+
+  polygon.value.on("mousedown", (e: any) => {
+    if (!props.draggable || props.editable) return;
+    isDragging.value = true;
+    startLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map((ll) =>
+      L.value!.latLng(ll.lat, ll.lng),
+    );
+    startMousePos = e.latlng;
+    map.value!.dragging.disable();
+    e.originalEvent.stopPropagation();
+  });
+
+  map.value.on("mousemove", (e: any) => {
+    if (!isDragging.value || !startMousePos) return;
+
+    const deltaLat = e.latlng.lat - startMousePos.lat;
+    const deltaLng = e.latlng.lng - startMousePos.lng;
+
+    const newLatLngs = startLatLngs.map((ll) =>
+      L.value!.latLng(ll.lat + deltaLat, ll.lng + deltaLng),
+    );
+
+    polygon.value!.setLatLngs([newLatLngs]);
+  });
+
+  map.value.on("mouseup", () => {
+    if (!isDragging.value) return;
+    isDragging.value = false;
+    map.value!.dragging.enable();
+
+    const updatedLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map(
+      (ll) => [ll.lat, ll.lng],
+    ) as Array<[number, number]>;
+    emit("update:latlngs", updatedLatLngs);
+  });
+};
+
 watch(
-  () => [map.value, props.latlngs, props.editable, props.interactive],
+  () => [
+    map.value,
+    props.latlngs,
+    props.editable,
+    props.draggable,
+    props.interactive,
+  ],
   () => {
     nextTick(() => {
       if (map.value && L.value && props.latlngs && props.latlngs.length >= 3) {
@@ -1535,6 +1586,10 @@ watch(
           enableEditing();
         } else {
           clearEditMarkers();
+        }
+
+        if (props.draggable || props.editable) {
+          enableDragging();
         }
       } else {
         if (polygon.value) {
@@ -1734,6 +1789,7 @@ import "./leaflet-editing.css";
 export interface LeafletRectangleProps {
   bounds?: [[number, number], [number, number]];
   editable?: boolean;
+  draggable?: boolean;
   class?: HTMLAttributes["class"];
 }
 
@@ -1743,6 +1799,7 @@ const props = withDefaults(defineProps<LeafletRectangleProps>(), {
     [0, 0],
   ],
   editable: false,
+  draggable: false,
 });
 
 const emit = defineEmits<{
@@ -1755,6 +1812,7 @@ const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const rectangle = ref<L.Rectangle | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
+const isDragging = ref(false);
 
 const getColors = () => {
   const classNames = props.class ? props.class.toString().split(" ") : [];
@@ -1865,8 +1923,50 @@ const enableEditing = () => {
   });
 };
 
+const enableDragging = () => {
+  if (!rectangle.value || !L.value || !map.value) return;
+
+  let startBounds: L.LatLngBounds | null = null;
+  let startMousePos: L.LatLng | null = null;
+
+  rectangle.value.on("mousedown", (e: any) => {
+    if (!props.draggable || props.editable) return;
+    isDragging.value = true;
+    startBounds = rectangle.value!.getBounds();
+    startMousePos = e.latlng;
+    map.value!.dragging.disable();
+    e.originalEvent.stopPropagation();
+  });
+
+  map.value.on("mousemove", (e: any) => {
+    if (!isDragging.value || !startBounds || !startMousePos) return;
+
+    const deltaLat = e.latlng.lat - startMousePos.lat;
+    const deltaLng = e.latlng.lng - startMousePos.lng;
+
+    const newBounds = L.value!.latLngBounds(
+      [startBounds.getSouth() + deltaLat, startBounds.getWest() + deltaLng],
+      [startBounds.getNorth() + deltaLat, startBounds.getEast() + deltaLng],
+    );
+
+    rectangle.value!.setBounds(newBounds);
+  });
+
+  map.value.on("mouseup", () => {
+    if (!isDragging.value) return;
+    isDragging.value = false;
+    map.value!.dragging.enable();
+
+    const updatedBounds = rectangle.value!.getBounds();
+    emit("update:bounds", [
+      [updatedBounds.getSouth(), updatedBounds.getWest()],
+      [updatedBounds.getNorth(), updatedBounds.getEast()],
+    ]);
+  });
+};
+
 watch(
-  () => [map.value, props.bounds, props.editable],
+  () => [map.value, props.bounds, props.editable, props.draggable],
   () => {
     nextTick(() => {
       if (
@@ -1899,6 +1999,10 @@ watch(
           enableEditing();
         } else {
           clearEditMarkers();
+        }
+
+        if (props.draggable || props.editable) {
+          enableDragging();
         }
       } else {
         if (rectangle.value) {
@@ -2376,6 +2480,7 @@ export const useTailwindClassParser = () => {
 |------|------|---------|-------------|
 | `latlngs`{.primary .text-primary} | `Array<[number, number]> \| Array<{ lat: number; lng: number }>` |  |  |
 | `editable`{.primary .text-primary} | `boolean` | false |  |
+| `draggable`{.primary .text-primary} | `boolean` | false |  |
 | `interactive`{.primary .text-primary} | `boolean` | true |  |
 | `autoClose`{.primary .text-primary} | `boolean` | true |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
@@ -2431,6 +2536,7 @@ export const useTailwindClassParser = () => {
 |------|------|---------|-------------|
 | `bounds`{.primary .text-primary} | `[[number, number], [number, number]]` | 0,0,0,0 |  |
 | `editable`{.primary .text-primary} | `boolean` | false |  |
+| `draggable`{.primary .text-primary} | `boolean` | false |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
   ### Slots
@@ -2674,6 +2780,8 @@ import {
 
 const mapRef = ref<LeafletMapExposed | null>(null);
 
+const editMode = ref(false);
+
 const markers = ref([
   { id: 1, lat: 48.8566, lng: 2.3522, label: "Paris" },
   { id: 2, lat: 48.8738, lng: 2.295, label: "Arc de Triomphe" },
@@ -2742,6 +2850,16 @@ const editableShapes = ref({
   rectangles: false,
 });
 
+const toggleEditMode = () => {
+  editMode.value = !editMode.value;
+
+  editableShapes.value.markers = editMode.value;
+  editableShapes.value.circles = editMode.value;
+  editableShapes.value.polylines = editMode.value;
+  editableShapes.value.polygons = editMode.value;
+  editableShapes.value.rectangles = editMode.value;
+};
+
 const updateMarker = (id: number, lat: number, lng: number) => {
   const marker = markers.value.find((m) => m.id === id);
   if (marker) {
@@ -2800,54 +2918,37 @@ const onPolygonClosed = (id: number) => {
 
 <template>
   <div class="w-full h-full flex flex-col gap-4">
-    <div class="p-4 bg-gray-100 rounded space-y-2">
-      <h3 class="font-semibold mb-2">Mode édition</h3>
-      <div class="flex flex-wrap gap-3">
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            v-model="editableShapes.markers"
-            class="rounded"
-          />
-          <span class="text-sm">Marqueurs ({{ markers.length }})</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            v-model="editableShapes.circles"
-            class="rounded"
-          />
-          <span class="text-sm">Cercles ({{ circles.length }})</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            v-model="editableShapes.polylines"
-            class="rounded"
-          />
-          <span class="text-sm">Polylignes ({{ polylines.length }})</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            v-model="editableShapes.polygons"
-            class="rounded"
-          />
-          <span class="text-sm">Polygones ({{ polygons.length }})</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            v-model="editableShapes.rectangles"
-            class="rounded"
-          />
-          <span class="text-sm">Rectangles ({{ rectangles.length }})</span>
-        </label>
+    <div class="p-4 bg-gray-100 rounded flex items-center justify-between">
+      <div>
+        <h3 class="font-semibold">Démonstration des formes Leaflet</h3>
+        <p class="text-sm text-gray-600">
+          {{
+            editMode
+              ? "Mode édition activé - Déplacez les formes"
+              : "Mode visualisation"
+          }}
+        </p>
       </div>
-      <p class="text-xs text-gray-600 mt-2">
-        💡 Activez l'édition puis déplacez les formes. Pour les polygones,
-        cliquez sur le premier point (blanc) pour fermer.
-      </p>
+      <button
+        @click="toggleEditMode"
+        :class="[
+          'px-6 py-2 rounded-lg font-medium transition-colors',
+          editMode
+            ? 'bg-green-500 hover:bg-green-600 text-white'
+            : 'bg-blue-500 hover:bg-blue-600 text-white',
+        ]"
+      >
+        {{ editMode ? "✓ Édition active" : "Activer l'édition" }}
+      </button>
+    </div>
+
+    <div
+      class="p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800"
+      v-if="editMode"
+    >
+      💡 <strong>Mode édition :</strong> Déplacez les marqueurs et modifiez les
+      cercles (points blancs). Les polylignes, polygones et rectangles sont
+      déplaçables - cliquez et faites glisser.
     </div>
 
     <div class="flex-1 relative">
@@ -2906,7 +3007,7 @@ const onPolygonClosed = (id: number) => {
           :key="`polygon-${polygon.id}`"
           :latlngs="polygon.latlngs"
           :class="polygon.class"
-          :editable="editableShapes.polygons"
+          :draggable="editableShapes.polygons"
           :auto-close="true"
           @update:latlngs="(latlngs) => updatePolygon(polygon.id, latlngs)"
           @closed="() => onPolygonClosed(polygon.id)"
@@ -2917,7 +3018,7 @@ const onPolygonClosed = (id: number) => {
           :key="`rectangle-${rectangle.id}`"
           :bounds="rectangle.bounds"
           :class="rectangle.class"
-          :editable="editableShapes.rectangles"
+          :draggable="editableShapes.rectangles"
           @update:bounds="(bounds) => updateRectangle(rectangle.id, bounds)"
         />
       </LeafletMap>

@@ -14,6 +14,9 @@ import {
 
 const mapRef = ref<LeafletMapExposed | null>(null);
 
+// Mode édition global
+const editMode = ref(false);
+
 // Données pour les différentes shapes
 const markers = ref([
   { id: 1, lat: 48.8566, lng: 2.3522, label: 'Paris' },
@@ -72,6 +75,17 @@ const editableShapes = ref({
   rectangles: false,
 });
 
+// Basculer le mode édition
+const toggleEditMode = () => {
+  editMode.value = !editMode.value;
+  // Synchroniser tous les types de shapes avec le mode global
+  editableShapes.value.markers = editMode.value;
+  editableShapes.value.circles = editMode.value;
+  editableShapes.value.polylines = editMode.value;
+  editableShapes.value.polygons = editMode.value;
+  editableShapes.value.rectangles = editMode.value;
+};
+
 // Gestion des mises à jour
 const updateMarker = (id: number, lat: number, lng: number) => {
   const marker = markers.value.find((m) => m.id === id);
@@ -126,35 +140,33 @@ const onPolygonClosed = (id: number) => {
 
 <template>
   <div class="w-full h-full flex flex-col gap-4">
-    <!-- Contrôles d'édition -->
-    <div class="p-4 bg-gray-100 rounded space-y-2">
-      <h3 class="font-semibold mb-2">Mode édition</h3>
-      <div class="flex flex-wrap gap-3">
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" v-model="editableShapes.markers" class="rounded" />
-          <span class="text-sm">Marqueurs ({{ markers.length }})</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" v-model="editableShapes.circles" class="rounded" />
-          <span class="text-sm">Cercles ({{ circles.length }})</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" v-model="editableShapes.polylines" class="rounded" />
-          <span class="text-sm">Polylignes ({{ polylines.length }})</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" v-model="editableShapes.polygons" class="rounded" />
-          <span class="text-sm">Polygones ({{ polygons.length }})</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" v-model="editableShapes.rectangles" class="rounded" />
-          <span class="text-sm">Rectangles ({{ rectangles.length }})</span>
-        </label>
+    <!-- Contrôle d'édition simplifié -->
+    <div class="p-4 bg-gray-100 rounded flex items-center justify-between">
+      <div>
+        <h3 class="font-semibold">Démonstration des formes Leaflet</h3>
+        <p class="text-sm text-gray-600">
+          {{ editMode ? 'Mode édition activé - Déplacez les formes' : 'Mode visualisation' }}
+        </p>
       </div>
-      <p class="text-xs text-gray-600 mt-2">
-        💡 Activez l'édition puis déplacez les formes. Pour les polygones, cliquez sur le premier
-        point (blanc) pour fermer.
-      </p>
+      <button
+        @click="toggleEditMode"
+        :class="[
+          'px-6 py-2 rounded-lg font-medium transition-colors',
+          editMode
+            ? 'bg-green-500 hover:bg-green-600 text-white'
+            : 'bg-blue-500 hover:bg-blue-600 text-white',
+        ]"
+      >
+        {{ editMode ? '✓ Édition active' : "Activer l'édition" }}
+      </button>
+    </div>
+
+    <div
+      class="p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800"
+      v-if="editMode"
+    >
+      💡 <strong>Mode édition :</strong> Déplacez les marqueurs et modifiez les cercles (points
+      blancs). Les polylignes, polygones et rectangles sont déplaçables - cliquez et faites glisser.
     </div>
 
     <!-- Carte -->
@@ -218,7 +230,7 @@ const onPolygonClosed = (id: number) => {
           :key="`polygon-${polygon.id}`"
           :latlngs="polygon.latlngs"
           :class="polygon.class"
-          :editable="editableShapes.polygons"
+          :draggable="editableShapes.polygons"
           :auto-close="true"
           @update:latlngs="(latlngs) => updatePolygon(polygon.id, latlngs)"
           @closed="() => onPolygonClosed(polygon.id)"
@@ -230,7 +242,7 @@ const onPolygonClosed = (id: number) => {
           :key="`rectangle-${rectangle.id}`"
           :bounds="rectangle.bounds"
           :class="rectangle.class"
-          :editable="editableShapes.rectangles"
+          :draggable="editableShapes.rectangles"
           @update:bounds="(bounds) => updateRectangle(rectangle.id, bounds)"
         />
       </LeafletMap>

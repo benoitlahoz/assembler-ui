@@ -7,6 +7,7 @@ import './leaflet-editing.css';
 export interface LeafletPolygonProps {
   latlngs?: Array<[number, number]> | Array<{ lat: number; lng: number }>;
   editable?: boolean;
+  draggable?: boolean;
   interactive?: boolean;
   autoClose?: boolean; // Nouvelle prop pour la fermeture auto
   class?: HTMLAttributes['class'];
@@ -15,6 +16,7 @@ export interface LeafletPolygonProps {
 const props = withDefaults(defineProps<LeafletPolygonProps>(), {
   latlngs: () => [],
   editable: false,
+  draggable: false,
   interactive: true,
   autoClose: true,
 });
@@ -31,6 +33,7 @@ const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const polygon = ref<L.Polygon | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
 const firstPointMarker = ref<L.Marker | null>(null);
+const isDragging = ref(false);
 
 const normalizeLatLngs = (
   latlngs: Array<[number, number]> | Array<{ lat: number; lng: number }>
@@ -117,8 +120,51 @@ const enableEditing = () => {
   });
 };
 
+const enableDragging = () => {
+  if (!polygon.value || !L.value || !map.value) return;
+
+  let startLatLngs: L.LatLng[] = [];
+  let startMousePos: L.LatLng | null = null;
+
+  polygon.value.on('mousedown', (e: any) => {
+    if (!props.draggable || props.editable) return; // Ne pas activer le drag si en mode édition
+    isDragging.value = true;
+    startLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map((ll) =>
+      L.value!.latLng(ll.lat, ll.lng)
+    );
+    startMousePos = e.latlng;
+    map.value!.dragging.disable();
+    e.originalEvent.stopPropagation();
+  });
+
+  map.value.on('mousemove', (e: any) => {
+    if (!isDragging.value || !startMousePos) return;
+
+    const deltaLat = e.latlng.lat - startMousePos.lat;
+    const deltaLng = e.latlng.lng - startMousePos.lng;
+
+    const newLatLngs = startLatLngs.map((ll) =>
+      L.value!.latLng(ll.lat + deltaLat, ll.lng + deltaLng)
+    );
+
+    polygon.value!.setLatLngs([newLatLngs]);
+  });
+
+  map.value.on('mouseup', () => {
+    if (!isDragging.value) return;
+    isDragging.value = false;
+    map.value!.dragging.enable();
+
+    const updatedLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map((ll) => [
+      ll.lat,
+      ll.lng,
+    ]) as Array<[number, number]>;
+    emit('update:latlngs', updatedLatLngs);
+  });
+};
+
 watch(
-  () => [map.value, props.latlngs, props.editable, props.interactive],
+  () => [map.value, props.latlngs, props.editable, props.draggable, props.interactive],
   () => {
     nextTick(() => {
       if (map.value && L.value && props.latlngs && props.latlngs.length >= 3) {
@@ -147,6 +193,10 @@ watch(
           enableEditing();
         } else {
           clearEditMarkers();
+        }
+
+        if (props.draggable || props.editable) {
+          enableDragging();
         }
       } else {
         if (polygon.value) {
