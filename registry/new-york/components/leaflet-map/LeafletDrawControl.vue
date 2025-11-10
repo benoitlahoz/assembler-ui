@@ -17,6 +17,7 @@ export interface DrawHandlerOptions {
 
 export interface LeafletDrawControlProps {
   position?: ControlOptions['position'];
+  editMode?: boolean;
   draw?: {
     marker?: DrawHandlerOptions | boolean;
     circle?: DrawHandlerOptions | boolean;
@@ -38,6 +39,7 @@ export interface DrawEvent {
 
 const props = withDefaults(defineProps<LeafletDrawControlProps>(), {
   position: 'topright',
+  editMode: false,
 });
 
 const emit = defineEmits<{
@@ -46,7 +48,6 @@ const emit = defineEmits<{
   (e: 'draw:deleted', event: { layers: Layer[] }): void;
   (e: 'draw:drawstart', event: { layerType: string }): void;
   (e: 'draw:drawstop', event: { layerType: string }): void;
-  (e: 'edit-mode-change', enabled: boolean): void;
 }>();
 
 const L = inject(LeafletModuleKey, ref());
@@ -54,7 +55,6 @@ const map = inject(LeafletMapKey, ref(null));
 
 const control = ref<any>(null);
 const activeMode = ref<string | null>(null);
-const editMode = ref(false);
 const handlers = ref<Map<string, any>>(new Map());
 const drawnItems = ref<any>(null);
 
@@ -73,9 +73,6 @@ const createDrawControl = () => {
       // Empêcher la propagation des événements
       L.value!.DomEvent.disableClickPropagation(container);
       L.value!.DomEvent.disableScrollPropagation(container);
-
-      // Bouton Edit/Draw mode
-      createEditButton(container);
 
       // Créer les boutons pour chaque outil de dessin
       if (props.draw) {
@@ -151,60 +148,7 @@ const createButton = (container: HTMLElement, type: string, title: string) => {
   return button;
 };
 
-const createEditButton = (container: HTMLElement) => {
-  const button = L.value!.DomUtil.create(
-    'div',
-    'leaflet-draw-button leaflet-edit-button',
-    container
-  );
-  button.title = 'Activer le mode Édition';
-  button.innerHTML = getIconSvg('edit');
-  button.setAttribute('role', 'button');
-  button.setAttribute('aria-label', 'Mode Édition');
-  button.setAttribute('tabindex', '0');
-
-  const updateButtonState = () => {
-    if (editMode.value) {
-      button.classList.add('active');
-      button.title = 'Mode Édition activé (cliquez pour désactiver)';
-      button.innerHTML = getIconSvg('edit', '#ffffff');
-    } else {
-      button.classList.remove('active');
-      button.title = 'Activer le mode Édition';
-      button.innerHTML = getIconSvg('edit', '#333333');
-    }
-  };
-
-  L.value!.DomEvent.on(button, 'click', (e: Event) => {
-    L.value!.DomEvent.preventDefault(e);
-    toggleEditMode();
-    updateButtonState();
-  });
-
-  updateButtonState();
-  return button;
-};
-
-const toggleEditMode = () => {
-  editMode.value = !editMode.value;
-
-  // Si on désactive le mode edit, désactiver aussi le mode dessin actif
-  if (!editMode.value && activeMode.value) {
-    disableHandler(activeMode.value);
-    activeMode.value = null;
-  }
-
-  emit('edit-mode-change', editMode.value);
-};
-
 const toggleDrawMode = (type: string) => {
-  // Les outils de dessin ne fonctionnent qu'en mode édition
-  if (!editMode.value) {
-    // Activer automatiquement le mode édition
-    editMode.value = true;
-    emit('edit-mode-change', true);
-  }
-
   if (activeMode.value === type) {
     disableHandler(type);
     activeMode.value = null;
@@ -681,8 +625,8 @@ const createRectangleHandler = (options: DrawHandlerOptions) => {
 
 // Initialisation du contrôle
 watch(
-  () => map.value,
-  async (newMap) => {
+  () => [map.value, props.editMode] as const,
+  async ([newMap, editMode]) => {
     if (!newMap || !L.value) return;
 
     // Attendre que le DOM et Leaflet soient complètement prêts
@@ -695,10 +639,21 @@ watch(
         drawnItems.value = L.value.featureGroup().addTo(newMap);
       }
 
-      // Créer et ajouter le contrôle
-      control.value = createDrawControl();
-      if (control.value) {
-        control.value.addTo(newMap);
+      // Ajouter ou retirer le contrôle selon le mode édition
+      if (editMode) {
+        if (!control.value) {
+          control.value = createDrawControl();
+          if (control.value) {
+            control.value.addTo(newMap);
+          }
+        }
+      } else {
+        // Retirer le contrôle si le mode édition est désactivé
+        if (control.value) {
+          disableAllHandlers();
+          newMap.removeControl(control.value);
+          control.value = null;
+        }
       }
     } catch (error) {
       console.error('Error creating draw control:', error);
@@ -753,16 +708,5 @@ onBeforeUnmount(() => {
 
 .leaflet-draw-button:last-child {
   border-bottom: none;
-}
-
-.leaflet-edit-button.active {
-  background: #3388ff;
-  color: white;
-}
-
-.leaflet-edit-button.active svg path,
-.leaflet-edit-button.active svg circle,
-.leaflet-edit-button.active svg rect {
-  stroke: white;
 }
 </style>

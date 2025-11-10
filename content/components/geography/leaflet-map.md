@@ -590,6 +590,7 @@ export interface DrawHandlerOptions {
 
 export interface LeafletDrawControlProps {
   position?: ControlOptions["position"];
+  editMode?: boolean;
   draw?: {
     marker?: DrawHandlerOptions | boolean;
     circle?: DrawHandlerOptions | boolean;
@@ -611,6 +612,7 @@ export interface DrawEvent {
 
 const props = withDefaults(defineProps<LeafletDrawControlProps>(), {
   position: "topright",
+  editMode: false,
 });
 
 const emit = defineEmits<{
@@ -619,7 +621,6 @@ const emit = defineEmits<{
   (e: "draw:deleted", event: { layers: Layer[] }): void;
   (e: "draw:drawstart", event: { layerType: string }): void;
   (e: "draw:drawstop", event: { layerType: string }): void;
-  (e: "edit-mode-change", enabled: boolean): void;
 }>();
 
 const L = inject(LeafletModuleKey, ref());
@@ -627,7 +628,6 @@ const map = inject(LeafletMapKey, ref(null));
 
 const control = ref<any>(null);
 const activeMode = ref<string | null>(null);
-const editMode = ref(false);
 const handlers = ref<Map<string, any>>(new Map());
 const drawnItems = ref<any>(null);
 
@@ -647,8 +647,6 @@ const createDrawControl = () => {
 
       L.value!.DomEvent.disableClickPropagation(container);
       L.value!.DomEvent.disableScrollPropagation(container);
-
-      createEditButton(container);
 
       if (props.draw) {
         if (shouldEnableHandler("marker")) {
@@ -707,12 +705,16 @@ const getIconSvg = (type: string, color: string = "#333333"): string => {
 };
 
 const createButton = (container: HTMLElement, type: string, title: string) => {
-  const button = L.value!.DomUtil.create("a", "leaflet-draw-button", container);
-  button.href = "#";
+  const button = L.value!.DomUtil.create(
+    "div",
+    "leaflet-draw-button",
+    container,
+  );
   button.title = title;
   button.innerHTML = getIconSvg(type);
   button.setAttribute("role", "button");
   button.setAttribute("aria-label", title);
+  button.setAttribute("tabindex", "0");
 
   L.value!.DomEvent.on(button, "click", (e: Event) => {
     L.value!.DomEvent.preventDefault(e);
@@ -722,57 +724,7 @@ const createButton = (container: HTMLElement, type: string, title: string) => {
   return button;
 };
 
-const createEditButton = (container: HTMLElement) => {
-  const button = L.value!.DomUtil.create(
-    "a",
-    "leaflet-draw-button leaflet-edit-button",
-    container,
-  );
-  button.href = "#";
-  button.title = "Activer le mode Édition";
-  button.innerHTML = getIconSvg("edit");
-  button.setAttribute("role", "button");
-  button.setAttribute("aria-label", "Mode Édition");
-
-  const updateButtonState = () => {
-    if (editMode.value) {
-      button.classList.add("active");
-      button.title = "Mode Édition activé (cliquez pour désactiver)";
-      button.innerHTML = getIconSvg("edit", "#ffffff");
-    } else {
-      button.classList.remove("active");
-      button.title = "Activer le mode Édition";
-      button.innerHTML = getIconSvg("edit", "#333333");
-    }
-  };
-
-  L.value!.DomEvent.on(button, "click", (e: Event) => {
-    L.value!.DomEvent.preventDefault(e);
-    toggleEditMode();
-    updateButtonState();
-  });
-
-  updateButtonState();
-  return button;
-};
-
-const toggleEditMode = () => {
-  editMode.value = !editMode.value;
-
-  if (!editMode.value && activeMode.value) {
-    disableHandler(activeMode.value);
-    activeMode.value = null;
-  }
-
-  emit("edit-mode-change", editMode.value);
-};
-
 const toggleDrawMode = (type: string) => {
-  if (!editMode.value) {
-    editMode.value = true;
-    emit("edit-mode-change", true);
-  }
-
   if (activeMode.value === type) {
     disableHandler(type);
     activeMode.value = null;
@@ -1218,8 +1170,8 @@ const createRectangleHandler = (options: DrawHandlerOptions) => {
 };
 
 watch(
-  () => map.value,
-  async (newMap) => {
+  () => [map.value, props.editMode] as const,
+  async ([newMap, editMode]) => {
     if (!newMap || !L.value) return;
 
     await nextTick();
@@ -1230,9 +1182,19 @@ watch(
         drawnItems.value = L.value.featureGroup().addTo(newMap);
       }
 
-      control.value = createDrawControl();
-      if (control.value) {
-        control.value.addTo(newMap);
+      if (editMode) {
+        if (!control.value) {
+          control.value = createDrawControl();
+          if (control.value) {
+            control.value.addTo(newMap);
+          }
+        }
+      } else {
+        if (control.value) {
+          disableAllHandlers();
+          newMap.removeControl(control.value);
+          control.value = null;
+        }
       }
     } catch (error) {
       console.error("Error creating draw control:", error);
@@ -1265,19 +1227,14 @@ onBeforeUnmount(() => {
 .leaflet-draw-button {
   width: 30px;
   height: 30px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  text-decoration: none;
-  color: #333;
   background: white;
   border-bottom: 1px solid #ccc;
   transition: all 0.2s ease;
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-  line-height: 1;
-  vertical-align: middle;
+  cursor: pointer;
+  user-select: none;
 }
 
 .leaflet-draw-button svg {
@@ -1292,17 +1249,6 @@ onBeforeUnmount(() => {
 
 .leaflet-draw-button:last-child {
   border-bottom: none;
-}
-
-.leaflet-edit-button.active {
-  background: #3388ff;
-  color: white;
-}
-
-.leaflet-edit-button.active svg path,
-.leaflet-edit-button.active svg circle,
-.leaflet-edit-button.active svg rect {
-  stroke: white;
 }
 </style>
 ```
@@ -2701,6 +2647,7 @@ export const useTailwindClassParser = () => {
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `position`{.primary .text-primary} | `ControlOptions['position']` | topright |  |
+| `editMode`{.primary .text-primary} | `boolean` | false |  |
 | `draw`{.primary .text-primary} | `{
     marker?: DrawHandlerOptions \| boolean;
     circle?: DrawHandlerOptions \| boolean;
@@ -2721,7 +2668,6 @@ export const useTailwindClassParser = () => {
 | `draw:deleted`{.primary .text-primary} | — |
 | `draw:drawstart`{.primary .text-primary} | — |
 | `draw:drawstop`{.primary .text-primary} | — |
-| `edit-mode-change`{.primary .text-primary} | — |
 
   ### Inject
 | Key | Default | Type | Description |
@@ -3294,15 +3240,28 @@ const onPolygonClosed = (id: number) => {
 
 <template>
   <div class="w-full h-full flex flex-col gap-4">
-    <div class="p-4 bg-gray-100 rounded">
-      <h3 class="font-semibold">Démonstration des formes Leaflet</h3>
-      <p class="text-sm text-gray-600">
-        {{
+    <div class="p-4 bg-gray-100 rounded flex items-center justify-between">
+      <div>
+        <h3 class="font-semibold">Démonstration des formes Leaflet</h3>
+        <p class="text-sm text-gray-600">
+          {{
+            editMode
+              ? "Mode édition activé - Modifiez et ajoutez des formes"
+              : "Mode visualisation - Activez l'édition pour interagir"
+          }}
+        </p>
+      </div>
+      <button
+        @click="editMode = !editMode"
+        class="px-4 py-2 rounded transition-colors"
+        :class="
           editMode
-            ? "Mode édition activé - Modifiez et ajoutez des formes"
-            : "Mode visualisation - Activez l'édition pour interagir"
-        }}
-      </p>
+            ? 'bg-blue-500 text-white hover:bg-blue-600'
+            : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+        "
+      >
+        {{ editMode ? "Désactiver édition" : "Activer édition" }}
+      </button>
     </div>
 
     <div
@@ -3335,6 +3294,7 @@ const onPolygonClosed = (id: number) => {
 
         <LeafletDrawControl
           position="topright"
+          :edit-mode="editMode"
           :draw="{
             marker: true,
             circle: true,
@@ -3342,7 +3302,6 @@ const onPolygonClosed = (id: number) => {
             polygon: true,
             rectangle: true,
           }"
-          @edit-mode-change="handleEditModeChange"
           @draw:created="handleShapeCreated"
         />
 
