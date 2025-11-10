@@ -152,7 +152,11 @@ const createButton = (container: HTMLElement, type: string, title: string) => {
 };
 
 const createEditButton = (container: HTMLElement) => {
-  const button = L.value!.DomUtil.create('div', 'leaflet-draw-button leaflet-edit-button', container);
+  const button = L.value!.DomUtil.create(
+    'div',
+    'leaflet-draw-button leaflet-edit-button',
+    container
+  );
   button.title = 'Activer le mode Édition';
   button.innerHTML = getIconSvg('edit');
   button.setAttribute('role', 'button');
