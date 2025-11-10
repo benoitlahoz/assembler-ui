@@ -72,6 +72,7 @@ const enableEditing = () => {
       draggable: true,
       icon: L.value!.divIcon({
         className: 'leaflet-editing-icon',
+        html: '<div style="width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #3388ff;"></div>',
         iconSize: [8, 8],
       }),
     }).addTo(map.value!);

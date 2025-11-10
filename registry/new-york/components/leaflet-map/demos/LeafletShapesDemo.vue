@@ -4,6 +4,7 @@ import {
   LeafletMap,
   LeafletTileLayer,
   LeafletZoomControl,
+  LeafletDrawControl,
   LeafletMarker,
   LeafletCircle,
   LeafletPolyline,
@@ -75,15 +76,15 @@ const editableShapes = ref({
   rectangles: false,
 });
 
-// Basculer le mode édition
-const toggleEditMode = () => {
-  editMode.value = !editMode.value;
+// Basculer le mode édition (géré par le contrôle maintenant)
+const handleEditModeChange = (enabled: boolean) => {
+  editMode.value = enabled;
   // Synchroniser tous les types de shapes avec le mode global
-  editableShapes.value.markers = editMode.value;
-  editableShapes.value.circles = editMode.value;
-  editableShapes.value.polylines = editMode.value;
-  editableShapes.value.polygons = editMode.value;
-  editableShapes.value.rectangles = editMode.value;
+  editableShapes.value.markers = enabled;
+  editableShapes.value.circles = enabled;
+  editableShapes.value.polylines = enabled;
+  editableShapes.value.polygons = enabled;
+  editableShapes.value.rectangles = enabled;
 };
 
 // Gestion des mises à jour
@@ -140,25 +141,16 @@ const onPolygonClosed = (id: number) => {
 
 <template>
   <div class="w-full h-full flex flex-col gap-4">
-    <!-- Contrôle d'édition simplifié -->
-    <div class="p-4 bg-gray-100 rounded flex items-center justify-between">
-      <div>
-        <h3 class="font-semibold">Démonstration des formes Leaflet</h3>
-        <p class="text-sm text-gray-600">
-          {{ editMode ? 'Mode édition activé - Déplacez les formes' : 'Mode visualisation' }}
-        </p>
-      </div>
-      <button
-        @click="toggleEditMode"
-        :class="[
-          'px-6 py-2 rounded-lg font-medium transition-colors',
+    <!-- Info du mode actuel -->
+    <div class="p-4 bg-gray-100 rounded">
+      <h3 class="font-semibold">Démonstration des formes Leaflet</h3>
+      <p class="text-sm text-gray-600">
+        {{
           editMode
-            ? 'bg-green-500 hover:bg-green-600 text-white'
-            : 'bg-blue-500 hover:bg-blue-600 text-white',
-        ]"
-      >
-        {{ editMode ? '✓ Édition active' : "Activer l'édition" }}
-      </button>
+            ? 'Mode édition activé - Déplacez les formes'
+            : 'Mode dessin - Créez de nouvelles formes'
+        }}
+      </p>
     </div>
 
     <div
@@ -187,6 +179,19 @@ const onPolygonClosed = (id: number) => {
         />
 
         <LeafletZoomControl position="topleft" />
+
+        <!-- Contrôle de dessin avec bouton Edit intégré -->
+        <LeafletDrawControl
+          position="topright"
+          :draw="{
+            marker: true,
+            circle: true,
+            polyline: true,
+            polygon: true,
+            rectangle: true,
+          }"
+          @edit-mode-change="handleEditModeChange"
+        />
 
         <!-- Marqueurs avec v-for -->
         <LeafletMarker

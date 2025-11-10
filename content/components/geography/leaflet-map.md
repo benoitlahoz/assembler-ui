@@ -619,6 +619,7 @@ const emit = defineEmits<{
   (e: "draw:deleted", event: { layers: Layer[] }): void;
   (e: "draw:drawstart", event: { layerType: string }): void;
   (e: "draw:drawstop", event: { layerType: string }): void;
+  (e: "edit-mode-change", enabled: boolean): void;
 }>();
 
 const L = inject(LeafletModuleKey, ref());
@@ -626,6 +627,7 @@ const map = inject(LeafletMapKey, ref(null));
 
 const control = ref<any>(null);
 const activeMode = ref<string | null>(null);
+const editMode = ref(false);
 const handlers = ref<Map<string, any>>(new Map());
 const drawnItems = ref<any>(null);
 
@@ -645,6 +647,8 @@ const createDrawControl = () => {
 
       L.value!.DomEvent.disableClickPropagation(container);
       L.value!.DomEvent.disableScrollPropagation(container);
+
+      createEditButton(container);
 
       if (props.draw) {
         if (shouldEnableHandler("marker")) {
@@ -711,7 +715,55 @@ const createButton = (
   return button;
 };
 
+const createEditButton = (container: HTMLElement) => {
+  const button = L.value!.DomUtil.create(
+    "a",
+    "leaflet-draw-button leaflet-edit-button",
+    container,
+  );
+  button.href = "#";
+  button.title = "Éditer / Dessiner";
+  button.innerHTML = "✏️";
+  button.setAttribute("role", "button");
+  button.setAttribute("aria-label", "Éditer / Dessiner");
+
+  const updateButtonState = () => {
+    if (editMode.value) {
+      button.classList.add("active");
+      button.title = "Mode Édition (cliquez pour dessiner)";
+    } else {
+      button.classList.remove("active");
+      button.title = "Mode Dessin (cliquez pour éditer)";
+    }
+  };
+
+  L.value!.DomEvent.on(button, "click", (e: Event) => {
+    L.value!.DomEvent.preventDefault(e);
+    toggleEditMode();
+    updateButtonState();
+  });
+
+  updateButtonState();
+  return button;
+};
+
+const toggleEditMode = () => {
+  editMode.value = !editMode.value;
+
+  if (editMode.value && activeMode.value) {
+    disableHandler(activeMode.value);
+    activeMode.value = null;
+  }
+
+  emit("edit-mode-change", editMode.value);
+};
+
 const toggleDrawMode = (type: string) => {
+  if (editMode.value) {
+    editMode.value = false;
+    emit("edit-mode-change", false);
+  }
+
   if (activeMode.value === type) {
     disableHandler(type);
     activeMode.value = null;
@@ -1240,6 +1292,11 @@ onBeforeUnmount(() => {
 .leaflet-draw-button:last-child {
   border-bottom: none;
 }
+
+.leaflet-edit-button.active {
+  background: #3388ff;
+  color: white;
+}
 </style>
 ```
 
@@ -1696,6 +1753,7 @@ const enableEditing = () => {
       draggable: true,
       icon: L.value!.divIcon({
         className: "leaflet-editing-icon",
+        html: '<div style="width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #3388ff;"></div>',
         iconSize: [8, 8],
       }),
     }).addTo(map.value!);
@@ -1859,6 +1917,7 @@ const enableEditing = () => {
       icon: L.value!.divIcon({
         className: "leaflet-editing-icon",
         iconSize: [8, 8],
+        html: '<div style="width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #3388ff;"></div>',
       }),
     }).addTo(map.value!);
 
@@ -2433,6 +2492,7 @@ export const useTailwindClassParser = () => {
 | `draw:deleted`{.primary .text-primary} | — |
 | `draw:drawstart`{.primary .text-primary} | — |
 | `draw:drawstop`{.primary .text-primary} | — |
+| `edit-mode-change`{.primary .text-primary} | — |
 
   ### Inject
 | Key | Default | Type | Description |
@@ -2770,6 +2830,7 @@ import {
   LeafletMap,
   LeafletTileLayer,
   LeafletZoomControl,
+  LeafletDrawControl,
   LeafletMarker,
   LeafletCircle,
   LeafletPolyline,
@@ -2850,14 +2911,14 @@ const editableShapes = ref({
   rectangles: false,
 });
 
-const toggleEditMode = () => {
-  editMode.value = !editMode.value;
+const handleEditModeChange = (enabled: boolean) => {
+  editMode.value = enabled;
 
-  editableShapes.value.markers = editMode.value;
-  editableShapes.value.circles = editMode.value;
-  editableShapes.value.polylines = editMode.value;
-  editableShapes.value.polygons = editMode.value;
-  editableShapes.value.rectangles = editMode.value;
+  editableShapes.value.markers = enabled;
+  editableShapes.value.circles = enabled;
+  editableShapes.value.polylines = enabled;
+  editableShapes.value.polygons = enabled;
+  editableShapes.value.rectangles = enabled;
 };
 
 const updateMarker = (id: number, lat: number, lng: number) => {
@@ -2918,28 +2979,15 @@ const onPolygonClosed = (id: number) => {
 
 <template>
   <div class="w-full h-full flex flex-col gap-4">
-    <div class="p-4 bg-gray-100 rounded flex items-center justify-between">
-      <div>
-        <h3 class="font-semibold">Démonstration des formes Leaflet</h3>
-        <p class="text-sm text-gray-600">
-          {{
-            editMode
-              ? "Mode édition activé - Déplacez les formes"
-              : "Mode visualisation"
-          }}
-        </p>
-      </div>
-      <button
-        @click="toggleEditMode"
-        :class="[
-          'px-6 py-2 rounded-lg font-medium transition-colors',
+    <div class="p-4 bg-gray-100 rounded">
+      <h3 class="font-semibold">Démonstration des formes Leaflet</h3>
+      <p class="text-sm text-gray-600">
+        {{
           editMode
-            ? 'bg-green-500 hover:bg-green-600 text-white'
-            : 'bg-blue-500 hover:bg-blue-600 text-white',
-        ]"
-      >
-        {{ editMode ? "✓ Édition active" : "Activer l'édition" }}
-      </button>
+            ? "Mode édition activé - Déplacez les formes"
+            : "Mode dessin - Créez de nouvelles formes"
+        }}
+      </p>
     </div>
 
     <div
@@ -2968,6 +3016,18 @@ const onPolygonClosed = (id: number) => {
         />
 
         <LeafletZoomControl position="topleft" />
+
+        <LeafletDrawControl
+          position="topright"
+          :draw="{
+            marker: true,
+            circle: true,
+            polyline: true,
+            polygon: true,
+            rectangle: true,
+          }"
+          @edit-mode-change="handleEditModeChange"
+        />
 
         <LeafletMarker
           v-for="marker in markers"

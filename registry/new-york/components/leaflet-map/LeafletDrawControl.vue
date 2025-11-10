@@ -46,6 +46,7 @@ const emit = defineEmits<{
   (e: 'draw:deleted', event: { layers: Layer[] }): void;
   (e: 'draw:drawstart', event: { layerType: string }): void;
   (e: 'draw:drawstop', event: { layerType: string }): void;
+  (e: 'edit-mode-change', enabled: boolean): void;
 }>();
 
 const L = inject(LeafletModuleKey, ref());
@@ -53,6 +54,7 @@ const map = inject(LeafletMapKey, ref(null));
 
 const control = ref<any>(null);
 const activeMode = ref<string | null>(null);
+const editMode = ref(false);
 const handlers = ref<Map<string, any>>(new Map());
 const drawnItems = ref<any>(null);
 
@@ -71,6 +73,9 @@ const createDrawControl = () => {
       // Empêcher la propagation des événements
       L.value!.DomEvent.disableClickPropagation(container);
       L.value!.DomEvent.disableScrollPropagation(container);
+
+      // Bouton Edit/Draw mode
+      createEditButton(container);
 
       // Créer les boutons pour chaque outil de dessin
       if (props.draw) {
@@ -134,7 +139,53 @@ const createButton = (container: HTMLElement, type: string, icon: string, title:
   return button;
 };
 
+const createEditButton = (container: HTMLElement) => {
+  const button = L.value!.DomUtil.create('a', 'leaflet-draw-button leaflet-edit-button', container);
+  button.href = '#';
+  button.title = 'Éditer / Dessiner';
+  button.innerHTML = '✏️';
+  button.setAttribute('role', 'button');
+  button.setAttribute('aria-label', 'Éditer / Dessiner');
+
+  const updateButtonState = () => {
+    if (editMode.value) {
+      button.classList.add('active');
+      button.title = 'Mode Édition (cliquez pour dessiner)';
+    } else {
+      button.classList.remove('active');
+      button.title = 'Mode Dessin (cliquez pour éditer)';
+    }
+  };
+
+  L.value!.DomEvent.on(button, 'click', (e: Event) => {
+    L.value!.DomEvent.preventDefault(e);
+    toggleEditMode();
+    updateButtonState();
+  });
+
+  updateButtonState();
+  return button;
+};
+
+const toggleEditMode = () => {
+  editMode.value = !editMode.value;
+
+  // Si on passe en mode edit, désactiver le mode dessin actif
+  if (editMode.value && activeMode.value) {
+    disableHandler(activeMode.value);
+    activeMode.value = null;
+  }
+
+  emit('edit-mode-change', editMode.value);
+};
+
 const toggleDrawMode = (type: string) => {
+  // Si on active un mode de dessin, désactiver le mode edit
+  if (editMode.value) {
+    editMode.value = false;
+    emit('edit-mode-change', false);
+  }
+
   if (activeMode.value === type) {
     disableHandler(type);
     activeMode.value = null;
@@ -671,5 +722,10 @@ onBeforeUnmount(() => {
 
 .leaflet-draw-button:last-child {
   border-bottom: none;
+}
+
+.leaflet-edit-button.active {
+  background: #3388ff;
+  color: white;
 }
 </style>
