@@ -8,11 +8,20 @@ import {
   provide,
   type HTMLAttributes,
   type Ref,
+  onBeforeUnmount,
 } from 'vue';
-import * as L from 'leaflet';
 import { cn } from '@/lib/utils';
 import 'leaflet/dist/leaflet.css';
-import { LeafletMapKey, LeafletTileLayersKey } from '.';
+import { LeafletErrorsKey, LeafletMapKey, LeafletModuleKey, LeafletTileLayersKey } from '.';
+import type Leaflet from 'leaflet';
+import type { LeafletMouseEvent, Map } from 'leaflet';
+type Leaflet = typeof Leaflet;
+
+export interface LeafletMapExposed {
+  map: Ref<Leaflet.Map | null | any>;
+  errors: Ref<Error[]>;
+  locate: () => Leaflet.Map | null;
+}
 
 export interface LeafletMapProps {
   class?: HTMLAttributes['class'];
@@ -32,25 +41,66 @@ const props = withDefaults(defineProps<LeafletMapProps>(), {
   zoom: 13,
 });
 
+const emit = defineEmits<{
+  (e: 'click', event: LeafletMouseEvent): void;
+  (e: 'location:found', event: Leaflet.LocationEvent): void;
+  (e: 'location:error', event: Leaflet.ErrorEvent): void;
+}>();
+
+// Load Leaflet only on client side.
+let L: Leaflet | undefined;
+if (process.client) {
+  L = await import('leaflet');
+}
+provide(LeafletModuleKey, L);
+
 const mapName = computed(() => props.name || 'map');
 
-const map = ref<L.Map | null>(null);
-const tileLayers = ref<Array<L.TileLayerOptions & { name: string } & { urlTemplate: string }>>([]);
-const currentTileLayer = ref<L.TileLayer | null>(null);
+const map = ref<Leaflet.Map | null>(null);
+const errors = ref<Error[]>([]);
+const tileLayers = ref<
+  Array<Leaflet.TileLayerOptions & { name: string } & { urlTemplate: string }>
+>([]);
+const currentTileLayer = ref<Leaflet.TileLayer | null>(null);
 
-provide<Ref<L.Map | null>>(LeafletMapKey, map as any);
-provide<Ref<Array<L.TileLayerOptions & { name: string } & { urlTemplate: string }>>>(
+provide<Ref<Leaflet.Map | null>>(LeafletMapKey, map as any);
+provide<Ref<Array<Leaflet.TileLayerOptions & { name: string } & { urlTemplate: string }>>>(
   LeafletTileLayersKey,
   tileLayers as any
 );
+provide<Ref<Error[]>>(LeafletErrorsKey, errors);
 
 const centerLat = computed(() => Number(props.centerLat) || 43.280608);
 const centerLng = computed(() => Number(props.centerLng) || 5.350242);
 const zoom = computed(() => Number(props.zoom) || 13);
 
 const tileLayerForName = () => {
-  console.log('Tile layers available:', tileLayers.value, props.tileLayer);
-  return tileLayers.value.find((layerOptions) => (layerOptions as any).name === props.tileLayer);
+  const layer = tileLayers.value.find(
+    (layerOptions) => (layerOptions as any).name === props.tileLayer
+  );
+  if (layer) {
+    return { ...layer, crossOrigin: true };
+  }
+};
+
+const locate = () => {
+  if (map.value && map.value.locate) {
+    return map.value.locate({ setView: true, maxZoom: zoom.value });
+  }
+  return null;
+};
+
+const onLocationFound = (event: Leaflet.LocationEvent) => {
+  if (map.value && L) {
+    emit('location:found', event);
+    const radius = event.accuracy;
+    L.circle(event.latlng, { radius }).addTo(map.value as any);
+  }
+};
+
+const onLocationError = (event: Leaflet.ErrorEvent) => {
+  emit('location:error', event);
+  errors.value.push(new Error(event.message));
 };
 
 watch(
@@ -76,7 +126,7 @@ watch(
 watch(
   () => props.tileLayer,
   () => {
-    if (map.value) {
+    if (map.value && L && props.tileLayer) {
       const layerOptions = tileLayerForName();
       if (layerOptions) {
         if (currentTileLayer.value) {
@@ -92,8 +142,22 @@ watch(
 );
 
 onMounted(() => {
+  if (typeof window === 'undefined') return;
+
   nextTick(() => {
-    map.value = L.map(mapName.value).setView([centerLat.value, centerLng.value], zoom.value);
+    if (!L) return;
+
+    map.value = L.map(mapName.value, { zoomControl: false }).setView(
+      [centerLat.value, centerLng.value],
+      zoom.value
+    );
+
+    map.value.on('click', (event: LeafletMouseEvent) => {
+      emit('click', event);
+    });
+    map.value.on('locationfound', onLocationFound);
+    map.value.on('locationerror', onLocationError);
+
     if (props.tileLayer) {
       const layerOptions = tileLayerForName();
       if (layerOptions) {
@@ -107,10 +171,24 @@ onMounted(() => {
     }
   });
 });
+
+onBeforeUnmount(() => {
+  if (map.value) {
+    map.value.off();
+    map.value.remove();
+    map.value = null;
+  }
+});
+
+defineExpose<LeafletMapExposed>({
+  map,
+  errors,
+  locate,
+});
 </script>
 
 <template>
   <div :id="mapName" :class="cn('w-full h-full', props.class)" :style="props.style">
-    <slot />
+    <slot :map="map" :errors="errors" :locate="locate" />
   </div>
 </template>

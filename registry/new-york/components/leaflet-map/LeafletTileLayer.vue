@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, ref, watchEffect, type HTMLAttributes } from 'vue';
-import * as L from 'leaflet';
-import { LeafletTileLayersKey } from '.';
+import { LeafletModuleKey, LeafletTileLayersKey } from '.';
 
 export interface LeafletTileLayerProps {
   name: string;
@@ -12,11 +11,13 @@ export interface LeafletTileLayerProps {
 
 const props = defineProps<LeafletTileLayerProps>();
 
+const L = inject(LeafletModuleKey, null);
 const tileLayers = inject(LeafletTileLayersKey, ref([] as any));
-
 const className = computed(() => props.class);
 
 watchEffect(() => {
+  if (!L) return;
+
   const options: L.TileLayerOptions & { name: string } & { urlTemplate: string } = {
     name: props.name,
     attribution: props.attribution,

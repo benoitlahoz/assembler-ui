@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { inject, watch, ref, type Ref, nextTick } from 'vue';
-import * as L from 'leaflet';
-import { LeafletMapKey } from '.';
+import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount, onMounted } from 'vue';
+import { LeafletMapKey, LeafletModuleKey } from '.';
 
 export interface LeafletMarkerProps {
   lat?: number | string;
@@ -13,15 +12,17 @@ const props = withDefaults(defineProps<LeafletMarkerProps>(), {
   lng: 5.350242,
 });
 
+const L = inject(LeafletModuleKey, null);
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 
-const marker = ref(L.marker([Number(props.lat), Number(props.lng)]));
+const marker = ref<L.Marker | null>(null);
 
 watch(
   () => [props.lat, props.lng],
   ([newLat, newLng]) => {
     nextTick(() => {
-      if (map.value && newLat && newLng) {
+      if (!L) return;
+      if (map.value && !isNaN(Number(newLat)) && !isNaN(Number(newLng))) {
         if (marker.value) {
           marker.value.setLatLng([Number(newLat), Number(newLng)]);
         } else {
@@ -36,13 +37,13 @@ watch(
       }
     });
   },
-  { immediate: true, deep: true, flush: 'post' }
+  { immediate: true }
 );
 
 watch(
   () => map.value,
   (newMap) => {
-    if (newMap) {
+    if (newMap && L) {
       if (!marker.value) {
         marker.value = L.marker([Number(props.lat), Number(props.lng)]);
       }
@@ -51,6 +52,21 @@ watch(
   },
   { immediate: true }
 );
+
+onMounted(() => {
+  if (map.value && L) {
+    if (!marker.value) {
+      marker.value = L.marker([Number(props.lat), Number(props.lng)]);
+    }
+    marker.value.addTo(map.value);
+  }
+});
+
+onBeforeUnmount(() => {
+  if (marker.value) {
+    marker.value.remove();
+  }
+});
 </script>
 
 <template><slot /></template>

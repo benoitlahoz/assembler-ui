@@ -143,6 +143,10 @@ export const useTailwindClassParser = () => {
     el: HTMLElement,
     properties?: string[],
   ): Record<string, string> => {
+    if (typeof window === "undefined") {
+      return {};
+    }
+
     const computed = window.getComputedStyle(el);
     const result: Record<string, string> = {};
     if (properties && properties.length > 0) {
