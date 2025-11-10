@@ -153,8 +153,6 @@ const handleShapeCreated = (event: any) => {
       break;
     }
   }
-
-  console.log(`Nouvelle forme créée: ${layerType}`, event);
 };
 
 // Gestion des mises à jour
@@ -163,7 +161,6 @@ const updateMarker = (id: number, lat: number, lng: number) => {
   if (marker) {
     marker.lat = lat;
     marker.lng = lng;
-    console.log(`Marker ${id} updated:`, { lat, lng });
   }
 };
 
@@ -173,7 +170,6 @@ const updateCircle = (id: number, updates: { lat?: number; lng?: number; radius?
     if (updates.lat !== undefined) circle.lat = updates.lat;
     if (updates.lng !== undefined) circle.lng = updates.lng;
     if (updates.radius !== undefined) circle.radius = updates.radius;
-    console.log(`Circle ${id} updated:`, updates);
   }
 };
 
@@ -181,7 +177,6 @@ const updatePolyline = (id: number, latlngs: Array<[number, number]>) => {
   const polyline = polylines.value.find((p) => p.id === id);
   if (polyline) {
     polyline.latlngs = latlngs;
-    console.log(`Polyline ${id} updated:`, latlngs);
   }
 };
 
@@ -189,7 +184,6 @@ const updatePolygon = (id: number, latlngs: Array<[number, number]>) => {
   const polygon = polygons.value.find((p) => p.id === id);
   if (polygon) {
     polygon.latlngs = latlngs;
-    console.log(`Polygon ${id} updated:`, latlngs);
   }
 };
 
@@ -197,21 +191,16 @@ const updateRectangle = (id: number, bounds: [[number, number], [number, number]
   const rectangle = rectangles.value.find((r) => r.id === id);
   if (rectangle) {
     rectangle.bounds = bounds;
-    console.log(`Rectangle ${id} updated:`, bounds);
   }
 };
 
-// Gestion de la fermeture du polygone
 const onPolygonClosed = (id: number) => {
-  console.log(`Polygon ${id} closed!`);
-  // Désactiver l'édition après fermeture
   editableShapes.value.polygons = false;
 };
 </script>
 
 <template>
   <div class="w-full h-full flex flex-col gap-4">
-    <!-- Info du mode actuel -->
     <div class="rounded flex items-center justify-between">
       <Button
         @click="editMode = !editMode"
@@ -222,11 +211,10 @@ const onPolygonClosed = (id: number) => {
             : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
         "
       >
-        {{ editMode ? 'Désactiver édition' : 'Activer édition' }}
+        {{ editMode ? 'Disable edition' : 'Enable edition' }}
       </Button>
     </div>
 
-    <!-- Carte -->
     <div class="flex-1 relative">
       <LeafletMap
         ref="mapRef"
@@ -245,7 +233,6 @@ const onPolygonClosed = (id: number) => {
 
         <LeafletZoomControl position="topleft" />
 
-        <!-- Contrôle de dessin - s'affiche uniquement en mode édition -->
         <LeafletDrawControl
           position="topright"
           :edit-mode="editMode"
@@ -259,7 +246,6 @@ const onPolygonClosed = (id: number) => {
           @draw:created="handleShapeCreated"
         />
 
-        <!-- Marqueurs avec v-for -->
         <LeafletMarker
           v-for="marker in markers"
           :key="`marker-${marker.id}`"
@@ -270,7 +256,6 @@ const onPolygonClosed = (id: number) => {
           @update:lng="(lng) => updateMarker(marker.id, marker.lat, lng)"
         />
 
-        <!-- Cercles avec v-for -->
         <LeafletCircle
           v-for="circle in circles"
           :key="`circle-${circle.id}`"
@@ -284,7 +269,6 @@ const onPolygonClosed = (id: number) => {
           @update:radius="(radius) => updateCircle(circle.id, { radius })"
         />
 
-        <!-- Polylignes avec v-for -->
         <LeafletPolyline
           v-for="polyline in polylines"
           :key="`polyline-${polyline.id}`"
@@ -295,7 +279,6 @@ const onPolygonClosed = (id: number) => {
           @update:latlngs="(latlngs) => updatePolyline(polyline.id, latlngs)"
         />
 
-        <!-- Polygones avec v-for -->
         <LeafletPolygon
           v-for="polygon in polygons"
           :key="`polygon-${polygon.id}`"
@@ -308,7 +291,6 @@ const onPolygonClosed = (id: number) => {
           @closed="() => onPolygonClosed(polygon.id)"
         />
 
-        <!-- Rectangles avec v-for -->
         <LeafletRectangle
           v-for="rectangle in rectangles"
           :key="`rectangle-${rectangle.id}`"
@@ -321,24 +303,23 @@ const onPolygonClosed = (id: number) => {
       </LeafletMap>
     </div>
 
-    <!-- Statistiques -->
     <div class="p-4 bg-gray-50 rounded">
-      <h4 class="font-semibold mb-2">Statistiques</h4>
+      <h4 class="font-semibold mb-2">Statistics</h4>
       <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
         <div>
-          <div class="text-gray-500">Marqueurs</div>
+          <div class="text-gray-500">Markers</div>
           <div class="text-lg font-bold text-blue-600">{{ markers.length }}</div>
         </div>
         <div>
-          <div class="text-gray-500">Cercles</div>
+          <div class="text-gray-500">Circles</div>
           <div class="text-lg font-bold text-green-600">{{ circles.length }}</div>
         </div>
         <div>
-          <div class="text-gray-500">Polylignes</div>
+          <div class="text-gray-500">Polylines</div>
           <div class="text-lg font-bold text-red-600">{{ polylines.length }}</div>
         </div>
         <div>
-          <div class="text-gray-500">Polygones</div>
+          <div class="text-gray-500">Polygons</div>
           <div class="text-lg font-bold text-purple-600">{{ polygons.length }}</div>
         </div>
         <div>
