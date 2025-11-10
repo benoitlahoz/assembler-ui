@@ -13,6 +13,7 @@ description:
 <script setup lang="ts">
 import { Button } from "@/components/ui/button";
 import { ref, type ComponentPublicInstance } from "vue";
+import { ClientOnly } from "#components";
 import {
   LeafletMap,
   LeafletTileLayer,
@@ -25,7 +26,7 @@ import {
 type LeafletMapInstance = ComponentPublicInstance & LeafletMapExposed;
 
 const mapRef = ref<LeafletMapInstance | null>(null);
-
+const zoom = ref(13);
 const locationCoords = ref<{
   lat: number;
   lng: number;
@@ -57,6 +58,7 @@ const onLocationFound = (event: any) => {
         tile-layer="openstreetmap"
         center-lat="44.280608"
         center-lng="5.350242"
+        :zoom="zoom"
         class="rounded-lg"
         @location:found="onLocationFound"
       >
@@ -66,14 +68,6 @@ const onLocationFound = (event: any) => {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
         <LeafletZoomControl position="topleft" />
-
-        <LeafletCircle
-          v-if="locationCoords"
-          :lat="locationCoords.lat"
-          :lng="locationCoords.lng"
-          :radius="locationCoords.accuracy"
-          class="bg-red-500 text-red-500 opacity-20"
-        />
       </LeafletMap>
     </div>
   </ClientOnly>
@@ -116,7 +110,7 @@ Copy and paste these files into your project.
 
 ```ts [src/components/ui/leaflet-map/index.ts]
 import type { InjectionKey, Ref } from "vue";
-import type L from "leaflet";
+import type * as L from "leaflet";
 import type { Map, TileLayerOptions } from "leaflet";
 
 type L = typeof L;
@@ -127,7 +121,7 @@ export { default as LeafletTileLayer } from "./LeafletTileLayer.vue";
 export { default as LeafletMarker } from "./LeafletMarker.vue";
 export { default as LeafletCircle } from "./LeafletCircle.vue";
 
-export const LeafletModuleKey: InjectionKey<L | undefined> =
+export const LeafletModuleKey: InjectionKey<Ref<L | undefined>> =
   Symbol("LeafletModule");
 export const LeafletMapKey: InjectionKey<Ref<Map | null>> =
   Symbol("LeafletMap");
@@ -197,10 +191,7 @@ const emit = defineEmits<{
   (e: "location:error", event: Leaflet.ErrorEvent): void;
 }>();
 
-let L: Leaflet | undefined;
-if (process.client) {
-  L = await import("leaflet");
-}
+const L = ref<Leaflet | undefined>(undefined);
 provide(LeafletModuleKey, L);
 
 const mapName = computed(() => props.name || "map");
@@ -274,54 +265,69 @@ watch(
 watch(
   () => props.tileLayer,
   () => {
-    if (map.value && L && props.tileLayer) {
+    if (map.value && L.value && props.tileLayer) {
       const layerOptions = tileLayerForName();
       if (layerOptions) {
         if (currentTileLayer.value) {
           currentTileLayer.value.remove();
         }
-        currentTileLayer.value = L.tileLayer(
-          layerOptions.urlTemplate,
-          layerOptions,
-        ).addTo(map.value as any);
+        currentTileLayer.value = L.value
+          .tileLayer(layerOptions.urlTemplate, layerOptions)
+          .addTo(map.value as any);
       }
     }
   },
   { immediate: true, deep: true },
 );
 
-onMounted(async () => {
-  if (typeof window === "undefined") return;
+onMounted(() => {
+  console.log("LeafletMap onMounted - SSR:", process.server);
+  try {
+    nextTick(async () => {
+      console.log(
+        "LeafletMap onMounted - inside nextTick - SSR:",
+        process.server,
+      );
+      if (typeof window === "undefined") return;
+      console.log("Loading Leaflet library...");
 
-  await import("leaflet/dist/leaflet.css");
-  L = await import("leaflet");
-  nextTick(() => {
-    if (!L) return;
+      await import("leaflet/dist/leaflet.css");
+      L.value = (await import("leaflet")).default;
+      console.log("Leaflet loaded:", L.value);
+      nextTick(() => {
+        console.log(
+          "LeafletMap nextTick - initializing map...",
+          process.server,
+        );
+        console.log("Initializing map with Leaflet:", L.value);
+        if (!L.value) return;
+        map.value = L.value
+          .map(mapName.value, { zoomControl: false })
+          .setView([centerLat.value, centerLng.value], zoom.value);
 
-    map.value = L.map(mapName.value, { zoomControl: false }).setView(
-      [centerLat.value, centerLng.value],
-      zoom.value,
-    );
+        map.value.on("click", (event: LeafletMouseEvent) => {
+          emit("click", event);
+        });
+        map.value.on("locationfound", onLocationFound);
+        map.value.on("locationerror", onLocationError);
 
-    map.value.on("click", (event: LeafletMouseEvent) => {
-      emit("click", event);
-    });
-    map.value.on("locationfound", onLocationFound);
-    map.value.on("locationerror", onLocationError);
-
-    if (props.tileLayer) {
-      const layerOptions = tileLayerForName();
-      if (layerOptions) {
-        if (currentTileLayer.value) {
-          currentTileLayer.value.remove();
+        if (props.tileLayer) {
+          const layerOptions = tileLayerForName();
+          if (layerOptions) {
+            if (currentTileLayer.value) {
+              currentTileLayer.value.remove();
+            }
+            currentTileLayer.value = L.value
+              .tileLayer(layerOptions.urlTemplate, layerOptions)
+              .addTo(map.value as any);
+          }
         }
-        currentTileLayer.value = L.tileLayer(
-          layerOptions.urlTemplate,
-          layerOptions,
-        ).addTo(map.value as any);
-      }
-    }
-  });
+      });
+    });
+  } catch (error) {
+    console.error("Error loading Leaflet:", error);
+    errors.value.push(error as Error);
+  }
 });
 
 onBeforeUnmount(() => {
@@ -380,7 +386,7 @@ const props = withDefaults(defineProps<LeafletCircleProps>(), {
 
 const { getTailwindBaseCssValues } = useTailwindClassParser();
 
-const L = inject(LeafletModuleKey, null);
+const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const circle = ref<L.Circle | null>(null);
 
@@ -411,7 +417,7 @@ watch(
     nextTick(() => {
       if (
         map.value &&
-        L &&
+        L.value &&
         !isNaN(Number(props.lat)) &&
         !isNaN(Number(props.lng)) &&
         !isNaN(Number(props.radius))
@@ -420,9 +426,12 @@ watch(
           circle.value.setLatLng([Number(props.lat), Number(props.lng)]);
           circle.value.setRadius(Number(props.radius));
         } else {
-          circle.value = L.circle([Number(props.lat), Number(props.lng)], {
-            radius: Number(props.radius),
-          });
+          circle.value = L.value.circle(
+            [Number(props.lat), Number(props.lng)],
+            {
+              radius: Number(props.radius),
+            },
+          );
           circle.value.addTo(map.value);
         }
         const colors = getColors();
@@ -441,23 +450,6 @@ watch(
   },
   { immediate: true, flush: "post" },
 );
-
-onMounted(() => {
-  if (map.value && L) {
-    if (!circle.value) {
-      circle.value = L.circle([Number(props.lat), Number(props.lng)], {
-        radius: Number(props.radius),
-      });
-    }
-    const colors = getColors();
-    circle.value.setStyle({
-      color: colors.color,
-      fillColor: colors.fillColor,
-      fillOpacity: colors.fillOpacity,
-    });
-    circle.value.addTo(map.value);
-  }
-});
 
 onBeforeUnmount(() => {
   if (circle.value) {
@@ -492,7 +484,7 @@ const props = withDefaults(defineProps<LeafletMarkerProps>(), {
   lng: 5.350242,
 });
 
-const L = inject(LeafletModuleKey, null);
+const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 
 const marker = ref<L.Marker | null>(null);
@@ -501,12 +493,12 @@ watch(
   () => [props.lat, props.lng],
   ([newLat, newLng]) => {
     nextTick(() => {
-      if (!L) return;
+      if (!L.value) return;
       if (map.value && !isNaN(Number(newLat)) && !isNaN(Number(newLng))) {
         if (marker.value) {
           marker.value.setLatLng([Number(newLat), Number(newLng)]);
         } else {
-          marker.value = L.marker([Number(newLat), Number(newLng)]);
+          marker.value = L.value.marker([Number(newLat), Number(newLng)]);
           marker.value.addTo(map.value);
         }
       } else {
@@ -523,9 +515,9 @@ watch(
 watch(
   () => map.value,
   (newMap) => {
-    if (newMap && L) {
+    if (newMap && L.value) {
       if (!marker.value) {
-        marker.value = L.marker([Number(props.lat), Number(props.lng)]);
+        marker.value = L.value.marker([Number(props.lat), Number(props.lng)]);
       }
       marker.value.addTo(newMap);
     }
@@ -534,9 +526,9 @@ watch(
 );
 
 onMounted(() => {
-  if (map.value && L) {
+  if (map.value && L.value) {
     if (!marker.value) {
-      marker.value = L.marker([Number(props.lat), Number(props.lng)]);
+      marker.value = L.value.marker([Number(props.lat), Number(props.lng)]);
     }
     marker.value.addTo(map.value);
   }
@@ -554,7 +546,7 @@ onBeforeUnmount(() => {
 
 ```vue [src/components/ui/leaflet-map/LeafletTileLayer.vue]
 <script setup lang="ts">
-import { computed, inject, ref, watchEffect, type HTMLAttributes } from "vue";
+import { computed, inject, ref, watch, type HTMLAttributes } from "vue";
 import { LeafletModuleKey, LeafletTileLayersKey } from ".";
 
 export interface LeafletTileLayerProps {
@@ -566,35 +558,45 @@ export interface LeafletTileLayerProps {
 
 const props = defineProps<LeafletTileLayerProps>();
 
-const L = inject(LeafletModuleKey, null);
+const L = inject(LeafletModuleKey, ref());
 const tileLayers = inject(LeafletTileLayersKey, ref([] as any));
 const className = computed(() => props.class);
 
-watchEffect(() => {
-  if (!L) return;
+watch(
+  () => [
+    L.value,
+    props.name,
+    props.urlTemplate,
+    props.attribution,
+    className.value,
+  ],
+  () => {
+    console.warn("LeafletTileLayer watchEffect triggered", L);
+    if (!L.value) return;
 
-  const options: L.TileLayerOptions & { name: string } & {
-    urlTemplate: string;
-  } = {
-    name: props.name,
-    attribution: props.attribution,
-    urlTemplate: props.urlTemplate,
-    className: className.value,
-  };
+    const options: L.TileLayerOptions & { name: string } & {
+      urlTemplate: string;
+    } = {
+      name: props.name,
+      attribution: props.attribution,
+      urlTemplate: props.urlTemplate,
+      className: className.value,
+    };
 
-  const existingLayer = tileLayers.value.find(
-    (layer: L.TileLayerOptions & { name: string }) =>
-      (layer as any).name === props.name,
-  );
+    const existingLayer = tileLayers.value.find(
+      (layer: L.TileLayerOptions & { name: string }) =>
+        (layer as any).name === props.name,
+    );
 
-  if (existingLayer) {
-    const index = tileLayers.value.indexOf(existingLayer);
-    tileLayers.value[index] = options;
-    return;
-  }
+    if (existingLayer) {
+      const index = tileLayers.value.indexOf(existingLayer);
+      tileLayers.value[index] = options;
+      return;
+    }
 
-  tileLayers.value.push(options);
-});
+    tileLayers.value.push(options);
+  },
+);
 </script>
 
 <template><slot /></template>
@@ -614,15 +616,15 @@ const props = withDefaults(defineProps<LeafletControlProps>(), {
   position: "topright",
 });
 
-const L = inject(LeafletModuleKey, null);
+const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const control = ref<L.Control.Zoom | null>(null);
 
 watch(
   () => map.value,
   (newMap) => {
-    if (newMap && L) {
-      control.value = L.control.zoom({ position: props.position });
+    if (newMap && L.value) {
+      control.value = L.value.control.zoom({ position: props.position });
       control.value.addTo(newMap);
     }
   },
@@ -637,7 +639,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div>L</div>
+  <div></div>
 </template>
 ```
 
@@ -913,7 +915,7 @@ export const useTailwindClassParser = () => {
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
-| `LeafletModuleKey`{.primary .text-primary} | `null` | `any` | — |
+| `LeafletModuleKey`{.primary .text-primary} | `ref()` | `any` | — |
 | `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
 
 ---
@@ -938,7 +940,7 @@ export const useTailwindClassParser = () => {
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
-| `LeafletModuleKey`{.primary .text-primary} | `null` | `any` | — |
+| `LeafletModuleKey`{.primary .text-primary} | `ref()` | `any` | — |
 | `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
 
 ---
@@ -965,7 +967,7 @@ export const useTailwindClassParser = () => {
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
-| `LeafletModuleKey`{.primary .text-primary} | `null` | `any` | — |
+| `LeafletModuleKey`{.primary .text-primary} | `ref()` | `any` | — |
 | `LeafletTileLayersKey`{.primary .text-primary} | `ref([] as any)` | `any` | — |
 
 ---
@@ -984,7 +986,7 @@ export const useTailwindClassParser = () => {
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
-| `LeafletModuleKey`{.primary .text-primary} | `null` | `any` | — |
+| `LeafletModuleKey`{.primary .text-primary} | `ref()` | `any` | — |
 | `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
 
 ---

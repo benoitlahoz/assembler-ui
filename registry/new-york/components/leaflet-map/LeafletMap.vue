@@ -47,10 +47,7 @@ const emit = defineEmits<{
 }>();
 
 // Load Leaflet only on client side.
-let L: Leaflet | undefined;
-if (process.client) {
-  L = await import('leaflet');
-}
+const L = ref<Leaflet | undefined>(undefined);
 provide(LeafletModuleKey, L);
 
 const mapName = computed(() => props.name || 'map');
@@ -123,53 +120,58 @@ watch(
 watch(
   () => props.tileLayer,
   () => {
-    if (map.value && L && props.tileLayer) {
+    if (map.value && L.value && props.tileLayer) {
       const layerOptions = tileLayerForName();
       if (layerOptions) {
         if (currentTileLayer.value) {
           currentTileLayer.value.remove();
         }
-        currentTileLayer.value = L.tileLayer(layerOptions.urlTemplate, layerOptions).addTo(
-          map.value as any
-        );
+        currentTileLayer.value = L.value
+          .tileLayer(layerOptions.urlTemplate, layerOptions)
+          .addTo(map.value as any);
       }
     }
   },
   { immediate: true, deep: true }
 );
 
-onMounted(async () => {
-  if (typeof window === 'undefined') return;
+onMounted(() => {
+  try {
+    nextTick(async () => {
+      if (typeof window === 'undefined') return;
 
-  // @ts-expect-error: Dynamic import of CSS
-  await import('leaflet/dist/leaflet.css');
-  L = await import('leaflet');
-  nextTick(() => {
-    if (!L) return;
+      // @ts-expect-error: Dynamic import of CSS
+      await import('leaflet/dist/leaflet.css');
+      L.value = (await import('leaflet')).default;
+      nextTick(() => {
+        if (!L.value) return;
+        map.value = L.value
+          .map(mapName.value, { zoomControl: false })
+          .setView([centerLat.value, centerLng.value], zoom.value);
 
-    map.value = L.map(mapName.value, { zoomControl: false }).setView(
-      [centerLat.value, centerLng.value],
-      zoom.value
-    );
+        map.value.on('click', (event: LeafletMouseEvent) => {
+          emit('click', event);
+        });
+        map.value.on('locationfound', onLocationFound);
+        map.value.on('locationerror', onLocationError);
 
-    map.value.on('click', (event: LeafletMouseEvent) => {
-      emit('click', event);
-    });
-    map.value.on('locationfound', onLocationFound);
-    map.value.on('locationerror', onLocationError);
-
-    if (props.tileLayer) {
-      const layerOptions = tileLayerForName();
-      if (layerOptions) {
-        if (currentTileLayer.value) {
-          currentTileLayer.value.remove();
+        if (props.tileLayer) {
+          const layerOptions = tileLayerForName();
+          if (layerOptions) {
+            if (currentTileLayer.value) {
+              currentTileLayer.value.remove();
+            }
+            currentTileLayer.value = L.value
+              .tileLayer(layerOptions.urlTemplate, layerOptions)
+              .addTo(map.value as any);
+          }
         }
-        currentTileLayer.value = L.tileLayer(layerOptions.urlTemplate, layerOptions).addTo(
-          map.value as any
-        );
-      }
-    }
-  });
+      });
+    });
+  } catch (error) {
+    console.error('Error loading Leaflet:', error);
+    errors.value.push(error as Error);
+  }
 });
 
 onBeforeUnmount(() => {

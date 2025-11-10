@@ -12,7 +12,7 @@ const props = withDefaults(defineProps<LeafletMarkerProps>(), {
   lng: 5.350242,
 });
 
-const L = inject(LeafletModuleKey, null);
+const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 
 const marker = ref<L.Marker | null>(null);
@@ -21,12 +21,12 @@ watch(
   () => [props.lat, props.lng],
   ([newLat, newLng]) => {
     nextTick(() => {
-      if (!L) return;
+      if (!L.value) return;
       if (map.value && !isNaN(Number(newLat)) && !isNaN(Number(newLng))) {
         if (marker.value) {
           marker.value.setLatLng([Number(newLat), Number(newLng)]);
         } else {
-          marker.value = L.marker([Number(newLat), Number(newLng)]);
+          marker.value = L.value.marker([Number(newLat), Number(newLng)]);
           marker.value.addTo(map.value);
         }
       } else {
@@ -43,9 +43,9 @@ watch(
 watch(
   () => map.value,
   (newMap) => {
-    if (newMap && L) {
+    if (newMap && L.value) {
       if (!marker.value) {
-        marker.value = L.marker([Number(props.lat), Number(props.lng)]);
+        marker.value = L.value.marker([Number(props.lat), Number(props.lng)]);
       }
       marker.value.addTo(newMap);
     }
@@ -54,9 +54,9 @@ watch(
 );
 
 onMounted(() => {
-  if (map.value && L) {
+  if (map.value && L.value) {
     if (!marker.value) {
-      marker.value = L.marker([Number(props.lat), Number(props.lng)]);
+      marker.value = L.value.marker([Number(props.lat), Number(props.lng)]);
     }
     marker.value.addTo(map.value);
   }

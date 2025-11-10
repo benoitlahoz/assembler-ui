@@ -27,6 +27,11 @@ export default defineNuxtConfig({
     '@nuxtjs/robots',
     'shadcn-nuxt',
   ],
+  hooks: {
+    'vue-renderer:ssr:context': (context) => {
+      // Ignorer les erreurs sandbox
+    },
+  },
   // @ts-expect-error nuxtjs/robots module is missing types?
   robots: {
     robotsTxt: false,
@@ -89,5 +94,15 @@ export default defineNuxtConfig({
   shadcn: {
     prefix: '',
     componentDir: '../registry/new-york/components',
+  },
+  routeRules: {
+    // Désactiver SSR pour les pages avec des démos Leaflet
+    '/components/geography/leaflet-map/**': { ssr: false },
+  },
+  vite: {
+    ssr: {
+      // Exclure leaflet du SSR
+      external: ['leaflet'],
+    },
   },
 });

@@ -27,7 +27,7 @@ const props = withDefaults(defineProps<LeafletCircleProps>(), {
 
 const { getTailwindBaseCssValues } = useTailwindClassParser();
 
-const L = inject(LeafletModuleKey, null);
+const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const circle = ref<L.Circle | null>(null);
 
@@ -54,7 +54,7 @@ watch(
     nextTick(() => {
       if (
         map.value &&
-        L &&
+        L.value &&
         !isNaN(Number(props.lat)) &&
         !isNaN(Number(props.lng)) &&
         !isNaN(Number(props.radius))
@@ -63,7 +63,7 @@ watch(
           circle.value.setLatLng([Number(props.lat), Number(props.lng)]);
           circle.value.setRadius(Number(props.radius));
         } else {
-          circle.value = L.circle([Number(props.lat), Number(props.lng)], {
+          circle.value = L.value.circle([Number(props.lat), Number(props.lng)], {
             radius: Number(props.radius),
           });
           circle.value.addTo(map.value);

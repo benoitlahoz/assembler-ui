@@ -6,7 +6,7 @@
  */
 
 import type { InjectionKey, Ref } from 'vue';
-import type L from 'leaflet';
+import type * as L from 'leaflet';
 import type { Map, TileLayerOptions } from 'leaflet';
 
 type L = typeof L;
@@ -17,7 +17,7 @@ export { default as LeafletTileLayer } from './LeafletTileLayer.vue';
 export { default as LeafletMarker } from './LeafletMarker.vue';
 export { default as LeafletCircle } from './LeafletCircle.vue';
 
-export const LeafletModuleKey: InjectionKey<L | undefined> = Symbol('LeafletModule');
+export const LeafletModuleKey: InjectionKey<Ref<L | undefined>> = Symbol('LeafletModule');
 export const LeafletMapKey: InjectionKey<Ref<Map | null>> = Symbol('LeafletMap');
 export const LeafletTileLayersKey: InjectionKey<
   Ref<TileLayerOptions & { name: string } & { urlTemplate: string }>

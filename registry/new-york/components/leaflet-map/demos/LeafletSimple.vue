@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button';
 import { ref, type ComponentPublicInstance } from 'vue';
+import { ClientOnly } from '#components';
 import {
   LeafletMap,
   LeafletTileLayer,
@@ -13,7 +14,7 @@ import {
 type LeafletMapInstance = ComponentPublicInstance & LeafletMapExposed;
 
 const mapRef = ref<LeafletMapInstance | null>(null);
-
+const zoom = ref(13);
 const locationCoords = ref<{ lat: number; lng: number; accuracy: number } | null>(null);
 const onLocate = () => {
   // Ugly way to call the locate method on the LeafletMap component.
@@ -43,6 +44,7 @@ const onLocationFound = (event: any) => {
         tile-layer="openstreetmap"
         center-lat="44.280608"
         center-lng="5.350242"
+        :zoom="zoom"
         class="rounded-lg"
         @location:found="onLocationFound"
       >

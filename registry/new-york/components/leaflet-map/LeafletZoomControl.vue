@@ -11,15 +11,15 @@ const props = withDefaults(defineProps<LeafletControlProps>(), {
   position: 'topright',
 });
 
-const L = inject(LeafletModuleKey, null);
+const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const control = ref<L.Control.Zoom | null>(null);
 
 watch(
   () => map.value,
   (newMap) => {
-    if (newMap && L) {
-      control.value = L.control.zoom({ position: props.position });
+    if (newMap && L.value) {
+      control.value = L.value.control.zoom({ position: props.position });
       control.value.addTo(newMap);
     }
   },
@@ -34,5 +34,5 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div>L</div>
+  <div></div>
 </template>
