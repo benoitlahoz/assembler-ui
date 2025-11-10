@@ -3067,6 +3067,7 @@ const onPolygonClosed = (id: number) => {
           :key="`polygon-${polygon.id}`"
           :latlngs="polygon.latlngs"
           :class="polygon.class"
+          :editable="editableShapes.polygons"
           :draggable="editableShapes.polygons"
           :auto-close="true"
           @update:latlngs="(latlngs) => updatePolygon(polygon.id, latlngs)"
@@ -3078,6 +3079,7 @@ const onPolygonClosed = (id: number) => {
           :key="`rectangle-${rectangle.id}`"
           :bounds="rectangle.bounds"
           :class="rectangle.class"
+          :editable="editableShapes.rectangles"
           :draggable="editableShapes.rectangles"
           @update:bounds="(bounds) => updateRectangle(rectangle.id, bounds)"
         />
