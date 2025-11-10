@@ -24,7 +24,7 @@ const emit = defineEmits<{
   'update:bounds': [bounds: [[number, number], [number, number]]];
 }>();
 
-const { getTailwindBaseCssValues } = useTailwindClassParser();
+const { getLeafletShapeColors } = useTailwindClassParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
@@ -35,23 +35,6 @@ const isDragging = ref(false);
 // Variables pour le drag
 let dragStartBounds: L.LatLngBounds | null = null;
 let dragStartMousePoint: L.Point | null = null;
-
-const getColors = () => {
-  const classNames = props.class ? props.class.toString().split(' ') : [];
-  const el = document.createElement('div');
-  el.className = classNames.join(' ');
-  el.style.position = 'absolute';
-  el.style.visibility = 'hidden';
-  el.style.zIndex = '-9999';
-  document.body.appendChild(el);
-  const cssValues = getTailwindBaseCssValues(el, ['color', 'background-color', 'opacity']);
-  document.body.removeChild(el);
-  return {
-    color: cssValues['color'] || '#3388ff',
-    fillColor: cssValues['background-color'] || '#3388ff',
-    fillOpacity: cssValues['opacity'] ? parseFloat(cssValues['opacity']) : 0.2,
-  };
-};
 
 const clearEditMarkers = () => {
   editMarkers.value.forEach((marker) => marker.remove());
@@ -237,14 +220,14 @@ watch(
       ) {
         if (rectangle.value) {
           rectangle.value.setBounds(props.bounds);
-          const colors = getColors();
+          const colors = getLeafletShapeColors(props.class);
           rectangle.value.setStyle({
             color: colors.color,
             fillColor: colors.fillColor,
             fillOpacity: colors.fillOpacity,
           });
         } else {
-          const colors = getColors();
+          const colors = getLeafletShapeColors(props.class);
           rectangle.value = L.value.rectangle(props.bounds, {
             color: colors.color,
             fillColor: colors.fillColor,

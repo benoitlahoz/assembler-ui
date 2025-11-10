@@ -26,7 +26,7 @@ const emit = defineEmits<{
   closed: [];
 }>();
 
-const { getTailwindBaseCssValues } = useTailwindClassParser();
+const { getLeafletShapeColors } = useTailwindClassParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
@@ -49,23 +49,6 @@ const normalizeLatLngs = (
     }
     return [point.lat, point.lng] as [number, number];
   });
-};
-
-const getColors = () => {
-  const classNames = props.class ? props.class.toString().split(' ') : [];
-  const el = document.createElement('div');
-  el.className = classNames.join(' ');
-  el.style.position = 'absolute';
-  el.style.visibility = 'hidden';
-  el.style.zIndex = '-9999';
-  document.body.appendChild(el);
-  const cssValues = getTailwindBaseCssValues(el, ['color', 'background-color', 'opacity']);
-  document.body.removeChild(el);
-  return {
-    color: cssValues['color'] || '#3388ff',
-    fillColor: cssValues['background-color'] || '#3388ff',
-    fillOpacity: cssValues['opacity'] ? parseFloat(cssValues['opacity']) : 0.2,
-  };
 };
 
 const clearEditMarkers = () => {
@@ -115,7 +98,7 @@ const enableEditing = () => {
 
       newLatLngs[index] = currentPos;
       polygon.value!.setLatLngs([newLatLngs]);
-      
+
       // Mettre à jour les midpoints en temps réel
       updateMidpoints(newLatLngs);
     });
@@ -312,14 +295,14 @@ watch(
 
         if (polygon.value) {
           polygon.value.setLatLngs([normalizedLatLngs]);
-          const colors = getColors();
+          const colors = getLeafletShapeColors(props.class);
           polygon.value.setStyle({
             color: colors.color,
             fillColor: colors.fillColor,
             fillOpacity: colors.fillOpacity,
           });
         } else {
-          const colors = getColors();
+          const colors = getLeafletShapeColors(props.class);
           polygon.value = L.value.polygon([normalizedLatLngs], {
             color: colors.color,
             fillColor: colors.fillColor,

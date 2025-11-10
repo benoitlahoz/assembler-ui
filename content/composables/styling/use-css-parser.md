@@ -165,6 +165,101 @@ export const useTailwindClassParser = () => {
     return result;
   };
 
+  const getLeafletShapeColors = (
+    classNames?: string | string[] | Record<string, boolean>,
+  ) => {
+    if (typeof window === "undefined") {
+      return {
+        color: "#3388ff",
+        fillColor: "#3388ff",
+        fillOpacity: 0.2,
+      };
+    }
+
+    try {
+      let classList: string[] = [];
+      if (typeof classNames === "string") {
+        classList = classNames.split(" ");
+      } else if (Array.isArray(classNames)) {
+        classList = classNames;
+      } else if (classNames && typeof classNames === "object") {
+        classList = Object.keys(classNames).filter((key) => classNames[key]);
+      }
+
+      const el = document.createElement("div");
+      el.className = classList.join(" ");
+      el.style.position = "absolute";
+      el.style.visibility = "hidden";
+      el.style.zIndex = "-9999";
+      document.body.appendChild(el);
+
+      const cssValues = getTailwindBaseCssValues(el, [
+        "color",
+        "background-color",
+        "opacity",
+      ]);
+      document.body.removeChild(el);
+
+      return {
+        color: cssValues["color"] || "#3388ff",
+        fillColor: cssValues["background-color"] || "#3388ff",
+        fillOpacity: cssValues["opacity"]
+          ? parseFloat(cssValues["opacity"])
+          : 0.2,
+      };
+    } catch (err) {
+      console.error("Error in getLeafletShapeColors:", err);
+      return {
+        color: "#3388ff",
+        fillColor: "#3388ff",
+        fillOpacity: 0.2,
+      };
+    }
+  };
+
+  const getLeafletLineColors = (
+    classNames?: string | string[] | Record<string, boolean>,
+  ) => {
+    if (typeof window === "undefined") {
+      return {
+        color: "#3388ff",
+        opacity: 1,
+      };
+    }
+
+    try {
+      let classList: string[] = [];
+      if (typeof classNames === "string") {
+        classList = classNames.split(" ");
+      } else if (Array.isArray(classNames)) {
+        classList = classNames;
+      } else if (classNames && typeof classNames === "object") {
+        classList = Object.keys(classNames).filter((key) => classNames[key]);
+      }
+
+      const el = document.createElement("div");
+      el.className = classList.join(" ");
+      el.style.position = "absolute";
+      el.style.visibility = "hidden";
+      el.style.zIndex = "-9999";
+      document.body.appendChild(el);
+
+      const cssValues = getTailwindBaseCssValues(el, ["color", "opacity"]);
+      document.body.removeChild(el);
+
+      return {
+        color: cssValues["color"] || "#3388ff",
+        opacity: cssValues["opacity"] ? parseFloat(cssValues["opacity"]) : 1,
+      };
+    } catch (err) {
+      console.error("Error in getLeafletLineColors:", err);
+      return {
+        color: "#3388ff",
+        opacity: 1,
+      };
+    }
+  };
+
   const parseGradient = function (
     input: string,
   ): GradientParseResult | undefined {
@@ -233,6 +328,8 @@ export const useTailwindClassParser = () => {
 
   return {
     getTailwindBaseCssValues,
+    getLeafletShapeColors,
+    getLeafletLineColors,
     parseGradient,
   };
 };
@@ -250,6 +347,8 @@ Can be undefined if match not found.
 | Property | Type | Description |
 |----------|------|-------------|
 | `getTailwindBaseCssValues`{.primary .text-primary} | `any` | — |
+| `getLeafletShapeColors`{.primary .text-primary} | `any` | — |
+| `getLeafletLineColors`{.primary .text-primary} | `any` | — |
 | `parseGradient`{.primary .text-primary} | `any` | — |
 
   ### Types

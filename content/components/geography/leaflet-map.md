@@ -409,7 +409,7 @@ const emit = defineEmits<{
   "update:radius": [radius: number];
 }>();
 
-const { getTailwindBaseCssValues } = useTailwindClassParser();
+const { getLeafletShapeColors } = useTailwindClassParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
@@ -420,27 +420,6 @@ const radiusMarker = ref<L.Marker | null>(null);
 const isDragging = ref(false);
 let dragStartLatLng: any = null;
 let dragStartMousePoint: any = null;
-
-const getColors = () => {
-  const classNames = props.class ? props.class.toString().split(" ") : [];
-  const el = document.createElement("div");
-  el.className = classNames.join(" ");
-  el.style.position = "absolute";
-  el.style.visibility = "hidden";
-  el.style.zIndex = "-9999";
-  document.body.appendChild(el);
-  const cssValues = getTailwindBaseCssValues(el, [
-    "color",
-    "background-color",
-    "opacity",
-  ]);
-  document.body.removeChild(el);
-  return {
-    color: cssValues["color"] || "blue",
-    fillColor: cssValues["background-color"] || "blue",
-    fillOpacity: cssValues["opacity"] ? parseFloat(cssValues["opacity"]) : 0.2,
-  };
-};
 
 const clearEditMarkers = () => {
   if (centerMarker.value) {
@@ -591,7 +570,7 @@ watch(
           setupMapDragHandlers();
         }
 
-        const colors = getColors();
+        const colors = getLeafletShapeColors(props.class);
         circle.value.setStyle({
           color: colors.color,
           fillColor: colors.fillColor,
@@ -2498,7 +2477,7 @@ const emit = defineEmits<{
   closed: [];
 }>();
 
-const { getTailwindBaseCssValues } = useTailwindClassParser();
+const { getLeafletShapeColors } = useTailwindClassParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
@@ -2520,27 +2499,6 @@ const normalizeLatLngs = (
     }
     return [point.lat, point.lng] as [number, number];
   });
-};
-
-const getColors = () => {
-  const classNames = props.class ? props.class.toString().split(" ") : [];
-  const el = document.createElement("div");
-  el.className = classNames.join(" ");
-  el.style.position = "absolute";
-  el.style.visibility = "hidden";
-  el.style.zIndex = "-9999";
-  document.body.appendChild(el);
-  const cssValues = getTailwindBaseCssValues(el, [
-    "color",
-    "background-color",
-    "opacity",
-  ]);
-  document.body.removeChild(el);
-  return {
-    color: cssValues["color"] || "#3388ff",
-    fillColor: cssValues["background-color"] || "#3388ff",
-    fillOpacity: cssValues["opacity"] ? parseFloat(cssValues["opacity"]) : 0.2,
-  };
 };
 
 const clearEditMarkers = () => {
@@ -2590,6 +2548,8 @@ const enableEditing = () => {
 
       newLatLngs[index] = currentPos;
       polygon.value!.setLatLngs([newLatLngs]);
+
+      updateMidpoints(newLatLngs);
     });
 
     marker.on("dragend", () => {
@@ -2674,6 +2634,17 @@ const createMidpoints = () => {
 
     midpointMarkers.value.push(midMarker);
   }
+};
+
+const updateMidpoints = (latlngs: L.LatLng[]) => {
+  midpointMarkers.value.forEach((midMarker, i) => {
+    const nextIndex = (i + 1) % latlngs.length;
+    if (latlngs[i] && latlngs[nextIndex]) {
+      const midLat = (latlngs[i].lat + latlngs[nextIndex].lat) / 2;
+      const midLng = (latlngs[i].lng + latlngs[nextIndex].lng) / 2;
+      midMarker.setLatLng(L.value!.latLng(midLat, midLng));
+    }
+  });
 };
 
 const enableDragging = () => {
@@ -2767,14 +2738,14 @@ watch(
 
         if (polygon.value) {
           polygon.value.setLatLngs([normalizedLatLngs]);
-          const colors = getColors();
+          const colors = getLeafletShapeColors(props.class);
           polygon.value.setStyle({
             color: colors.color,
             fillColor: colors.fillColor,
             fillOpacity: colors.fillOpacity,
           });
         } else {
-          const colors = getColors();
+          const colors = getLeafletShapeColors(props.class);
           polygon.value = L.value.polygon([normalizedLatLngs], {
             color: colors.color,
             fillColor: colors.fillColor,
@@ -2851,7 +2822,7 @@ const emit = defineEmits<{
   "update:latlngs": [latlngs: Array<[number, number]>];
 }>();
 
-const { getTailwindBaseCssValues } = useTailwindClassParser();
+const { getLeafletLineColors } = useTailwindClassParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
@@ -2872,22 +2843,6 @@ const normalizeLatLngs = (
     }
     return [point.lat, point.lng] as [number, number];
   });
-};
-
-const getColors = () => {
-  const classNames = props.class ? props.class.toString().split(" ") : [];
-  const el = document.createElement("div");
-  el.className = classNames.join(" ");
-  el.style.position = "absolute";
-  el.style.visibility = "hidden";
-  el.style.zIndex = "-9999";
-  document.body.appendChild(el);
-  const cssValues = getTailwindBaseCssValues(el, ["color", "opacity"]);
-  document.body.removeChild(el);
-  return {
-    color: cssValues["color"] || "#3388ff",
-    opacity: cssValues["opacity"] ? parseFloat(cssValues["opacity"]) : 1,
-  };
 };
 
 const clearEditMarkers = () => {
@@ -2917,6 +2872,8 @@ const enableEditing = () => {
       const newLatLngs = [...latlngs];
       newLatLngs[index] = marker.getLatLng();
       polyline.value!.setLatLngs(newLatLngs);
+
+      updateMidpoints(newLatLngs);
     });
 
     marker.on("dragend", () => {
@@ -3001,6 +2958,18 @@ const createMidpoints = () => {
 
     midpointMarkers.value.push(midMarker);
   }
+};
+
+const updateMidpoints = (latlngs: L.LatLng[]) => {
+  midpointMarkers.value.forEach((midMarker, i) => {
+    const current = latlngs[i];
+    const next = latlngs[i + 1];
+    if (current && next) {
+      const midLat = (current.lat + next.lat) / 2;
+      const midLng = (current.lng + next.lng) / 2;
+      midMarker.setLatLng(L.value!.latLng(midLat, midLng));
+    }
+  });
 };
 
 const enableDragging = () => {
@@ -3094,14 +3063,14 @@ watch(
 
         if (polyline.value) {
           polyline.value.setLatLngs(normalizedLatLngs);
-          const colors = getColors();
+          const colors = getLeafletLineColors(props.class);
           polyline.value.setStyle({
             color: colors.color,
             weight: props.weight,
             opacity: colors.opacity,
           });
         } else {
-          const colors = getColors();
+          const colors = getLeafletLineColors(props.class);
           polyline.value = L.value.polyline(normalizedLatLngs, {
             color: colors.color,
             weight: props.weight,
@@ -3178,7 +3147,7 @@ const emit = defineEmits<{
   "update:bounds": [bounds: [[number, number], [number, number]]];
 }>();
 
-const { getTailwindBaseCssValues } = useTailwindClassParser();
+const { getLeafletShapeColors } = useTailwindClassParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
@@ -3188,27 +3157,6 @@ const isDragging = ref(false);
 
 let dragStartBounds: L.LatLngBounds | null = null;
 let dragStartMousePoint: L.Point | null = null;
-
-const getColors = () => {
-  const classNames = props.class ? props.class.toString().split(" ") : [];
-  const el = document.createElement("div");
-  el.className = classNames.join(" ");
-  el.style.position = "absolute";
-  el.style.visibility = "hidden";
-  el.style.zIndex = "-9999";
-  document.body.appendChild(el);
-  const cssValues = getTailwindBaseCssValues(el, [
-    "color",
-    "background-color",
-    "opacity",
-  ]);
-  document.body.removeChild(el);
-  return {
-    color: cssValues["color"] || "#3388ff",
-    fillColor: cssValues["background-color"] || "#3388ff",
-    fillOpacity: cssValues["opacity"] ? parseFloat(cssValues["opacity"]) : 0.2,
-  };
-};
 
 const clearEditMarkers = () => {
   editMarkers.value.forEach((marker) => marker.remove());
@@ -3401,14 +3349,14 @@ watch(
       ) {
         if (rectangle.value) {
           rectangle.value.setBounds(props.bounds);
-          const colors = getColors();
+          const colors = getLeafletShapeColors(props.class);
           rectangle.value.setStyle({
             color: colors.color,
             fillColor: colors.fillColor,
             fillOpacity: colors.fillOpacity,
           });
         } else {
-          const colors = getColors();
+          const colors = getLeafletShapeColors(props.class);
           rectangle.value = L.value.rectangle(props.bounds, {
             color: colors.color,
             fillColor: colors.fillColor,
@@ -3678,6 +3626,101 @@ export const useTailwindClassParser = () => {
     return result;
   };
 
+  const getLeafletShapeColors = (
+    classNames?: string | string[] | Record<string, boolean>,
+  ) => {
+    if (typeof window === "undefined") {
+      return {
+        color: "#3388ff",
+        fillColor: "#3388ff",
+        fillOpacity: 0.2,
+      };
+    }
+
+    try {
+      let classList: string[] = [];
+      if (typeof classNames === "string") {
+        classList = classNames.split(" ");
+      } else if (Array.isArray(classNames)) {
+        classList = classNames;
+      } else if (classNames && typeof classNames === "object") {
+        classList = Object.keys(classNames).filter((key) => classNames[key]);
+      }
+
+      const el = document.createElement("div");
+      el.className = classList.join(" ");
+      el.style.position = "absolute";
+      el.style.visibility = "hidden";
+      el.style.zIndex = "-9999";
+      document.body.appendChild(el);
+
+      const cssValues = getTailwindBaseCssValues(el, [
+        "color",
+        "background-color",
+        "opacity",
+      ]);
+      document.body.removeChild(el);
+
+      return {
+        color: cssValues["color"] || "#3388ff",
+        fillColor: cssValues["background-color"] || "#3388ff",
+        fillOpacity: cssValues["opacity"]
+          ? parseFloat(cssValues["opacity"])
+          : 0.2,
+      };
+    } catch (err) {
+      console.error("Error in getLeafletShapeColors:", err);
+      return {
+        color: "#3388ff",
+        fillColor: "#3388ff",
+        fillOpacity: 0.2,
+      };
+    }
+  };
+
+  const getLeafletLineColors = (
+    classNames?: string | string[] | Record<string, boolean>,
+  ) => {
+    if (typeof window === "undefined") {
+      return {
+        color: "#3388ff",
+        opacity: 1,
+      };
+    }
+
+    try {
+      let classList: string[] = [];
+      if (typeof classNames === "string") {
+        classList = classNames.split(" ");
+      } else if (Array.isArray(classNames)) {
+        classList = classNames;
+      } else if (classNames && typeof classNames === "object") {
+        classList = Object.keys(classNames).filter((key) => classNames[key]);
+      }
+
+      const el = document.createElement("div");
+      el.className = classList.join(" ");
+      el.style.position = "absolute";
+      el.style.visibility = "hidden";
+      el.style.zIndex = "-9999";
+      document.body.appendChild(el);
+
+      const cssValues = getTailwindBaseCssValues(el, ["color", "opacity"]);
+      document.body.removeChild(el);
+
+      return {
+        color: cssValues["color"] || "#3388ff",
+        opacity: cssValues["opacity"] ? parseFloat(cssValues["opacity"]) : 1,
+      };
+    } catch (err) {
+      console.error("Error in getLeafletLineColors:", err);
+      return {
+        color: "#3388ff",
+        opacity: 1,
+      };
+    }
+  };
+
   const parseGradient = function (
     input: string,
   ): GradientParseResult | undefined {
@@ -3746,6 +3789,8 @@ export const useTailwindClassParser = () => {
 
   return {
     getTailwindBaseCssValues,
+    getLeafletShapeColors,
+    getLeafletLineColors,
     parseGradient,
   };
 };

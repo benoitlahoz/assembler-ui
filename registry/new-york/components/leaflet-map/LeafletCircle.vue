@@ -36,7 +36,7 @@ const emit = defineEmits<{
   'update:radius': [radius: number];
 }>();
 
-const { getTailwindBaseCssValues } = useTailwindClassParser();
+const { getLeafletShapeColors } = useTailwindClassParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
@@ -48,23 +48,6 @@ const radiusMarker = ref<L.Marker | null>(null);
 const isDragging = ref(false);
 let dragStartLatLng: any = null;
 let dragStartMousePoint: any = null;
-
-const getColors = () => {
-  const classNames = props.class ? props.class.toString().split(' ') : [];
-  const el = document.createElement('div');
-  el.className = classNames.join(' ');
-  el.style.position = 'absolute';
-  el.style.visibility = 'hidden';
-  el.style.zIndex = '-9999';
-  document.body.appendChild(el);
-  const cssValues = getTailwindBaseCssValues(el, ['color', 'background-color', 'opacity']);
-  document.body.removeChild(el);
-  return {
-    color: cssValues['color'] || 'blue',
-    fillColor: cssValues['background-color'] || 'blue',
-    fillOpacity: cssValues['opacity'] ? parseFloat(cssValues['opacity']) : 0.2,
-  };
-};
 
 const clearEditMarkers = () => {
   if (centerMarker.value) {
@@ -210,7 +193,7 @@ watch(
         }
 
         // Apply colors
-        const colors = getColors();
+        const colors = getLeafletShapeColors(props.class);
         circle.value.setStyle({
           color: colors.color,
           fillColor: colors.fillColor,
