@@ -112,7 +112,9 @@ const enableEditing = () => {
 
     marker.on('drag', () => {
       const newLatLngs = [...latlngs];
-      newLatLngs[index] = marker.getLatLng();
+      let currentPos = marker.getLatLng();
+
+      newLatLngs[index] = currentPos;
       polygon.value!.setLatLngs([newLatLngs]);
     });
 

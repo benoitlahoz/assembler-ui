@@ -1430,6 +1430,7 @@ const editMarkers = ref<L.Marker[]>([]);
 const midpointMarkers = ref<L.Marker[]>([]);
 const centerMarker = ref<L.Marker | null>(null);
 const firstPointMarker = ref<L.Marker | null>(null);
+const snapCircle = ref<L.CircleMarker | null>(null);
 const isDragging = ref(false);
 
 const normalizeLatLngs = (
@@ -1477,6 +1478,10 @@ const clearEditMarkers = () => {
     firstPointMarker.value.remove();
     firstPointMarker.value = null;
   }
+  if (snapCircle.value) {
+    snapCircle.value.remove();
+    snapCircle.value = null;
+  }
 };
 
 const enableEditing = () => {
@@ -1511,11 +1516,91 @@ const enableEditing = () => {
 
     marker.on("drag", () => {
       const newLatLngs = [...latlngs];
-      newLatLngs[index] = marker.getLatLng();
+      let currentPos = marker.getLatLng();
+
+      if (
+        !isFirstPoint &&
+        firstPointMarker.value &&
+        props.autoClose &&
+        map.value
+      ) {
+        const firstPos = firstPointMarker.value.getLatLng();
+
+        const currentPixel = map.value.latLngToContainerPoint(currentPos);
+        const firstPixel = map.value.latLngToContainerPoint(firstPos);
+        const pixelDistance = Math.sqrt(
+          Math.pow(currentPixel.x - firstPixel.x, 2) +
+            Math.pow(currentPixel.y - firstPixel.y, 2),
+        );
+
+        console.log("Distance en pixels:", pixelDistance, "Index:", index);
+
+        const snapThreshold = 30;
+
+        if (pixelDistance < snapThreshold) {
+          console.log("🔴 SNAP ACTIVÉ ! Création/affichage du cercle rouge");
+
+          currentPos = firstPos;
+          marker.setLatLng(firstPos);
+
+          if (!snapCircle.value) {
+            console.log("Création du cercle rouge");
+            snapCircle.value = L.value!.circleMarker(firstPos, {
+              radius: 20,
+              color: "#ff0000",
+              fillColor: "#ff0000",
+              fillOpacity: 0.3,
+              weight: 3,
+              opacity: 0.8,
+              interactive: false,
+            }).addTo(map.value);
+          } else {
+            console.log("Mise à jour du cercle rouge existant");
+            snapCircle.value.setLatLng(firstPos);
+            snapCircle.value.setStyle({ opacity: 0.8, fillOpacity: 0.3 });
+          }
+
+          const firstElement = firstPointMarker.value.getElement();
+          if (firstElement) {
+            firstElement.style.transform = "scale(1.8)";
+            firstElement.style.transition = "transform 0.15s ease";
+          }
+
+          map.value.getContainer().style.cursor = "pointer";
+        } else {
+          if (snapCircle.value) {
+            snapCircle.value.setStyle({ opacity: 0, fillOpacity: 0 });
+          }
+
+          const firstElement = firstPointMarker.value.getElement();
+          if (firstElement) {
+            firstElement.style.transform = "scale(1)";
+          }
+
+          map.value.getContainer().style.cursor = "move";
+        }
+      }
+
+      newLatLngs[index] = currentPos;
       polygon.value!.setLatLngs([newLatLngs]);
     });
 
     marker.on("dragend", () => {
+      if (firstPointMarker.value) {
+        const firstElement = firstPointMarker.value.getElement();
+        if (firstElement) {
+          firstElement.style.transform = "scale(1)";
+        }
+      }
+
+      if (snapCircle.value) {
+        snapCircle.value.setStyle({ opacity: 0, fillOpacity: 0.1 });
+      }
+
+      if (map.value) {
+        map.value.getContainer().style.cursor = "";
+      }
+
       const updatedLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map(
         (ll) => [ll.lat, ll.lng],
       ) as Array<[number, number]>;

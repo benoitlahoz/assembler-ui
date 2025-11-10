@@ -447,9 +447,47 @@ const createPolygonHandler = (options: DrawHandlerOptions) => {
   let latlngs: LatLng[] = [];
   let tempPolygon: L.Polygon | null = null;
   let tempMarkers: L.CircleMarker[] = [];
+  let firstPointMarker: L.CircleMarker | null = null;
+  let snapCircle: L.CircleMarker | null = null;
+
+  const finishPolygon = () => {
+    if (!L.value || !map.value || latlngs.length < 3) return;
+
+    const polygon = L.value.polygon(latlngs, options.shapeOptions);
+
+    const event: DrawEvent = {
+      layer: polygon,
+      layerType: 'polygon',
+      type: 'draw:created',
+    };
+
+    emit('draw:created', event);
+    cleanup();
+
+    if (!options.repeatMode) {
+      disable();
+      activeMode.value = null;
+    }
+  };
 
   const clickHandler = (e: L.LeafletMouseEvent) => {
     if (!enabled || !L.value || !map.value) return;
+
+    // Si on a déjà au moins 3 points et qu'on clique sur le premier point, fermer le polygone
+    if (latlngs.length >= 3 && firstPointMarker && latlngs[0]) {
+      const clickPixel = map.value.latLngToContainerPoint(e.latlng);
+      const firstPixel = map.value.latLngToContainerPoint(latlngs[0]);
+      const distance = Math.sqrt(
+        Math.pow(clickPixel.x - firstPixel.x, 2) +
+        Math.pow(clickPixel.y - firstPixel.y, 2)
+      );
+
+      if (distance < 15) {
+        // Clic sur le premier point = fermeture
+        finishPolygon();
+        return;
+      }
+    }
 
     latlngs.push(e.latlng);
 
@@ -460,7 +498,18 @@ const createPolygonHandler = (options: DrawHandlerOptions) => {
     marker.addTo(map.value);
     tempMarkers.push(marker);
 
+    // Le premier marker est spécial
     if (latlngs.length === 1) {
+      firstPointMarker = marker;
+      // Style spécial pour le premier point
+      firstPointMarker.setStyle({
+        radius: 6,
+        color: '#3388ff',
+        fillColor: '#ffffff',
+        fillOpacity: 1,
+        weight: 3,
+      });
+
       tempPolygon = L.value.polygon(latlngs, {
         ...options.shapeOptions,
         dashArray: '5, 5',
@@ -504,8 +553,65 @@ const createPolygonHandler = (options: DrawHandlerOptions) => {
   };
 
   const mouseMoveHandler = (e: L.LeafletMouseEvent) => {
-    if (!enabled || !tempPolygon || latlngs.length === 0) return;
-    const previewLatLngs = [...latlngs, e.latlng];
+    if (!enabled || !tempPolygon || latlngs.length === 0 || !map.value || !L.value) return;
+
+    let mousePos = e.latlng;
+    let isNearFirstPoint = false;
+
+    // Si on a au moins 3 points, vérifier la proximité avec le premier point
+    if (latlngs.length >= 3 && firstPointMarker && latlngs[0]) {
+      const mousePixel = map.value.latLngToContainerPoint(e.latlng);
+      const firstPixel = map.value.latLngToContainerPoint(latlngs[0]);
+      const distance = Math.sqrt(
+        Math.pow(mousePixel.x - firstPixel.x, 2) +
+        Math.pow(mousePixel.y - firstPixel.y, 2)
+      );
+
+      const snapThreshold = 30;
+      isNearFirstPoint = distance < snapThreshold;
+
+      if (isNearFirstPoint) {
+        // Snapper au premier point
+        mousePos = latlngs[0];
+
+        // Créer/afficher le cercle rouge
+        if (!snapCircle) {
+          snapCircle = L.value.circleMarker(latlngs[0], {
+            radius: 20,
+            color: '#ff0000',
+            fillColor: '#ff0000',
+            fillOpacity: 0.3,
+            weight: 3,
+            opacity: 0.8,
+            interactive: false,
+          });
+          snapCircle.addTo(map.value);
+        } else {
+          snapCircle.setStyle({ opacity: 0.8, fillOpacity: 0.3 });
+        }
+
+        // Agrandir le premier point
+        firstPointMarker.setStyle({ radius: 9 });
+
+        // Curseur pointer
+        map.value.getContainer().style.cursor = 'pointer';
+      } else {
+        // Masquer le cercle rouge
+        if (snapCircle) {
+          snapCircle.setStyle({ opacity: 0, fillOpacity: 0 });
+        }
+
+        // Taille normale du premier point
+        if (firstPointMarker) {
+          firstPointMarker.setStyle({ radius: 6 });
+        }
+
+        // Curseur crosshair
+        map.value.getContainer().style.cursor = 'crosshair';
+      }
+    }
+
+    const previewLatLngs = [...latlngs, mousePos];
     tempPolygon.setLatLngs(previewLatLngs);
   };
 
@@ -516,6 +622,11 @@ const createPolygonHandler = (options: DrawHandlerOptions) => {
     }
     tempMarkers.forEach((m) => m.remove());
     tempMarkers = [];
+    if (snapCircle) {
+      snapCircle.remove();
+      snapCircle = null;
+    }
+    firstPointMarker = null;
     latlngs = [];
   };
 
