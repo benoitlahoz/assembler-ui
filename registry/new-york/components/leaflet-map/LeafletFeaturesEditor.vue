@@ -11,7 +11,15 @@ export interface DrawHandlerOptions {
 
 export interface LeafletFeaturesEditorProps {
   enabled?: boolean;
-  mode?: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'move' | 'edit' | null;
+  mode?:
+    | 'marker'
+    | 'circle'
+    | 'polyline'
+    | 'polygon'
+    | 'rectangle'
+    | 'select'
+    | 'directSelect'
+    | null;
   shapeOptions?: any;
   repeatMode?: boolean;
 }
@@ -36,7 +44,7 @@ const emit = defineEmits<{
     e: 'mode-changed',
     mode: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | null
   ): void;
-  (e: 'edit-mode-changed', mode: 'move' | 'edit' | null): void;
+  (e: 'edit-mode-changed', mode: 'select' | 'directSelect' | null): void;
 }>();
 
 const L = inject(LeafletModuleKey, ref());
@@ -557,14 +565,14 @@ watch(
       activeHandler.value = null;
     }
 
-    // Handle edit modes (move and edit)
-    if (newMode === 'move' || newMode === 'edit') {
+    // Handle edit modes (select and directSelect)
+    if (newMode === 'select' || newMode === 'directSelect') {
       emit('edit-mode-changed', newMode);
       return;
     }
 
     // If switching away from edit modes
-    if (oldMode === 'move' || oldMode === 'edit') {
+    if (oldMode === 'select' || oldMode === 'directSelect') {
       emit('edit-mode-changed', null);
     }
 

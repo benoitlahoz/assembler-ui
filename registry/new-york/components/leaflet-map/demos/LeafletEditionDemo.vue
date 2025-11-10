@@ -23,11 +23,11 @@ const editMode = ref(false);
 
 // Current drawing/editing mode
 const currentMode = ref<
-  'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'move' | 'edit' | null
+  'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'select' | 'directSelect' | null
 >(null);
 
-// Current edit mode (move or edit points)
-const currentEditMode = ref<'move' | 'edit' | null>(null);
+// Current edit mode (select or directSelect)
+const currentEditMode = ref<'select' | 'directSelect' | null>(null);
 
 // Données pour les différentes shapes
 const markers = ref([
@@ -109,29 +109,29 @@ watch(editMode, (enabled) => {
 });
 
 // Watch edit mode changes from features editor
-const handleEditModeChanged = (mode: 'move' | 'edit' | null) => {
+const handleEditModeChanged = (mode: 'select' | 'directSelect' | null) => {
   currentEditMode.value = mode;
 
-  if (mode === 'move') {
-    // Enable move (draggable) for all shapes
+  if (mode === 'select') {
+    // Enable select (draggable + transform) for all shapes
     Object.keys(moveableShapes.value).forEach((key) => {
       moveableShapes.value[key as keyof typeof moveableShapes.value] = true;
     });
-    // Disable edit for all shapes
+    // Disable direct edit for all shapes
     Object.keys(editableShapes.value).forEach((key) => {
       editableShapes.value[key as keyof typeof editableShapes.value] = false;
     });
-  } else if (mode === 'edit') {
-    // Disable move for all shapes
+  } else if (mode === 'directSelect') {
+    // Disable select for all shapes
     Object.keys(moveableShapes.value).forEach((key) => {
       moveableShapes.value[key as keyof typeof moveableShapes.value] = false;
     });
-    // Enable edit (points) for all shapes
+    // Enable direct edit (points/radius) for all shapes
     Object.keys(editableShapes.value).forEach((key) => {
       editableShapes.value[key as keyof typeof editableShapes.value] = true;
     });
   } else {
-    // Disable both move and edit
+    // Disable both select and direct edit
     Object.keys(moveableShapes.value).forEach((key) => {
       moveableShapes.value[key as keyof typeof moveableShapes.value] = false;
     });
@@ -143,7 +143,15 @@ const handleEditModeChanged = (mode: 'move' | 'edit' | null) => {
 
 // Handle mode selection from control
 const handleModeSelected = (
-  mode: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'move' | 'edit' | null
+  mode:
+    | 'marker'
+    | 'circle'
+    | 'polyline'
+    | 'polygon'
+    | 'rectangle'
+    | 'select'
+    | 'directSelect'
+    | null
 ) => {
   currentMode.value = mode;
 };
@@ -312,8 +320,8 @@ const onPolygonClosed = (id: number) => {
           :edit-mode="editMode"
           :active-mode="currentMode"
           :modes="{
-            move: true,
-            edit: true,
+            select: true,
+            directSelect: true,
             marker: true,
             circle: true,
             polyline: true,

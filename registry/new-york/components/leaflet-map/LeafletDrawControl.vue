@@ -12,8 +12,8 @@ export interface LeafletDrawControlProps {
   editMode?: boolean;
   activeMode?: string | null;
   modes?: {
-    move?: DrawButton | boolean;
-    edit?: DrawButton | boolean;
+    select?: DrawButton | boolean; // Mode sélection (flèche noire) - transform avec bounding box
+    directSelect?: DrawButton | boolean; // Mode édition directe (flèche blanche) - éditer les points
     marker?: DrawButton | boolean;
     circle?: DrawButton | boolean;
     polyline?: DrawButton | boolean;
@@ -31,7 +31,15 @@ const props = withDefaults(defineProps<LeafletDrawControlProps>(), {
 const emit = defineEmits<{
   (
     e: 'mode-selected',
-    mode: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'move' | 'edit' | null
+    mode:
+      | 'marker'
+      | 'circle'
+      | 'polyline'
+      | 'polygon'
+      | 'rectangle'
+      | 'select'
+      | 'directSelect'
+      | null
   ): void;
 }>();
 
@@ -49,7 +57,14 @@ const shouldEnableButton = (type: string): boolean => {
 };
 
 const getIconSvg = (
-  type: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'move' | 'edit'
+  type:
+    | 'marker'
+    | 'circle'
+    | 'polyline'
+    | 'polygon'
+    | 'rectangle'
+    | 'select'
+    | 'directSelect'
 ): string => {
   const color = '#333';
   const svgs: Record<string, string> = {
@@ -58,15 +73,22 @@ const getIconSvg = (
     polyline: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 17 L8 12 L13 15 L21 7" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="3" cy="17" r="2.5" fill="${color}"/><circle cx="8" cy="12" r="2.5" fill="${color}"/><circle cx="13" cy="15" r="2.5" fill="${color}"/><circle cx="21" cy="7" r="2.5" fill="${color}"/></svg>`,
     polygon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3 L21 8 L18 17 L6 17 L3 8 Z" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="12" cy="3" r="2.5" fill="${color}"/><circle cx="21" cy="8" r="2.5" fill="${color}"/><circle cx="18" cy="17" r="2.5" fill="${color}"/><circle cx="6" cy="17" r="2.5" fill="${color}"/><circle cx="3" cy="8" r="2.5" fill="${color}"/></svg>`,
     rectangle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="6" width="16" height="12" stroke="${color}" stroke-width="2.5" rx="1" fill="none"/></svg>`,
-    move: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 9L2 12L5 15M9 5L12 2L15 5M15 19L12 22L9 19M19 9L22 12L19 15" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="2" fill="${color}"/></svg>`,
-    edit: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 20 L4 16 L16 4 L20 8 L8 20 Z" fill="white" stroke="${color}" stroke-width="2" stroke-linejoin="round"/><path d="M15 5 L19 9" stroke="${color}" stroke-width="2" stroke-linecap="round"/></svg>`,
+    select: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 3 L3 15 L7 11 L10 16 L12 15 L9 10 L15 10 Z" fill="${color}" stroke="${color}" stroke-width="1" stroke-linejoin="round"/></svg>`,
+    directSelect: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 3 L3 15 L7 11 L10 16 L12 15 L9 10 L15 10 Z" fill="white" stroke="${color}" stroke-width="2" stroke-linejoin="round"/></svg>`,
   };
   return svgs[type] || '';
 };
 
 const createButton = (
   container: HTMLElement,
-  type: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'move' | 'edit',
+  type:
+    | 'marker'
+    | 'circle'
+    | 'polyline'
+    | 'polygon'
+    | 'rectangle'
+    | 'select'
+    | 'directSelect',
   title: string
 ) => {
   const button = L.value!.DomUtil.create('div', 'leaflet-draw-button', container);
@@ -86,7 +108,14 @@ const createButton = (
 };
 
 const toggleDrawMode = (
-  type: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'move' | 'edit'
+  type:
+    | 'marker'
+    | 'circle'
+    | 'polyline'
+    | 'polygon'
+    | 'rectangle'
+    | 'select'
+    | 'directSelect'
 ) => {
   if (props.activeMode === type) {
     emit('mode-selected', null);
@@ -129,11 +158,11 @@ const createDrawControl = () => {
 
       // All modes in one unified section
       if (props.modes) {
-        if (shouldEnableButton('move')) {
-          createButton(container, 'move', 'Move shapes');
+        if (shouldEnableButton('select')) {
+          createButton(container, 'select', 'Selection Tool (V)');
         }
-        if (shouldEnableButton('edit')) {
-          createButton(container, 'edit', 'Edit points');
+        if (shouldEnableButton('directSelect')) {
+          createButton(container, 'directSelect', 'Direct Selection Tool (A)');
         }
         if (shouldEnableButton('marker')) {
           createButton(container, 'marker', 'Draw a marker');
