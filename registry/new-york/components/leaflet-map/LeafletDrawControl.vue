@@ -473,17 +473,16 @@ const createPolygonHandler = (options: DrawHandlerOptions) => {
   const clickHandler = (e: L.LeafletMouseEvent) => {
     if (!enabled || !L.value || !map.value) return;
 
-    // Si on a déjà au moins 3 points et qu'on clique sur le premier point, fermer le polygone
+    // If we have at least 3 points and click on the first point, close the polygon
     if (latlngs.length >= 3 && firstPointMarker && latlngs[0]) {
       const clickPixel = map.value.latLngToContainerPoint(e.latlng);
       const firstPixel = map.value.latLngToContainerPoint(latlngs[0]);
       const distance = Math.sqrt(
-        Math.pow(clickPixel.x - firstPixel.x, 2) +
-        Math.pow(clickPixel.y - firstPixel.y, 2)
+        Math.pow(clickPixel.x - firstPixel.x, 2) + Math.pow(clickPixel.y - firstPixel.y, 2)
       );
 
       if (distance < 15) {
-        // Clic sur le premier point = fermeture
+        // Click on first point = close polygon
         finishPolygon();
         return;
       }
@@ -498,10 +497,9 @@ const createPolygonHandler = (options: DrawHandlerOptions) => {
     marker.addTo(map.value);
     tempMarkers.push(marker);
 
-    // Le premier marker est spécial
+    // First marker gets special styling
     if (latlngs.length === 1) {
       firstPointMarker = marker;
-      // Style spécial pour le premier point
       firstPointMarker.setStyle({
         radius: 6,
         color: '#3388ff',
@@ -537,11 +535,6 @@ const createPolygonHandler = (options: DrawHandlerOptions) => {
       };
 
       emit('draw:created', event);
-
-      // Note: Ne pas ajouter à drawnItems ici - laisser le parent gérer via @draw:created
-      // if (drawnItems.value) {
-      //   drawnItems.value.addLayer(polygon);
-      // }
     }
 
     cleanup();
@@ -558,23 +551,22 @@ const createPolygonHandler = (options: DrawHandlerOptions) => {
     let mousePos = e.latlng;
     let isNearFirstPoint = false;
 
-    // Si on a au moins 3 points, vérifier la proximité avec le premier point
+    // If we have at least 3 points, check proximity to first point
     if (latlngs.length >= 3 && firstPointMarker && latlngs[0]) {
       const mousePixel = map.value.latLngToContainerPoint(e.latlng);
       const firstPixel = map.value.latLngToContainerPoint(latlngs[0]);
       const distance = Math.sqrt(
-        Math.pow(mousePixel.x - firstPixel.x, 2) +
-        Math.pow(mousePixel.y - firstPixel.y, 2)
+        Math.pow(mousePixel.x - firstPixel.x, 2) + Math.pow(mousePixel.y - firstPixel.y, 2)
       );
 
       const snapThreshold = 30;
       isNearFirstPoint = distance < snapThreshold;
 
       if (isNearFirstPoint) {
-        // Snapper au premier point
+        // Snap to first point
         mousePos = latlngs[0];
 
-        // Créer/afficher le cercle rouge
+        // Show/create red circle
         if (!snapCircle) {
           snapCircle = L.value.circleMarker(latlngs[0], {
             radius: 20,
@@ -590,23 +582,23 @@ const createPolygonHandler = (options: DrawHandlerOptions) => {
           snapCircle.setStyle({ opacity: 0.8, fillOpacity: 0.3 });
         }
 
-        // Agrandir le premier point
+        // Enlarge first point
         firstPointMarker.setStyle({ radius: 9 });
 
-        // Curseur pointer
+        // Change cursor to pointer
         map.value.getContainer().style.cursor = 'pointer';
       } else {
-        // Masquer le cercle rouge
+        // Hide red circle
         if (snapCircle) {
           snapCircle.setStyle({ opacity: 0, fillOpacity: 0 });
         }
 
-        // Taille normale du premier point
+        // Restore first point size
         if (firstPointMarker) {
           firstPointMarker.setStyle({ radius: 6 });
         }
 
-        // Curseur crosshair
+        // Restore crosshair cursor
         map.value.getContainer().style.cursor = 'crosshair';
       }
     }

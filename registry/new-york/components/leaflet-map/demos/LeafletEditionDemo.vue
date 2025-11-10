@@ -212,7 +212,7 @@ const onPolygonClosed = (id: number) => {
 <template>
   <div class="w-full h-full flex flex-col gap-4">
     <!-- Info du mode actuel -->
-    <div class="p-4 rounded flex items-center justify-between">
+    <div class="rounded flex items-center justify-between">
       <Button
         @click="editMode = !editMode"
         class="px-4 py-2 rounded transition-colors"
