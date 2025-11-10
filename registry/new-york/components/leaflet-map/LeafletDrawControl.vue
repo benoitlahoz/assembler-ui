@@ -25,7 +25,6 @@ export interface LeafletDrawControlProps {
     rectangle?: DrawHandlerOptions | boolean;
   };
   edit?: {
-    featureGroup: FeatureGroup;
     edit?: boolean;
     remove?: boolean;
   };
@@ -213,8 +212,8 @@ const createMarkerHandler = (options: DrawHandlerOptions) => {
 
     emit('draw:created', event);
 
-    if (props.edit?.featureGroup) {
-      props.edit.featureGroup.addLayer(marker);
+    if (drawnItems.value) {
+      drawnItems.value.addLayer(marker);
     }
 
     if (!options.repeatMode) {
@@ -277,8 +276,8 @@ const createCircleHandler = (options: DrawHandlerOptions) => {
 
         emit('draw:created', event);
 
-        if (props.edit?.featureGroup) {
-          props.edit.featureGroup.addLayer(circle);
+        if (drawnItems.value) {
+          drawnItems.value.addLayer(circle);
         }
       }
 
@@ -373,8 +372,8 @@ const createPolylineHandler = (options: DrawHandlerOptions) => {
 
       emit('draw:created', event);
 
-      if (props.edit?.featureGroup) {
-        props.edit.featureGroup.addLayer(polyline);
+      if (drawnItems.value) {
+        drawnItems.value.addLayer(polyline);
       }
     }
 
@@ -473,8 +472,8 @@ const createPolygonHandler = (options: DrawHandlerOptions) => {
 
       emit('draw:created', event);
 
-      if (props.edit?.featureGroup) {
-        props.edit.featureGroup.addLayer(polygon);
+      if (drawnItems.value) {
+        drawnItems.value.addLayer(polygon);
       }
     }
 
@@ -552,8 +551,8 @@ const createRectangleHandler = (options: DrawHandlerOptions) => {
 
       emit('draw:created', event);
 
-      if (props.edit?.featureGroup) {
-        props.edit.featureGroup.addLayer(rectangle);
+      if (drawnItems.value) {
+        drawnItems.value.addLayer(rectangle);
       }
 
       startLatLng = null;
@@ -612,16 +611,23 @@ watch(
     if (!newMap || !L.value) return;
 
     // Attendre que le DOM et Leaflet soient complètement prêts
-    nextTick(() => {
-      try {
-        control.value = createDrawControl();
-        if (control.value) {
-          control.value.addTo(newMap);
-        }
-      } catch (error) {
-        console.error('Error creating draw control:', error);
+    await nextTick();
+    await nextTick();
+
+    try {
+      // Créer le FeatureGroup pour stocker les formes dessinées
+      if (!drawnItems.value) {
+        drawnItems.value = L.value.featureGroup().addTo(newMap);
       }
-    });
+
+      // Créer et ajouter le contrôle
+      control.value = createDrawControl();
+      if (control.value) {
+        control.value.addTo(newMap);
+      }
+    } catch (error) {
+      console.error('Error creating draw control:', error);
+    }
   },
   { immediate: true }
 );
@@ -630,6 +636,9 @@ onBeforeUnmount(() => {
   disableAllHandlers();
   if (control.value && map.value) {
     map.value.removeControl(control.value);
+  }
+  if (drawnItems.value && map.value) {
+    map.value.removeLayer(drawnItems.value);
   }
 });
 </script>

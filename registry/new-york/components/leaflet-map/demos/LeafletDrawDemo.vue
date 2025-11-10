@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref } from 'vue';
 import {
   LeafletMap,
   LeafletTileLayer,
@@ -10,24 +10,7 @@ import {
 } from '..';
 
 const mapRef = ref<LeafletMapExposed | null>(null);
-const drawnItems = ref<any>(null);
 const createdLayers = ref<Array<{ type: string; layer: any }>>([]);
-
-// Surveiller quand la carte est prête
-watch(
-  () => mapRef.value?.map,
-  async (mapInstance) => {
-    if (!mapInstance) return;
-
-    // Petite attente pour s'assurer que Leaflet est complètement initialisé
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    // Importer dynamiquement Leaflet pour créer le FeatureGroup
-    const L = (await import('leaflet')).default;
-    drawnItems.value = L.featureGroup().addTo(mapInstance);
-  },
-  { immediate: true }
-);
 
 const onDrawCreated = (event: DrawEvent) => {
   console.log('Shape created:', event.layerType, event.layer);
@@ -46,8 +29,14 @@ const onDrawStop = (event: { layerType: string }) => {
 };
 
 const clearAllLayers = () => {
-  if (drawnItems.value) {
-    drawnItems.value.clearLayers();
+  // Récupérer le FeatureGroup interne du contrôle via la carte
+  const map = mapRef.value?.map;
+  if (map) {
+    map.eachLayer((layer: any) => {
+      if (layer instanceof (window as any).L.FeatureGroup && layer !== map) {
+        layer.clearLayers();
+      }
+    });
     createdLayers.value = [];
   }
 };
@@ -69,6 +58,7 @@ const clearAllLayers = () => {
     <div class="flex-1 relative">
       <LeafletMap
         ref="mapRef"
+        name="draw-demo"
         class="w-full h-[600px] rounded-lg shadow-lg"
         tile-layer="osm"
         :center-lat="48.8566"
@@ -84,7 +74,6 @@ const clearAllLayers = () => {
         <LeafletZoomControl position="topleft" />
 
         <LeafletDrawControl
-          v-if="drawnItems"
           position="topleft"
           :draw="{
             marker: {
@@ -122,11 +111,6 @@ const clearAllLayers = () => {
                 fillOpacity: 0.2,
               },
             },
-          }"
-          :edit="{
-            featureGroup: drawnItems,
-            edit: false,
-            remove: false,
           }"
           @draw:created="onDrawCreated"
           @draw:drawstart="onDrawStart"

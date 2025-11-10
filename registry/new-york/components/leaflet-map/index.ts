@@ -4,6 +4,7 @@
  *
  * @demo LeafletSimple
  * @demo LeafletDrawDemo
+ * @demo LeafletShapesDemo
  */
 
 import type { InjectionKey, Ref } from 'vue';
@@ -18,6 +19,9 @@ export { default as LeafletDrawControl } from './LeafletDrawControl.vue';
 export { default as LeafletTileLayer } from './LeafletTileLayer.vue';
 export { default as LeafletMarker } from './LeafletMarker.vue';
 export { default as LeafletCircle } from './LeafletCircle.vue';
+export { default as LeafletPolyline } from './LeafletPolyline.vue';
+export { default as LeafletPolygon } from './LeafletPolygon.vue';
+export { default as LeafletRectangle } from './LeafletRectangle.vue';
 
 export const LeafletModuleKey: InjectionKey<Ref<L | undefined>> = Symbol('LeafletModule');
 export const LeafletMapKey: InjectionKey<Ref<Map | null>> = Symbol('LeafletMap');
@@ -33,3 +37,6 @@ export type { LeafletDrawControlProps, DrawEvent } from './LeafletDrawControl.vu
 export type { LeafletTileLayerProps } from './LeafletTileLayer.vue';
 export type { LeafletMarkerProps } from './LeafletMarker.vue';
 export type { LeafletCircleProps } from './LeafletCircle.vue';
+export type { LeafletPolylineProps } from './LeafletPolyline.vue';
+export type { LeafletPolygonProps } from './LeafletPolygon.vue';
+export type { LeafletRectangleProps } from './LeafletRectangle.vue';

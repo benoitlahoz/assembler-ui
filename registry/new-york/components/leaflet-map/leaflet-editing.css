@@ -1,0 +1,23 @@
+/* Styles pour les icônes d'édition Leaflet */
+.leaflet-editing-icon {
+  margin-left: -4px !important;
+  margin-top: -4px !important;
+  pointer-events: auto !important;
+  cursor: move !important;
+}
+
+.leaflet-editing-icon-first {
+  margin-left: -6px !important;
+  margin-top: -6px !important;
+  cursor: pointer !important;
+  z-index: 1000 !important;
+}
+
+.leaflet-editing-icon div {
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.leaflet-editing-icon-first div:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 0 2px rgba(51, 136, 255, 0.5);
+}

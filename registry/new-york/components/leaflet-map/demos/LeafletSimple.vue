@@ -7,7 +7,6 @@ import {
   LeafletTileLayer,
   LeafletZoomControl,
   LeafletDrawControl,
-  LeafletMarker,
   LeafletCircle,
   type LeafletMapExposed,
 } from '~~/registry/new-york/components/leaflet-map';
@@ -16,7 +15,11 @@ type LeafletMapInstance = ComponentPublicInstance & LeafletMapExposed;
 
 const mapRef = ref<LeafletMapInstance | null>(null);
 const zoom = ref(13);
-const locationCoords = ref<{ lat: number; lng: number; accuracy: number } | null>(null);
+const locationCoords = ref<{ lat: number; lng: number; accuracy: number }>({
+  lat: 43.3026,
+  lng: 5.3691,
+  accuracy: 500,
+});
 const onLocate = () => {
   // Ugly way to call the locate method on the LeafletMap component.
   // https://www.answeroverflow.com/m/1398747077265064026
@@ -43,8 +46,8 @@ const onLocationFound = (event: any) => {
         ref="mapRef"
         name="marseille"
         tile-layer="openstreetmap"
-        center-lat="43.3026"
-        center-lng="5.3691"
+        :center-lat="locationCoords.lat"
+        :center-lng="locationCoords.lng"
         :zoom="zoom"
         class="rounded-lg"
         @location:found="onLocationFound"
@@ -61,7 +64,6 @@ const onLocationFound = (event: any) => {
 
         <!-- Adds a circle at location -->
         <LeafletCircle
-          v-if="locationCoords"
           :key="`circle-${locationCoords.lat}-${locationCoords.lng}`"
           :lat="locationCoords.lat"
           :lng="locationCoords.lng"
