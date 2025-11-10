@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, inject, type Ref, watch, onBeforeUnmount, nextTick } from 'vue';
+import { ref, inject, watch, onBeforeUnmount, nextTick } from 'vue';
 import {
   type ControlOptions,
   type Layer,
@@ -67,7 +67,7 @@ const createDrawControl = () => {
       position: props.position,
     },
 
-    onAdd: function (map: L.Map) {
+    onAdd: function () {
       const container = L.value!.DomUtil.create('div', 'leaflet-draw leaflet-control leaflet-bar');
 
       // Empêcher la propagation des événements
@@ -80,19 +80,19 @@ const createDrawControl = () => {
       // Créer les boutons pour chaque outil de dessin
       if (props.draw) {
         if (shouldEnableHandler('marker')) {
-          createButton(container, 'marker', '📍', 'Dessiner un marqueur');
+          createButton(container, 'marker', 'Dessiner un marqueur');
         }
         if (shouldEnableHandler('circle')) {
-          createButton(container, 'circle', '⭕', 'Dessiner un cercle');
+          createButton(container, 'circle', 'Dessiner un cercle');
         }
         if (shouldEnableHandler('polyline')) {
-          createButton(container, 'polyline', '〰️', 'Dessiner une ligne');
+          createButton(container, 'polyline', 'Dessiner une ligne');
         }
         if (shouldEnableHandler('polygon')) {
-          createButton(container, 'polygon', '▽', 'Dessiner un polygone');
+          createButton(container, 'polygon', 'Dessiner un polygone');
         }
         if (shouldEnableHandler('rectangle')) {
-          createButton(container, 'rectangle', '▢', 'Dessiner un rectangle');
+          createButton(container, 'rectangle', 'Dessiner un rectangle');
         }
       }
 
@@ -123,11 +123,23 @@ const getHandlerOptions = (type: string): DrawHandlerOptions => {
   return {};
 };
 
-const createButton = (container: HTMLElement, type: string, icon: string, title: string) => {
+const getIconSvg = (type: string, color: string = '#333333'): string => {
+  const svgs: Record<string, string> = {
+    marker: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}"/></svg>`,
+    circle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="${color}" stroke-width="2.5" fill="none"/></svg>`,
+    polyline: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 17 L8 12 L13 15 L21 7" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="3" cy="17" r="2.5" fill="${color}"/><circle cx="8" cy="12" r="2.5" fill="${color}"/><circle cx="13" cy="15" r="2.5" fill="${color}"/><circle cx="21" cy="7" r="2.5" fill="${color}"/></svg>`,
+    polygon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3 L21 8 L18 17 L6 17 L3 8 Z" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="12" cy="3" r="2.5" fill="${color}"/><circle cx="21" cy="8" r="2.5" fill="${color}"/><circle cx="18" cy="17" r="2.5" fill="${color}"/><circle cx="6" cy="17" r="2.5" fill="${color}"/><circle cx="3" cy="8" r="2.5" fill="${color}"/></svg>`,
+    rectangle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="6" width="16" height="12" stroke="${color}" stroke-width="2.5" rx="1" fill="none"/></svg>`,
+    edit: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  };
+  return svgs[type] || '';
+};
+
+const createButton = (container: HTMLElement, type: string, title: string) => {
   const button = L.value!.DomUtil.create('a', 'leaflet-draw-button', container);
   button.href = '#';
   button.title = title;
-  button.innerHTML = icon;
+  button.innerHTML = getIconSvg(type);
   button.setAttribute('role', 'button');
   button.setAttribute('aria-label', title);
 
@@ -143,7 +155,7 @@ const createEditButton = (container: HTMLElement) => {
   const button = L.value!.DomUtil.create('a', 'leaflet-draw-button leaflet-edit-button', container);
   button.href = '#';
   button.title = 'Activer le mode Édition';
-  button.innerHTML = '✏️';
+  button.innerHTML = getIconSvg('edit');
   button.setAttribute('role', 'button');
   button.setAttribute('aria-label', 'Mode Édition');
 
@@ -151,9 +163,11 @@ const createEditButton = (container: HTMLElement) => {
     if (editMode.value) {
       button.classList.add('active');
       button.title = 'Mode Édition activé (cliquez pour désactiver)';
+      button.innerHTML = getIconSvg('edit', '#ffffff');
     } else {
       button.classList.remove('active');
       button.title = 'Activer le mode Édition';
+      button.innerHTML = getIconSvg('edit', '#333333');
     }
   };
 
@@ -713,13 +727,25 @@ onBeforeUnmount(() => {
 .leaflet-draw-button {
   width: 30px;
   height: 30px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   text-decoration: none;
   color: #333;
   background: white;
   border-bottom: 1px solid #ccc;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.leaflet-draw-button svg {
+  display: block;
+  flex-shrink: 0;
+  pointer-events: none;
 }
 
 .leaflet-draw-button:hover {
@@ -733,5 +759,11 @@ onBeforeUnmount(() => {
 .leaflet-edit-button.active {
   background: #3388ff;
   color: white;
+}
+
+.leaflet-edit-button.active svg path,
+.leaflet-edit-button.active svg circle,
+.leaflet-edit-button.active svg rect {
+  stroke: white;
 }
 </style>
