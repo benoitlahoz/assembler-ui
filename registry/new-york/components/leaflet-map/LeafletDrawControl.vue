@@ -142,18 +142,18 @@ const createButton = (container: HTMLElement, type: string, icon: string, title:
 const createEditButton = (container: HTMLElement) => {
   const button = L.value!.DomUtil.create('a', 'leaflet-draw-button leaflet-edit-button', container);
   button.href = '#';
-  button.title = 'Éditer / Dessiner';
+  button.title = 'Activer le mode Édition';
   button.innerHTML = '✏️';
   button.setAttribute('role', 'button');
-  button.setAttribute('aria-label', 'Éditer / Dessiner');
+  button.setAttribute('aria-label', 'Mode Édition');
 
   const updateButtonState = () => {
     if (editMode.value) {
       button.classList.add('active');
-      button.title = 'Mode Édition (cliquez pour dessiner)';
+      button.title = 'Mode Édition activé (cliquez pour désactiver)';
     } else {
       button.classList.remove('active');
-      button.title = 'Mode Dessin (cliquez pour éditer)';
+      button.title = 'Activer le mode Édition';
     }
   };
 
@@ -170,8 +170,8 @@ const createEditButton = (container: HTMLElement) => {
 const toggleEditMode = () => {
   editMode.value = !editMode.value;
 
-  // Si on passe en mode edit, désactiver le mode dessin actif
-  if (editMode.value && activeMode.value) {
+  // Si on désactive le mode edit, désactiver aussi le mode dessin actif
+  if (!editMode.value && activeMode.value) {
     disableHandler(activeMode.value);
     activeMode.value = null;
   }
@@ -180,10 +180,11 @@ const toggleEditMode = () => {
 };
 
 const toggleDrawMode = (type: string) => {
-  // Si on active un mode de dessin, désactiver le mode edit
-  if (editMode.value) {
-    editMode.value = false;
-    emit('edit-mode-change', false);
+  // Les outils de dessin ne fonctionnent qu'en mode édition
+  if (!editMode.value) {
+    // Activer automatiquement le mode édition
+    editMode.value = true;
+    emit('edit-mode-change', true);
   }
 
   if (activeMode.value === type) {
@@ -263,9 +264,10 @@ const createMarkerHandler = (options: DrawHandlerOptions) => {
 
     emit('draw:created', event);
 
-    if (drawnItems.value) {
-      drawnItems.value.addLayer(marker);
-    }
+    // Note: Ne pas ajouter à drawnItems ici - laisser le parent gérer via @draw:created
+    // if (drawnItems.value) {
+    //   drawnItems.value.addLayer(marker);
+    // }
 
     if (!options.repeatMode) {
       disable();
@@ -327,9 +329,10 @@ const createCircleHandler = (options: DrawHandlerOptions) => {
 
         emit('draw:created', event);
 
-        if (drawnItems.value) {
-          drawnItems.value.addLayer(circle);
-        }
+        // Note: Ne pas ajouter à drawnItems ici - laisser le parent gérer via @draw:created
+        // if (drawnItems.value) {
+        //   drawnItems.value.addLayer(circle);
+        // }
       }
 
       centerLatLng = null;
@@ -423,9 +426,10 @@ const createPolylineHandler = (options: DrawHandlerOptions) => {
 
       emit('draw:created', event);
 
-      if (drawnItems.value) {
-        drawnItems.value.addLayer(polyline);
-      }
+      // Note: Ne pas ajouter à drawnItems ici - laisser le parent gérer via @draw:created
+      // if (drawnItems.value) {
+      //   drawnItems.value.addLayer(polyline);
+      // }
     }
 
     cleanup();
@@ -523,9 +527,10 @@ const createPolygonHandler = (options: DrawHandlerOptions) => {
 
       emit('draw:created', event);
 
-      if (drawnItems.value) {
-        drawnItems.value.addLayer(polygon);
-      }
+      // Note: Ne pas ajouter à drawnItems ici - laisser le parent gérer via @draw:created
+      // if (drawnItems.value) {
+      //   drawnItems.value.addLayer(polygon);
+      // }
     }
 
     cleanup();
@@ -602,9 +607,10 @@ const createRectangleHandler = (options: DrawHandlerOptions) => {
 
       emit('draw:created', event);
 
-      if (drawnItems.value) {
-        drawnItems.value.addLayer(rectangle);
-      }
+      // Note: Ne pas ajouter à drawnItems ici - laisser le parent gérer via @draw:created
+      // if (drawnItems.value) {
+      //   drawnItems.value.addLayer(rectangle);
+      // }
 
       startLatLng = null;
       tempRectangle = null;

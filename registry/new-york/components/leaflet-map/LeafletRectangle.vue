@@ -149,14 +149,16 @@ const createCenterMarker = () => {
   const bounds = rectangle.value.getBounds();
   const center = bounds.getCenter();
 
-  centerMarker.value = L.value.marker(center, {
-    draggable: true,
-    icon: L.value.divIcon({
-      className: 'leaflet-editing-icon-center',
-      html: '<div style="width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #ff8800;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
-      iconSize: [10, 10],
-    }),
-  }).addTo(map.value);
+  centerMarker.value = L.value
+    .marker(center, {
+      draggable: true,
+      icon: L.value.divIcon({
+        className: 'leaflet-editing-icon-center',
+        html: '<div style="width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #ff8800;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
+        iconSize: [10, 10],
+      }),
+    })
+    .addTo(map.value);
 
   let startBounds: L.LatLngBounds | null = null;
   let startCenter: L.LatLng | null = null;

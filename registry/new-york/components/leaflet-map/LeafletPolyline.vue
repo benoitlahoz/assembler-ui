@@ -110,20 +110,22 @@ const createMidpoints = () => {
   for (let i = 0; i < latlngs.length - 1; i++) {
     const current = latlngs[i];
     const next = latlngs[i + 1];
-    
+
     if (!current || !next) continue;
 
     const midLat = (current.lat + next.lat) / 2;
     const midLng = (current.lng + next.lng) / 2;
 
-    const midMarker = L.value.marker([midLat, midLng], {
-      draggable: true,
-      icon: L.value.divIcon({
-        className: 'leaflet-editing-icon-midpoint',
-        html: '<div style="width:6px;height:6px;border-radius:50%;background:#fff;border:2px solid #3388ff;opacity:0.6;"></div>',
-        iconSize: [6, 6],
-      }),
-    }).addTo(map.value);
+    const midMarker = L.value
+      .marker([midLat, midLng], {
+        draggable: true,
+        icon: L.value.divIcon({
+          className: 'leaflet-editing-icon-midpoint',
+          html: '<div style="width:6px;height:6px;border-radius:50%;background:#fff;border:2px solid #3388ff;opacity:0.6;"></div>',
+          iconSize: [6, 6],
+        }),
+      })
+      .addTo(map.value);
 
     let pointAdded = false;
 
@@ -134,7 +136,7 @@ const createMidpoints = () => {
     midMarker.on('drag', () => {
       const newPos = midMarker.getLatLng();
       const currentLatlngs = polyline.value!.getLatLngs() as L.LatLng[];
-      
+
       if (!pointAdded) {
         const newLatlngs = [...currentLatlngs];
         newLatlngs.splice(i + 1, 0, newPos);

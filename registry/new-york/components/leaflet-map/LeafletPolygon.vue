@@ -145,20 +145,22 @@ const createMidpoints = () => {
     const nextIndex = (i + 1) % latlngs.length;
     const current = latlngs[i];
     const next = latlngs[nextIndex];
-    
+
     if (!current || !next) continue;
 
     const midLat = (current.lat + next.lat) / 2;
     const midLng = (current.lng + next.lng) / 2;
 
-    const midMarker = L.value.marker([midLat, midLng], {
-      draggable: true,
-      icon: L.value.divIcon({
-        className: 'leaflet-editing-icon-midpoint',
-        html: '<div style="width:6px;height:6px;border-radius:50%;background:#fff;border:2px solid #3388ff;opacity:0.6;"></div>',
-        iconSize: [6, 6],
-      }),
-    }).addTo(map.value);
+    const midMarker = L.value
+      .marker([midLat, midLng], {
+        draggable: true,
+        icon: L.value.divIcon({
+          className: 'leaflet-editing-icon-midpoint',
+          html: '<div style="width:6px;height:6px;border-radius:50%;background:#fff;border:2px solid #3388ff;opacity:0.6;"></div>',
+          iconSize: [6, 6],
+        }),
+      })
+      .addTo(map.value);
 
     let pointAdded = false;
 
@@ -169,7 +171,7 @@ const createMidpoints = () => {
     midMarker.on('drag', () => {
       const newPos = midMarker.getLatLng();
       const currentLatlngs = polygon.value!.getLatLngs()[0] as L.LatLng[];
-      
+
       if (!pointAdded) {
         // Ajouter le nouveau point
         const newLatlngs = [...currentLatlngs];
@@ -214,14 +216,16 @@ const createCenterMarker = () => {
   const bounds = polygon.value.getBounds();
   const center = bounds.getCenter();
 
-  centerMarker.value = L.value.marker(center, {
-    draggable: true,
-    icon: L.value.divIcon({
-      className: 'leaflet-editing-icon-center',
-      html: '<div style="width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #ff8800;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
-      iconSize: [10, 10],
-    }),
-  }).addTo(map.value);
+  centerMarker.value = L.value
+    .marker(center, {
+      draggable: true,
+      icon: L.value.divIcon({
+        className: 'leaflet-editing-icon-center',
+        html: '<div style="width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #ff8800;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
+        iconSize: [10, 10],
+      }),
+    })
+    .addTo(map.value);
 
   let startLatLngs: L.LatLng[] = [];
   let startCenter: L.LatLng | null = null;

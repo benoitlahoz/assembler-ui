@@ -87,6 +87,77 @@ const handleEditModeChange = (enabled: boolean) => {
   editableShapes.value.rectangles = enabled;
 };
 
+// Gestion de la création de nouvelles formes
+const handleShapeCreated = (event: any) => {
+  const { layer, layerType } = event;
+
+  switch (layerType) {
+    case 'marker': {
+      const latlng = layer.getLatLng();
+      const newId = markers.value.length > 0 ? Math.max(...markers.value.map((m) => m.id)) + 1 : 1;
+      markers.value.push({
+        id: newId,
+        lat: latlng.lat,
+        lng: latlng.lng,
+        label: `Marker ${newId}`,
+      });
+      break;
+    }
+    case 'circle': {
+      const latlng = layer.getLatLng();
+      const radius = layer.getRadius();
+      const newId = circles.value.length > 0 ? Math.max(...circles.value.map((c) => c.id)) + 1 : 1;
+      circles.value.push({
+        id: newId,
+        lat: latlng.lat,
+        lng: latlng.lng,
+        radius: radius,
+        class: 'text-blue-500 bg-blue-500/20',
+      });
+      break;
+    }
+    case 'polyline': {
+      const latlngs = layer.getLatLngs().map((ll: any) => [ll.lat, ll.lng] as [number, number]);
+      const newId =
+        polylines.value.length > 0 ? Math.max(...polylines.value.map((p) => p.id)) + 1 : 1;
+      polylines.value.push({
+        id: newId,
+        latlngs: latlngs,
+        class: 'text-red-500',
+        weight: 4,
+      });
+      break;
+    }
+    case 'polygon': {
+      const latlngs = layer.getLatLngs()[0].map((ll: any) => [ll.lat, ll.lng] as [number, number]);
+      const newId =
+        polygons.value.length > 0 ? Math.max(...polygons.value.map((p) => p.id)) + 1 : 1;
+      polygons.value.push({
+        id: newId,
+        latlngs: latlngs,
+        class: 'text-purple-500 bg-purple-500/30',
+      });
+      break;
+    }
+    case 'rectangle': {
+      const bounds = layer.getBounds();
+      const newId =
+        rectangles.value.length > 0 ? Math.max(...rectangles.value.map((r) => r.id)) + 1 : 1;
+      rectangles.value.push({
+        id: newId,
+        bounds: [
+          [bounds.getSouth(), bounds.getWest()],
+          [bounds.getNorth(), bounds.getEast()],
+        ] as [[number, number], [number, number]],
+        class: 'text-orange-500 bg-orange-500/20',
+      });
+      break;
+    }
+  }
+
+  console.log(`Nouvelle forme créée: ${layerType}`, event);
+};
+
 // Gestion des mises à jour
 const updateMarker = (id: number, lat: number, lng: number) => {
   const marker = markers.value.find((m) => m.id === id);
@@ -147,8 +218,8 @@ const onPolygonClosed = (id: number) => {
       <p class="text-sm text-gray-600">
         {{
           editMode
-            ? 'Mode édition activé - Déplacez les formes'
-            : 'Mode dessin - Créez de nouvelles formes'
+            ? 'Mode édition activé - Modifiez et ajoutez des formes'
+            : "Mode visualisation - Activez l'édition pour interagir"
         }}
       </p>
     </div>
@@ -157,8 +228,9 @@ const onPolygonClosed = (id: number) => {
       class="p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800"
       v-if="editMode"
     >
-      💡 <strong>Mode édition :</strong> Déplacez les marqueurs et modifiez les cercles (points
-      blancs). Les polylignes, polygones et rectangles sont déplaçables - cliquez et faites glisser.
+      💡 <strong>Mode édition :</strong> Modifiez les formes existantes (déplacez les points bleus,
+      le point orange central) et utilisez les outils de dessin pour ajouter de nouvelles formes.
+      Les petits points semi-transparents permettent d'ajouter des points intermédiaires.
     </div>
 
     <!-- Carte -->
@@ -191,6 +263,7 @@ const onPolygonClosed = (id: number) => {
             rectangle: true,
           }"
           @edit-mode-change="handleEditModeChange"
+          @draw:created="handleShapeCreated"
         />
 
         <!-- Marqueurs avec v-for -->
