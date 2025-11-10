@@ -129,6 +129,7 @@ type L = typeof L;
 export { default as LeafletMap } from "./LeafletMap.vue";
 export { default as LeafletZoomControl } from "./LeafletZoomControl.vue";
 export { default as LeafletDrawControl } from "./LeafletDrawControl.vue";
+export { default as LeafletFeaturesEditor } from "./LeafletFeaturesEditor.vue";
 export { default as LeafletTileLayer } from "./LeafletTileLayer.vue";
 export { default as LeafletMarker } from "./LeafletMarker.vue";
 export { default as LeafletCircle } from "./LeafletCircle.vue";
@@ -149,10 +150,11 @@ export const LeafletErrorsKey: InjectionKey<Ref<Error[]>> =
 export type { LeafletMapProps } from "./LeafletMap.vue";
 export type { LeafletMapExposed } from "./LeafletMap.vue";
 export type { LeafletZoomControlProps } from "./LeafletZoomControl.vue";
+export type { LeafletDrawControlProps } from "./LeafletDrawControl.vue";
 export type {
-  LeafletDrawControlProps,
+  LeafletFeaturesEditorProps,
   DrawEvent,
-} from "./LeafletDrawControl.vue";
+} from "./LeafletFeaturesEditor.vue";
 export type { LeafletTileLayerProps } from "./LeafletTileLayer.vue";
 export type { LeafletMarkerProps } from "./LeafletMarker.vue";
 export type { LeafletCircleProps } from "./LeafletCircle.vue";
@@ -570,22 +572,14 @@ onBeforeUnmount(() => {
 <template><slot /></template>
 ```
 
-```vue [src/components/ui/leaflet-map/LeafletDrawControl.vue]
+```vue [src/components/ui/leaflet-map/LeafletDrawControl.old.vue]
 <script setup lang="ts">
 import { ref, inject, watch, onBeforeUnmount, nextTick } from "vue";
-import {
-  type ControlOptions,
-  type Layer,
-  type LatLng,
-  type LeafletEvent,
-  type FeatureGroup,
-} from "leaflet";
+import type { ControlOptions } from "leaflet";
 import { LeafletMapKey, LeafletModuleKey } from ".";
 
 export interface DrawHandlerOptions {
   enabled?: boolean;
-  shapeOptions?: any;
-  repeatMode?: boolean;
 }
 
 export interface LeafletDrawControlProps {
@@ -598,16 +592,6 @@ export interface LeafletDrawControlProps {
     polygon?: DrawHandlerOptions | boolean;
     rectangle?: DrawHandlerOptions | boolean;
   };
-  edit?: {
-    edit?: boolean;
-    remove?: boolean;
-  };
-}
-
-export interface DrawEvent {
-  layer: Layer;
-  layerType: string;
-  type: string;
 }
 
 const props = withDefaults(defineProps<LeafletDrawControlProps>(), {
@@ -616,11 +600,7 @@ const props = withDefaults(defineProps<LeafletDrawControlProps>(), {
 });
 
 const emit = defineEmits<{
-  (e: "draw:created", event: DrawEvent): void;
-  (e: "draw:edited", event: { layers: Layer[] }): void;
-  (e: "draw:deleted", event: { layers: Layer[] }): void;
-  (e: "draw:drawstart", event: { layerType: string }): void;
-  (e: "draw:drawstop", event: { layerType: string }): void;
+  (e: "mode-selected", mode: string | null): void;
 }>();
 
 const L = inject(LeafletModuleKey, ref());
@@ -628,8 +608,6 @@ const map = inject(LeafletMapKey, ref(null));
 
 const control = ref<any>(null);
 const activeMode = ref<string | null>(null);
-const handlers = ref<Map<string, any>>(new Map());
-const drawnItems = ref<any>(null);
 
 const createDrawControl = () => {
   if (!L.value || !map.value) return;
@@ -1357,6 +1335,867 @@ onBeforeUnmount(() => {
   border-bottom: none;
 }
 </style>
+```
+
+```vue [src/components/ui/leaflet-map/LeafletDrawControl.vue]
+<script setup lang="ts">
+import { ref, inject, watch, onBeforeUnmount, nextTick } from "vue";
+import type { ControlOptions } from "leaflet";
+import { LeafletMapKey, LeafletModuleKey } from ".";
+
+export interface DrawButton {
+  enabled?: boolean;
+}
+
+export interface LeafletDrawControlProps {
+  position?: ControlOptions["position"];
+  editMode?: boolean;
+  activeMode?: string | null;
+  draw?: {
+    marker?: DrawButton | boolean;
+    circle?: DrawButton | boolean;
+    polyline?: DrawButton | boolean;
+    polygon?: DrawButton | boolean;
+    rectangle?: DrawButton | boolean;
+  };
+}
+
+const props = withDefaults(defineProps<LeafletDrawControlProps>(), {
+  position: "topright",
+  editMode: false,
+  activeMode: null,
+});
+
+const emit = defineEmits<{
+  (e: "mode-selected", mode: string | null): void;
+}>();
+
+const L = inject(LeafletModuleKey, ref());
+const map = inject(LeafletMapKey, ref(null));
+
+const control = ref<any>(null);
+
+const shouldEnableButton = (type: string): boolean => {
+  if (!props.draw) return false;
+  const config = props.draw[type as keyof typeof props.draw];
+  if (config === undefined) return false;
+  if (typeof config === "boolean") return config;
+  return config.enabled !== false;
+};
+
+const getIconSvg = (type: string): string => {
+  const color = "#333";
+  const svgs: Record<string, string> = {
+    marker: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}"/></svg>`,
+    circle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="${color}" stroke-width="2.5" fill="none"/></svg>`,
+    polyline: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 17 L8 12 L13 15 L21 7" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="3" cy="17" r="2.5" fill="${color}"/><circle cx="8" cy="12" r="2.5" fill="${color}"/><circle cx="13" cy="15" r="2.5" fill="${color}"/><circle cx="21" cy="7" r="2.5" fill="${color}"/></svg>`,
+    polygon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3 L21 8 L18 17 L6 17 L3 8 Z" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="12" cy="3" r="2.5" fill="${color}"/><circle cx="21" cy="8" r="2.5" fill="${color}"/><circle cx="18" cy="17" r="2.5" fill="${color}"/><circle cx="6" cy="17" r="2.5" fill="${color}"/><circle cx="3" cy="8" r="2.5" fill="${color}"/></svg>`,
+    rectangle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="6" width="16" height="12" stroke="${color}" stroke-width="2.5" rx="1" fill="none"/></svg>`,
+  };
+  return svgs[type] || "";
+};
+
+const createButton = (container: HTMLElement, type: string, title: string) => {
+  const button = L.value!.DomUtil.create(
+    "div",
+    "leaflet-draw-button",
+    container,
+  );
+  button.title = title;
+  button.innerHTML = getIconSvg(type);
+  button.setAttribute("role", "button");
+  button.setAttribute("aria-label", title);
+  button.setAttribute("tabindex", "0");
+  button.dataset.toolType = type;
+
+  L.value!.DomEvent.on(button, "click", (e: Event) => {
+    L.value!.DomEvent.preventDefault(e);
+    toggleDrawMode(type);
+  });
+
+  return button;
+};
+
+const toggleDrawMode = (type: string) => {
+  if (props.activeMode === type) {
+    emit("mode-selected", null);
+  } else {
+    emit("mode-selected", type);
+  }
+};
+
+const updateActiveButton = () => {
+  if (!control.value) return;
+
+  const container = control.value.getContainer();
+  if (!container) return;
+
+  const buttons = container.querySelectorAll(".leaflet-draw-button");
+  buttons.forEach((button: Element) => {
+    const htmlButton = button as HTMLElement;
+    const toolType = htmlButton.dataset.toolType;
+    if (toolType === props.activeMode) {
+      htmlButton.classList.add("leaflet-draw-toolbar-button-enabled");
+    } else {
+      htmlButton.classList.remove("leaflet-draw-toolbar-button-enabled");
+    }
+  });
+};
+
+const createDrawControl = () => {
+  if (!L.value || !map.value) return;
+
+  const DrawControl = L.value.Control.extend({
+    options: {
+      position: props.position,
+    },
+
+    onAdd: function () {
+      const container = L.value!.DomUtil.create(
+        "div",
+        "leaflet-draw leaflet-control leaflet-bar",
+      );
+
+      L.value!.DomEvent.disableClickPropagation(container);
+      L.value!.DomEvent.disableScrollPropagation(container);
+
+      if (props.draw) {
+        if (shouldEnableButton("marker")) {
+          createButton(container, "marker", "Draw a marker");
+        }
+        if (shouldEnableButton("circle")) {
+          createButton(container, "circle", "Draw a circle");
+        }
+        if (shouldEnableButton("polyline")) {
+          createButton(container, "polyline", "Draw a polyline");
+        }
+        if (shouldEnableButton("polygon")) {
+          createButton(container, "polygon", "Draw a polygon");
+        }
+        if (shouldEnableButton("rectangle")) {
+          createButton(container, "rectangle", "Draw a rectangle");
+        }
+      }
+
+      return container;
+    },
+
+    onRemove: function () {},
+  });
+
+  control.value = new DrawControl();
+  control.value.addTo(map.value);
+};
+
+watch(
+  () => props.activeMode,
+  () => {
+    nextTick(() => {
+      updateActiveButton();
+    });
+  },
+);
+
+watch(
+  [map, () => props.editMode],
+  ([newMap, newEditMode]) => {
+    if (newMap && newEditMode) {
+      if (!control.value) {
+        nextTick(() => {
+          createDrawControl();
+        });
+      } else if (!control.value._map) {
+        control.value.addTo(newMap);
+      }
+    } else if (control.value && control.value._map) {
+      control.value.remove();
+    }
+  },
+  { immediate: true },
+);
+
+onBeforeUnmount(() => {
+  if (control.value && map.value) {
+    try {
+      control.value.remove();
+    } catch (e) {}
+  }
+});
+</script>
+
+<template></template>
+
+<style>
+.leaflet-draw-button {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: white;
+  border: none;
+  transition: background-color 0.2s;
+}
+
+.leaflet-draw-button:hover {
+  background-color: #f4f4f4;
+}
+
+.leaflet-draw-button:active {
+  background-color: #e0e0e0;
+}
+
+.leaflet-draw-toolbar-button-enabled {
+  background-color: #e8f4f8;
+}
+
+.leaflet-draw-toolbar-button-enabled:hover {
+  background-color: #d4e9f2;
+}
+
+.leaflet-bar {
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
+  border-radius: 4px;
+}
+
+.leaflet-bar .leaflet-draw-button:first-child {
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+}
+
+.leaflet-bar .leaflet-draw-button:last-child {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.leaflet-bar .leaflet-draw-button:not(:last-child) {
+  border-bottom: 1px solid #ccc;
+}
+</style>
+```
+
+```vue [src/components/ui/leaflet-map/LeafletFeaturesEditor.vue]
+<script setup lang="ts">
+import { ref, inject, watch, onBeforeUnmount } from "vue";
+import type { Layer, LatLng, LeafletMouseEvent } from "leaflet";
+import { LeafletMapKey, LeafletModuleKey } from ".";
+
+export interface DrawHandlerOptions {
+  enabled?: boolean;
+  shapeOptions?: any;
+  repeatMode?: boolean;
+}
+
+export interface LeafletFeaturesEditorProps {
+  enabled?: boolean;
+  mode?: "marker" | "circle" | "polyline" | "polygon" | "rectangle" | null;
+  shapeOptions?: any;
+  repeatMode?: boolean;
+}
+
+export interface DrawEvent {
+  layer: Layer;
+  layerType: string;
+  type: string;
+}
+
+const props = withDefaults(defineProps<LeafletFeaturesEditorProps>(), {
+  enabled: false,
+  mode: null,
+  repeatMode: false,
+});
+
+const emit = defineEmits<{
+  (e: "draw:created", event: DrawEvent): void;
+  (e: "draw:drawstart", event: { layerType: string }): void;
+  (e: "draw:drawstop", event: { layerType: string }): void;
+  (e: "mode-changed", mode: string | null): void;
+}>();
+
+const L = inject(LeafletModuleKey, ref());
+const map = inject(LeafletMapKey, ref(null));
+
+const activeHandler = ref<any>(null);
+
+const createMarkerHandler = () => {
+  if (!map.value || !L.value) return null;
+
+  let enabled = false;
+
+  const clickHandler = (e: LeafletMouseEvent) => {
+    if (!enabled || !L.value) return;
+
+    const marker = L.value.marker(e.latlng, props.shapeOptions || {});
+
+    const event: DrawEvent = {
+      layer: marker,
+      layerType: "marker",
+      type: "draw:created",
+    };
+
+    emit("draw:created", event);
+
+    if (!props.repeatMode) {
+      disable();
+    }
+  };
+
+  const enable = () => {
+    if (!map.value) return;
+    enabled = true;
+    map.value.getContainer().style.cursor = "crosshair";
+    map.value.on("click", clickHandler);
+    emit("draw:drawstart", { layerType: "marker" });
+  };
+
+  const disable = () => {
+    if (!map.value) return;
+    enabled = false;
+    map.value.getContainer().style.cursor = "";
+    map.value.off("click", clickHandler);
+    emit("draw:drawstop", { layerType: "marker" });
+    emit("mode-changed", null);
+  };
+
+  return { enable, disable };
+};
+
+const createCircleHandler = () => {
+  if (!map.value || !L.value) return null;
+
+  let enabled = false;
+  let centerLatLng: LatLng | null = null;
+  let tempCircle: L.Circle | null = null;
+
+  const clickHandler = (e: LeafletMouseEvent) => {
+    if (!enabled || !L.value || !map.value) return;
+
+    if (!centerLatLng) {
+      centerLatLng = e.latlng;
+      tempCircle = L.value.circle(centerLatLng, {
+        ...props.shapeOptions,
+        radius: 1,
+      });
+      tempCircle.addTo(map.value);
+    } else {
+      const radius = map.value.distance(centerLatLng, e.latlng);
+      const circle = L.value.circle(centerLatLng, {
+        ...props.shapeOptions,
+        radius,
+      });
+
+      const event: DrawEvent = {
+        layer: circle,
+        layerType: "circle",
+        type: "draw:created",
+      };
+
+      emit("draw:created", event);
+
+      cleanup();
+
+      if (!props.repeatMode) {
+        disable();
+      }
+    }
+  };
+
+  const mouseMoveHandler = (e: LeafletMouseEvent) => {
+    if (!enabled || !centerLatLng || !tempCircle || !map.value) return;
+    const radius = map.value.distance(centerLatLng, e.latlng);
+    tempCircle.setRadius(radius);
+  };
+
+  const cleanup = () => {
+    if (tempCircle) {
+      tempCircle.remove();
+      tempCircle = null;
+    }
+    centerLatLng = null;
+  };
+
+  const enable = () => {
+    if (!map.value) return;
+    enabled = true;
+    map.value.getContainer().style.cursor = "crosshair";
+    map.value.on("click", clickHandler);
+    map.value.on("mousemove", mouseMoveHandler);
+    emit("draw:drawstart", { layerType: "circle" });
+  };
+
+  const disable = () => {
+    if (!map.value) return;
+    enabled = false;
+    map.value.getContainer().style.cursor = "";
+    map.value.off("click", clickHandler);
+    map.value.off("mousemove", mouseMoveHandler);
+    cleanup();
+    emit("draw:drawstop", { layerType: "circle" });
+    emit("mode-changed", null);
+  };
+
+  return { enable, disable };
+};
+
+const createPolylineHandler = () => {
+  if (!map.value || !L.value) return null;
+
+  let enabled = false;
+  let latlngs: LatLng[] = [];
+  let tempPolyline: L.Polyline | null = null;
+  let tempMarkers: L.CircleMarker[] = [];
+
+  const clickHandler = (e: LeafletMouseEvent) => {
+    if (!enabled || !L.value || !map.value) return;
+
+    latlngs.push(e.latlng);
+
+    const marker = L.value.circleMarker(e.latlng, {
+      radius: 4,
+      color: "#3388ff",
+    });
+    marker.addTo(map.value);
+    tempMarkers.push(marker);
+
+    if (latlngs.length === 1) {
+      tempPolyline = L.value.polyline(latlngs, {
+        ...props.shapeOptions,
+        dashArray: "5, 5",
+      });
+      tempPolyline.addTo(map.value);
+    } else if (tempPolyline) {
+      tempPolyline.setLatLngs(latlngs);
+    }
+  };
+
+  const dblClickHandler = (e: LeafletMouseEvent) => {
+    if (!enabled || !L.value || latlngs.length < 2) return;
+
+    L.value.DomEvent.stop(e);
+
+    latlngs.pop();
+
+    if (latlngs.length >= 2) {
+      const polyline = L.value.polyline(latlngs, props.shapeOptions);
+
+      const event: DrawEvent = {
+        layer: polyline,
+        layerType: "polyline",
+        type: "draw:created",
+      };
+
+      emit("draw:created", event);
+    }
+
+    cleanup();
+
+    if (!props.repeatMode) {
+      disable();
+    }
+  };
+
+  const mouseMoveHandler = (e: LeafletMouseEvent) => {
+    if (!enabled || !tempPolyline || latlngs.length === 0) return;
+    const previewLatLngs = [...latlngs, e.latlng];
+    tempPolyline.setLatLngs(previewLatLngs);
+  };
+
+  const cleanup = () => {
+    if (tempPolyline) {
+      tempPolyline.remove();
+      tempPolyline = null;
+    }
+    tempMarkers.forEach((m) => m.remove());
+    tempMarkers = [];
+    latlngs = [];
+  };
+
+  const enable = () => {
+    if (!map.value) return;
+    enabled = true;
+    map.value.getContainer().style.cursor = "crosshair";
+    map.value.on("click", clickHandler);
+    map.value.on("dblclick", dblClickHandler);
+    map.value.on("mousemove", mouseMoveHandler);
+    emit("draw:drawstart", { layerType: "polyline" });
+  };
+
+  const disable = () => {
+    if (!map.value) return;
+    enabled = false;
+    map.value.getContainer().style.cursor = "";
+    map.value.off("click", clickHandler);
+    map.value.off("dblclick", dblClickHandler);
+    map.value.off("mousemove", mouseMoveHandler);
+    cleanup();
+    emit("draw:drawstop", { layerType: "polyline" });
+    emit("mode-changed", null);
+  };
+
+  return { enable, disable };
+};
+
+const createPolygonHandler = () => {
+  if (!map.value || !L.value) return null;
+
+  let enabled = false;
+  let latlngs: LatLng[] = [];
+  let tempPolygon: L.Polygon | null = null;
+  let tempMarkers: L.CircleMarker[] = [];
+  let firstPointMarker: L.CircleMarker | null = null;
+  let snapCircle: L.CircleMarker | null = null;
+
+  const finishPolygon = () => {
+    if (!L.value || !map.value || latlngs.length < 3) return;
+
+    const polygon = L.value.polygon(latlngs, props.shapeOptions);
+
+    const event: DrawEvent = {
+      layer: polygon,
+      layerType: "polygon",
+      type: "draw:created",
+    };
+
+    emit("draw:created", event);
+    cleanup();
+
+    if (!props.repeatMode) {
+      disable();
+    }
+  };
+
+  const clickHandler = (e: LeafletMouseEvent) => {
+    if (!enabled || !L.value || !map.value) return;
+
+    if (latlngs.length >= 3 && firstPointMarker && latlngs[0]) {
+      const clickPixel = map.value.latLngToContainerPoint(e.latlng);
+      const firstPixel = map.value.latLngToContainerPoint(latlngs[0]);
+      const distance = Math.sqrt(
+        Math.pow(clickPixel.x - firstPixel.x, 2) +
+          Math.pow(clickPixel.y - firstPixel.y, 2),
+      );
+
+      if (distance < 15) {
+        finishPolygon();
+        return;
+      }
+    }
+
+    latlngs.push(e.latlng);
+
+    const marker = L.value.circleMarker(e.latlng, {
+      radius: 4,
+      color: "#3388ff",
+    });
+    marker.addTo(map.value);
+    tempMarkers.push(marker);
+
+    if (latlngs.length === 1) {
+      firstPointMarker = marker;
+      firstPointMarker.setStyle({
+        radius: 6,
+        color: "#3388ff",
+        fillColor: "#ffffff",
+        fillOpacity: 1,
+        weight: 3,
+      });
+
+      tempPolygon = L.value.polygon(latlngs, {
+        ...props.shapeOptions,
+        dashArray: "5, 5",
+      });
+      tempPolygon.addTo(map.value);
+    } else if (tempPolygon) {
+      tempPolygon.setLatLngs(latlngs);
+    }
+  };
+
+  const dblClickHandler = (e: LeafletMouseEvent) => {
+    if (!enabled || !L.value || !map.value || latlngs.length < 3) return;
+
+    L.value.DomEvent.stop(e);
+
+    latlngs.pop();
+
+    if (latlngs.length >= 3) {
+      const polygon = L.value.polygon(latlngs, props.shapeOptions);
+
+      const event: DrawEvent = {
+        layer: polygon,
+        layerType: "polygon",
+        type: "draw:created",
+      };
+
+      emit("draw:created", event);
+    }
+
+    cleanup();
+
+    if (!props.repeatMode) {
+      disable();
+    }
+  };
+
+  const mouseMoveHandler = (e: LeafletMouseEvent) => {
+    if (
+      !enabled ||
+      !tempPolygon ||
+      latlngs.length === 0 ||
+      !map.value ||
+      !L.value
+    )
+      return;
+
+    let mousePos = e.latlng;
+
+    if (latlngs.length >= 3 && firstPointMarker && latlngs[0]) {
+      const mousePixel = map.value.latLngToContainerPoint(e.latlng);
+      const firstPixel = map.value.latLngToContainerPoint(latlngs[0]);
+      const distance = Math.sqrt(
+        Math.pow(mousePixel.x - firstPixel.x, 2) +
+          Math.pow(mousePixel.y - firstPixel.y, 2),
+      );
+
+      const snapThreshold = 30;
+      const isNearFirstPoint = distance < snapThreshold;
+
+      if (isNearFirstPoint) {
+        mousePos = latlngs[0];
+
+        if (!snapCircle) {
+          snapCircle = L.value.circleMarker(latlngs[0], {
+            radius: 20,
+            color: "#ff0000",
+            fillColor: "#ff0000",
+            fillOpacity: 0.3,
+            weight: 3,
+            opacity: 0.8,
+            interactive: false,
+          });
+          snapCircle.addTo(map.value);
+        } else {
+          snapCircle.setStyle({ opacity: 0.8, fillOpacity: 0.3 });
+        }
+
+        firstPointMarker.setStyle({ radius: 9 });
+
+        map.value.getContainer().style.cursor = "pointer";
+      } else {
+        if (snapCircle) {
+          snapCircle.setStyle({ opacity: 0, fillOpacity: 0 });
+        }
+
+        if (firstPointMarker) {
+          firstPointMarker.setStyle({ radius: 6 });
+        }
+
+        map.value.getContainer().style.cursor = "crosshair";
+      }
+    }
+
+    const previewLatLngs = [...latlngs, mousePos];
+    tempPolygon.setLatLngs(previewLatLngs);
+  };
+
+  const cleanup = () => {
+    if (tempPolygon) {
+      tempPolygon.remove();
+      tempPolygon = null;
+    }
+    tempMarkers.forEach((m) => m.remove());
+    tempMarkers = [];
+    if (snapCircle) {
+      snapCircle.remove();
+      snapCircle = null;
+    }
+    firstPointMarker = null;
+    latlngs = [];
+  };
+
+  const enable = () => {
+    if (!map.value) return;
+    enabled = true;
+    map.value.getContainer().style.cursor = "crosshair";
+    map.value.on("click", clickHandler);
+    map.value.on("dblclick", dblClickHandler);
+    map.value.on("mousemove", mouseMoveHandler);
+    emit("draw:drawstart", { layerType: "polygon" });
+  };
+
+  const disable = () => {
+    if (!map.value) return;
+    enabled = false;
+    map.value.getContainer().style.cursor = "";
+    map.value.off("click", clickHandler);
+    map.value.off("dblclick", dblClickHandler);
+    map.value.off("mousemove", mouseMoveHandler);
+    cleanup();
+    emit("draw:drawstop", { layerType: "polygon" });
+    emit("mode-changed", null);
+  };
+
+  return { enable, disable };
+};
+
+const createRectangleHandler = () => {
+  if (!map.value || !L.value) return null;
+
+  let enabled = false;
+  let startLatLng: LatLng | null = null;
+  let tempRectangle: L.Rectangle | null = null;
+
+  const clickHandler = (e: LeafletMouseEvent) => {
+    if (!enabled || !L.value || !map.value) return;
+
+    if (!startLatLng) {
+      startLatLng = e.latlng;
+      const bounds = L.value.latLngBounds(startLatLng, startLatLng);
+      tempRectangle = L.value.rectangle(bounds, {
+        ...props.shapeOptions,
+        dashArray: "5, 5",
+      });
+      tempRectangle.addTo(map.value);
+    } else {
+      const bounds = L.value.latLngBounds(startLatLng, e.latlng);
+      const rectangle = L.value.rectangle(bounds, props.shapeOptions);
+
+      const event: DrawEvent = {
+        layer: rectangle,
+        layerType: "rectangle",
+        type: "draw:created",
+      };
+
+      emit("draw:created", event);
+
+      cleanup();
+
+      if (!props.repeatMode) {
+        disable();
+      }
+    }
+  };
+
+  const mouseMoveHandler = (e: LeafletMouseEvent) => {
+    if (!enabled || !startLatLng || !tempRectangle || !L.value) return;
+    const bounds = L.value.latLngBounds(startLatLng, e.latlng);
+    tempRectangle.setBounds(bounds);
+  };
+
+  const cleanup = () => {
+    if (tempRectangle) {
+      tempRectangle.remove();
+      tempRectangle = null;
+    }
+    startLatLng = null;
+  };
+
+  const enable = () => {
+    if (!map.value) return;
+    enabled = true;
+    map.value.getContainer().style.cursor = "crosshair";
+    map.value.on("click", clickHandler);
+    map.value.on("mousemove", mouseMoveHandler);
+    emit("draw:drawstart", { layerType: "rectangle" });
+  };
+
+  const disable = () => {
+    if (!map.value) return;
+    enabled = false;
+    map.value.getContainer().style.cursor = "";
+    map.value.off("click", clickHandler);
+    map.value.off("mousemove", mouseMoveHandler);
+    cleanup();
+    emit("draw:drawstop", { layerType: "rectangle" });
+    emit("mode-changed", null);
+  };
+
+  return { enable, disable };
+};
+
+watch(
+  () => props.mode,
+  (newMode, oldMode) => {
+    if (!props.enabled) return;
+
+    if (activeHandler.value) {
+      activeHandler.value.disable();
+      activeHandler.value = null;
+    }
+
+    if (newMode) {
+      let handler = null;
+      switch (newMode) {
+        case "marker":
+          handler = createMarkerHandler();
+          break;
+        case "circle":
+          handler = createCircleHandler();
+          break;
+        case "polyline":
+          handler = createPolylineHandler();
+          break;
+        case "polygon":
+          handler = createPolygonHandler();
+          break;
+        case "rectangle":
+          handler = createRectangleHandler();
+          break;
+      }
+
+      if (handler) {
+        activeHandler.value = handler;
+        handler.enable();
+      }
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.enabled,
+  (enabled) => {
+    if (!enabled && activeHandler.value) {
+      activeHandler.value.disable();
+      activeHandler.value = null;
+      emit("mode-changed", null);
+    } else if (enabled && props.mode && !activeHandler.value) {
+      const modeValue = props.mode;
+      let handler = null;
+      switch (modeValue) {
+        case "marker":
+          handler = createMarkerHandler();
+          break;
+        case "circle":
+          handler = createCircleHandler();
+          break;
+        case "polyline":
+          handler = createPolylineHandler();
+          break;
+        case "polygon":
+          handler = createPolygonHandler();
+          break;
+        case "rectangle":
+          handler = createRectangleHandler();
+          break;
+      }
+
+      if (handler) {
+        activeHandler.value = handler;
+        handler.enable();
+      }
+    }
+  },
+);
+
+onBeforeUnmount(() => {
+  if (activeHandler.value) {
+    activeHandler.value.disable();
+  }
+});
+</script>
+
+<template></template>
 ```
 
 ```vue [src/components/ui/leaflet-map/LeafletMarker.vue]
@@ -2745,7 +3584,7 @@ export const useTailwindClassParser = () => {
 
 ---
 
-## LeafletDrawControl
+## LeafletDrawControlold
 ::hr-underline
 ::
 
@@ -2763,19 +3602,74 @@ export const useTailwindClassParser = () => {
     polygon?: DrawHandlerOptions \| boolean;
     rectangle?: DrawHandlerOptions \| boolean;
   }` | - |  |
-| `edit`{.primary .text-primary} | `{
-    edit?: boolean;
-    remove?: boolean;
+
+  ### Events
+| Name | Description |
+|------|-------------|
+| `mode-selected`{.primary .text-primary} | — |
+
+  ### Inject
+| Key | Default | Type | Description |
+|-----|--------|------|-------------|
+| `LeafletModuleKey`{.primary .text-primary} | `ref()` | `any` | — |
+| `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
+
+---
+
+## LeafletDrawControl
+::hr-underline
+::
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `position`{.primary .text-primary} | `ControlOptions['position']` | topright |  |
+| `editMode`{.primary .text-primary} | `boolean` | false |  |
+| `activeMode`{.primary .text-primary} | `string \| null` |  |  |
+| `draw`{.primary .text-primary} | `{
+    marker?: DrawButton \| boolean;
+    circle?: DrawButton \| boolean;
+    polyline?: DrawButton \| boolean;
+    polygon?: DrawButton \| boolean;
+    rectangle?: DrawButton \| boolean;
   }` | - |  |
 
   ### Events
 | Name | Description |
 |------|-------------|
+| `mode-selected`{.primary .text-primary} | — |
+
+  ### Inject
+| Key | Default | Type | Description |
+|-----|--------|------|-------------|
+| `LeafletModuleKey`{.primary .text-primary} | `ref()` | `any` | — |
+| `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
+
+---
+
+## LeafletFeaturesEditor
+::hr-underline
+::
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `enabled`{.primary .text-primary} | `boolean` | false |  |
+| `mode`{.primary .text-primary} | `'marker' \| 'circle' \| 'polyline' \| 'polygon' \| 'rectangle' \| null` |  |  |
+| `shapeOptions`{.primary .text-primary} | `any` | - |  |
+| `repeatMode`{.primary .text-primary} | `boolean` | false |  |
+
+  ### Events
+| Name | Description |
+|------|-------------|
 | `draw:created`{.primary .text-primary} | — |
-| `draw:edited`{.primary .text-primary} | — |
-| `draw:deleted`{.primary .text-primary} | — |
 | `draw:drawstart`{.primary .text-primary} | — |
 | `draw:drawstop`{.primary .text-primary} | — |
+| `mode-changed`{.primary .text-primary} | — |
 
   ### Inject
 | Key | Default | Type | Description |
@@ -2960,17 +3854,23 @@ import {
   LeafletTileLayer,
   LeafletZoomControl,
   LeafletDrawControl,
+  LeafletFeaturesEditor,
   LeafletMarker,
   LeafletCircle,
   LeafletPolyline,
   LeafletPolygon,
   LeafletRectangle,
   type LeafletMapExposed,
+  type DrawEvent,
 } from "@/components/ui/leaflet-map";
 
 const mapRef = ref<LeafletMapExposed | null>(null);
 
 const editMode = ref(false);
+
+const currentMode = ref<
+  "marker" | "circle" | "polyline" | "polygon" | "rectangle" | null
+>(null);
 
 const markers = ref([
   { id: 1, lat: 48.8566, lng: 2.3522, label: "Paris" },
@@ -3048,12 +3948,32 @@ watch(editMode, (enabled) => {
   editableShapes.value.rectangles = enabled;
 });
 
-const handleShapeCreated = (event: any) => {
+const handleModeSelected = (mode: string | null) => {
+  currentMode.value = mode as
+    | "marker"
+    | "circle"
+    | "polyline"
+    | "polygon"
+    | "rectangle"
+    | null;
+};
+
+const handleModeChanged = (mode: string | null) => {
+  currentMode.value = mode as
+    | "marker"
+    | "circle"
+    | "polyline"
+    | "polygon"
+    | "rectangle"
+    | null;
+};
+
+const handleShapeCreated = (event: DrawEvent) => {
   const { layer, layerType } = event;
 
   switch (layerType) {
     case "marker": {
-      const latlng = layer.getLatLng();
+      const latlng = (layer as any).getLatLng();
       const newId =
         markers.value.length > 0
           ? Math.max(...markers.value.map((m) => m.id)) + 1
@@ -3067,8 +3987,8 @@ const handleShapeCreated = (event: any) => {
       break;
     }
     case "circle": {
-      const latlng = layer.getLatLng();
-      const radius = layer.getRadius();
+      const latlng = (layer as any).getLatLng();
+      const radius = (layer as any).getRadius();
       const newId =
         circles.value.length > 0
           ? Math.max(...circles.value.map((c) => c.id)) + 1
@@ -3083,7 +4003,7 @@ const handleShapeCreated = (event: any) => {
       break;
     }
     case "polyline": {
-      const latlngs = layer
+      const latlngs = (layer as any)
         .getLatLngs()
         .map((ll: any) => [ll.lat, ll.lng] as [number, number]);
       const newId =
@@ -3099,7 +4019,7 @@ const handleShapeCreated = (event: any) => {
       break;
     }
     case "polygon": {
-      const latlngs = layer
+      const latlngs = (layer as any)
         .getLatLngs()[0]
         .map((ll: any) => [ll.lat, ll.lng] as [number, number]);
       const newId =
@@ -3114,7 +4034,7 @@ const handleShapeCreated = (event: any) => {
       break;
     }
     case "rectangle": {
-      const bounds = layer.getBounds();
+      const bounds = (layer as any).getBounds();
       const newId =
         rectangles.value.length > 0
           ? Math.max(...rectangles.value.map((r) => r.id)) + 1
@@ -3130,8 +4050,6 @@ const handleShapeCreated = (event: any) => {
       break;
     }
   }
-
-  console.log(`Nouvelle forme créée: ${layerType}`, event);
 };
 
 const updateMarker = (id: number, lat: number, lng: number) => {
@@ -3139,7 +4057,6 @@ const updateMarker = (id: number, lat: number, lng: number) => {
   if (marker) {
     marker.lat = lat;
     marker.lng = lng;
-    console.log(`Marker ${id} updated:`, { lat, lng });
   }
 };
 
@@ -3152,7 +4069,6 @@ const updateCircle = (
     if (updates.lat !== undefined) circle.lat = updates.lat;
     if (updates.lng !== undefined) circle.lng = updates.lng;
     if (updates.radius !== undefined) circle.radius = updates.radius;
-    console.log(`Circle ${id} updated:`, updates);
   }
 };
 
@@ -3160,7 +4076,6 @@ const updatePolyline = (id: number, latlngs: Array<[number, number]>) => {
   const polyline = polylines.value.find((p) => p.id === id);
   if (polyline) {
     polyline.latlngs = latlngs;
-    console.log(`Polyline ${id} updated:`, latlngs);
   }
 };
 
@@ -3168,7 +4083,6 @@ const updatePolygon = (id: number, latlngs: Array<[number, number]>) => {
   const polygon = polygons.value.find((p) => p.id === id);
   if (polygon) {
     polygon.latlngs = latlngs;
-    console.log(`Polygon ${id} updated:`, latlngs);
   }
 };
 
@@ -3179,13 +4093,10 @@ const updateRectangle = (
   const rectangle = rectangles.value.find((r) => r.id === id);
   if (rectangle) {
     rectangle.bounds = bounds;
-    console.log(`Rectangle ${id} updated:`, bounds);
   }
 };
 
 const onPolygonClosed = (id: number) => {
-  console.log(`Polygon ${id} closed!`);
-
   editableShapes.value.polygons = false;
 };
 </script>
@@ -3202,7 +4113,7 @@ const onPolygonClosed = (id: number) => {
             : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
         "
       >
-        {{ editMode ? "Désactiver édition" : "Activer édition" }}
+        {{ editMode ? "Disable edition" : "Enable edition" }}
       </Button>
     </div>
 
@@ -3227,6 +4138,7 @@ const onPolygonClosed = (id: number) => {
         <LeafletDrawControl
           position="topright"
           :edit-mode="editMode"
+          :active-mode="currentMode"
           :draw="{
             marker: true,
             circle: true,
@@ -3234,7 +4146,15 @@ const onPolygonClosed = (id: number) => {
             polygon: true,
             rectangle: true,
           }"
+          @mode-selected="handleModeSelected"
+        />
+
+        <LeafletFeaturesEditor
+          :enabled="editMode"
+          :mode="currentMode"
+          :shape-options="{ color: '#3388ff', fillOpacity: 0.2 }"
           @draw:created="handleShapeCreated"
+          @mode-changed="handleModeChanged"
         />
 
         <LeafletMarker
@@ -3295,28 +4215,28 @@ const onPolygonClosed = (id: number) => {
     </div>
 
     <div class="p-4 bg-gray-50 rounded">
-      <h4 class="font-semibold mb-2">Statistiques</h4>
+      <h4 class="font-semibold mb-2">Statistics</h4>
       <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
         <div>
-          <div class="text-gray-500">Marqueurs</div>
+          <div class="text-gray-500">Markers</div>
           <div class="text-lg font-bold text-blue-600">
             {{ markers.length }}
           </div>
         </div>
         <div>
-          <div class="text-gray-500">Cercles</div>
+          <div class="text-gray-500">Circles</div>
           <div class="text-lg font-bold text-green-600">
             {{ circles.length }}
           </div>
         </div>
         <div>
-          <div class="text-gray-500">Polylignes</div>
+          <div class="text-gray-500">Polylines</div>
           <div class="text-lg font-bold text-red-600">
             {{ polylines.length }}
           </div>
         </div>
         <div>
-          <div class="text-gray-500">Polygones</div>
+          <div class="text-gray-500">Polygons</div>
           <div class="text-lg font-bold text-purple-600">
             {{ polygons.length }}
           </div>

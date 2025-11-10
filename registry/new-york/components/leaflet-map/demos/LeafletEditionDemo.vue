@@ -6,18 +6,23 @@ import {
   LeafletTileLayer,
   LeafletZoomControl,
   LeafletDrawControl,
+  LeafletFeaturesEditor,
   LeafletMarker,
   LeafletCircle,
   LeafletPolyline,
   LeafletPolygon,
   LeafletRectangle,
   type LeafletMapExposed,
+  type DrawEvent,
 } from '~~/registry/new-york/components/leaflet-map';
 
 const mapRef = ref<LeafletMapExposed | null>(null);
 
 // Mode édition global
 const editMode = ref(false);
+
+// Current drawing mode
+const currentMode = ref<'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | null>(null);
 
 // Données pour les différentes shapes
 const markers = ref([
@@ -86,13 +91,23 @@ watch(editMode, (enabled) => {
   editableShapes.value.rectangles = enabled;
 });
 
+// Handle mode selection from control
+const handleModeSelected = (mode: string | null) => {
+  currentMode.value = mode as 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | null;
+};
+
+// Handle mode change from editor (for sync)
+const handleModeChanged = (mode: string | null) => {
+  currentMode.value = mode as 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | null;
+};
+
 // Gestion de la création de nouvelles formes
-const handleShapeCreated = (event: any) => {
+const handleShapeCreated = (event: DrawEvent) => {
   const { layer, layerType } = event;
 
   switch (layerType) {
     case 'marker': {
-      const latlng = layer.getLatLng();
+      const latlng = (layer as any).getLatLng();
       const newId = markers.value.length > 0 ? Math.max(...markers.value.map((m) => m.id)) + 1 : 1;
       markers.value.push({
         id: newId,
@@ -103,8 +118,8 @@ const handleShapeCreated = (event: any) => {
       break;
     }
     case 'circle': {
-      const latlng = layer.getLatLng();
-      const radius = layer.getRadius();
+      const latlng = (layer as any).getLatLng();
+      const radius = (layer as any).getRadius();
       const newId = circles.value.length > 0 ? Math.max(...circles.value.map((c) => c.id)) + 1 : 1;
       circles.value.push({
         id: newId,
@@ -116,7 +131,7 @@ const handleShapeCreated = (event: any) => {
       break;
     }
     case 'polyline': {
-      const latlngs = layer.getLatLngs().map((ll: any) => [ll.lat, ll.lng] as [number, number]);
+      const latlngs = (layer as any).getLatLngs().map((ll: any) => [ll.lat, ll.lng] as [number, number]);
       const newId =
         polylines.value.length > 0 ? Math.max(...polylines.value.map((p) => p.id)) + 1 : 1;
       polylines.value.push({
@@ -128,7 +143,7 @@ const handleShapeCreated = (event: any) => {
       break;
     }
     case 'polygon': {
-      const latlngs = layer.getLatLngs()[0].map((ll: any) => [ll.lat, ll.lng] as [number, number]);
+      const latlngs = (layer as any).getLatLngs()[0].map((ll: any) => [ll.lat, ll.lng] as [number, number]);
       const newId =
         polygons.value.length > 0 ? Math.max(...polygons.value.map((p) => p.id)) + 1 : 1;
       polygons.value.push({
@@ -139,7 +154,7 @@ const handleShapeCreated = (event: any) => {
       break;
     }
     case 'rectangle': {
-      const bounds = layer.getBounds();
+      const bounds = (layer as any).getBounds();
       const newId =
         rectangles.value.length > 0 ? Math.max(...rectangles.value.map((r) => r.id)) + 1 : 1;
       rectangles.value.push({
@@ -233,9 +248,11 @@ const onPolygonClosed = (id: number) => {
 
         <LeafletZoomControl position="topleft" />
 
+        <!-- Draw Control - UI only -->
         <LeafletDrawControl
           position="topright"
           :edit-mode="editMode"
+          :active-mode="currentMode"
           :draw="{
             marker: true,
             circle: true,
@@ -243,7 +260,16 @@ const onPolygonClosed = (id: number) => {
             polygon: true,
             rectangle: true,
           }"
+          @mode-selected="handleModeSelected"
+        />
+
+        <!-- Features Editor - Logic only -->
+        <LeafletFeaturesEditor
+          :enabled="editMode"
+          :mode="currentMode"
+          :shape-options="{ color: '#3388ff', fillOpacity: 0.2 }"
           @draw:created="handleShapeCreated"
+          @mode-changed="handleModeChanged"
         />
 
         <LeafletMarker
