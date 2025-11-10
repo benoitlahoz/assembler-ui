@@ -30,6 +30,7 @@ const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const rectangle = ref<L.Rectangle | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
+const centerMarker = ref<L.Marker | null>(null);
 const isDragging = ref(false);
 
 const getColors = () => {
@@ -52,6 +53,10 @@ const getColors = () => {
 const clearEditMarkers = () => {
   editMarkers.value.forEach((marker) => marker.remove());
   editMarkers.value = [];
+  if (centerMarker.value) {
+    centerMarker.value.remove();
+    centerMarker.value = null;
+  }
 };
 
 const enableEditing = () => {
@@ -131,28 +136,43 @@ const enableEditing = () => {
 
     editMarkers.value.push(marker);
   });
+
+  // Créer le marqueur central pour le drag
+  if (props.draggable) {
+    createCenterMarker();
+  }
 };
 
-const enableDragging = () => {
+const createCenterMarker = () => {
   if (!rectangle.value || !L.value || !map.value) return;
 
-  let startBounds: L.LatLngBounds | null = null;
-  let startMousePos: L.LatLng | null = null;
+  const bounds = rectangle.value.getBounds();
+  const center = bounds.getCenter();
 
-  rectangle.value.on('mousedown', (e: any) => {
-    if (!props.draggable || props.editable) return; // Ne pas activer le drag si en mode édition
-    isDragging.value = true;
+  centerMarker.value = L.value.marker(center, {
+    draggable: true,
+    icon: L.value.divIcon({
+      className: 'leaflet-editing-icon-center',
+      html: '<div style="width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #ff8800;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
+      iconSize: [10, 10],
+    }),
+  }).addTo(map.value);
+
+  let startBounds: L.LatLngBounds | null = null;
+  let startCenter: L.LatLng | null = null;
+
+  centerMarker.value.on('dragstart', () => {
+    if (map.value) map.value.getContainer().style.cursor = 'move';
     startBounds = rectangle.value!.getBounds();
-    startMousePos = e.latlng;
-    map.value!.dragging.disable();
-    e.originalEvent.stopPropagation();
+    startCenter = centerMarker.value!.getLatLng();
   });
 
-  map.value.on('mousemove', (e: any) => {
-    if (!isDragging.value || !startBounds || !startMousePos) return;
+  centerMarker.value.on('drag', () => {
+    if (!startBounds || !startCenter) return;
 
-    const deltaLat = e.latlng.lat - startMousePos.lat;
-    const deltaLng = e.latlng.lng - startMousePos.lng;
+    const newCenter = centerMarker.value!.getLatLng();
+    const deltaLat = newCenter.lat - startCenter.lat;
+    const deltaLng = newCenter.lng - startCenter.lng;
 
     const newBounds = L.value!.latLngBounds(
       [startBounds.getSouth() + deltaLat, startBounds.getWest() + deltaLng],
@@ -160,18 +180,36 @@ const enableDragging = () => {
     );
 
     rectangle.value!.setBounds(newBounds);
+
+    // Mettre à jour les coins
+    const corners = [
+      newBounds.getSouthWest(),
+      newBounds.getNorthWest(),
+      newBounds.getNorthEast(),
+      newBounds.getSouthEast(),
+    ];
+    editMarkers.value.forEach((marker, i) => {
+      if (corners[i]) marker.setLatLng(corners[i]);
+    });
   });
 
-  map.value.on('mouseup', () => {
-    if (!isDragging.value) return;
-    isDragging.value = false;
-    map.value!.dragging.enable();
-
+  centerMarker.value.on('dragend', () => {
+    if (map.value) map.value.getContainer().style.cursor = '';
     const updatedBounds = rectangle.value!.getBounds();
     emit('update:bounds', [
       [updatedBounds.getSouth(), updatedBounds.getWest()],
       [updatedBounds.getNorth(), updatedBounds.getEast()],
     ]);
+  });
+
+  centerMarker.value.on('mouseover', () => {
+    if (map.value) map.value.getContainer().style.cursor = 'move';
+  });
+
+  centerMarker.value.on('mouseout', () => {
+    if (map.value) {
+      map.value.getContainer().style.cursor = '';
+    }
   });
 };
 
@@ -209,10 +247,6 @@ watch(
           enableEditing();
         } else {
           clearEditMarkers();
-        }
-
-        if (props.draggable || props.editable) {
-          enableDragging();
         }
       } else {
         if (rectangle.value) {

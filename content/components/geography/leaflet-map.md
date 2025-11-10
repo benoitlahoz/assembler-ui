@@ -1474,6 +1474,8 @@ const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const polygon = ref<L.Polygon | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
+const midpointMarkers = ref<L.Marker[]>([]);
+const centerMarker = ref<L.Marker | null>(null);
 const firstPointMarker = ref<L.Marker | null>(null);
 const isDragging = ref(false);
 
@@ -1512,6 +1514,12 @@ const getColors = () => {
 const clearEditMarkers = () => {
   editMarkers.value.forEach((marker) => marker.remove());
   editMarkers.value = [];
+  midpointMarkers.value.forEach((marker) => marker.remove());
+  midpointMarkers.value = [];
+  if (centerMarker.value) {
+    centerMarker.value.remove();
+    centerMarker.value = null;
+  }
   if (firstPointMarker.value) {
     firstPointMarker.value.remove();
     firstPointMarker.value = null;
@@ -1563,47 +1571,156 @@ const enableEditing = () => {
 
     editMarkers.value.push(marker);
   });
+
+  createMidpoints();
+
+  if (props.draggable) {
+    createCenterMarker();
+  }
 };
 
-const enableDragging = () => {
+const createMidpoints = () => {
   if (!polygon.value || !L.value || !map.value) return;
 
-  let startLatLngs: L.LatLng[] = [];
-  let startMousePos: L.LatLng | null = null;
+  const latlngs = polygon.value.getLatLngs()[0] as L.LatLng[];
 
-  polygon.value.on("mousedown", (e: any) => {
-    if (!props.draggable || props.editable) return;
-    isDragging.value = true;
+  for (let i = 0; i < latlngs.length; i++) {
+    const nextIndex = (i + 1) % latlngs.length;
+    const current = latlngs[i];
+    const next = latlngs[nextIndex];
+
+    if (!current || !next) continue;
+
+    const midLat = (current.lat + next.lat) / 2;
+    const midLng = (current.lng + next.lng) / 2;
+
+    const midMarker = L.value
+      .marker([midLat, midLng], {
+        draggable: true,
+        icon: L.value.divIcon({
+          className: "leaflet-editing-icon-midpoint",
+          html: '<div style="width:6px;height:6px;border-radius:50%;background:#fff;border:2px solid #3388ff;opacity:0.6;"></div>',
+          iconSize: [6, 6],
+        }),
+      })
+      .addTo(map.value);
+
+    let pointAdded = false;
+
+    midMarker.on("dragstart", () => {
+      if (map.value) map.value.getContainer().style.cursor = "copy";
+    });
+
+    midMarker.on("drag", () => {
+      const newPos = midMarker.getLatLng();
+      const currentLatlngs = polygon.value!.getLatLngs()[0] as L.LatLng[];
+
+      if (!pointAdded) {
+        const newLatlngs = [...currentLatlngs];
+        newLatlngs.splice(nextIndex, 0, newPos);
+        polygon.value!.setLatLngs([newLatlngs]);
+        pointAdded = true;
+      } else {
+        const newLatlngs = [...currentLatlngs];
+        newLatlngs[nextIndex] = newPos;
+        polygon.value!.setLatLngs([newLatlngs]);
+      }
+    });
+
+    midMarker.on("dragend", () => {
+      if (map.value) map.value.getContainer().style.cursor = "";
+      const updatedLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map(
+        (ll) => [ll.lat, ll.lng],
+      ) as Array<[number, number]>;
+      emit("update:latlngs", updatedLatLngs);
+      enableEditing();
+    });
+
+    midMarker.on("mouseover", () => {
+      if (map.value) map.value.getContainer().style.cursor = "copy";
+    });
+
+    midMarker.on("mouseout", () => {
+      if (map.value) {
+        map.value.getContainer().style.cursor = "";
+      }
+    });
+
+    midpointMarkers.value.push(midMarker);
+  }
+};
+
+const createCenterMarker = () => {
+  if (!polygon.value || !L.value || !map.value) return;
+
+  const bounds = polygon.value.getBounds();
+  const center = bounds.getCenter();
+
+  centerMarker.value = L.value
+    .marker(center, {
+      draggable: true,
+      icon: L.value.divIcon({
+        className: "leaflet-editing-icon-center",
+        html: '<div style="width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #ff8800;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
+        iconSize: [10, 10],
+      }),
+    })
+    .addTo(map.value);
+
+  let startLatLngs: L.LatLng[] = [];
+  let startCenter: L.LatLng | null = null;
+
+  centerMarker.value.on("dragstart", () => {
+    if (map.value) map.value.getContainer().style.cursor = "move";
     startLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map((ll) =>
       L.value!.latLng(ll.lat, ll.lng),
     );
-    startMousePos = e.latlng;
-    map.value!.dragging.disable();
-    e.originalEvent.stopPropagation();
+    startCenter = centerMarker.value!.getLatLng();
   });
 
-  map.value.on("mousemove", (e: any) => {
-    if (!isDragging.value || !startMousePos) return;
+  centerMarker.value.on("drag", () => {
+    if (!startCenter) return;
 
-    const deltaLat = e.latlng.lat - startMousePos.lat;
-    const deltaLng = e.latlng.lng - startMousePos.lng;
+    const newCenter = centerMarker.value!.getLatLng();
+    const deltaLat = newCenter.lat - startCenter.lat;
+    const deltaLng = newCenter.lng - startCenter.lng;
 
     const newLatLngs = startLatLngs.map((ll) =>
       L.value!.latLng(ll.lat + deltaLat, ll.lng + deltaLng),
     );
 
     polygon.value!.setLatLngs([newLatLngs]);
+
+    editMarkers.value.forEach((marker, index) => {
+      if (newLatLngs[index]) marker.setLatLng(newLatLngs[index]);
+    });
+
+    midpointMarkers.value.forEach((marker, i) => {
+      const nextIndex = (i + 1) % newLatLngs.length;
+      if (newLatLngs[i] && newLatLngs[nextIndex]) {
+        const midLat = (newLatLngs[i].lat + newLatLngs[nextIndex].lat) / 2;
+        const midLng = (newLatLngs[i].lng + newLatLngs[nextIndex].lng) / 2;
+        marker.setLatLng(L.value!.latLng(midLat, midLng));
+      }
+    });
   });
 
-  map.value.on("mouseup", () => {
-    if (!isDragging.value) return;
-    isDragging.value = false;
-    map.value!.dragging.enable();
-
+  centerMarker.value.on("dragend", () => {
+    if (map.value) map.value.getContainer().style.cursor = "";
     const updatedLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map(
       (ll) => [ll.lat, ll.lng],
     ) as Array<[number, number]>;
     emit("update:latlngs", updatedLatLngs);
+  });
+
+  centerMarker.value.on("mouseover", () => {
+    if (map.value) map.value.getContainer().style.cursor = "move";
+  });
+
+  centerMarker.value.on("mouseout", () => {
+    if (map.value) {
+      map.value.getContainer().style.cursor = "";
+    }
   });
 };
 
@@ -1643,10 +1760,6 @@ watch(
           enableEditing();
         } else {
           clearEditMarkers();
-        }
-
-        if (props.draggable || props.editable) {
-          enableDragging();
         }
       } else {
         if (polygon.value) {
@@ -1709,6 +1822,7 @@ const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const polyline = ref<L.Polyline | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
+const midpointMarkers = ref<L.Marker[]>([]);
 
 const normalizeLatLngs = (
   latlngs: Array<[number, number]> | Array<{ lat: number; lng: number }>,
@@ -1740,6 +1854,8 @@ const getColors = () => {
 const clearEditMarkers = () => {
   editMarkers.value.forEach((marker) => marker.remove());
   editMarkers.value = [];
+  midpointMarkers.value.forEach((marker) => marker.remove());
+  midpointMarkers.value = [];
 };
 
 const enableEditing = () => {
@@ -1774,6 +1890,78 @@ const enableEditing = () => {
 
     editMarkers.value.push(marker);
   });
+
+  createMidpoints();
+};
+
+const createMidpoints = () => {
+  if (!polyline.value || !L.value || !map.value) return;
+
+  const latlngs = polyline.value.getLatLngs() as L.LatLng[];
+
+  for (let i = 0; i < latlngs.length - 1; i++) {
+    const current = latlngs[i];
+    const next = latlngs[i + 1];
+
+    if (!current || !next) continue;
+
+    const midLat = (current.lat + next.lat) / 2;
+    const midLng = (current.lng + next.lng) / 2;
+
+    const midMarker = L.value
+      .marker([midLat, midLng], {
+        draggable: true,
+        icon: L.value.divIcon({
+          className: "leaflet-editing-icon-midpoint",
+          html: '<div style="width:6px;height:6px;border-radius:50%;background:#fff;border:2px solid #3388ff;opacity:0.6;"></div>',
+          iconSize: [6, 6],
+        }),
+      })
+      .addTo(map.value);
+
+    let pointAdded = false;
+
+    midMarker.on("dragstart", () => {
+      if (map.value) map.value.getContainer().style.cursor = "copy";
+    });
+
+    midMarker.on("drag", () => {
+      const newPos = midMarker.getLatLng();
+      const currentLatlngs = polyline.value!.getLatLngs() as L.LatLng[];
+
+      if (!pointAdded) {
+        const newLatlngs = [...currentLatlngs];
+        newLatlngs.splice(i + 1, 0, newPos);
+        polyline.value!.setLatLngs(newLatlngs);
+        pointAdded = true;
+      } else {
+        const newLatlngs = [...currentLatlngs];
+        newLatlngs[i + 1] = newPos;
+        polyline.value!.setLatLngs(newLatlngs);
+      }
+    });
+
+    midMarker.on("dragend", () => {
+      if (map.value) map.value.getContainer().style.cursor = "";
+      const updatedLatLngs = (polyline.value!.getLatLngs() as L.LatLng[]).map(
+        (ll) => [ll.lat, ll.lng],
+      ) as Array<[number, number]>;
+      emit("update:latlngs", updatedLatLngs);
+      enableEditing();
+    });
+
+    midMarker.on("mouseover", () => {
+      if (map.value) map.value.getContainer().style.cursor = "copy";
+    });
+
+    midMarker.on("mouseout", () => {
+      if (map.value) {
+        map.value.getContainer().style.cursor = "";
+      }
+    });
+
+    midpointMarkers.value.push(midMarker);
+  }
 };
 
 watch(
@@ -1870,6 +2058,7 @@ const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const rectangle = ref<L.Rectangle | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
+const centerMarker = ref<L.Marker | null>(null);
 const isDragging = ref(false);
 
 const getColors = () => {
@@ -1896,6 +2085,10 @@ const getColors = () => {
 const clearEditMarkers = () => {
   editMarkers.value.forEach((marker) => marker.remove());
   editMarkers.value = [];
+  if (centerMarker.value) {
+    centerMarker.value.remove();
+    centerMarker.value = null;
+  }
 };
 
 const enableEditing = () => {
@@ -1980,28 +2173,44 @@ const enableEditing = () => {
 
     editMarkers.value.push(marker);
   });
+
+  if (props.draggable) {
+    createCenterMarker();
+  }
 };
 
-const enableDragging = () => {
+const createCenterMarker = () => {
   if (!rectangle.value || !L.value || !map.value) return;
 
-  let startBounds: L.LatLngBounds | null = null;
-  let startMousePos: L.LatLng | null = null;
+  const bounds = rectangle.value.getBounds();
+  const center = bounds.getCenter();
 
-  rectangle.value.on("mousedown", (e: any) => {
-    if (!props.draggable || props.editable) return;
-    isDragging.value = true;
+  centerMarker.value = L.value
+    .marker(center, {
+      draggable: true,
+      icon: L.value.divIcon({
+        className: "leaflet-editing-icon-center",
+        html: '<div style="width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #ff8800;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
+        iconSize: [10, 10],
+      }),
+    })
+    .addTo(map.value);
+
+  let startBounds: L.LatLngBounds | null = null;
+  let startCenter: L.LatLng | null = null;
+
+  centerMarker.value.on("dragstart", () => {
+    if (map.value) map.value.getContainer().style.cursor = "move";
     startBounds = rectangle.value!.getBounds();
-    startMousePos = e.latlng;
-    map.value!.dragging.disable();
-    e.originalEvent.stopPropagation();
+    startCenter = centerMarker.value!.getLatLng();
   });
 
-  map.value.on("mousemove", (e: any) => {
-    if (!isDragging.value || !startBounds || !startMousePos) return;
+  centerMarker.value.on("drag", () => {
+    if (!startBounds || !startCenter) return;
 
-    const deltaLat = e.latlng.lat - startMousePos.lat;
-    const deltaLng = e.latlng.lng - startMousePos.lng;
+    const newCenter = centerMarker.value!.getLatLng();
+    const deltaLat = newCenter.lat - startCenter.lat;
+    const deltaLng = newCenter.lng - startCenter.lng;
 
     const newBounds = L.value!.latLngBounds(
       [startBounds.getSouth() + deltaLat, startBounds.getWest() + deltaLng],
@@ -2009,18 +2218,35 @@ const enableDragging = () => {
     );
 
     rectangle.value!.setBounds(newBounds);
+
+    const corners = [
+      newBounds.getSouthWest(),
+      newBounds.getNorthWest(),
+      newBounds.getNorthEast(),
+      newBounds.getSouthEast(),
+    ];
+    editMarkers.value.forEach((marker, i) => {
+      if (corners[i]) marker.setLatLng(corners[i]);
+    });
   });
 
-  map.value.on("mouseup", () => {
-    if (!isDragging.value) return;
-    isDragging.value = false;
-    map.value!.dragging.enable();
-
+  centerMarker.value.on("dragend", () => {
+    if (map.value) map.value.getContainer().style.cursor = "";
     const updatedBounds = rectangle.value!.getBounds();
     emit("update:bounds", [
       [updatedBounds.getSouth(), updatedBounds.getWest()],
       [updatedBounds.getNorth(), updatedBounds.getEast()],
     ]);
+  });
+
+  centerMarker.value.on("mouseover", () => {
+    if (map.value) map.value.getContainer().style.cursor = "move";
+  });
+
+  centerMarker.value.on("mouseout", () => {
+    if (map.value) {
+      map.value.getContainer().style.cursor = "";
+    }
   });
 };
 
@@ -2058,10 +2284,6 @@ watch(
           enableEditing();
         } else {
           clearEditMarkers();
-        }
-
-        if (props.draggable || props.editable) {
-          enableDragging();
         }
       } else {
         if (rectangle.value) {

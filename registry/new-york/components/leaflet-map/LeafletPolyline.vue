@@ -27,6 +27,7 @@ const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const polyline = ref<L.Polyline | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
+const midpointMarkers = ref<L.Marker[]>([]);
 
 const normalizeLatLngs = (
   latlngs: Array<[number, number]> | Array<{ lat: number; lng: number }>
@@ -58,6 +59,8 @@ const getColors = () => {
 const clearEditMarkers = () => {
   editMarkers.value.forEach((marker) => marker.remove());
   editMarkers.value = [];
+  midpointMarkers.value.forEach((marker) => marker.remove());
+  midpointMarkers.value = [];
 };
 
 const enableEditing = () => {
@@ -93,6 +96,79 @@ const enableEditing = () => {
 
     editMarkers.value.push(marker);
   });
+
+  // Créer les midpoints
+  createMidpoints();
+};
+
+const createMidpoints = () => {
+  if (!polyline.value || !L.value || !map.value) return;
+
+  const latlngs = polyline.value.getLatLngs() as L.LatLng[];
+
+  // Pour une polyline, pas de boucle (ligne ouverte)
+  for (let i = 0; i < latlngs.length - 1; i++) {
+    const current = latlngs[i];
+    const next = latlngs[i + 1];
+    
+    if (!current || !next) continue;
+
+    const midLat = (current.lat + next.lat) / 2;
+    const midLng = (current.lng + next.lng) / 2;
+
+    const midMarker = L.value.marker([midLat, midLng], {
+      draggable: true,
+      icon: L.value.divIcon({
+        className: 'leaflet-editing-icon-midpoint',
+        html: '<div style="width:6px;height:6px;border-radius:50%;background:#fff;border:2px solid #3388ff;opacity:0.6;"></div>',
+        iconSize: [6, 6],
+      }),
+    }).addTo(map.value);
+
+    let pointAdded = false;
+
+    midMarker.on('dragstart', () => {
+      if (map.value) map.value.getContainer().style.cursor = 'copy';
+    });
+
+    midMarker.on('drag', () => {
+      const newPos = midMarker.getLatLng();
+      const currentLatlngs = polyline.value!.getLatLngs() as L.LatLng[];
+      
+      if (!pointAdded) {
+        const newLatlngs = [...currentLatlngs];
+        newLatlngs.splice(i + 1, 0, newPos);
+        polyline.value!.setLatLngs(newLatlngs);
+        pointAdded = true;
+      } else {
+        const newLatlngs = [...currentLatlngs];
+        newLatlngs[i + 1] = newPos;
+        polyline.value!.setLatLngs(newLatlngs);
+      }
+    });
+
+    midMarker.on('dragend', () => {
+      if (map.value) map.value.getContainer().style.cursor = '';
+      const updatedLatLngs = (polyline.value!.getLatLngs() as L.LatLng[]).map((ll) => [
+        ll.lat,
+        ll.lng,
+      ]) as Array<[number, number]>;
+      emit('update:latlngs', updatedLatLngs);
+      enableEditing();
+    });
+
+    midMarker.on('mouseover', () => {
+      if (map.value) map.value.getContainer().style.cursor = 'copy';
+    });
+
+    midMarker.on('mouseout', () => {
+      if (map.value) {
+        map.value.getContainer().style.cursor = '';
+      }
+    });
+
+    midpointMarkers.value.push(midMarker);
+  }
 };
 
 watch(
