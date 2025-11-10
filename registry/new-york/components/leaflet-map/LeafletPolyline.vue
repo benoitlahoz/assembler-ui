@@ -91,6 +91,9 @@ const enableEditing = () => {
       const newLatLngs = [...latlngs];
       newLatLngs[index] = marker.getLatLng();
       polyline.value!.setLatLngs(newLatLngs);
+      
+      // Mettre à jour les midpoints en temps réel
+      updateMidpoints(newLatLngs);
     });
 
     marker.on('dragend', () => {
@@ -178,6 +181,20 @@ const createMidpoints = () => {
 
     midpointMarkers.value.push(midMarker);
   }
+};
+
+const updateMidpoints = (latlngs: L.LatLng[]) => {
+  // Mettre à jour les positions des midpoints existants
+  // Pour une polyline, il y a latlngs.length - 1 midpoints
+  midpointMarkers.value.forEach((midMarker, i) => {
+    const current = latlngs[i];
+    const next = latlngs[i + 1];
+    if (current && next) {
+      const midLat = (current.lat + next.lat) / 2;
+      const midLng = (current.lng + next.lng) / 2;
+      midMarker.setLatLng(L.value!.latLng(midLat, midLng));
+    }
+  });
 };
 
 const enableDragging = () => {
