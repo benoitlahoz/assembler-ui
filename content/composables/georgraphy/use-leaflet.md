@@ -70,6 +70,7 @@ export const useLeaflet = async () => {
 
   return {
     L,
+    LatDegreesMeters,
     radiusToLatDegrees,
     latDegreesToRadius,
     radiusToLngDegrees,
@@ -88,6 +89,7 @@ export const useLeaflet = async () => {
 | Property | Type | Description |
 |----------|------|-------------|
 | `L`{.primary .text-primary} | `any` | — |
+| `LatDegreesMeters`{.primary .text-primary} | `any` | — |
 | `radiusToLatDegrees`{.primary .text-primary} | `any` | — |
 | `latDegreesToRadius`{.primary .text-primary} | `any` | — |
 | `radiusToLngDegrees`{.primary .text-primary} | `any` | — |

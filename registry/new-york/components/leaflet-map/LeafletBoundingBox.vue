@@ -1,13 +1,27 @@
 <script setup lang="ts">
-import { inject, watch, ref, type Ref, onBeforeUnmount } from 'vue';
-import { LeafletBoundingBoxHandlesKey, LeafletMapKey, LeafletModuleKey } from '.';
+import { inject, watch, ref, type Ref, onBeforeUnmount, provide } from 'vue';
+import { LeafletBoundingBoxStylesKey, LeafletMapKey, LeafletModuleKey } from '.';
 
-export interface LeafletBoundingBoxFeatures {
-  box: Ref<L.Rectangle>;
-  corners: Ref<L.Marker[]>;
-  edges: Ref<L.Marker[]>;
-  rotate: Ref<L.Marker>;
-  center: Ref<L.Marker>;
+export interface LeafletHandleStyle {
+  className: string;
+  html: string;
+  iconSize: [number, number];
+}
+
+export interface LeafletBoxStyle {
+  color: string;
+  weight: number;
+  fill: boolean;
+  dashArray: string;
+  interactive: boolean;
+}
+
+export interface LeafletBoundingBoxStyles {
+  box: LeafletBoxStyle;
+  corner: LeafletHandleStyle;
+  edge: LeafletHandleStyle;
+  rotate: LeafletHandleStyle;
+  center: LeafletHandleStyle;
 }
 
 export interface LeafletBoundingBoxProps {
@@ -29,6 +43,38 @@ const emit = defineEmits<{
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
+
+const stylesOptions = ref<LeafletBoundingBoxStyles>({
+  box: {
+    color: '#3388ff',
+    weight: 2,
+    fill: false,
+    dashArray: '5, 5',
+    interactive: false,
+  },
+  corner: {
+    className: 'leaflet-bounding-box-handle leaflet-bounding-box-corner',
+    html: '<div style="width:8px;height:8px;background:#fff;border:2px solid #3388ff;border-radius:2px;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
+    iconSize: [8, 8],
+  },
+  edge: {
+    className: 'leaflet-bounding-box-handle leaflet-bounding-box-edge',
+    html: '<div style="width:8px;height:8px;background:#fff;border:2px solid #3388ff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
+    iconSize: [8, 8],
+  },
+  rotate: {
+    className: 'leaflet-bounding-box-handle leaflet-bounding-box-rotate',
+    html: '<div style="width:12px;height:12px;background:#fff;border:2px solid #3388ff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
+    iconSize: [12, 12],
+  },
+  center: {
+    className: 'leaflet-bounding-box-handle leaflet-bounding-box-center',
+    html: '<div style="width:12px;height:12px;background:#ff8800;border:2px solid #fff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
+    iconSize: [12, 12],
+  },
+});
+
+provide(LeafletBoundingBoxStylesKey, stylesOptions);
 
 const boundingBox = ref<L.Rectangle | null>(null);
 const cornerHandles = ref<L.Marker[]>([]);
@@ -72,15 +118,7 @@ const createBoundingBox = () => {
   clearHandles();
 
   // Créer le rectangle de bounding box
-  boundingBox.value = L.value
-    .rectangle(props.bounds, {
-      color: '#3388ff',
-      weight: 2,
-      fill: false,
-      dashArray: '5, 5',
-      interactive: false,
-    })
-    .addTo(map.value);
+  boundingBox.value = L.value.rectangle(props.bounds, stylesOptions.value.box).addTo(map.value);
 
   // Créer les handles aux coins (pour scale)
   const corners = [
@@ -96,11 +134,7 @@ const createBoundingBox = () => {
   corners.forEach((corner, index) => {
     const handle = L.value!.marker(corner, {
       draggable: true,
-      icon: L.value!.divIcon({
-        className: 'leaflet-bounding-box-handle leaflet-bounding-box-corner',
-        html: '<div style="width:8px;height:8px;background:#fff;border:2px solid #3388ff;border-radius:2px;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
-        iconSize: [8, 8],
-      }),
+      icon: L.value!.divIcon(stylesOptions.value.corner),
     }).addTo(map.value!);
 
     handle.on('mousedown', () => {
@@ -194,11 +228,7 @@ const createBoundingBox = () => {
   edges.forEach((edge, index) => {
     const handle = L.value!.marker(edge, {
       draggable: true,
-      icon: L.value!.divIcon({
-        className: 'leaflet-bounding-box-handle leaflet-bounding-box-edge',
-        html: '<div style="width:8px;height:8px;background:#fff;border:2px solid #3388ff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
-        iconSize: [8, 8],
-      }),
+      icon: L.value!.divIcon(stylesOptions.value.edge),
     }).addTo(map.value!);
 
     handle.on('mousedown', () => {
@@ -289,11 +319,7 @@ const createBoundingBox = () => {
   rotateHandle.value = L.value
     .marker(rotateHandleLatLng, {
       draggable: true,
-      icon: L.value.divIcon({
-        className: 'leaflet-bounding-box-handle leaflet-bounding-box-rotate',
-        html: '<div style="width:12px;height:12px;background:#fff;border:2px solid #3388ff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
-        iconSize: [12, 12],
-      }),
+      icon: L.value.divIcon(stylesOptions.value.rotate),
     })
     .addTo(map.value);
 
@@ -375,12 +401,7 @@ const createBoundingBox = () => {
   centerHandle.value = L.value
     .marker(center, {
       draggable: false,
-      icon: L.value.divIcon({
-        // TODO: Ces classes ne sont plus définies nul part.
-        className: 'leaflet-bounding-box-handle leaflet-bounding-box-center',
-        html: '<div style="width:12px;height:12px;background:#ff8800;border:2px solid #fff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
-        iconSize: [12, 12],
-      }),
+      icon: L.value.divIcon(stylesOptions.value.center),
     })
     .addTo(map.value);
 };

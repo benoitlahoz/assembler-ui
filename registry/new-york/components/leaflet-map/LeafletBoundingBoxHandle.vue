@@ -1,18 +1,24 @@
 <script setup lang="ts">
-import { watch, type HTMLAttributes } from 'vue';
+import { watch, inject, type HTMLAttributes, ref } from 'vue';
 import { cn } from '@/lib/utils';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
+import { LeafletBoundingBoxStylesKey } from '.';
 
-export interface LeafletCornerHandleProps {
+export type LeafletBoundingBoxHandleRole = 'corner' | 'edge' | 'center' | 'rotate';
+
+export interface LeafletBoundingBoxHandleProps {
+  role: LeafletBoundingBoxHandleRole;
   class?: HTMLAttributes['class'];
   size?: number | string;
 }
 
-const props = withDefaults(defineProps<LeafletCornerHandleProps>(), {
+const props = withDefaults(defineProps<LeafletBoundingBoxHandleProps>(), {
   class:
     'bg-red-500 border-2 border-red-500 opacity-30 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]',
   size: 8,
 });
+
+const stylesOptions = inject(LeafletBoundingBoxStylesKey, ref());
 
 const { withHiddenElement, getTailwindBaseCssValues } = useCssParser();
 
@@ -23,7 +29,6 @@ const tailwindToMarkerHtml = (className: string, size: number | string) => {
       'border',
       'border-radius',
       'box-shadow',
-      'opacity',
     ]);
 
     const styleString = Object.entries(config)
@@ -37,16 +42,17 @@ const tailwindToMarkerHtml = (className: string, size: number | string) => {
 };
 
 watch(
-  () => [props.class, props.size],
+  () => [stylesOptions.value, props.class, props.size],
   () => {
-    // No-op: just to trigger reactivity
-    console.log('Props changed:', props.class, props.size);
-
     const options = {
+      className: `leaflet-bounding-box-handle leaflet-bounding-box-${props.role}`,
       html: tailwindToMarkerHtml(props.class || '', props.size || 8),
-      iconSize: [props.size || 8, props.size || 8],
+      iconSize: [Number(props.size) || 8, Number(props.size) || 8] as [number, number],
     };
-    console.log('Marker options:', options);
+
+    if (stylesOptions.value) {
+      stylesOptions.value[props.role] = options;
+    }
   },
   { immediate: true }
 );

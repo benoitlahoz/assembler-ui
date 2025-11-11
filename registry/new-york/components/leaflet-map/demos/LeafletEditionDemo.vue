@@ -9,7 +9,7 @@ import {
   LeafletDrawControl,
   LeafletFeaturesEditor,
   LeafletBoundingBox,
-  LeafletBoundingBoxCornerHandle,
+  LeafletBoundingBoxHandle,
   LeafletMarker,
   LeafletCircle,
   LeafletPolyline,
@@ -23,7 +23,7 @@ import {
 
 const mapRef = ref<LeafletMapExposed | null>(null);
 
-const { L, radiusToLatDegrees, radiusToLngDegrees } = await useLeaflet();
+const { L, LatDegreesMeters, radiusToLatDegrees, radiusToLngDegrees } = await useLeaflet();
 
 // Shape selection for bounding box
 const selectedShape = ref<{
@@ -523,8 +523,8 @@ const handleBoundingBoxRotate = (angle: number) => {
     // Convertir lat/lng en mètres relatifs au centre (approximation simple)
     // 1 degré de latitude ≈ 111320 mètres
     // 1 degré de longitude ≈ 111320 * cos(latitude) mètres
-    const metersPerDegreeLat = 111320;
-    const metersPerDegreeLng = 111320 * Math.cos((center.lat * Math.PI) / 180);
+    const metersPerDegreeLat = LatDegreesMeters;
+    const metersPerDegreeLng = LatDegreesMeters * Math.cos((center.lat * Math.PI) / 180);
 
     // Convertir en mètres relatifs
     const relMetersY = (lat - center.lat) * metersPerDegreeLat;
@@ -682,7 +682,7 @@ const handleBoundingBoxRotateEnd = () => {
           @mode-changed="handleModeChanged"
           @edit-mode-changed="handleEditModeChanged"
         >
-          <!-- Bounding Box for selected shape in select mode. TODO: handle slot with features editor. -->
+          <!-- Bounding Box for selected shape in select mode. -->
           <LeafletBoundingBox
             :bounds="boundingBox"
             :visible="boundingBox !== null && currentEditMode === 'select'"
@@ -690,9 +690,26 @@ const handleBoundingBoxRotateEnd = () => {
             @rotate="handleBoundingBoxRotate"
             @rotate-end="handleBoundingBoxRotateEnd"
           >
-            <LeafletBoundingBoxCornerHandle
-              class="bg-blue-500 opacity-30 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+            <!-- Here register your custom box and handles styles -->
+            <LeafletBoundingBoxHandle
+              role="corner"
+              class="bg-red-500/30 border border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
               :size="10"
+            />
+            <LeafletBoundingBoxHandle
+              role="edge"
+              class="bg-blue-500/20 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+              :size="8"
+            />
+            <LeafletBoundingBoxHandle
+              role="rotate"
+              class="bg-blue-500/40 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+              :size="12"
+            />
+            <LeafletBoundingBoxHandle
+              role="center"
+              class="bg-orange-500/40 border border-white rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+              :size="12"
             />
           </LeafletBoundingBox>
 

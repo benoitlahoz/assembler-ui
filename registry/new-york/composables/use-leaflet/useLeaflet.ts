@@ -37,5 +37,12 @@ export const useLeaflet = async () => {
     return lngDegrees * LatDegreesMeters * Math.cos((lat * Math.PI) / 180);
   };
 
-  return { L, radiusToLatDegrees, latDegreesToRadius, radiusToLngDegrees, lngDegreesToRadius };
+  return {
+    L,
+    LatDegreesMeters,
+    radiusToLatDegrees,
+    latDegreesToRadius,
+    radiusToLngDegrees,
+    lngDegreesToRadius,
+  };
 };

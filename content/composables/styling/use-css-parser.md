@@ -139,6 +139,23 @@ const buildGradientRegExp = () => {
 const RegExpLib = buildGradientRegExp();
 
 export const useCssParser = () => {
+  const withHiddenElement = (
+    fn: (el: HTMLElement) => any,
+    className: string,
+  ) => {
+    const el = document.createElement("div");
+    el.style.position = "absolute";
+    el.style.width = "0px";
+    el.style.height = "0px";
+    el.style.visibility = "hidden";
+    el.className = className;
+    el.style.overflow = "hidden";
+    document.body.appendChild(el);
+    const result = fn(el);
+    document.body.removeChild(el);
+    return result;
+  };
+
   const getTailwindBaseCssValues = (
     el: HTMLElement,
     properties?: string[],
@@ -186,19 +203,15 @@ export const useCssParser = () => {
         classList = Object.keys(classNames).filter((key) => classNames[key]);
       }
 
-      const el = document.createElement("div");
-      el.className = classList.join(" ");
-      el.style.position = "absolute";
-      el.style.visibility = "hidden";
-      el.style.zIndex = "-9999";
-      document.body.appendChild(el);
-
-      const cssValues = getTailwindBaseCssValues(el, [
-        "color",
-        "background-color",
-        "opacity",
-      ]);
-      document.body.removeChild(el);
+      const cssValues = withHiddenElement(
+        (el) =>
+          getTailwindBaseCssValues(el, [
+            "color",
+            "background-color",
+            "opacity",
+          ]),
+        classList.join(" "),
+      );
 
       return {
         color: cssValues["color"] || "#3388ff",
@@ -237,15 +250,10 @@ export const useCssParser = () => {
         classList = Object.keys(classNames).filter((key) => classNames[key]);
       }
 
-      const el = document.createElement("div");
-      el.className = classList.join(" ");
-      el.style.position = "absolute";
-      el.style.visibility = "hidden";
-      el.style.zIndex = "-9999";
-      document.body.appendChild(el);
-
-      const cssValues = getTailwindBaseCssValues(el, ["color", "opacity"]);
-      document.body.removeChild(el);
+      const cssValues = withHiddenElement(
+        (el) => getTailwindBaseCssValues(el, ["color", "opacity"]),
+        classList.join(" "),
+      );
 
       return {
         color: cssValues["color"] || "#3388ff",
@@ -327,6 +335,7 @@ export const useCssParser = () => {
   };
 
   return {
+    withHiddenElement,
     getTailwindBaseCssValues,
     getLeafletShapeColors,
     getLeafletLineColors,
@@ -346,6 +355,7 @@ Can be undefined if match not found.
 
 | Property | Type | Description |
 |----------|------|-------------|
+| `withHiddenElement`{.primary .text-primary} | `any` | — |
 | `getTailwindBaseCssValues`{.primary .text-primary} | `any` | — |
 | `getLeafletShapeColors`{.primary .text-primary} | `any` | — |
 | `getLeafletLineColors`{.primary .text-primary} | `any` | — |
