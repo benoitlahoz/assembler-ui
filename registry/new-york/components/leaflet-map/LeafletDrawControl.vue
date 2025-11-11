@@ -12,8 +12,8 @@ export interface LeafletDrawControlProps {
   editMode?: boolean;
   activeMode?: string | null;
   modes?: {
-    select?: DrawButton | boolean; // Mode sélection (flèche noire) - transform avec bounding box
-    directSelect?: DrawButton | boolean; // Mode édition directe (flèche blanche) - éditer les points
+    select?: DrawButton | boolean;
+    directSelect?: DrawButton | boolean;
     marker?: DrawButton | boolean;
     circle?: DrawButton | boolean;
     polyline?: DrawButton | boolean;
