@@ -17,6 +17,7 @@ export { default as LeafletZoomControl } from './LeafletZoomControl.vue';
 export { default as LeafletDrawControl } from './LeafletDrawControl.vue';
 export { default as LeafletFeaturesEditor } from './LeafletFeaturesEditor.vue';
 export { default as LeafletBoundingBox } from './LeafletBoundingBox.vue';
+export { default as LeafletBoundingBoxRectangle } from './LeafletBoundingBoxRectangle.vue';
 export { default as LeafletBoundingBoxHandle } from './LeafletBoundingBoxHandle.vue';
 export { default as LeafletTileLayer } from './LeafletTileLayer.vue';
 export { default as LeafletMarker } from './LeafletMarker.vue';

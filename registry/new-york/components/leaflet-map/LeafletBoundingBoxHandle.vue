@@ -18,9 +18,9 @@ const props = withDefaults(defineProps<LeafletBoundingBoxHandleProps>(), {
   size: 8,
 });
 
-const stylesOptions = inject(LeafletBoundingBoxStylesKey, ref());
-
 const { withHiddenElement, getTailwindBaseCssValues } = useCssParser();
+
+const stylesOptions = inject(LeafletBoundingBoxStylesKey, ref());
 
 const tailwindToMarkerHtml = (className: string, size: number | string) => {
   const styles = withHiddenElement((el: HTMLElement) => {
@@ -31,7 +31,8 @@ const tailwindToMarkerHtml = (className: string, size: number | string) => {
       'box-shadow',
     ]);
 
-    const styleString = Object.entries(config)
+    const styleString = Object.entries(config ?? {})
+      .filter(([_, value]) => value !== undefined && value !== '')
       .map(([key, value]) => `${key}: ${value};`)
       .join(' ');
 

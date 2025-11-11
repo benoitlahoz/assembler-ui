@@ -10,6 +10,7 @@ import {
   LeafletFeaturesEditor,
   LeafletBoundingBox,
   LeafletBoundingBoxHandle,
+  LeafletBoundingBoxRectangle,
   LeafletMarker,
   LeafletCircle,
   LeafletPolyline,
@@ -691,6 +692,7 @@ const handleBoundingBoxRotateEnd = () => {
             @rotate-end="handleBoundingBoxRotateEnd"
           >
             <!-- Here register your custom box and handles styles -->
+            <LeafletBoundingBoxRectangle class="border-2 border-orange-400" :dashed="[5, 5]" />
             <LeafletBoundingBoxHandle
               role="corner"
               class="bg-red-500/30 border border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
@@ -708,7 +710,7 @@ const handleBoundingBoxRotateEnd = () => {
             />
             <LeafletBoundingBoxHandle
               role="center"
-              class="bg-orange-500/40 border border-white rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+              class="bg-orange-500/40 border border-orange-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
               :size="12"
             />
           </LeafletBoundingBox>

@@ -131,6 +131,7 @@ export { default as LeafletZoomControl } from "./LeafletZoomControl.vue";
 export { default as LeafletDrawControl } from "./LeafletDrawControl.vue";
 export { default as LeafletFeaturesEditor } from "./LeafletFeaturesEditor.vue";
 export { default as LeafletBoundingBox } from "./LeafletBoundingBox.vue";
+export { default as LeafletBoundingBoxRectangle } from "./LeafletBoundingBoxRectangle.vue";
 export { default as LeafletBoundingBoxHandle } from "./LeafletBoundingBoxHandle.vue";
 export { default as LeafletTileLayer } from "./LeafletTileLayer.vue";
 export { default as LeafletMarker } from "./LeafletMarker.vue";
@@ -408,7 +409,8 @@ export interface LeafletBoxStyle {
   color: string;
   weight: number;
   fill: boolean;
-  dashArray: string;
+  fillColor?: string;
+  dashArray?: string;
   interactive: boolean;
 }
 
@@ -445,6 +447,7 @@ const stylesOptions = ref<LeafletBoundingBoxStyles>({
     color: "#3388ff",
     weight: 2,
     fill: false,
+    fillColor: undefined,
     dashArray: "5, 5",
     interactive: false,
   },
@@ -932,23 +935,21 @@ const props = withDefaults(defineProps<LeafletBoundingBoxHandleProps>(), {
   size: 8,
 });
 
-const stylesOptions = inject(LeafletBoundingBoxStylesKey, ref());
-
 const { withHiddenElement, getTailwindBaseCssValues } = useCssParser();
+
+const stylesOptions = inject(LeafletBoundingBoxStylesKey, ref());
 
 const tailwindToMarkerHtml = (className: string, size: number | string) => {
   const styles = withHiddenElement((el: HTMLElement) => {
     const config = getTailwindBaseCssValues(el, [
       "background-color",
       "border",
-      "border-width",
       "border-radius",
       "box-shadow",
     ]);
 
-    console.warn("CONFIG", config);
-
-    const styleString = Object.entries(config)
+    const styleString = Object.entries(config ?? {})
+      .filter(([_, value]) => value !== undefined && value !== "")
       .map(([key, value]) => `${key}: ${value};`)
       .join(" ");
 
@@ -961,8 +962,6 @@ const tailwindToMarkerHtml = (className: string, size: number | string) => {
 watch(
   () => [stylesOptions.value, props.class, props.size],
   () => {
-    console.log("Props changed:", props.class, props.size);
-
     const options = {
       className: `leaflet-bounding-box-handle leaflet-bounding-box-${props.role}`,
       html: tailwindToMarkerHtml(props.class || "", props.size || 8),
@@ -975,7 +974,80 @@ watch(
     if (stylesOptions.value) {
       stylesOptions.value[props.role] = options;
     }
-    console.log("Marker options:", options);
+  },
+  { immediate: true },
+);
+</script>
+
+<template>
+  <div
+    data-slot="leaflet-bounding-box-corner-handle"
+    :class="cn('hidden -z-50', props.class)"
+  ></div>
+</template>
+```
+
+```vue [src/components/ui/leaflet-map/LeafletBoundingBoxRectangle.vue]
+<script setup lang="ts">
+import { watch, inject, type HTMLAttributes, ref } from "vue";
+import { cn } from "@/lib/utils";
+import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
+import { LeafletBoundingBoxStylesKey, type LeafletBoxStyle } from ".";
+import { removeWhitespaces } from "@assemblerjs/core";
+
+export interface LeafletBoundingBoxRectangleProps {
+  class?: HTMLAttributes["class"];
+  dashed?: number[];
+}
+
+const props = withDefaults(defineProps<LeafletBoundingBoxRectangleProps>(), {
+  class: "border-2 border-blue-500",
+});
+
+const stylesOptions = inject(LeafletBoundingBoxStylesKey, ref());
+
+const { withHiddenElement, getTailwindBaseCssValues } = useCssParser();
+
+const tailwindToBoxOptions = (className: string, dashed?: number[]) => {
+  const style = withHiddenElement((el: HTMLElement): LeafletBoxStyle => {
+    const config = getTailwindBaseCssValues(el, [
+      "background-color",
+      "border-color",
+      "border-width",
+      "opacity",
+    ]);
+
+    const color = config["border-color"] || "#3388ff";
+    const weight = config["border-width"]
+      ? parseInt(config["border-width"])
+      : 2;
+    const fill: boolean =
+      !!config["background-color"] &&
+      removeWhitespaces(config["background-color"]) !== "rgba(0,0,0,0)" &&
+      config["opacity"] !== "0";
+    const fillColor = fill ? config["background-color"] : undefined;
+
+    return {
+      color,
+      weight,
+      fill,
+      fillColor,
+      dashArray: dashed ? dashed.join(", ") : undefined,
+      interactive: false,
+    };
+  }, className);
+
+  return style;
+};
+
+watch(
+  () => [stylesOptions.value, props.class, props.dashed],
+  () => {
+    const options = tailwindToBoxOptions(props.class || "", props.dashed);
+    console.warn("Options updated:", options);
+    if (stylesOptions.value) {
+      stylesOptions.value.box = options;
+    }
   },
   { immediate: true },
 );
@@ -4021,6 +4093,25 @@ export const useLeaflet = async () => {
 
 ---
 
+## LeafletBoundingBoxRectangle
+::hr-underline
+::
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `class`{.primary .text-primary} | `HTMLAttributes['class']` | border-2 border-blue-500 |  |
+| `dashed`{.primary .text-primary} | `number[]` | - |  |
+
+  ### Inject
+| Key | Default | Type | Description |
+|-----|--------|------|-------------|
+| `LeafletBoundingBoxStylesKey`{.primary .text-primary} | `ref()` | `any` | — |
+
+---
+
 ## LeafletCircle
 ::hr-underline
 ::
@@ -4301,6 +4392,7 @@ import {
   LeafletFeaturesEditor,
   LeafletBoundingBox,
   LeafletBoundingBoxHandle,
+  LeafletBoundingBoxRectangle,
   LeafletMarker,
   LeafletCircle,
   LeafletPolyline,
@@ -4994,10 +5086,14 @@ const handleBoundingBoxRotateEnd = () => {
             @rotate="handleBoundingBoxRotate"
             @rotate-end="handleBoundingBoxRotateEnd"
           >
+            <LeafletBoundingBoxRectangle
+              class="border-2 border-orange-400"
+              :dashed="[5, 5]"
+            />
             <LeafletBoundingBoxHandle
               role="corner"
-              class="bg-red-500/30 border-4 border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
-              :size="20"
+              class="bg-red-500/30 border border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+              :size="10"
             />
             <LeafletBoundingBoxHandle
               role="edge"
@@ -5011,7 +5107,7 @@ const handleBoundingBoxRotateEnd = () => {
             />
             <LeafletBoundingBoxHandle
               role="center"
-              class="bg-orange-500/40 border border-white rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+              class="bg-orange-500/40 border border-orange-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
               :size="12"
             />
           </LeafletBoundingBox>

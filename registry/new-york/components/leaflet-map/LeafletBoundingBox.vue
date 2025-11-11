@@ -12,7 +12,8 @@ export interface LeafletBoxStyle {
   color: string;
   weight: number;
   fill: boolean;
-  dashArray: string;
+  fillColor?: string;
+  dashArray?: string;
   interactive: boolean;
 }
 
@@ -49,6 +50,7 @@ const stylesOptions = ref<LeafletBoundingBoxStyles>({
     color: '#3388ff',
     weight: 2,
     fill: false,
+    fillColor: undefined,
     dashArray: '5, 5',
     interactive: false,
   },
