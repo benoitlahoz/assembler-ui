@@ -1002,7 +1002,7 @@ import {
   type AudioMotionGradientDefinition,
   type AudioMotionGradientProperties,
 } from ".";
-import { useTailwindClassParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
+import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 
 export interface AudioMotionGradientProps {
   name: string;
@@ -1036,7 +1036,7 @@ const deepEqual = (a: any, b: any): boolean => {
 const gradientFromClasses = (
   classes: string = "",
 ): AudioMotionGradientProperties | null => {
-  const { getTailwindBaseCssValues, parseGradient } = useTailwindClassParser();
+  const { getTailwindBaseCssValues, parseGradient } = useCssParser();
 
   const el = document.createElement("div");
   el.className = classes;
@@ -1078,7 +1078,7 @@ const gradientFromElement = (
   const styles = el?.getAttribute("style");
 
   if (styles) {
-    const { parseGradient } = useTailwindClassParser();
+    const { parseGradient } = useCssParser();
     const result = parseGradient(styles);
     if (result) {
       const gradient = {
@@ -2236,7 +2236,7 @@ const buildGradientRegExp = () => {
 
 const RegExpLib = buildGradientRegExp();
 
-export const useTailwindClassParser = () => {
+export const useCssParser = () => {
   const getTailwindBaseCssValues = (
     el: HTMLElement,
     properties?: string[],
@@ -3153,7 +3153,7 @@ import {
   type AudioMotionGradientDefinition,
   type AudioMotionGradientProperties,
 } from ".";
-import { useTailwindClassParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
+import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 
 export interface AudioMotionGradientProps {
   name: string;
@@ -3187,7 +3187,7 @@ const deepEqual = (a: any, b: any): boolean => {
 const gradientFromClasses = (
   classes: string = "",
 ): AudioMotionGradientProperties | null => {
-  const { getTailwindBaseCssValues, parseGradient } = useTailwindClassParser();
+  const { getTailwindBaseCssValues, parseGradient } = useCssParser();
 
   const el = document.createElement("div");
   el.className = classes;
@@ -3229,7 +3229,7 @@ const gradientFromElement = (
   const styles = el?.getAttribute("style");
 
   if (styles) {
-    const { parseGradient } = useTailwindClassParser();
+    const { parseGradient } = useCssParser();
     const result = parseGradient(styles);
     if (result) {
       const gradient = {

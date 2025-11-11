@@ -11,9 +11,10 @@ import {
   onBeforeUnmount,
 } from 'vue';
 import { cn } from '@/lib/utils';
+import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
 import { LeafletErrorsKey, LeafletMapKey, LeafletModuleKey, LeafletTileLayersKey } from '.';
 import type Leaflet from 'leaflet';
-import type { LeafletMouseEvent, Map } from 'leaflet';
+import type { LeafletMouseEvent } from 'leaflet';
 type Leaflet = typeof Leaflet;
 
 export interface LeafletMapExposed {
@@ -140,9 +141,9 @@ onMounted(() => {
     nextTick(async () => {
       if (typeof window === 'undefined') return;
 
-      // @ts-expect-error: Dynamic import of CSS
-      await import('leaflet/dist/leaflet.css');
-      L.value = (await import('leaflet')).default;
+      const { L: ImportedLeaflet } = await useLeaflet();
+      L.value = ImportedLeaflet.value;
+
       nextTick(() => {
         if (!L.value) return;
         map.value = L.value

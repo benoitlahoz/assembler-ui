@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed, nextTick } from 'vue';
 import { Button } from '@/components/ui/button';
+import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
 import {
   LeafletMap,
   LeafletTileLayer,
@@ -8,16 +9,21 @@ import {
   LeafletDrawControl,
   LeafletFeaturesEditor,
   LeafletBoundingBox,
+  LeafletBoundingBoxCornerHandle,
   LeafletMarker,
   LeafletCircle,
   LeafletPolyline,
   LeafletPolygon,
   LeafletRectangle,
   type LeafletMapExposed,
-  type DrawEvent,
+  type FeatureDrawEvent,
+  type FeatureSelectMode,
+  type FeatureShapeType,
 } from '~~/registry/new-york/components/leaflet-map';
 
 const mapRef = ref<LeafletMapExposed | null>(null);
+
+const { L, radiusToLatDegrees, radiusToLngDegrees } = await useLeaflet();
 
 // Shape selection for bounding box
 const selectedShape = ref<{
@@ -29,13 +35,10 @@ const selectedShape = ref<{
 const editMode = ref(false);
 
 // Current drawing/editing mode
-const currentMode = ref<
-  'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'select' | 'directSelect' | null
->(null);
+const currentMode = ref<FeatureShapeType | FeatureSelectMode | null>(null);
 
 // Current edit mode (select or directSelect)
-const currentEditMode = ref<'select' | 'directSelect' | null>(null);
-
+const currentEditMode = ref<FeatureSelectMode | null>(null);
 // Données pour les différentes shapes
 const markers = ref([
   { id: 1, lat: 48.8566, lng: 2.3522, label: 'Paris' },
@@ -116,7 +119,7 @@ watch(editMode, (enabled) => {
 });
 
 // Watch edit mode changes from features editor
-const handleEditModeChanged = (mode: 'select' | 'directSelect' | null) => {
+const handleEditModeChanged = (mode: FeatureSelectMode | null) => {
   currentEditMode.value = mode;
 
   // Clear selection when changing modes
@@ -156,29 +159,17 @@ const handleEditModeChanged = (mode: 'select' | 'directSelect' | null) => {
 };
 
 // Handle mode selection from control
-const handleModeSelected = (
-  mode:
-    | 'marker'
-    | 'circle'
-    | 'polyline'
-    | 'polygon'
-    | 'rectangle'
-    | 'select'
-    | 'directSelect'
-    | null
-) => {
+const handleModeSelected = (mode: FeatureShapeType | FeatureSelectMode | null) => {
   currentMode.value = mode;
 };
 
 // Handle mode change from editor (for sync)
-const handleModeChanged = (
-  mode: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | null
-) => {
+const handleModeChanged = (mode: FeatureShapeType | null) => {
   currentMode.value = mode;
 };
 
 // Gestion de la création de nouvelles formes
-const handleShapeCreated = (event: DrawEvent) => {
+const handleShapeCreated = (event: FeatureDrawEvent) => {
   const { layer, layerType } = event;
 
   switch (layerType) {
@@ -294,26 +285,21 @@ const onPolygonClosed = (id: number) => {
 };
 
 // Shape selection handlers
-const selectShape = (
-  type: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle',
-  id: number
-) => {
-  console.log('selectShape called:', type, id, 'currentEditMode:', currentEditMode.value);
+const selectShape = (type: FeatureShapeType, id: number) => {
   if (currentEditMode.value === 'select') {
     // Réinitialiser les positions de rotation quand on change de shape
     rotationStartPositions.value = null;
     rotationCenter.value = null;
-    
+
     // Vérifier si c'est la même shape
     const isSameShape = selectedShape.value?.type === type && selectedShape.value?.id === id;
-    
+
     if (!isSameShape) {
       // Forcer la réactivité en réinitialisant d'abord
       selectedShape.value = null;
       // Puis assigner la nouvelle valeur dans le prochain tick
       nextTick(() => {
         selectedShape.value = { type, id };
-        console.log('selectedShape set:', selectedShape.value);
       });
     }
   } else {
@@ -326,7 +312,6 @@ const rotationStartPositions = ref<any>(null);
 const rotationCenter = ref<{ lat: number; lng: number } | null>(null);
 
 const saveRotationStartPositions = () => {
-  console.log('saveRotationStartPositions called, selectedShape:', selectedShape.value);
   if (!selectedShape.value) return;
 
   const { type, id } = selectedShape.value;
@@ -336,7 +321,6 @@ const saveRotationStartPositions = () => {
   if (bounds) {
     const center = bounds.getCenter();
     rotationCenter.value = { lat: center.lat, lng: center.lng };
-    console.log('Rotation center saved:', rotationCenter.value);
   }
 
   switch (type) {
@@ -371,7 +355,6 @@ const saveRotationStartPositions = () => {
         rotationStartPositions.value = polygon.latlngs.map(
           (ll) => [ll[0], ll[1]] as [number, number]
         );
-        console.log('Saved polygon positions:', rotationStartPositions.value);
       }
       break;
     }
@@ -387,16 +370,11 @@ const saveRotationStartPositions = () => {
       break;
     }
   }
-  console.log('rotationStartPositions after save:', rotationStartPositions.value);
 };
 
 // Computed bounding box
 const boundingBox = computed(() => {
-  console.log('boundingBox computed, selectedShape:', selectedShape.value);
-  if (!selectedShape.value || !mapRef.value?.map) return null;
-
-  const L = (window as any).L;
-  if (!L) return null;
+  if (!L.value || !selectedShape.value || !mapRef.value?.map) return null;
 
   const { type, id } = selectedShape.value;
 
@@ -405,10 +383,10 @@ const boundingBox = computed(() => {
       case 'marker': {
         const marker = markers.value.find((m) => m.id === id);
         if (!marker) return null;
-        const point = L.latLng(marker.lat, marker.lng);
+        const point = L.value.latLng(marker.lat, marker.lng);
         // Create a small bounds around the marker
         const offset = 0.001;
-        return L.latLngBounds(
+        return L.value.latLngBounds(
           [marker.lat - offset, marker.lng - offset],
           [marker.lat + offset, marker.lng + offset]
         );
@@ -416,17 +394,11 @@ const boundingBox = computed(() => {
       case 'circle': {
         const circle = circles.value.find((c) => c.id === id);
         if (!circle) return null;
-        const center = L.latLng(circle.lat, circle.lng);
 
-        // Convert radius in meters to degrees
-        // 1 degree of latitude ≈ 111,320 meters (constant)
-        const radiusInLatDegrees = circle.radius / 111320;
+        const radiusInLatDegrees = radiusToLatDegrees(circle.radius);
+        const radiusInLngDegrees = radiusToLngDegrees(circle.radius, circle.lat);
 
-        // 1 degree of longitude varies with latitude: 111,320 * cos(latitude)
-        const radiusInLngDegrees =
-          circle.radius / (111320 * Math.cos((circle.lat * Math.PI) / 180));
-
-        return L.latLngBounds(
+        return L.value.latLngBounds(
           [circle.lat - radiusInLatDegrees, circle.lng - radiusInLngDegrees],
           [circle.lat + radiusInLatDegrees, circle.lng + radiusInLngDegrees]
         );
@@ -434,47 +406,33 @@ const boundingBox = computed(() => {
       case 'polyline': {
         const polyline = polylines.value.find((p) => p.id === id);
         if (!polyline || polyline.latlngs.length === 0) return null;
-        return L.latLngBounds(polyline.latlngs.map((ll) => L.latLng(ll[0], ll[1])));
+        return L.value.latLngBounds(polyline.latlngs.map((ll) => L.value!.latLng(ll[0], ll[1])));
       }
       case 'polygon': {
         const polygon = polygons.value.find((p) => p.id === id);
-        console.log('polygon found:', polygon);
         if (!polygon || polygon.latlngs.length === 0) return null;
-        const bounds = L.latLngBounds(polygon.latlngs.map((ll) => L.latLng(ll[0], ll[1])));
-        console.log('polygon bounds:', bounds);
+        const bounds = L.value.latLngBounds(
+          polygon.latlngs.map((ll) => L.value!.latLng(ll[0], ll[1]))
+        );
         return bounds;
       }
       case 'rectangle': {
         const rectangle = rectangles.value.find((r) => r.id === id);
         if (!rectangle) return null;
-        return L.latLngBounds(rectangle.bounds[0], rectangle.bounds[1]);
+        return L.value.latLngBounds(rectangle.bounds[0], rectangle.bounds[1]);
       }
     }
   } catch (error) {
     console.error('Error computing bounding box:', error);
     return null;
   }
-
-  console.log('boundingBox: returning null at end');
-  return null;
 });
-
-// Watch boundingBox changes
-watch(
-  boundingBox,
-  (newVal) => {
-    console.log('boundingBox changed:', newVal);
-  },
-  { immediate: true }
-);
 
 // Handle bounding box updates (transform operations)
 const handleBoundingBoxUpdate = (newBounds: any) => {
   if (!selectedShape.value) return;
 
   const { type, id } = selectedShape.value;
-  const L = (window as any).L;
-  if (!L) return;
 
   // Calculate transformation ratios
   const oldBounds = boundingBox.value;
@@ -545,13 +503,7 @@ const handleBoundingBoxUpdate = (newBounds: any) => {
 
 // Handle rotation from bounding box
 const handleBoundingBoxRotate = (angle: number) => {
-  console.log('=== handleBoundingBoxRotate ===');
-  console.log('Rotation angle:', angle);
-  console.log('selectedShape:', selectedShape.value);
-  console.log('rotationStartPositions:', rotationStartPositions.value);
-  console.log('rotationCenter:', rotationCenter.value);
-
-  if (!selectedShape.value) return;
+  if (!L.value || !selectedShape.value) return;
 
   // Sauvegarder les positions de départ au premier appel
   if (rotationStartPositions.value === null) {
@@ -559,8 +511,6 @@ const handleBoundingBoxRotate = (angle: number) => {
   }
 
   const { type, id } = selectedShape.value;
-  const L = (window as any).L;
-  if (!L) return;
 
   if (!rotationCenter.value || !rotationStartPositions.value) return;
 
@@ -645,7 +595,7 @@ const handleBoundingBoxRotate = (angle: number) => {
         // Si vous voulez vraiment faire tourner un rectangle, il faudrait le convertir en polygon.
 
         // Pour l'instant, on translate juste le rectangle pour suivre le centre tournant
-        const oldCenter = L.latLng(
+        const oldCenter = L.value.latLng(
           (rotationStartPositions.value[0][0] + rotationStartPositions.value[1][0]) / 2,
           (rotationStartPositions.value[0][1] + rotationStartPositions.value[1][1]) / 2
         );
@@ -706,7 +656,7 @@ const handleBoundingBoxRotateEnd = () => {
 
         <LeafletZoomControl position="topleft" />
 
-        <!-- Draw Control - UI only -->
+        <!-- Draw Control - UI only. We could avoid these controls and have a set of external buttons that act on FeaturesEditor. -->
         <LeafletDrawControl
           position="topright"
           :edit-mode="editMode"
@@ -723,7 +673,7 @@ const handleBoundingBoxRotateEnd = () => {
           @mode-selected="handleModeSelected"
         />
 
-        <!-- Features Editor - Logic only -->
+        <!-- Features Editor - Logic only. TODO: Handle slot to register features. -->
         <LeafletFeaturesEditor
           :enabled="editMode"
           :mode="currentMode"
@@ -731,112 +681,90 @@ const handleBoundingBoxRotateEnd = () => {
           @draw:created="handleShapeCreated"
           @mode-changed="handleModeChanged"
           @edit-mode-changed="handleEditModeChanged"
-        />
+        >
+          <!-- Bounding Box for selected shape in select mode. TODO: handle slot with features editor. -->
+          <LeafletBoundingBox
+            :bounds="boundingBox"
+            :visible="boundingBox !== null && currentEditMode === 'select'"
+            @update:bounds="handleBoundingBoxUpdate"
+            @rotate="handleBoundingBoxRotate"
+            @rotate-end="handleBoundingBoxRotateEnd"
+          >
+            <LeafletBoundingBoxCornerHandle
+              class="bg-blue-500 opacity-30 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+              :size="10"
+            />
+          </LeafletBoundingBox>
 
-        <!-- Bounding Box for selected shape in select mode -->
-        <LeafletBoundingBox
-          v-if="boundingBox"
-          :bounds="boundingBox"
-          :visible="true"
-          @update:bounds="handleBoundingBoxUpdate"
-          @rotate="handleBoundingBoxRotate"
-          @rotate-end="handleBoundingBoxRotateEnd"
-        />
+          <LeafletMarker
+            v-for="marker in markers"
+            :key="`marker-${marker.id}`"
+            :lat="marker.lat"
+            :lng="marker.lng"
+            :draggable="moveableShapes.markers"
+            :editable="editableShapes.markers"
+            @update:lat="(lat) => updateMarker(marker.id, lat, marker.lng)"
+            @update:lng="(lng) => updateMarker(marker.id, marker.lat, lng)"
+            @click="selectShape('marker', marker.id)"
+            @dragstart="selectShape('marker', marker.id)"
+          />
 
-        <LeafletMarker
-          v-for="marker in markers"
-          :key="`marker-${marker.id}`"
-          :lat="marker.lat"
-          :lng="marker.lng"
-          :draggable="moveableShapes.markers"
-          :editable="editableShapes.markers"
-          @update:lat="(lat) => updateMarker(marker.id, lat, marker.lng)"
-          @update:lng="(lng) => updateMarker(marker.id, marker.lat, lng)"
-          @click="selectShape('marker', marker.id)"
-          @dragstart="selectShape('marker', marker.id)"
-        />
+          <LeafletCircle
+            v-for="circle in circles"
+            :key="`circle-${circle.id}`"
+            :lat="circle.lat"
+            :lng="circle.lng"
+            :radius="circle.radius"
+            :class="circle.class"
+            :draggable="moveableShapes.circles"
+            :editable="editableShapes.circles"
+            @update:lat="(lat) => updateCircle(circle.id, { lat })"
+            @update:lng="(lng) => updateCircle(circle.id, { lng })"
+            @update:radius="(radius) => updateCircle(circle.id, { radius })"
+            @click="selectShape('circle', circle.id)"
+            @dragstart="selectShape('circle', circle.id)"
+          />
 
-        <LeafletCircle
-          v-for="circle in circles"
-          :key="`circle-${circle.id}`"
-          :lat="circle.lat"
-          :lng="circle.lng"
-          :radius="circle.radius"
-          :class="circle.class"
-          :draggable="moveableShapes.circles"
-          :editable="editableShapes.circles"
-          @update:lat="(lat) => updateCircle(circle.id, { lat })"
-          @update:lng="(lng) => updateCircle(circle.id, { lng })"
-          @update:radius="(radius) => updateCircle(circle.id, { radius })"
-          @click="selectShape('circle', circle.id)"
-          @dragstart="selectShape('circle', circle.id)"
-        />
+          <LeafletPolyline
+            v-for="polyline in polylines"
+            :key="`polyline-${polyline.id}`"
+            :latlngs="polyline.latlngs"
+            :weight="polyline.weight"
+            :class="polyline.class"
+            :draggable="moveableShapes.polylines"
+            :editable="editableShapes.polylines"
+            @update:latlngs="(latlngs) => updatePolyline(polyline.id, latlngs)"
+            @click="selectShape('polyline', polyline.id)"
+            @dragstart="selectShape('polyline', polyline.id)"
+          />
 
-        <LeafletPolyline
-          v-for="polyline in polylines"
-          :key="`polyline-${polyline.id}`"
-          :latlngs="polyline.latlngs"
-          :weight="polyline.weight"
-          :class="polyline.class"
-          :draggable="moveableShapes.polylines"
-          :editable="editableShapes.polylines"
-          @update:latlngs="(latlngs) => updatePolyline(polyline.id, latlngs)"
-          @click="selectShape('polyline', polyline.id)"
-          @dragstart="selectShape('polyline', polyline.id)"
-        />
+          <LeafletPolygon
+            v-for="polygon in polygons"
+            :key="`polygon-${polygon.id}`"
+            :latlngs="polygon.latlngs"
+            :class="polygon.class"
+            :draggable="moveableShapes.polygons"
+            :editable="editableShapes.polygons"
+            :auto-close="true"
+            @update:latlngs="(latlngs) => updatePolygon(polygon.id, latlngs)"
+            @closed="() => onPolygonClosed(polygon.id)"
+            @click="selectShape('polygon', polygon.id)"
+            @dragstart="selectShape('polygon', polygon.id)"
+          />
 
-        <LeafletPolygon
-          v-for="polygon in polygons"
-          :key="`polygon-${polygon.id}`"
-          :latlngs="polygon.latlngs"
-          :class="polygon.class"
-          :draggable="moveableShapes.polygons"
-          :editable="editableShapes.polygons"
-          :auto-close="true"
-          @update:latlngs="(latlngs) => updatePolygon(polygon.id, latlngs)"
-          @closed="() => onPolygonClosed(polygon.id)"
-          @click="selectShape('polygon', polygon.id)"
-          @dragstart="selectShape('polygon', polygon.id)"
-        />
-
-        <LeafletRectangle
-          v-for="rectangle in rectangles"
-          :key="`rectangle-${rectangle.id}`"
-          :bounds="rectangle.bounds"
-          :class="rectangle.class"
-          :draggable="moveableShapes.rectangles"
-          :editable="editableShapes.rectangles"
-          @update:bounds="(bounds) => updateRectangle(rectangle.id, bounds)"
-          @click="selectShape('rectangle', rectangle.id)"
-          @dragstart="selectShape('rectangle', rectangle.id)"
-        />
+          <LeafletRectangle
+            v-for="rectangle in rectangles"
+            :key="`rectangle-${rectangle.id}`"
+            :bounds="rectangle.bounds"
+            :class="rectangle.class"
+            :draggable="moveableShapes.rectangles"
+            :editable="editableShapes.rectangles"
+            @update:bounds="(bounds) => updateRectangle(rectangle.id, bounds)"
+            @click="selectShape('rectangle', rectangle.id)"
+            @dragstart="selectShape('rectangle', rectangle.id)"
+          />
+        </LeafletFeaturesEditor>
       </LeafletMap>
-    </div>
-
-    <div class="p-4 bg-gray-50 rounded">
-      <h4 class="font-semibold mb-2">Statistics</h4>
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-        <div>
-          <div class="text-gray-500">Markers</div>
-          <div class="text-lg font-bold text-blue-600">{{ markers.length }}</div>
-        </div>
-        <div>
-          <div class="text-gray-500">Circles</div>
-          <div class="text-lg font-bold text-green-600">{{ circles.length }}</div>
-        </div>
-        <div>
-          <div class="text-gray-500">Polylines</div>
-          <div class="text-lg font-bold text-red-600">{{ polylines.length }}</div>
-        </div>
-        <div>
-          <div class="text-gray-500">Polygons</div>
-          <div class="text-lg font-bold text-purple-600">{{ polygons.length }}</div>
-        </div>
-        <div>
-          <div class="text-gray-500">Rectangles</div>
-          <div class="text-lg font-bold text-orange-600">{{ rectangles.length }}</div>
-        </div>
-      </div>
     </div>
   </div>
 </template>

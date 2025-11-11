@@ -138,7 +138,7 @@ const buildGradientRegExp = () => {
 
 const RegExpLib = buildGradientRegExp();
 
-export const useTailwindClassParser = () => {
+export const useCssParser = () => {
   const getTailwindBaseCssValues = (
     el: HTMLElement,
     properties?: string[],

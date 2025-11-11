@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { inject, watch, ref, type Ref, onBeforeUnmount } from 'vue';
-import { LeafletMapKey, LeafletModuleKey } from '.';
+import { LeafletBoundingBoxHandlesKey, LeafletMapKey, LeafletModuleKey } from '.';
+
+export interface LeafletBoundingBoxFeatures {
+  box: Ref<L.Rectangle>;
+  corners: Ref<L.Marker[]>;
+  edges: Ref<L.Marker[]>;
+  rotate: Ref<L.Marker>;
+  center: Ref<L.Marker>;
+}
 
 export interface LeafletBoundingBoxProps {
   bounds?: L.LatLngBounds | null;
@@ -32,8 +40,6 @@ const isDragging = ref(false);
 const isRotating = ref(false);
 const isScaling = ref(false);
 
-let dragStartBounds: L.LatLngBounds | null = null;
-let dragStartMousePoint: L.Point | null = null;
 let scaleStartBounds: L.LatLngBounds | null = null;
 let scaleCornerIndex = -1;
 let rotationStartAngle = 0;
@@ -58,14 +64,7 @@ const clearHandles = () => {
 };
 
 const createBoundingBox = () => {
-  console.log('createBoundingBox called, props:', props);
   if (!props.bounds || !L.value || !map.value || !props.visible) {
-    console.log('Bailing out:', {
-      bounds: !!props.bounds,
-      L: !!L.value,
-      map: !!map.value,
-      visible: props.visible,
-    });
     clearHandles();
     return;
   }
@@ -298,17 +297,13 @@ const createBoundingBox = () => {
     })
     .addTo(map.value);
 
-  console.log('Rotate handle created:', rotateHandle.value);
-
   rotateHandle.value.on('mousedown', () => {
-    console.log('Rotate handle mousedown');
     if (map.value) {
       map.value.getContainer().style.cursor = 'grabbing';
     }
   });
 
   rotateHandle.value.on('dragstart', () => {
-    console.log('Rotate handle dragstart');
     isRotating.value = true;
     if (map.value && props.bounds) {
       map.value.dragging.disable();
@@ -342,14 +337,11 @@ const createBoundingBox = () => {
     // Calculer la rotation relative
     const rotationAngle = currentAngle - rotationStartAngle;
 
-    console.log('Emitting rotate event:', rotationAngle);
-
     // Émettre l'événement de rotation en temps réel
     emit('rotate', rotationAngle);
   });
 
   rotateHandle.value.on('dragend', () => {
-    console.log('Rotate handle dragend');
     isRotating.value = false;
     if (map.value) {
       map.value.getContainer().style.cursor = '';
@@ -384,14 +376,13 @@ const createBoundingBox = () => {
     .marker(center, {
       draggable: false,
       icon: L.value.divIcon({
+        // TODO: Ces classes ne sont plus définies nul part.
         className: 'leaflet-bounding-box-handle leaflet-bounding-box-center',
         html: '<div style="width:12px;height:12px;background:#ff8800;border:2px solid #fff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
         iconSize: [12, 12],
       }),
     })
     .addTo(map.value);
-
-  console.log('Center handle created:', centerHandle.value);
 };
 
 const updateHandlePositions = (bounds: L.LatLngBounds) => {
@@ -452,7 +443,6 @@ watch(
   (newVal, oldVal) => {
     // Si on manipule la bounding box (rotation, scale), ne pas recréer
     if (isRotating.value || isScaling.value) {
-      console.log('Skipping createBoundingBox because manipulation in progress');
       return;
     }
 
@@ -474,12 +464,10 @@ watch(
       cornerHandles.value.length > 0 &&
       boundsChanged
     ) {
-      console.log('Updating bounding box visually', newVal);
       boundingBox.value.setBounds(props.bounds);
       updateHandlePositions(props.bounds);
     } else if (newVal.visible !== oldVal?.visible || !boundingBox.value) {
       // Sinon recréer complètement si visibility change ou pas encore créé
-      console.log('Recreating bounding box');
       createBoundingBox();
     }
   },
@@ -491,4 +479,6 @@ onBeforeUnmount(() => {
 });
 </script>
 
-<template><slot /></template>
+<template>
+  <div data-slot="leaflet-bounding-box"><slot /></div>
+</template>

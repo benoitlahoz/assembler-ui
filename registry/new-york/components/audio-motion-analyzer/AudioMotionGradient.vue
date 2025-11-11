@@ -15,7 +15,7 @@ import {
   type AudioMotionGradientDefinition,
   type AudioMotionGradientProperties,
 } from '.';
-import { useTailwindClassParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
+import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
 
 // TODO: Handle colorMode changes event outside of nuxt.
 export interface AudioMotionGradientProps {
@@ -45,7 +45,7 @@ const deepEqual = (a: any, b: any): boolean => {
 };
 
 const gradientFromClasses = (classes: string = ''): AudioMotionGradientProperties | null => {
-  const { getTailwindBaseCssValues, parseGradient } = useTailwindClassParser();
+  const { getTailwindBaseCssValues, parseGradient } = useCssParser();
 
   const el = document.createElement('div');
   el.className = classes;
@@ -83,7 +83,7 @@ const gradientFromElement = (el: HTMLElement | null): AudioMotionGradientPropert
   const styles = el?.getAttribute('style');
 
   if (styles) {
-    const { parseGradient } = useTailwindClassParser();
+    const { parseGradient } = useCssParser();
     const result = parseGradient(styles);
     if (result) {
       const gradient = {

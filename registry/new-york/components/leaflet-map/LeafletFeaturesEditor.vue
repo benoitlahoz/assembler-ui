@@ -3,31 +3,59 @@ import { ref, inject, watch, onBeforeUnmount } from 'vue';
 import type { Layer, LatLng, LeafletMouseEvent } from 'leaflet';
 import { LeafletMapKey, LeafletModuleKey } from '.';
 
-export interface DrawHandlerOptions {
-  enabled?: boolean;
-  shapeOptions?: any;
-  repeatMode?: boolean;
-}
-
-export interface LeafletFeaturesEditorProps {
-  enabled?: boolean;
-  mode?:
-    | 'marker'
-    | 'circle'
-    | 'polyline'
-    | 'polygon'
-    | 'rectangle'
-    | 'select'
-    | 'directSelect'
-    | null;
-  shapeOptions?: any;
-  repeatMode?: boolean;
-}
-
-export interface DrawEvent {
+export interface FeatureDrawEvent {
   layer: Layer;
   layerType: string;
   type: string;
+}
+
+export interface FeatureDrawHandlerOptions {
+  enabled?: boolean;
+  shapeOptions?: any;
+  repeatMode?: boolean;
+}
+
+export type FeatureShapeType = 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle';
+export type FeatureShapeOptions =
+  | {
+      type: 'marker';
+      id: string;
+      lat: number;
+      lng: number;
+    }
+  | {
+      type: 'circle';
+      id: string;
+      lat: number;
+      lng: number;
+      radius: number;
+    }
+  | {
+      type: 'polyline';
+      id: string;
+      latlngs: Array<{ lat: number; lng: number }>;
+    }
+  | {
+      type: 'polygon';
+      id: string;
+      latlngs: Array<{ lat: number; lng: number }>;
+    }
+  | {
+      type: 'rectangle';
+      id: string;
+      bounds: {
+        southWest: { lat: number; lng: number };
+        northEast: { lat: number; lng: number };
+      };
+    };
+
+export type FeatureSelectMode = 'select' | 'directSelect';
+
+export interface LeafletFeaturesEditorProps {
+  enabled?: boolean;
+  mode?: FeatureShapeType | FeatureSelectMode | null;
+  shapeOptions?: any;
+  repeatMode?: boolean;
 }
 
 const props = withDefaults(defineProps<LeafletFeaturesEditorProps>(), {
@@ -37,14 +65,11 @@ const props = withDefaults(defineProps<LeafletFeaturesEditorProps>(), {
 });
 
 const emit = defineEmits<{
-  (e: 'draw:created', event: DrawEvent): void;
+  (e: 'draw:created', event: FeatureDrawEvent): void;
   (e: 'draw:drawstart', event: { layerType: string }): void;
   (e: 'draw:drawstop', event: { layerType: string }): void;
-  (
-    e: 'mode-changed',
-    mode: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | null
-  ): void;
-  (e: 'edit-mode-changed', mode: 'select' | 'directSelect' | null): void;
+  (e: 'mode-changed', mode: FeatureShapeType | null): void;
+  (e: 'edit-mode-changed', mode: FeatureSelectMode | null): void;
 }>();
 
 const L = inject(LeafletModuleKey, ref());
@@ -63,7 +88,7 @@ const createMarkerHandler = () => {
 
     const marker = L.value.marker(e.latlng, props.shapeOptions || {});
 
-    const event: DrawEvent = {
+    const event: FeatureDrawEvent = {
       layer: marker,
       layerType: 'marker',
       type: 'draw:created',
@@ -136,7 +161,7 @@ const createCircleHandler = () => {
         radius,
       });
 
-      const event: DrawEvent = {
+      const event: FeatureDrawEvent = {
         layer: circle,
         layerType: 'circle',
         type: 'draw:created',
@@ -245,7 +270,7 @@ const createPolylineHandler = () => {
     if (latlngs.length >= 2) {
       const polyline = L.value.polyline(latlngs, props.shapeOptions);
 
-      const event: DrawEvent = {
+      const event: FeatureDrawEvent = {
         layer: polyline,
         layerType: 'polyline',
         type: 'draw:created',
@@ -330,7 +355,7 @@ const createPolygonHandler = () => {
 
     const polygon = L.value.polygon(latlngs, props.shapeOptions);
 
-    const event: DrawEvent = {
+    const event: FeatureDrawEvent = {
       layer: polygon,
       layerType: 'polygon',
       type: 'draw:created',
@@ -401,7 +426,7 @@ const createPolygonHandler = () => {
     if (latlngs.length >= 3) {
       const polygon = L.value.polygon(latlngs, props.shapeOptions);
 
-      const event: DrawEvent = {
+      const event: FeatureDrawEvent = {
         layer: polygon,
         layerType: 'polygon',
         type: 'draw:created',
@@ -570,7 +595,7 @@ const createRectangleHandler = () => {
     if (Math.abs(sw.lat - ne.lat) > 0.00001 || Math.abs(sw.lng - ne.lng) > 0.00001) {
       const rectangle = L.value.rectangle(bounds, props.shapeOptions);
 
-      const event: DrawEvent = {
+      const event: FeatureDrawEvent = {
         layer: rectangle,
         layerType: 'rectangle',
         type: 'draw:created',
@@ -736,5 +761,5 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <!-- This component has no visual representation - it only handles drawing logic -->
+  <slot />
 </template>

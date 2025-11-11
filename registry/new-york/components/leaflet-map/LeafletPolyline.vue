@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount, type HTMLAttributes } from 'vue';
-import { useTailwindClassParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
+import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
 import { LeafletMapKey, LeafletModuleKey } from '.';
 import './leaflet-editing.css';
 
@@ -25,7 +25,7 @@ const emit = defineEmits<{
   dragstart: [];
 }>();
 
-const { getLeafletLineColors } = useTailwindClassParser();
+const { getLeafletLineColors } = useCssParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));

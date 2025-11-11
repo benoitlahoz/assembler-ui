@@ -123,7 +123,6 @@ Copy and paste these files into your project.
 import type { InjectionKey, Ref } from "vue";
 import type * as L from "leaflet";
 import type { Map, TileLayerOptions } from "leaflet";
-
 type L = typeof L;
 
 export { default as LeafletMap } from "./LeafletMap.vue";
@@ -131,6 +130,7 @@ export { default as LeafletZoomControl } from "./LeafletZoomControl.vue";
 export { default as LeafletDrawControl } from "./LeafletDrawControl.vue";
 export { default as LeafletFeaturesEditor } from "./LeafletFeaturesEditor.vue";
 export { default as LeafletBoundingBox } from "./LeafletBoundingBox.vue";
+export { default as LeafletBoundingBoxCornerHandle } from "./LeafletBoundingBoxCornerHandle.vue";
 export { default as LeafletTileLayer } from "./LeafletTileLayer.vue";
 export { default as LeafletMarker } from "./LeafletMarker.vue";
 export { default as LeafletCircle } from "./LeafletCircle.vue";
@@ -147,6 +147,8 @@ export const LeafletTileLayersKey: InjectionKey<
 > = Symbol("LeafletTileLayerOptions");
 export const LeafletErrorsKey: InjectionKey<Ref<Error[]>> =
   Symbol("LeafletErrors");
+export const LeafletBoundingBoxHandlesKey: InjectionKey<Ref<L.Marker<any>[]>> =
+  Symbol("LeafletBoundingBoxHandles");
 
 export type { LeafletMapProps } from "./LeafletMap.vue";
 export type { LeafletMapExposed } from "./LeafletMap.vue";
@@ -154,9 +156,14 @@ export type { LeafletZoomControlProps } from "./LeafletZoomControl.vue";
 export type { LeafletDrawControlProps } from "./LeafletDrawControl.vue";
 export type {
   LeafletFeaturesEditorProps,
-  DrawEvent,
+  FeatureDrawEvent,
+  FeatureSelectMode,
+  FeatureShapeType,
 } from "./LeafletFeaturesEditor.vue";
-export type { LeafletBoundingBoxProps } from "./LeafletBoundingBox.vue";
+export type {
+  LeafletBoundingBoxProps,
+  LeafletBoundingBoxFeatures,
+} from "./LeafletBoundingBox.vue";
 export type { LeafletTileLayerProps } from "./LeafletTileLayer.vue";
 export type { LeafletMarkerProps } from "./LeafletMarker.vue";
 export type { LeafletCircleProps } from "./LeafletCircle.vue";
@@ -179,6 +186,7 @@ import {
   onBeforeUnmount,
 } from "vue";
 import { cn } from "@/lib/utils";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import {
   LeafletErrorsKey,
   LeafletMapKey,
@@ -186,7 +194,7 @@ import {
   LeafletTileLayersKey,
 } from ".";
 import type Leaflet from "leaflet";
-import type { LeafletMouseEvent, Map } from "leaflet";
+import type { LeafletMouseEvent } from "leaflet";
 type Leaflet = typeof Leaflet;
 
 export interface LeafletMapExposed {
@@ -313,8 +321,9 @@ onMounted(() => {
     nextTick(async () => {
       if (typeof window === "undefined") return;
 
-      await import("leaflet/dist/leaflet.css");
-      L.value = (await import("leaflet")).default;
+      const { L: ImportedLeaflet } = await useLeaflet();
+      L.value = ImportedLeaflet.value;
+
       nextTick(() => {
         if (!L.value) return;
         map.value = L.value
@@ -375,7 +384,19 @@ defineExpose<LeafletMapExposed>({
 ```vue [src/components/ui/leaflet-map/LeafletBoundingBox.vue]
 <script setup lang="ts">
 import { inject, watch, ref, type Ref, onBeforeUnmount } from "vue";
-import { LeafletMapKey, LeafletModuleKey } from ".";
+import {
+  LeafletBoundingBoxHandlesKey,
+  LeafletMapKey,
+  LeafletModuleKey,
+} from ".";
+
+export interface LeafletBoundingBoxFeatures {
+  box: Ref<L.Rectangle>;
+  corners: Ref<L.Marker[]>;
+  edges: Ref<L.Marker[]>;
+  rotate: Ref<L.Marker>;
+  center: Ref<L.Marker>;
+}
 
 export interface LeafletBoundingBoxProps {
   bounds?: L.LatLngBounds | null;
@@ -407,8 +428,6 @@ const isDragging = ref(false);
 const isRotating = ref(false);
 const isScaling = ref(false);
 
-let dragStartBounds: L.LatLngBounds | null = null;
-let dragStartMousePoint: L.Point | null = null;
 let scaleStartBounds: L.LatLngBounds | null = null;
 let scaleCornerIndex = -1;
 let rotationStartAngle = 0;
@@ -433,14 +452,7 @@ const clearHandles = () => {
 };
 
 const createBoundingBox = () => {
-  console.log("createBoundingBox called, props:", props);
   if (!props.bounds || !L.value || !map.value || !props.visible) {
-    console.log("Bailing out:", {
-      bounds: !!props.bounds,
-      L: !!L.value,
-      map: !!map.value,
-      visible: props.visible,
-    });
     clearHandles();
     return;
   }
@@ -678,17 +690,13 @@ const createBoundingBox = () => {
     })
     .addTo(map.value);
 
-  console.log("Rotate handle created:", rotateHandle.value);
-
   rotateHandle.value.on("mousedown", () => {
-    console.log("Rotate handle mousedown");
     if (map.value) {
       map.value.getContainer().style.cursor = "grabbing";
     }
   });
 
   rotateHandle.value.on("dragstart", () => {
-    console.log("Rotate handle dragstart");
     isRotating.value = true;
     if (map.value && props.bounds) {
       map.value.dragging.disable();
@@ -717,13 +725,10 @@ const createBoundingBox = () => {
 
     const rotationAngle = currentAngle - rotationStartAngle;
 
-    console.log("Emitting rotate event:", rotationAngle);
-
     emit("rotate", rotationAngle);
   });
 
   rotateHandle.value.on("dragend", () => {
-    console.log("Rotate handle dragend");
     isRotating.value = false;
     if (map.value) {
       map.value.getContainer().style.cursor = "";
@@ -760,8 +765,6 @@ const createBoundingBox = () => {
       }),
     })
     .addTo(map.value);
-
-  console.log("Center handle created:", centerHandle.value);
 };
 
 const updateHandlePositions = (bounds: L.LatLngBounds) => {
@@ -834,9 +837,6 @@ watch(
   },
   (newVal, oldVal) => {
     if (isRotating.value || isScaling.value) {
-      console.log(
-        "Skipping createBoundingBox because manipulation in progress",
-      );
       return;
     }
 
@@ -856,11 +856,9 @@ watch(
       cornerHandles.value.length > 0 &&
       boundsChanged
     ) {
-      console.log("Updating bounding box visually", newVal);
       boundingBox.value.setBounds(props.bounds);
       updateHandlePositions(props.bounds);
     } else if (newVal.visible !== oldVal?.visible || !boundingBox.value) {
-      console.log("Recreating bounding box");
       createBoundingBox();
     }
   },
@@ -872,7 +870,53 @@ onBeforeUnmount(() => {
 });
 </script>
 
-<template><slot /></template>
+<template>
+  <div data-slot="leaflet-bounding-box"><slot /></div>
+</template>
+```
+
+```vue [src/components/ui/leaflet-map/LeafletBoundingBoxCornerHandle.vue]
+<script setup lang="ts">
+import { watch, type HTMLAttributes } from "vue";
+import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
+
+export interface LeafletCornerHandleProps {
+  class?: HTMLAttributes["class"];
+  size?: number;
+}
+
+const props = withDefaults(defineProps<LeafletCornerHandleProps>(), {
+  class: "",
+  size: 8,
+});
+
+const { getTailwindBaseCssValues } = useCssParser();
+
+watch(
+  () => [props.class, props.size],
+  () => {
+    console.log("Props changed:", props.class, props.size);
+    const el = document.createElement("div");
+    el.className = props.class || "";
+    el.style.position = "absolute";
+    el.style.visibility = "hidden";
+    el.style.zIndex = "-9999";
+    document.body.appendChild(el);
+    const config = getTailwindBaseCssValues(el, [
+      "background-color",
+      "color",
+      "opacity",
+      "border-radius",
+      "box-shadow",
+    ]);
+    document.body.removeChild(el);
+    console.log("Parsed CSS config:", config);
+  },
+  { immediate: true },
+);
+</script>
+
+<template></template>
 ```
 
 ```vue [src/components/ui/leaflet-map/LeafletCircle.vue]
@@ -887,7 +931,7 @@ import {
   type HTMLAttributes,
   onMounted,
 } from "vue";
-import { useTailwindClassParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
+import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { LeafletMapKey, LeafletModuleKey } from ".";
 import "./leaflet-editing.css";
 
@@ -913,9 +957,10 @@ const emit = defineEmits<{
   "update:lng": [lng: number];
   "update:radius": [radius: number];
   click: [];
+  dragstart: [];
 }>();
 
-const { getLeafletShapeColors } = useTailwindClassParser();
+const { getLeafletShapeColors } = useCssParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
@@ -949,6 +994,8 @@ const enableDragging = () => {
     L.value!.DomEvent.stopPropagation(e);
     map.value.dragging.disable();
     map.value.getContainer().style.cursor = "move";
+
+    emit("dragstart");
   };
 
   circle.value.on("mousedown", onMouseDown);
@@ -975,6 +1022,9 @@ const setupMapDragHandlers = () => {
     const newLatLng = map.value.containerPointToLatLng(newPoint);
 
     circle.value.setLatLng(newLatLng);
+
+    emit("update:lat", newLatLng.lat);
+    emit("update:lng", newLatLng.lng);
 
     if (radiusMarker.value && props.editable) {
       const radius = circle.value.getRadius();
@@ -1436,31 +1486,64 @@ import { ref, inject, watch, onBeforeUnmount } from "vue";
 import type { Layer, LatLng, LeafletMouseEvent } from "leaflet";
 import { LeafletMapKey, LeafletModuleKey } from ".";
 
-export interface DrawHandlerOptions {
-  enabled?: boolean;
-  shapeOptions?: any;
-  repeatMode?: boolean;
-}
-
-export interface LeafletFeaturesEditorProps {
-  enabled?: boolean;
-  mode?:
-    | "marker"
-    | "circle"
-    | "polyline"
-    | "polygon"
-    | "rectangle"
-    | "select"
-    | "directSelect"
-    | null;
-  shapeOptions?: any;
-  repeatMode?: boolean;
-}
-
-export interface DrawEvent {
+export interface FeatureDrawEvent {
   layer: Layer;
   layerType: string;
   type: string;
+}
+
+export interface FeatureDrawHandlerOptions {
+  enabled?: boolean;
+  shapeOptions?: any;
+  repeatMode?: boolean;
+}
+
+export type FeatureShapeType =
+  | "marker"
+  | "circle"
+  | "polyline"
+  | "polygon"
+  | "rectangle";
+export type FeatureShapeOptions =
+  | {
+      type: "marker";
+      id: string;
+      lat: number;
+      lng: number;
+    }
+  | {
+      type: "circle";
+      id: string;
+      lat: number;
+      lng: number;
+      radius: number;
+    }
+  | {
+      type: "polyline";
+      id: string;
+      latlngs: Array<{ lat: number; lng: number }>;
+    }
+  | {
+      type: "polygon";
+      id: string;
+      latlngs: Array<{ lat: number; lng: number }>;
+    }
+  | {
+      type: "rectangle";
+      id: string;
+      bounds: {
+        southWest: { lat: number; lng: number };
+        northEast: { lat: number; lng: number };
+      };
+    };
+
+export type FeatureSelectMode = "select" | "directSelect";
+
+export interface LeafletFeaturesEditorProps {
+  enabled?: boolean;
+  mode?: FeatureShapeType | FeatureSelectMode | null;
+  shapeOptions?: any;
+  repeatMode?: boolean;
 }
 
 const props = withDefaults(defineProps<LeafletFeaturesEditorProps>(), {
@@ -1470,14 +1553,11 @@ const props = withDefaults(defineProps<LeafletFeaturesEditorProps>(), {
 });
 
 const emit = defineEmits<{
-  (e: "draw:created", event: DrawEvent): void;
+  (e: "draw:created", event: FeatureDrawEvent): void;
   (e: "draw:drawstart", event: { layerType: string }): void;
   (e: "draw:drawstop", event: { layerType: string }): void;
-  (
-    e: "mode-changed",
-    mode: "marker" | "circle" | "polyline" | "polygon" | "rectangle" | null,
-  ): void;
-  (e: "edit-mode-changed", mode: "select" | "directSelect" | null): void;
+  (e: "mode-changed", mode: FeatureShapeType | null): void;
+  (e: "edit-mode-changed", mode: FeatureSelectMode | null): void;
 }>();
 
 const L = inject(LeafletModuleKey, ref());
@@ -1495,7 +1575,7 @@ const createMarkerHandler = () => {
 
     const marker = L.value.marker(e.latlng, props.shapeOptions || {});
 
-    const event: DrawEvent = {
+    const event: FeatureDrawEvent = {
       layer: marker,
       layerType: "marker",
       type: "draw:created",
@@ -1564,7 +1644,7 @@ const createCircleHandler = () => {
         radius,
       });
 
-      const event: DrawEvent = {
+      const event: FeatureDrawEvent = {
         layer: circle,
         layerType: "circle",
         type: "draw:created",
@@ -1671,7 +1751,7 @@ const createPolylineHandler = () => {
     if (latlngs.length >= 2) {
       const polyline = L.value.polyline(latlngs, props.shapeOptions);
 
-      const event: DrawEvent = {
+      const event: FeatureDrawEvent = {
         layer: polyline,
         layerType: "polyline",
         type: "draw:created",
@@ -1753,7 +1833,7 @@ const createPolygonHandler = () => {
 
     const polygon = L.value.polygon(latlngs, props.shapeOptions);
 
-    const event: DrawEvent = {
+    const event: FeatureDrawEvent = {
       layer: polygon,
       layerType: "polygon",
       type: "draw:created",
@@ -1823,7 +1903,7 @@ const createPolygonHandler = () => {
     if (latlngs.length >= 3) {
       const polygon = L.value.polygon(latlngs, props.shapeOptions);
 
-      const event: DrawEvent = {
+      const event: FeatureDrawEvent = {
         layer: polygon,
         layerType: "polygon",
         type: "draw:created",
@@ -1989,7 +2069,7 @@ const createRectangleHandler = () => {
     ) {
       const rectangle = L.value.rectangle(bounds, props.shapeOptions);
 
-      const event: DrawEvent = {
+      const event: FeatureDrawEvent = {
         layer: rectangle,
         layerType: "rectangle",
         type: "draw:created",
@@ -2146,7 +2226,9 @@ onBeforeUnmount(() => {
 });
 </script>
 
-<template></template>
+<template>
+  <slot />
+</template>
 ```
 
 ```vue [src/components/ui/leaflet-map/LeafletMarker.vue]
@@ -2311,7 +2393,7 @@ import {
   onBeforeUnmount,
   type HTMLAttributes,
 } from "vue";
-import { useTailwindClassParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
+import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { LeafletMapKey, LeafletModuleKey } from ".";
 import "./leaflet-editing.css";
 
@@ -2339,7 +2421,7 @@ const emit = defineEmits<{
   dragstart: [];
 }>();
 
-const { getLeafletShapeColors } = useTailwindClassParser();
+const { getLeafletShapeColors } = useCssParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
@@ -2680,7 +2762,7 @@ import {
   onBeforeUnmount,
   type HTMLAttributes,
 } from "vue";
-import { useTailwindClassParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
+import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { LeafletMapKey, LeafletModuleKey } from ".";
 import "./leaflet-editing.css";
 
@@ -2705,7 +2787,7 @@ const emit = defineEmits<{
   dragstart: [];
 }>();
 
-const { getLeafletLineColors } = useTailwindClassParser();
+const { getLeafletLineColors } = useCssParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
@@ -3025,7 +3107,7 @@ import {
   onBeforeUnmount,
   type HTMLAttributes,
 } from "vue";
-import { useTailwindClassParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
+import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { LeafletMapKey, LeafletModuleKey } from ".";
 import "./leaflet-editing.css";
 
@@ -3048,9 +3130,10 @@ const props = withDefaults(defineProps<LeafletRectangleProps>(), {
 const emit = defineEmits<{
   "update:bounds": [bounds: [[number, number], [number, number]]];
   click: [];
+  dragstart: [];
 }>();
 
-const { getLeafletShapeColors } = useTailwindClassParser();
+const { getLeafletShapeColors } = useCssParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
@@ -3157,6 +3240,8 @@ const enableDragging = () => {
     L.value!.DomEvent.stopPropagation(e);
     isDragging.value = true;
 
+    emit("dragstart");
+
     dragStartBounds = rectangle.value!.getBounds();
     dragStartMousePoint = map.value!.latLngToContainerPoint(e.latlng);
 
@@ -3207,6 +3292,11 @@ const setupMapDragHandlers = () => {
     const newBounds = L.value!.latLngBounds(newSW, newNE);
 
     rectangle.value!.setBounds(newBounds);
+
+    emit("update:bounds", [
+      [newBounds.getSouth(), newBounds.getWest()],
+      [newBounds.getNorth(), newBounds.getEast()],
+    ]);
   };
 
   const onMouseUp = () => {
@@ -3514,7 +3604,7 @@ const buildGradientRegExp = () => {
 
 const RegExpLib = buildGradientRegExp();
 
-export const useTailwindClassParser = () => {
+export const useCssParser = () => {
   const getTailwindBaseCssValues = (
     el: HTMLElement,
     properties?: string[],
@@ -3710,6 +3800,49 @@ export const useTailwindClassParser = () => {
   };
 };
 ```
+
+```ts [src/composables/use-leaflet/useLeaflet.ts]
+import { ref, type Ref } from "vue";
+import type Leaflet from "leaflet";
+type Leaflet = typeof Leaflet;
+
+let L: Ref<Leaflet | undefined> = ref(undefined);
+
+const LatDegreesMeters = 111320;
+
+export const useLeaflet = async () => {
+  if (typeof window !== "undefined") {
+    await import("leaflet/dist/leaflet.css");
+    L.value = (await import("leaflet")).default;
+  }
+
+  const radiusToLatDegrees = (radiusInMeters: number) => {
+    return radiusInMeters / LatDegreesMeters;
+  };
+
+  const latDegreesToRadius = (latDegrees: number) => {
+    return latDegrees * LatDegreesMeters;
+  };
+
+  const radiusToLngDegrees = (radiusInMeters: number, lat: number) => {
+    return (
+      radiusInMeters / (LatDegreesMeters * Math.cos((lat * Math.PI) / 180))
+    );
+  };
+
+  const lngDegreesToRadius = (lngDegrees: number, lat: number) => {
+    return lngDegrees * LatDegreesMeters * Math.cos((lat * Math.PI) / 180);
+  };
+
+  return {
+    L,
+    radiusToLatDegrees,
+    latDegreesToRadius,
+    radiusToLngDegrees,
+    lngDegreesToRadius,
+  };
+};
+```
 :::
 
 ## LeafletMap
@@ -3780,6 +3913,20 @@ export const useTailwindClassParser = () => {
 |-----|--------|------|-------------|
 | `LeafletModuleKey`{.primary .text-primary} | `ref()` | `any` | — |
 | `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
+
+---
+
+## LeafletBoundingBoxCornerHandle
+::hr-underline
+::
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `class`{.primary .text-primary} | `HTMLAttributes['class']` | — |  |
+| `size`{.primary .text-primary} | `number` | 8 |  |
 
 ---
 
@@ -3857,14 +4004,7 @@ export const useTailwindClassParser = () => {
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `enabled`{.primary .text-primary} | `boolean` | false |  |
-| `mode`{.primary .text-primary} | `\| 'marker'
-    \| 'circle'
-    \| 'polyline'
-    \| 'polygon'
-    \| 'rectangle'
-    \| 'select'
-    \| 'directSelect'
-    \| null` |  |  |
+| `mode`{.primary .text-primary} | `FeatureShapeType \| FeatureSelectMode \| null` |  |  |
 | `shapeOptions`{.primary .text-primary} | `any` | - |  |
 | `repeatMode`{.primary .text-primary} | `boolean` | false |  |
 
@@ -3876,6 +4016,11 @@ export const useTailwindClassParser = () => {
 | `draw:drawstop`{.primary .text-primary} | — |
 | `mode-changed`{.primary .text-primary} | — |
 | `edit-mode-changed`{.primary .text-primary} | — |
+
+  ### Slots
+| Name | Description |
+|------|-------------|
+| `default`{.primary .text-primary} | — |
 
   ### Inject
 | Key | Default | Type | Description |
@@ -4054,8 +4199,9 @@ export const useTailwindClassParser = () => {
   :::tabs-item{icon="i-lucide-code" label="Code"}
 ```vue
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, nextTick } from "vue";
 import { Button } from "@/components/ui/button";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import {
   LeafletMap,
   LeafletTileLayer,
@@ -4063,16 +4209,21 @@ import {
   LeafletDrawControl,
   LeafletFeaturesEditor,
   LeafletBoundingBox,
+  LeafletBoundingBoxCornerHandle,
   LeafletMarker,
   LeafletCircle,
   LeafletPolyline,
   LeafletPolygon,
   LeafletRectangle,
   type LeafletMapExposed,
-  type DrawEvent,
+  type FeatureDrawEvent,
+  type FeatureSelectMode,
+  type FeatureShapeType,
 } from "@/components/ui/leaflet-map";
 
 const mapRef = ref<LeafletMapExposed | null>(null);
+
+const { L, radiusToLatDegrees, radiusToLngDegrees } = await useLeaflet();
 
 const selectedShape = ref<{
   type: "marker" | "circle" | "polyline" | "polygon" | "rectangle";
@@ -4081,18 +4232,9 @@ const selectedShape = ref<{
 
 const editMode = ref(false);
 
-const currentMode = ref<
-  | "marker"
-  | "circle"
-  | "polyline"
-  | "polygon"
-  | "rectangle"
-  | "select"
-  | "directSelect"
-  | null
->(null);
+const currentMode = ref<FeatureShapeType | FeatureSelectMode | null>(null);
 
-const currentEditMode = ref<"select" | "directSelect" | null>(null);
+const currentEditMode = ref<FeatureSelectMode | null>(null);
 
 const markers = ref([
   { id: 1, lat: 48.8566, lng: 2.3522, label: "Paris" },
@@ -4181,7 +4323,7 @@ watch(editMode, (enabled) => {
   }
 });
 
-const handleEditModeChanged = (mode: "select" | "directSelect" | null) => {
+const handleEditModeChanged = (mode: FeatureSelectMode | null) => {
   currentEditMode.value = mode;
 
   if (mode !== "select") {
@@ -4217,26 +4359,16 @@ const handleEditModeChanged = (mode: "select" | "directSelect" | null) => {
 };
 
 const handleModeSelected = (
-  mode:
-    | "marker"
-    | "circle"
-    | "polyline"
-    | "polygon"
-    | "rectangle"
-    | "select"
-    | "directSelect"
-    | null,
+  mode: FeatureShapeType | FeatureSelectMode | null,
 ) => {
   currentMode.value = mode;
 };
 
-const handleModeChanged = (
-  mode: "marker" | "circle" | "polyline" | "polygon" | "rectangle" | null,
-) => {
+const handleModeChanged = (mode: FeatureShapeType | null) => {
   currentMode.value = mode;
 };
 
-const handleShapeCreated = (event: DrawEvent) => {
+const handleShapeCreated = (event: FeatureDrawEvent) => {
   const { layer, layerType } = event;
 
   switch (layerType) {
@@ -4368,23 +4500,21 @@ const onPolygonClosed = (id: number) => {
   editableShapes.value.polygons = false;
 };
 
-const selectShape = (
-  type: "marker" | "circle" | "polyline" | "polygon" | "rectangle",
-  id: number,
-) => {
-  console.log(
-    "selectShape called:",
-    type,
-    id,
-    "currentEditMode:",
-    currentEditMode.value,
-  );
+const selectShape = (type: FeatureShapeType, id: number) => {
   if (currentEditMode.value === "select") {
-    selectedShape.value = { type, id };
-    console.log("selectedShape set:", selectedShape.value);
-
     rotationStartPositions.value = null;
     rotationCenter.value = null;
+
+    const isSameShape =
+      selectedShape.value?.type === type && selectedShape.value?.id === id;
+
+    if (!isSameShape) {
+      selectedShape.value = null;
+
+      nextTick(() => {
+        selectedShape.value = { type, id };
+      });
+    }
   } else {
     selectedShape.value = null;
   }
@@ -4394,10 +4524,6 @@ const rotationStartPositions = ref<any>(null);
 const rotationCenter = ref<{ lat: number; lng: number } | null>(null);
 
 const saveRotationStartPositions = () => {
-  console.log(
-    "saveRotationStartPositions called, selectedShape:",
-    selectedShape.value,
-  );
   if (!selectedShape.value) return;
 
   const { type, id } = selectedShape.value;
@@ -4406,7 +4532,6 @@ const saveRotationStartPositions = () => {
   if (bounds) {
     const center = bounds.getCenter();
     rotationCenter.value = { lat: center.lat, lng: center.lng };
-    console.log("Rotation center saved:", rotationCenter.value);
   }
 
   switch (type) {
@@ -4439,7 +4564,6 @@ const saveRotationStartPositions = () => {
         rotationStartPositions.value = polygon.latlngs.map(
           (ll) => [ll[0], ll[1]] as [number, number],
         );
-        console.log("Saved polygon positions:", rotationStartPositions.value);
       }
       break;
     }
@@ -4454,18 +4578,10 @@ const saveRotationStartPositions = () => {
       break;
     }
   }
-  console.log(
-    "rotationStartPositions after save:",
-    rotationStartPositions.value,
-  );
 };
 
 const boundingBox = computed(() => {
-  console.log("boundingBox computed, selectedShape:", selectedShape.value);
-  if (!selectedShape.value || !mapRef.value?.map) return null;
-
-  const L = (window as any).L;
-  if (!L) return null;
+  if (!L.value || !selectedShape.value || !mapRef.value?.map) return null;
 
   const { type, id } = selectedShape.value;
 
@@ -4474,10 +4590,10 @@ const boundingBox = computed(() => {
       case "marker": {
         const marker = markers.value.find((m) => m.id === id);
         if (!marker) return null;
-        const point = L.latLng(marker.lat, marker.lng);
+        const point = L.value.latLng(marker.lat, marker.lng);
 
         const offset = 0.001;
-        return L.latLngBounds(
+        return L.value.latLngBounds(
           [marker.lat - offset, marker.lng - offset],
           [marker.lat + offset, marker.lng + offset],
         );
@@ -4485,14 +4601,14 @@ const boundingBox = computed(() => {
       case "circle": {
         const circle = circles.value.find((c) => c.id === id);
         if (!circle) return null;
-        const center = L.latLng(circle.lat, circle.lng);
 
-        const radiusInLatDegrees = circle.radius / 111320;
+        const radiusInLatDegrees = radiusToLatDegrees(circle.radius);
+        const radiusInLngDegrees = radiusToLngDegrees(
+          circle.radius,
+          circle.lat,
+        );
 
-        const radiusInLngDegrees =
-          circle.radius / (111320 * Math.cos((circle.lat * Math.PI) / 180));
-
-        return L.latLngBounds(
+        return L.value.latLngBounds(
           [circle.lat - radiusInLatDegrees, circle.lng - radiusInLngDegrees],
           [circle.lat + radiusInLatDegrees, circle.lng + radiusInLngDegrees],
         );
@@ -4500,49 +4616,34 @@ const boundingBox = computed(() => {
       case "polyline": {
         const polyline = polylines.value.find((p) => p.id === id);
         if (!polyline || polyline.latlngs.length === 0) return null;
-        return L.latLngBounds(
-          polyline.latlngs.map((ll) => L.latLng(ll[0], ll[1])),
+        return L.value.latLngBounds(
+          polyline.latlngs.map((ll) => L.value!.latLng(ll[0], ll[1])),
         );
       }
       case "polygon": {
         const polygon = polygons.value.find((p) => p.id === id);
-        console.log("polygon found:", polygon);
         if (!polygon || polygon.latlngs.length === 0) return null;
-        const bounds = L.latLngBounds(
-          polygon.latlngs.map((ll) => L.latLng(ll[0], ll[1])),
+        const bounds = L.value.latLngBounds(
+          polygon.latlngs.map((ll) => L.value!.latLng(ll[0], ll[1])),
         );
-        console.log("polygon bounds:", bounds);
         return bounds;
       }
       case "rectangle": {
         const rectangle = rectangles.value.find((r) => r.id === id);
         if (!rectangle) return null;
-        return L.latLngBounds(rectangle.bounds[0], rectangle.bounds[1]);
+        return L.value.latLngBounds(rectangle.bounds[0], rectangle.bounds[1]);
       }
     }
   } catch (error) {
     console.error("Error computing bounding box:", error);
     return null;
   }
-
-  console.log("boundingBox: returning null at end");
-  return null;
 });
-
-watch(
-  boundingBox,
-  (newVal) => {
-    console.log("boundingBox changed:", newVal);
-  },
-  { immediate: true },
-);
 
 const handleBoundingBoxUpdate = (newBounds: any) => {
   if (!selectedShape.value) return;
 
   const { type, id } = selectedShape.value;
-  const L = (window as any).L;
-  if (!L) return;
 
   const oldBounds = boundingBox.value;
   if (!oldBounds) return;
@@ -4618,21 +4719,13 @@ const handleBoundingBoxUpdate = (newBounds: any) => {
 };
 
 const handleBoundingBoxRotate = (angle: number) => {
-  console.log("=== handleBoundingBoxRotate ===");
-  console.log("Rotation angle:", angle);
-  console.log("selectedShape:", selectedShape.value);
-  console.log("rotationStartPositions:", rotationStartPositions.value);
-  console.log("rotationCenter:", rotationCenter.value);
-
-  if (!selectedShape.value) return;
+  if (!L.value || !selectedShape.value) return;
 
   if (rotationStartPositions.value === null) {
     saveRotationStartPositions();
   }
 
   const { type, id } = selectedShape.value;
-  const L = (window as any).L;
-  if (!L) return;
 
   if (!rotationCenter.value || !rotationStartPositions.value) return;
 
@@ -4709,7 +4802,7 @@ const handleBoundingBoxRotate = (angle: number) => {
     case "rectangle": {
       const rectangle = rectangles.value.find((r) => r.id === id);
       if (rectangle) {
-        const oldCenter = L.latLng(
+        const oldCenter = L.value.latLng(
           (rotationStartPositions.value[0][0] +
             rotationStartPositions.value[1][0]) /
             2,
@@ -4800,119 +4893,89 @@ const handleBoundingBoxRotateEnd = () => {
           @draw:created="handleShapeCreated"
           @mode-changed="handleModeChanged"
           @edit-mode-changed="handleEditModeChanged"
-        />
+        >
+          <LeafletBoundingBox
+            :bounds="boundingBox"
+            :visible="boundingBox !== null && currentEditMode === 'select'"
+            @update:bounds="handleBoundingBoxUpdate"
+            @rotate="handleBoundingBoxRotate"
+            @rotate-end="handleBoundingBoxRotateEnd"
+          >
+            <LeafletBoundingBoxCornerHandle
+              class="text-blue-500 bg-blue-500 opacity-30 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+              :size="10"
+            />
+          </LeafletBoundingBox>
 
-        <LeafletBoundingBox
-          v-if="boundingBox"
-          :bounds="boundingBox"
-          :visible="true"
-          @update:bounds="handleBoundingBoxUpdate"
-          @rotate="handleBoundingBoxRotate"
-          @rotate-end="handleBoundingBoxRotateEnd"
-        />
+          <LeafletMarker
+            v-for="marker in markers"
+            :key="`marker-${marker.id}`"
+            :lat="marker.lat"
+            :lng="marker.lng"
+            :draggable="moveableShapes.markers"
+            :editable="editableShapes.markers"
+            @update:lat="(lat) => updateMarker(marker.id, lat, marker.lng)"
+            @update:lng="(lng) => updateMarker(marker.id, marker.lat, lng)"
+            @click="selectShape('marker', marker.id)"
+            @dragstart="selectShape('marker', marker.id)"
+          />
 
-        <LeafletMarker
-          v-for="marker in markers"
-          :key="`marker-${marker.id}`"
-          :lat="marker.lat"
-          :lng="marker.lng"
-          :draggable="moveableShapes.markers"
-          :editable="editableShapes.markers"
-          @update:lat="(lat) => updateMarker(marker.id, lat, marker.lng)"
-          @update:lng="(lng) => updateMarker(marker.id, marker.lat, lng)"
-          @click="selectShape('marker', marker.id)"
-          @dragstart="selectShape('marker', marker.id)"
-        />
+          <LeafletCircle
+            v-for="circle in circles"
+            :key="`circle-${circle.id}`"
+            :lat="circle.lat"
+            :lng="circle.lng"
+            :radius="circle.radius"
+            :class="circle.class"
+            :draggable="moveableShapes.circles"
+            :editable="editableShapes.circles"
+            @update:lat="(lat) => updateCircle(circle.id, { lat })"
+            @update:lng="(lng) => updateCircle(circle.id, { lng })"
+            @update:radius="(radius) => updateCircle(circle.id, { radius })"
+            @click="selectShape('circle', circle.id)"
+            @dragstart="selectShape('circle', circle.id)"
+          />
 
-        <LeafletCircle
-          v-for="circle in circles"
-          :key="`circle-${circle.id}`"
-          :lat="circle.lat"
-          :lng="circle.lng"
-          :radius="circle.radius"
-          :class="circle.class"
-          :draggable="moveableShapes.circles"
-          :editable="editableShapes.circles"
-          @update:lat="(lat) => updateCircle(circle.id, { lat })"
-          @update:lng="(lng) => updateCircle(circle.id, { lng })"
-          @update:radius="(radius) => updateCircle(circle.id, { radius })"
-          @click="selectShape('circle', circle.id)"
-        />
+          <LeafletPolyline
+            v-for="polyline in polylines"
+            :key="`polyline-${polyline.id}`"
+            :latlngs="polyline.latlngs"
+            :weight="polyline.weight"
+            :class="polyline.class"
+            :draggable="moveableShapes.polylines"
+            :editable="editableShapes.polylines"
+            @update:latlngs="(latlngs) => updatePolyline(polyline.id, latlngs)"
+            @click="selectShape('polyline', polyline.id)"
+            @dragstart="selectShape('polyline', polyline.id)"
+          />
 
-        <LeafletPolyline
-          v-for="polyline in polylines"
-          :key="`polyline-${polyline.id}`"
-          :latlngs="polyline.latlngs"
-          :weight="polyline.weight"
-          :class="polyline.class"
-          :draggable="moveableShapes.polylines"
-          :editable="editableShapes.polylines"
-          @update:latlngs="(latlngs) => updatePolyline(polyline.id, latlngs)"
-          @click="selectShape('polyline', polyline.id)"
-          @dragstart="selectShape('polyline', polyline.id)"
-        />
+          <LeafletPolygon
+            v-for="polygon in polygons"
+            :key="`polygon-${polygon.id}`"
+            :latlngs="polygon.latlngs"
+            :class="polygon.class"
+            :draggable="moveableShapes.polygons"
+            :editable="editableShapes.polygons"
+            :auto-close="true"
+            @update:latlngs="(latlngs) => updatePolygon(polygon.id, latlngs)"
+            @closed="() => onPolygonClosed(polygon.id)"
+            @click="selectShape('polygon', polygon.id)"
+            @dragstart="selectShape('polygon', polygon.id)"
+          />
 
-        <LeafletPolygon
-          v-for="polygon in polygons"
-          :key="`polygon-${polygon.id}`"
-          :latlngs="polygon.latlngs"
-          :class="polygon.class"
-          :draggable="moveableShapes.polygons"
-          :editable="editableShapes.polygons"
-          :auto-close="true"
-          @update:latlngs="(latlngs) => updatePolygon(polygon.id, latlngs)"
-          @closed="() => onPolygonClosed(polygon.id)"
-          @click="selectShape('polygon', polygon.id)"
-          @dragstart="selectShape('polygon', polygon.id)"
-        />
-
-        <LeafletRectangle
-          v-for="rectangle in rectangles"
-          :key="`rectangle-${rectangle.id}`"
-          :bounds="rectangle.bounds"
-          :class="rectangle.class"
-          :draggable="moveableShapes.rectangles"
-          :editable="editableShapes.rectangles"
-          @update:bounds="(bounds) => updateRectangle(rectangle.id, bounds)"
-          @click="selectShape('rectangle', rectangle.id)"
-        />
+          <LeafletRectangle
+            v-for="rectangle in rectangles"
+            :key="`rectangle-${rectangle.id}`"
+            :bounds="rectangle.bounds"
+            :class="rectangle.class"
+            :draggable="moveableShapes.rectangles"
+            :editable="editableShapes.rectangles"
+            @update:bounds="(bounds) => updateRectangle(rectangle.id, bounds)"
+            @click="selectShape('rectangle', rectangle.id)"
+            @dragstart="selectShape('rectangle', rectangle.id)"
+          />
+        </LeafletFeaturesEditor>
       </LeafletMap>
-    </div>
-
-    <div class="p-4 bg-gray-50 rounded">
-      <h4 class="font-semibold mb-2">Statistics</h4>
-      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-        <div>
-          <div class="text-gray-500">Markers</div>
-          <div class="text-lg font-bold text-blue-600">
-            {{ markers.length }}
-          </div>
-        </div>
-        <div>
-          <div class="text-gray-500">Circles</div>
-          <div class="text-lg font-bold text-green-600">
-            {{ circles.length }}
-          </div>
-        </div>
-        <div>
-          <div class="text-gray-500">Polylines</div>
-          <div class="text-lg font-bold text-red-600">
-            {{ polylines.length }}
-          </div>
-        </div>
-        <div>
-          <div class="text-gray-500">Polygons</div>
-          <div class="text-lg font-bold text-purple-600">
-            {{ polygons.length }}
-          </div>
-        </div>
-        <div>
-          <div class="text-gray-500">Rectangles</div>
-          <div class="text-lg font-bold text-orange-600">
-            {{ rectangles.length }}
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </template>

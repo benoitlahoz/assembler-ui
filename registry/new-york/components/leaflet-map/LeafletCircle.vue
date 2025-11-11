@@ -9,7 +9,7 @@ import {
   type HTMLAttributes,
   onMounted,
 } from 'vue';
-import { useTailwindClassParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
+import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
 import { LeafletMapKey, LeafletModuleKey } from '.';
 import './leaflet-editing.css';
 
@@ -38,7 +38,7 @@ const emit = defineEmits<{
   dragstart: [];
 }>();
 
-const { getLeafletShapeColors } = useTailwindClassParser();
+const { getLeafletShapeColors } = useCssParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
@@ -73,7 +73,7 @@ const enableDragging = () => {
     L.value!.DomEvent.stopPropagation(e);
     map.value.dragging.disable();
     map.value.getContainer().style.cursor = 'move';
-    
+
     // Émettre dragstart
     emit('dragstart');
   };
@@ -102,7 +102,7 @@ const setupMapDragHandlers = () => {
     const newLatLng = map.value.containerPointToLatLng(newPoint);
 
     circle.value.setLatLng(newLatLng);
-    
+
     // Emit updates in real-time for bounding box
     emit('update:lat', newLatLng.lat);
     emit('update:lng', newLatLng.lng);
