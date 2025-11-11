@@ -23,6 +23,7 @@ const props = withDefaults(defineProps<LeafletRectangleProps>(), {
 const emit = defineEmits<{
   'update:bounds': [bounds: [[number, number], [number, number]]];
   click: [];
+  dragstart: [];
 }>();
 
 const { getLeafletShapeColors } = useTailwindClassParser();
@@ -127,6 +128,9 @@ const enableDragging = () => {
   rectangle.value.on('mousedown', (e: L.LeafletMouseEvent) => {
     L.value!.DomEvent.stopPropagation(e);
     isDragging.value = true;
+    
+    // Émettre dragstart
+    emit('dragstart');
 
     // Sauvegarder les positions initiales
     dragStartBounds = rectangle.value!.getBounds();
@@ -173,6 +177,12 @@ const setupMapDragHandlers = () => {
 
     // Mettre à jour le rectangle
     rectangle.value!.setBounds(newBounds);
+    
+    // Emit updates in real-time for bounding box
+    emit('update:bounds', [
+      [newBounds.getSouth(), newBounds.getWest()],
+      [newBounds.getNorth(), newBounds.getEast()],
+    ]);
   };
 
   const onMouseUp = () => {

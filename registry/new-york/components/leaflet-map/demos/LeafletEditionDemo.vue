@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, nextTick } from 'vue';
 import { Button } from '@/components/ui/button';
 import {
   LeafletMap,
@@ -300,11 +300,22 @@ const selectShape = (
 ) => {
   console.log('selectShape called:', type, id, 'currentEditMode:', currentEditMode.value);
   if (currentEditMode.value === 'select') {
-    selectedShape.value = { type, id };
-    console.log('selectedShape set:', selectedShape.value);
     // Réinitialiser les positions de rotation quand on change de shape
     rotationStartPositions.value = null;
     rotationCenter.value = null;
+    
+    // Vérifier si c'est la même shape
+    const isSameShape = selectedShape.value?.type === type && selectedShape.value?.id === id;
+    
+    if (!isSameShape) {
+      // Forcer la réactivité en réinitialisant d'abord
+      selectedShape.value = null;
+      // Puis assigner la nouvelle valeur dans le prochain tick
+      nextTick(() => {
+        selectedShape.value = { type, id };
+        console.log('selectedShape set:', selectedShape.value);
+      });
+    }
   } else {
     selectedShape.value = null;
   }
@@ -758,6 +769,7 @@ const handleBoundingBoxRotateEnd = () => {
           @update:lng="(lng) => updateCircle(circle.id, { lng })"
           @update:radius="(radius) => updateCircle(circle.id, { radius })"
           @click="selectShape('circle', circle.id)"
+          @dragstart="selectShape('circle', circle.id)"
         />
 
         <LeafletPolyline
@@ -796,6 +808,7 @@ const handleBoundingBoxRotateEnd = () => {
           :editable="editableShapes.rectangles"
           @update:bounds="(bounds) => updateRectangle(rectangle.id, bounds)"
           @click="selectShape('rectangle', rectangle.id)"
+          @dragstart="selectShape('rectangle', rectangle.id)"
         />
       </LeafletMap>
     </div>

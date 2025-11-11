@@ -35,6 +35,7 @@ const emit = defineEmits<{
   'update:lng': [lng: number];
   'update:radius': [radius: number];
   click: [];
+  dragstart: [];
 }>();
 
 const { getLeafletShapeColors } = useTailwindClassParser();
@@ -72,6 +73,9 @@ const enableDragging = () => {
     L.value!.DomEvent.stopPropagation(e);
     map.value.dragging.disable();
     map.value.getContainer().style.cursor = 'move';
+    
+    // Émettre dragstart
+    emit('dragstart');
   };
 
   circle.value.on('mousedown', onMouseDown);
@@ -98,6 +102,10 @@ const setupMapDragHandlers = () => {
     const newLatLng = map.value.containerPointToLatLng(newPoint);
 
     circle.value.setLatLng(newLatLng);
+    
+    // Emit updates in real-time for bounding box
+    emit('update:lat', newLatLng.lat);
+    emit('update:lng', newLatLng.lng);
 
     // Update radius marker if in edit mode
     if (radiusMarker.value && props.editable) {
