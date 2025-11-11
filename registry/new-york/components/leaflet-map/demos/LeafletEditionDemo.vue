@@ -143,7 +143,7 @@ const handleEditModeChanged = (mode: 'select' | 'directSelect' | null) => {
       editableShapes.value[key as keyof typeof editableShapes.value] = true;
     });
   } else {
-    // Disable both select and direct edit
+    // mode === null: Disable both select and direct edit (drawing mode or no mode)
     Object.keys(moveableShapes.value).forEach((key) => {
       moveableShapes.value[key as keyof typeof moveableShapes.value] = false;
     });

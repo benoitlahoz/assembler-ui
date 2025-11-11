@@ -170,7 +170,7 @@ const enableEditing = () => {
 
 watch(
   () => [map.value, props.lat, props.lng, props.radius, props.editable, props.draggable],
-  () => {
+  (newVal, oldVal) => {
     nextTick(() => {
       if (
         map.value &&
@@ -181,8 +181,17 @@ watch(
       ) {
         // Create or update circle
         if (circle.value) {
-          circle.value.setLatLng([Number(props.lat), Number(props.lng)]);
-          circle.value.setRadius(Number(props.radius));
+          // Only update position/radius if they actually changed (not just editable/draggable)
+          const latChanged = oldVal && Number(oldVal[1]) !== Number(newVal[1]);
+          const lngChanged = oldVal && Number(oldVal[2]) !== Number(newVal[2]);
+          const radiusChanged = oldVal && Number(oldVal[3]) !== Number(newVal[3]);
+
+          if (latChanged || lngChanged) {
+            circle.value.setLatLng([Number(props.lat), Number(props.lng)]);
+          }
+          if (radiusChanged) {
+            circle.value.setRadius(Number(props.radius));
+          }
         } else {
           circle.value = L.value.circle([Number(props.lat), Number(props.lng)], {
             radius: Number(props.radius),

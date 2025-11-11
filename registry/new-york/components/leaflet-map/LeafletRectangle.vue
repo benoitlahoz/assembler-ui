@@ -209,7 +209,7 @@ const setupMapDragHandlers = () => {
 
 watch(
   () => [map.value, props.bounds, props.editable, props.draggable],
-  () => {
+  (newVal, oldVal) => {
     nextTick(() => {
       if (
         map.value &&
@@ -220,7 +220,15 @@ watch(
         props.bounds[1].length === 2
       ) {
         if (rectangle.value) {
-          rectangle.value.setBounds(props.bounds);
+          // Only update bounds if they actually changed (not just editable/draggable)
+          const oldBounds = oldVal?.[1];
+          const newBounds = newVal[1];
+          const boundsChanged = JSON.stringify(oldBounds) !== JSON.stringify(newBounds);
+
+          if (boundsChanged) {
+            rectangle.value.setBounds(props.bounds);
+          }
+
           const colors = getLeafletShapeColors(props.class);
           rectangle.value.setStyle({
             color: colors.color,

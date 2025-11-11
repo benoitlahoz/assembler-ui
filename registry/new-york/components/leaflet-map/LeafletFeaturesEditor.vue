@@ -103,19 +103,34 @@ const createCircleHandler = () => {
   let enabled = false;
   let centerLatLng: LatLng | null = null;
   let tempCircle: L.Circle | null = null;
+  let isDrawing = false;
 
-  const clickHandler = (e: LeafletMouseEvent) => {
-    if (!enabled || !L.value || !map.value) return;
+  const mouseDownHandler = (e: LeafletMouseEvent) => {
+    if (!enabled || !L.value || !map.value || isDrawing) return;
 
-    if (!centerLatLng) {
-      centerLatLng = e.latlng;
-      tempCircle = L.value.circle(centerLatLng, {
-        ...props.shapeOptions,
-        radius: 1,
-      });
-      tempCircle.addTo(map.value);
-    } else {
-      const radius = map.value.distance(centerLatLng, e.latlng);
+    // Start drawing: set center and create temp circle
+    isDrawing = true;
+    centerLatLng = e.latlng;
+    tempCircle = L.value.circle(centerLatLng, {
+      ...props.shapeOptions,
+      radius: 1,
+    });
+    tempCircle.addTo(map.value);
+
+    // Disable map dragging to prevent conflicts on mobile
+    if (map.value.dragging) {
+      map.value.dragging.disable();
+    }
+  };
+
+  const mouseUpHandler = (e: LeafletMouseEvent) => {
+    if (!enabled || !L.value || !map.value || !isDrawing || !centerLatLng) return;
+
+    // Finish drawing: create final circle
+    const radius = map.value.distance(centerLatLng, e.latlng);
+
+    // Only create if radius is meaningful (> 1 meter)
+    if (radius > 1) {
       const circle = L.value.circle(centerLatLng, {
         ...props.shapeOptions,
         radius,
@@ -128,17 +143,17 @@ const createCircleHandler = () => {
       };
 
       emit('draw:created', event);
+    }
 
-      cleanup();
+    cleanup();
 
-      if (!props.repeatMode) {
-        disable();
-      }
+    if (!props.repeatMode) {
+      disable();
     }
   };
 
   const mouseMoveHandler = (e: LeafletMouseEvent) => {
-    if (!enabled || !centerLatLng || !tempCircle || !map.value) return;
+    if (!enabled || !isDrawing || !centerLatLng || !tempCircle || !map.value) return;
     const radius = map.value.distance(centerLatLng, e.latlng);
     tempCircle.setRadius(radius);
   };
@@ -149,13 +164,20 @@ const createCircleHandler = () => {
       tempCircle = null;
     }
     centerLatLng = null;
+    isDrawing = false;
+
+    // Re-enable map dragging when cleaning up
+    if (map.value && map.value.dragging) {
+      map.value.dragging.enable();
+    }
   };
 
   const enable = () => {
     if (!map.value) return;
     enabled = true;
     map.value.getContainer().style.cursor = 'crosshair';
-    map.value.on('click', clickHandler);
+    map.value.on('mousedown', mouseDownHandler);
+    map.value.on('mouseup', mouseUpHandler);
     map.value.on('mousemove', mouseMoveHandler);
     emit('draw:drawstart', { layerType: 'circle' });
   };
@@ -164,9 +186,16 @@ const createCircleHandler = () => {
     if (!map.value) return;
     enabled = false;
     map.value.getContainer().style.cursor = '';
-    map.value.off('click', clickHandler);
+    map.value.off('mousedown', mouseDownHandler);
+    map.value.off('mouseup', mouseUpHandler);
     map.value.off('mousemove', mouseMoveHandler);
     cleanup();
+
+    // Ensure map dragging is re-enabled
+    if (map.value.dragging) {
+      map.value.dragging.enable();
+    }
+
     emit('draw:drawstop', { layerType: 'circle' });
     emit('mode-changed', null);
   };
@@ -252,6 +281,12 @@ const createPolylineHandler = () => {
     if (!map.value) return;
     enabled = true;
     map.value.getContainer().style.cursor = 'crosshair';
+
+    // Disable double-click zoom to prevent zooming when finishing polyline
+    if (map.value.doubleClickZoom) {
+      map.value.doubleClickZoom.disable();
+    }
+
     map.value.on('click', clickHandler);
     map.value.on('dblclick', dblClickHandler);
     map.value.on('mousemove', mouseMoveHandler);
@@ -266,6 +301,12 @@ const createPolylineHandler = () => {
     map.value.off('dblclick', dblClickHandler);
     map.value.off('mousemove', mouseMoveHandler);
     cleanup();
+
+    // Re-enable double-click zoom
+    if (map.value.doubleClickZoom) {
+      map.value.doubleClickZoom.enable();
+    }
+
     emit('draw:drawstop', { layerType: 'polyline' });
     emit('mode-changed', null);
   };
@@ -456,6 +497,12 @@ const createPolygonHandler = () => {
     if (!map.value) return;
     enabled = true;
     map.value.getContainer().style.cursor = 'crosshair';
+
+    // Disable double-click zoom to prevent zooming when finishing polygon
+    if (map.value.doubleClickZoom) {
+      map.value.doubleClickZoom.disable();
+    }
+
     map.value.on('click', clickHandler);
     map.value.on('dblclick', dblClickHandler);
     map.value.on('mousemove', mouseMoveHandler);
@@ -470,6 +517,12 @@ const createPolygonHandler = () => {
     map.value.off('dblclick', dblClickHandler);
     map.value.off('mousemove', mouseMoveHandler);
     cleanup();
+
+    // Re-enable double-click zoom
+    if (map.value.doubleClickZoom) {
+      map.value.doubleClickZoom.enable();
+    }
+
     emit('draw:drawstop', { layerType: 'polygon' });
     emit('mode-changed', null);
   };
@@ -484,20 +537,37 @@ const createRectangleHandler = () => {
   let enabled = false;
   let startLatLng: LatLng | null = null;
   let tempRectangle: L.Rectangle | null = null;
+  let isDrawing = false;
 
-  const clickHandler = (e: LeafletMouseEvent) => {
-    if (!enabled || !L.value || !map.value) return;
+  const mouseDownHandler = (e: LeafletMouseEvent) => {
+    if (!enabled || !L.value || !map.value || isDrawing) return;
 
-    if (!startLatLng) {
-      startLatLng = e.latlng;
-      const bounds = L.value.latLngBounds(startLatLng, startLatLng);
-      tempRectangle = L.value.rectangle(bounds, {
-        ...props.shapeOptions,
-        dashArray: '5, 5',
-      });
-      tempRectangle.addTo(map.value);
-    } else {
-      const bounds = L.value.latLngBounds(startLatLng, e.latlng);
+    // Start drawing: set start corner and create temp rectangle
+    isDrawing = true;
+    startLatLng = e.latlng;
+    const bounds = L.value.latLngBounds(startLatLng, startLatLng);
+    tempRectangle = L.value.rectangle(bounds, {
+      ...props.shapeOptions,
+      dashArray: '5, 5',
+    });
+    tempRectangle.addTo(map.value);
+
+    // Disable map dragging to prevent conflicts on mobile
+    if (map.value.dragging) {
+      map.value.dragging.disable();
+    }
+  };
+
+  const mouseUpHandler = (e: LeafletMouseEvent) => {
+    if (!enabled || !L.value || !map.value || !isDrawing || !startLatLng) return;
+
+    // Finish drawing: create final rectangle
+    const bounds = L.value.latLngBounds(startLatLng, e.latlng);
+
+    // Only create if bounds are meaningful (not a single point)
+    const sw = bounds.getSouthWest();
+    const ne = bounds.getNorthEast();
+    if (Math.abs(sw.lat - ne.lat) > 0.00001 || Math.abs(sw.lng - ne.lng) > 0.00001) {
       const rectangle = L.value.rectangle(bounds, props.shapeOptions);
 
       const event: DrawEvent = {
@@ -507,17 +577,17 @@ const createRectangleHandler = () => {
       };
 
       emit('draw:created', event);
+    }
 
-      cleanup();
+    cleanup();
 
-      if (!props.repeatMode) {
-        disable();
-      }
+    if (!props.repeatMode) {
+      disable();
     }
   };
 
   const mouseMoveHandler = (e: LeafletMouseEvent) => {
-    if (!enabled || !startLatLng || !tempRectangle || !L.value) return;
+    if (!enabled || !isDrawing || !startLatLng || !tempRectangle || !L.value) return;
     const bounds = L.value.latLngBounds(startLatLng, e.latlng);
     tempRectangle.setBounds(bounds);
   };
@@ -528,13 +598,20 @@ const createRectangleHandler = () => {
       tempRectangle = null;
     }
     startLatLng = null;
+    isDrawing = false;
+
+    // Re-enable map dragging when cleaning up
+    if (map.value && map.value.dragging) {
+      map.value.dragging.enable();
+    }
   };
 
   const enable = () => {
     if (!map.value) return;
     enabled = true;
     map.value.getContainer().style.cursor = 'crosshair';
-    map.value.on('click', clickHandler);
+    map.value.on('mousedown', mouseDownHandler);
+    map.value.on('mouseup', mouseUpHandler);
     map.value.on('mousemove', mouseMoveHandler);
     emit('draw:drawstart', { layerType: 'rectangle' });
   };
@@ -543,9 +620,16 @@ const createRectangleHandler = () => {
     if (!map.value) return;
     enabled = false;
     map.value.getContainer().style.cursor = '';
-    map.value.off('click', clickHandler);
+    map.value.off('mousedown', mouseDownHandler);
+    map.value.off('mouseup', mouseUpHandler);
     map.value.off('mousemove', mouseMoveHandler);
     cleanup();
+
+    // Ensure map dragging is re-enabled
+    if (map.value.dragging) {
+      map.value.dragging.enable();
+    }
+
     emit('draw:drawstop', { layerType: 'rectangle' });
     emit('mode-changed', null);
   };

@@ -932,7 +932,7 @@ watch(
     props.editable,
     props.draggable,
   ],
-  () => {
+  (newVal, oldVal) => {
     nextTick(() => {
       if (
         map.value &&
@@ -942,8 +942,17 @@ watch(
         !isNaN(Number(props.radius))
       ) {
         if (circle.value) {
-          circle.value.setLatLng([Number(props.lat), Number(props.lng)]);
-          circle.value.setRadius(Number(props.radius));
+          const latChanged = oldVal && Number(oldVal[1]) !== Number(newVal[1]);
+          const lngChanged = oldVal && Number(oldVal[2]) !== Number(newVal[2]);
+          const radiusChanged =
+            oldVal && Number(oldVal[3]) !== Number(newVal[3]);
+
+          if (latChanged || lngChanged) {
+            circle.value.setLatLng([Number(props.lat), Number(props.lng)]);
+          }
+          if (radiusChanged) {
+            circle.value.setRadius(Number(props.radius));
+          }
         } else {
           circle.value = L.value.circle(
             [Number(props.lat), Number(props.lng)],
@@ -1973,60 +1982,77 @@ const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const marker = ref<L.Marker | null>(null);
 
 let Icon: any;
+const iconOptions = {
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  iconRetinaUrl:
+    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+};
+
+const setupMarker = () => {
+  if (map.value && L.value && !marker.value) {
+    if (!Icon) {
+      Icon = L.value.Icon.extend({
+        options: iconOptions,
+      });
+    }
+
+    const isDraggable = props.editable || props.draggable;
+    marker.value = L.value.marker([Number(props.lat), Number(props.lng)], {
+      draggable: isDraggable,
+      icon: new Icon(),
+    });
+
+    if (isDraggable) {
+      marker.value.on("dragend", onDragEnd);
+    }
+
+    marker.value.addTo(map.value);
+  }
+};
+
+const updateMarker = (latChanged = false, lngChanged = false) => {
+  if (marker.value) {
+    const isDraggable = props.editable || props.draggable;
+
+    if (latChanged || lngChanged) {
+      marker.value.setLatLng([Number(props.lat), Number(props.lng)]);
+    }
+
+    marker.value.options.draggable = isDraggable;
+    if (isDraggable) {
+      marker.value.dragging?.enable();
+    } else {
+      marker.value.dragging?.disable();
+    }
+  }
+};
+
+const onDragEnd = () => {
+  if (marker.value) {
+    const latlng = marker.value.getLatLng();
+    emit("update:lat", latlng.lat);
+    emit("update:lng", latlng.lng);
+  }
+};
 
 watch(
   () => [props.lat, props.lng, props.editable, props.draggable],
-  ([newLat, newLng]) => {
+  ([newLat, newLng], oldVal) => {
     nextTick(() => {
       if (!L.value) return;
 
-      if (!Icon) {
-        Icon = L.value.Icon.extend({
-          options: {
-            iconUrl:
-              "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-            iconRetinaUrl:
-              "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-            shadowUrl:
-              "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41],
-          },
-        });
-      }
-
       if (map.value && !isNaN(Number(newLat)) && !isNaN(Number(newLng))) {
-        const isDraggable = props.editable || props.draggable;
-
         if (marker.value) {
-          marker.value.setLatLng([Number(newLat), Number(newLng)]);
-          marker.value.options.draggable = isDraggable;
-          if (isDraggable) {
-            marker.value.dragging?.enable();
-          } else {
-            marker.value.dragging?.disable();
-          }
+          const latChanged = oldVal && Number(oldVal[0]) !== Number(newLat);
+          const lngChanged = oldVal && Number(oldVal[1]) !== Number(newLng);
+          updateMarker(latChanged, lngChanged);
         } else {
-          marker.value = L.value.marker([Number(newLat), Number(newLng)], {
-            draggable: isDraggable,
-            icon: new Icon(),
-          });
-
-          if (isDraggable) {
-            marker.value.on("dragend", () => {
-              const latlng = marker.value!.getLatLng();
-              emit("update:lat", latlng.lat);
-              emit("update:lng", latlng.lng);
-            });
-          }
-
-          marker.value.on("click", () => {
-            emit("click");
-          });
-
-          marker.value.addTo(map.value);
+          setupMarker();
         }
       } else {
         if (marker.value) {
@@ -2041,63 +2067,11 @@ watch(
 
 watch(
   () => map.value,
-  (newMap) => {
-    if (newMap && L.value && !marker.value) {
-      if (!Icon) {
-        Icon = L.value.Icon.extend({
-          options: {
-            iconUrl:
-              "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-            iconRetinaUrl:
-              "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-            shadowUrl:
-              "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41],
-          },
-        });
-      }
-
-      const isDraggable = props.editable || props.draggable;
-      marker.value = L.value.marker([Number(props.lat), Number(props.lng)], {
-        draggable: isDraggable,
-        icon: new Icon(),
-      });
-
-      if (isDraggable) {
-        marker.value.on("dragend", () => {
-          const latlng = marker.value!.getLatLng();
-          emit("update:lat", latlng.lat);
-          emit("update:lng", latlng.lng);
-        });
-      }
-
-      marker.value.addTo(newMap);
-    }
+  () => {
+    setupMarker();
   },
   { immediate: true },
 );
-
-onMounted(() => {
-  if (map.value && L.value && !marker.value) {
-    const isDraggable = props.editable || props.draggable;
-    marker.value = L.value.marker([Number(props.lat), Number(props.lng)], {
-      draggable: isDraggable,
-    });
-
-    if (isDraggable) {
-      marker.value.on("dragend", () => {
-        const latlng = marker.value!.getLatLng();
-        emit("update:lat", latlng.lat);
-        emit("update:lng", latlng.lng);
-      });
-    }
-
-    marker.value.addTo(map.value);
-  }
-});
 
 onBeforeUnmount(() => {
   if (marker.value) {
@@ -2401,13 +2375,21 @@ watch(
     props.draggable,
     props.interactive,
   ],
-  () => {
+  (newVal, oldVal) => {
     nextTick(() => {
       if (map.value && L.value && props.latlngs && props.latlngs.length >= 3) {
         const normalizedLatLngs = normalizeLatLngs(props.latlngs);
 
         if (polygon.value) {
-          polygon.value.setLatLngs([normalizedLatLngs]);
+          const oldLatlngs = oldVal?.[1];
+          const newLatlngs = newVal[1];
+          const latlngsChanged =
+            JSON.stringify(oldLatlngs) !== JSON.stringify(newLatlngs);
+
+          if (latlngsChanged) {
+            polygon.value.setLatLngs([normalizedLatLngs]);
+          }
+
           const colors = getLeafletShapeColors(props.class);
           polygon.value.setStyle({
             color: colors.color,
@@ -2731,13 +2713,21 @@ watch(
     props.editable,
     props.draggable,
   ],
-  () => {
+  (newVal, oldVal) => {
     nextTick(() => {
       if (map.value && L.value && props.latlngs && props.latlngs.length > 0) {
         const normalizedLatLngs = normalizeLatLngs(props.latlngs);
 
         if (polyline.value) {
-          polyline.value.setLatLngs(normalizedLatLngs);
+          const oldLatlngs = oldVal?.[1];
+          const newLatlngs = newVal[1];
+          const latlngsChanged =
+            JSON.stringify(oldLatlngs) !== JSON.stringify(newLatlngs);
+
+          if (latlngsChanged) {
+            polyline.value.setLatLngs(normalizedLatLngs);
+          }
+
           const colors = getLeafletLineColors(props.class);
           polyline.value.setStyle({
             color: colors.color,
@@ -3017,7 +3007,7 @@ const setupMapDragHandlers = () => {
 
 watch(
   () => [map.value, props.bounds, props.editable, props.draggable],
-  () => {
+  (newVal, oldVal) => {
     nextTick(() => {
       if (
         map.value &&
@@ -3028,7 +3018,15 @@ watch(
         props.bounds[1].length === 2
       ) {
         if (rectangle.value) {
-          rectangle.value.setBounds(props.bounds);
+          const oldBounds = oldVal?.[1];
+          const newBounds = newVal[1];
+          const boundsChanged =
+            JSON.stringify(oldBounds) !== JSON.stringify(newBounds);
+
+          if (boundsChanged) {
+            rectangle.value.setBounds(props.bounds);
+          }
+
           const colors = getLeafletShapeColors(props.class);
           rectangle.value.setStyle({
             color: colors.color,

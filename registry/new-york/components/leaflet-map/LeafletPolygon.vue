@@ -289,13 +289,21 @@ const setupMapDragHandlers = () => {
 
 watch(
   () => [map.value, props.latlngs, props.editable, props.draggable, props.interactive],
-  () => {
+  (newVal, oldVal) => {
     nextTick(() => {
       if (map.value && L.value && props.latlngs && props.latlngs.length >= 3) {
         const normalizedLatLngs = normalizeLatLngs(props.latlngs);
 
         if (polygon.value) {
-          polygon.value.setLatLngs([normalizedLatLngs]);
+          // Only update latlngs if they actually changed (not just editable/draggable)
+          const oldLatlngs = oldVal?.[1];
+          const newLatlngs = newVal[1];
+          const latlngsChanged = JSON.stringify(oldLatlngs) !== JSON.stringify(newLatlngs);
+
+          if (latlngsChanged) {
+            polygon.value.setLatLngs([normalizedLatLngs]);
+          }
+
           const colors = getLeafletShapeColors(props.class);
           polygon.value.setStyle({
             color: colors.color,
