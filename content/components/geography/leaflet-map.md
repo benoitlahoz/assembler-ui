@@ -1972,11 +1972,31 @@ const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 
 const marker = ref<L.Marker | null>(null);
 
+let Icon: any;
+
 watch(
   () => [props.lat, props.lng, props.editable, props.draggable],
   ([newLat, newLng]) => {
     nextTick(() => {
       if (!L.value) return;
+
+      if (!Icon) {
+        Icon = L.value.Icon.extend({
+          options: {
+            iconUrl:
+              "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+            iconRetinaUrl:
+              "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+            shadowUrl:
+              "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41],
+          },
+        });
+      }
+
       if (map.value && !isNaN(Number(newLat)) && !isNaN(Number(newLng))) {
         const isDraggable = props.editable || props.draggable;
 
@@ -1991,6 +2011,7 @@ watch(
         } else {
           marker.value = L.value.marker([Number(newLat), Number(newLng)], {
             draggable: isDraggable,
+            icon: new Icon(),
           });
 
           if (isDraggable) {
