@@ -401,6 +401,7 @@ const boundingBox = ref<L.Rectangle | null>(null);
 const cornerHandles = ref<L.Marker[]>([]);
 const edgeHandles = ref<L.Marker[]>([]);
 const rotateHandle = ref<L.Marker | null>(null);
+const centerHandle = ref<L.Marker | null>(null);
 
 const isDragging = ref(false);
 const isRotating = ref(false);
@@ -421,6 +422,10 @@ const clearHandles = () => {
     rotateHandle.value.remove();
     rotateHandle.value = null;
   }
+  if (centerHandle.value) {
+    centerHandle.value.remove();
+    centerHandle.value = null;
+  }
   if (boundingBox.value) {
     boundingBox.value.remove();
     boundingBox.value = null;
@@ -428,7 +433,14 @@ const clearHandles = () => {
 };
 
 const createBoundingBox = () => {
+  console.log("createBoundingBox called, props:", props);
   if (!props.bounds || !L.value || !map.value || !props.visible) {
+    console.log("Bailing out:", {
+      bounds: !!props.bounds,
+      L: !!L.value,
+      map: !!map.value,
+      visible: props.visible,
+    });
     clearHandles();
     return;
   }
@@ -660,16 +672,30 @@ const createBoundingBox = () => {
       draggable: true,
       icon: L.value.divIcon({
         className: "leaflet-bounding-box-handle leaflet-bounding-box-rotate",
-        html: '<div style="width:12px;height:12px;background:#fff;border:2px solid #3388ff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);cursor:url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJzNC40OCAxMCAxMCAxMCAxMC00LjQ4IDEwLTEwUzE3LjUyIDIgMTIgMnptMCAxOGMtNC40MSAwLTgtMy41OS04LThzMy41OS04IDgtOCA4IDMuNTkgOCA4LTMuNTkgOC04IDh6IiBmaWxsPSIjMzM4OGZmIi8+PHBhdGggZD0iTTEyIDZWMTJsNCAyIiBzdHJva2U9IiMzMzg4ZmYiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==) 12 12, auto;"></div>',
+        html: '<div style="width:12px;height:12px;background:#fff;border:2px solid #3388ff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
         iconSize: [12, 12],
       }),
     })
     .addTo(map.value);
 
+  console.log("Rotate handle created:", rotateHandle.value);
+
+  rotateHandle.value.on("mousedown", () => {
+    console.log("Rotate handle mousedown");
+    if (map.value) {
+      map.value.getContainer().style.cursor = "grabbing";
+    }
+  });
+
   rotateHandle.value.on("dragstart", () => {
+    console.log("Rotate handle dragstart");
     isRotating.value = true;
     if (map.value && props.bounds) {
       map.value.dragging.disable();
+
+      if (boundingBox.value) boundingBox.value.setStyle({ opacity: 0 });
+      cornerHandles.value.forEach((h) => h.setOpacity(0));
+      edgeHandles.value.forEach((h) => h.setOpacity(0));
 
       const center = props.bounds.getCenter();
       const handlePos = rotateHandle.value!.getLatLng();
@@ -697,14 +723,45 @@ const createBoundingBox = () => {
   });
 
   rotateHandle.value.on("dragend", () => {
+    console.log("Rotate handle dragend");
     isRotating.value = false;
     if (map.value) {
       map.value.getContainer().style.cursor = "";
       map.value.dragging.enable();
     }
 
+    if (boundingBox.value) boundingBox.value.setStyle({ opacity: 1 });
+    cornerHandles.value.forEach((h) => h.setOpacity(1));
+    edgeHandles.value.forEach((h) => h.setOpacity(1));
+
     emit("rotate-end");
+
+    setTimeout(() => {
+      if (props.bounds) {
+        createBoundingBox();
+      }
+    }, 0);
   });
+
+  rotateHandle.value.on("mouseup", () => {
+    if (map.value) {
+      map.value.getContainer().style.cursor = "";
+    }
+  });
+
+  const center = props.bounds.getCenter();
+  centerHandle.value = L.value
+    .marker(center, {
+      draggable: false,
+      icon: L.value.divIcon({
+        className: "leaflet-bounding-box-handle leaflet-bounding-box-center",
+        html: '<div style="width:12px;height:12px;background:#ff8800;border:2px solid #fff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
+        iconSize: [12, 12],
+      }),
+    })
+    .addTo(map.value);
+
+  console.log("Center handle created:", centerHandle.value);
 };
 
 const updateHandlePositions = (bounds: L.LatLngBounds) => {
@@ -755,12 +812,57 @@ const updateHandlePositions = (bounds: L.LatLngBounds) => {
     const rotateHandleLatLng = map.value.layerPointToLatLng(rotateHandlePoint);
     rotateHandle.value.setLatLng(rotateHandleLatLng);
   }
+
+  if (centerHandle.value) {
+    const center = bounds.getCenter();
+    centerHandle.value.setLatLng(center);
+  }
 };
 
 watch(
-  () => [props.bounds, props.visible],
   () => {
-    createBoundingBox();
+    if (props.bounds) {
+      return {
+        visible: props.visible,
+        south: props.bounds.getSouth(),
+        north: props.bounds.getNorth(),
+        west: props.bounds.getWest(),
+        east: props.bounds.getEast(),
+      };
+    }
+    return { visible: props.visible, south: 0, north: 0, west: 0, east: 0 };
+  },
+  (newVal, oldVal) => {
+    if (isRotating.value || isScaling.value) {
+      console.log(
+        "Skipping createBoundingBox because manipulation in progress",
+      );
+      return;
+    }
+
+    const boundsChanged =
+      oldVal &&
+      newVal &&
+      (oldVal.south !== newVal.south ||
+        oldVal.north !== newVal.north ||
+        oldVal.west !== newVal.west ||
+        oldVal.east !== newVal.east);
+
+    if (
+      boundingBox.value &&
+      props.bounds &&
+      props.visible &&
+      !isDragging.value &&
+      cornerHandles.value.length > 0 &&
+      boundsChanged
+    ) {
+      console.log("Updating bounding box visually", newVal);
+      boundingBox.value.setBounds(props.bounds);
+      updateHandlePositions(props.bounds);
+    } else if (newVal.visible !== oldVal?.visible || !boundingBox.value) {
+      console.log("Recreating bounding box");
+      createBoundingBox();
+    }
   },
   { immediate: true, deep: true },
 );
@@ -2078,6 +2180,7 @@ const emit = defineEmits<{
   "update:lat": [lat: number];
   "update:lng": [lng: number];
   click: [];
+  dragstart: [];
 }>();
 
 const L = inject(LeafletModuleKey, ref());
@@ -2112,6 +2215,8 @@ const setupMarker = () => {
     });
 
     if (isDraggable) {
+      marker.value.on("drag", onDrag);
+      marker.value.on("dragstart", () => emit("dragstart"));
       marker.value.on("dragend", onDragEnd);
     }
 
@@ -2133,6 +2238,14 @@ const updateMarker = (latChanged = false, lngChanged = false) => {
     } else {
       marker.value.dragging?.disable();
     }
+  }
+};
+
+const onDrag = () => {
+  if (marker.value) {
+    const latlng = marker.value.getLatLng();
+    emit("update:lat", latlng.lat);
+    emit("update:lng", latlng.lng);
   }
 };
 
@@ -2223,6 +2336,7 @@ const emit = defineEmits<{
   "update:latlngs": [latlngs: Array<[number, number]>];
   closed: [];
   click: [];
+  dragstart: [];
 }>();
 
 const { getLeafletShapeColors } = useTailwindClassParser();
@@ -2402,6 +2516,8 @@ const enableDragging = () => {
     L.value!.DomEvent.stopPropagation(e);
     isDragging.value = true;
 
+    emit("dragstart");
+
     dragStartLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map(
       (ll) => L.value!.latLng(ll.lat, ll.lng),
     );
@@ -2441,6 +2557,11 @@ const setupMapDragHandlers = () => {
     });
 
     polygon.value!.setLatLngs([newLatLngs]);
+
+    const updatedLatLngs = newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<
+      [number, number]
+    >;
+    emit("update:latlngs", updatedLatLngs);
   };
 
   const onMouseUp = () => {
@@ -2581,6 +2702,7 @@ const props = withDefaults(defineProps<LeafletPolylineProps>(), {
 const emit = defineEmits<{
   "update:latlngs": [latlngs: Array<[number, number]>];
   click: [];
+  dragstart: [];
 }>();
 
 const { getLeafletLineColors } = useTailwindClassParser();
@@ -2740,6 +2862,8 @@ const enableDragging = () => {
     L.value!.DomEvent.stopPropagation(e);
     isDragging.value = true;
 
+    emit("dragstart");
+
     dragStartLatLngs = (polyline.value!.getLatLngs() as L.LatLng[]).map((ll) =>
       L.value!.latLng(ll.lat, ll.lng),
     );
@@ -2779,6 +2903,11 @@ const setupMapDragHandlers = () => {
     });
 
     polyline.value!.setLatLngs(newLatLngs);
+
+    const updatedLatLngs = newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<
+      [number, number]
+    >;
+    emit("update:latlngs", updatedLatLngs);
   };
 
   const onMouseUp = () => {
@@ -4057,6 +4186,8 @@ const handleEditModeChanged = (mode: "select" | "directSelect" | null) => {
 
   if (mode !== "select") {
     selectedShape.value = null;
+    rotationStartPositions.value = null;
+    rotationCenter.value = null;
   }
 
   if (mode === "select") {
@@ -4251,15 +4382,32 @@ const selectShape = (
   if (currentEditMode.value === "select") {
     selectedShape.value = { type, id };
     console.log("selectedShape set:", selectedShape.value);
+
+    rotationStartPositions.value = null;
+    rotationCenter.value = null;
+  } else {
+    selectedShape.value = null;
   }
 };
 
 const rotationStartPositions = ref<any>(null);
+const rotationCenter = ref<{ lat: number; lng: number } | null>(null);
 
 const saveRotationStartPositions = () => {
+  console.log(
+    "saveRotationStartPositions called, selectedShape:",
+    selectedShape.value,
+  );
   if (!selectedShape.value) return;
 
   const { type, id } = selectedShape.value;
+
+  const bounds = boundingBox.value;
+  if (bounds) {
+    const center = bounds.getCenter();
+    rotationCenter.value = { lat: center.lat, lng: center.lng };
+    console.log("Rotation center saved:", rotationCenter.value);
+  }
 
   switch (type) {
     case "marker": {
@@ -4279,14 +4427,19 @@ const saveRotationStartPositions = () => {
     case "polyline": {
       const polyline = polylines.value.find((p) => p.id === id);
       if (polyline) {
-        rotationStartPositions.value = [...polyline.latlngs];
+        rotationStartPositions.value = polyline.latlngs.map(
+          (ll) => [ll[0], ll[1]] as [number, number],
+        );
       }
       break;
     }
     case "polygon": {
       const polygon = polygons.value.find((p) => p.id === id);
       if (polygon) {
-        rotationStartPositions.value = [...polygon.latlngs];
+        rotationStartPositions.value = polygon.latlngs.map(
+          (ll) => [ll[0], ll[1]] as [number, number],
+        );
+        console.log("Saved polygon positions:", rotationStartPositions.value);
       }
       break;
     }
@@ -4294,13 +4447,17 @@ const saveRotationStartPositions = () => {
       const rectangle = rectangles.value.find((r) => r.id === id);
       if (rectangle) {
         rotationStartPositions.value = [
-          [...rectangle.bounds[0]],
-          [...rectangle.bounds[1]],
+          [rectangle.bounds[0][0], rectangle.bounds[0][1]],
+          [rectangle.bounds[1][0], rectangle.bounds[1][1]],
         ];
       }
       break;
     }
   }
+  console.log(
+    "rotationStartPositions after save:",
+    rotationStartPositions.value,
+  );
 };
 
 const boundingBox = computed(() => {
@@ -4349,10 +4506,13 @@ const boundingBox = computed(() => {
       }
       case "polygon": {
         const polygon = polygons.value.find((p) => p.id === id);
+        console.log("polygon found:", polygon);
         if (!polygon || polygon.latlngs.length === 0) return null;
-        return L.latLngBounds(
+        const bounds = L.latLngBounds(
           polygon.latlngs.map((ll) => L.latLng(ll[0], ll[1])),
         );
+        console.log("polygon bounds:", bounds);
+        return bounds;
       }
       case "rectangle": {
         const rectangle = rectangles.value.find((r) => r.id === id);
@@ -4365,8 +4525,17 @@ const boundingBox = computed(() => {
     return null;
   }
 
+  console.log("boundingBox: returning null at end");
   return null;
 });
+
+watch(
+  boundingBox,
+  (newVal) => {
+    console.log("boundingBox changed:", newVal);
+  },
+  { immediate: true },
+);
 
 const handleBoundingBoxUpdate = (newBounds: any) => {
   if (!selectedShape.value) return;
@@ -4449,7 +4618,11 @@ const handleBoundingBoxUpdate = (newBounds: any) => {
 };
 
 const handleBoundingBoxRotate = (angle: number) => {
+  console.log("=== handleBoundingBoxRotate ===");
   console.log("Rotation angle:", angle);
+  console.log("selectedShape:", selectedShape.value);
+  console.log("rotationStartPositions:", rotationStartPositions.value);
+  console.log("rotationCenter:", rotationCenter.value);
 
   if (!selectedShape.value) return;
 
@@ -4461,22 +4634,26 @@ const handleBoundingBoxRotate = (angle: number) => {
   const L = (window as any).L;
   if (!L) return;
 
-  const oldBounds = boundingBox.value;
-  if (!oldBounds || !rotationStartPositions.value) return;
+  if (!rotationCenter.value || !rotationStartPositions.value) return;
 
-  const center = oldBounds.getCenter();
-  const angleRad = (angle * Math.PI) / 180;
+  const center = rotationCenter.value;
+  const angleRad = (-angle * Math.PI) / 180;
 
   const rotatePoint = (lat: number, lng: number) => {
-    const relLat = lat - center.lat;
-    const relLng = lng - center.lng;
+    const metersPerDegreeLat = 111320;
+    const metersPerDegreeLng = 111320 * Math.cos((center.lat * Math.PI) / 180);
 
-    const newRelLat = relLat * Math.cos(angleRad) - relLng * Math.sin(angleRad);
-    const newRelLng = relLat * Math.sin(angleRad) + relLng * Math.cos(angleRad);
+    const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+    const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+
+    const newRelMetersY =
+      relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+    const newRelMetersX =
+      relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
 
     return {
-      lat: center.lat + newRelLat,
-      lng: center.lng + newRelLng,
+      lat: center.lat + newRelMetersY / metersPerDegreeLat,
+      lng: center.lng + newRelMetersX / metersPerDegreeLng,
     };
   };
 
@@ -4532,30 +4709,27 @@ const handleBoundingBoxRotate = (angle: number) => {
     case "rectangle": {
       const rectangle = rectangles.value.find((r) => r.id === id);
       if (rectangle) {
-        const corners = [
-          rotationStartPositions.value[0],
-          [
-            rotationStartPositions.value[1][0],
-            rotationStartPositions.value[0][1],
-          ],
-          rotationStartPositions.value[1],
-          [
-            rotationStartPositions.value[0][0],
-            rotationStartPositions.value[1][1],
-          ],
-        ] as Array<[number, number]>;
+        const oldCenter = L.latLng(
+          (rotationStartPositions.value[0][0] +
+            rotationStartPositions.value[1][0]) /
+            2,
+          (rotationStartPositions.value[0][1] +
+            rotationStartPositions.value[1][1]) /
+            2,
+        );
 
-        const rotatedCorners = corners.map((corner) => {
-          const rotated = rotatePoint(corner[0], corner[1]);
-          return [rotated.lat, rotated.lng] as [number, number];
-        });
+        const rotatedCenter = rotatePoint(oldCenter.lat, oldCenter.lng);
 
-        const lats = rotatedCorners.map((c) => c[0]);
-        const lngs = rotatedCorners.map((c) => c[1]);
+        const width =
+          rotationStartPositions.value[1][0] -
+          rotationStartPositions.value[0][0];
+        const height =
+          rotationStartPositions.value[1][1] -
+          rotationStartPositions.value[0][1];
 
         rectangle.bounds = [
-          [Math.min(...lats), Math.min(...lngs)],
-          [Math.max(...lats), Math.max(...lngs)],
+          [rotatedCenter.lat - width / 2, rotatedCenter.lng - height / 2],
+          [rotatedCenter.lat + width / 2, rotatedCenter.lng + height / 2],
         ] as [[number, number], [number, number]];
       }
       break;
@@ -4565,6 +4739,7 @@ const handleBoundingBoxRotate = (angle: number) => {
 
 const handleBoundingBoxRotateEnd = () => {
   rotationStartPositions.value = null;
+  rotationCenter.value = null;
 };
 </script>
 
@@ -4630,6 +4805,7 @@ const handleBoundingBoxRotateEnd = () => {
         <LeafletBoundingBox
           v-if="boundingBox"
           :bounds="boundingBox"
+          :visible="true"
           @update:bounds="handleBoundingBoxUpdate"
           @rotate="handleBoundingBoxRotate"
           @rotate-end="handleBoundingBoxRotateEnd"
@@ -4645,6 +4821,7 @@ const handleBoundingBoxRotateEnd = () => {
           @update:lat="(lat) => updateMarker(marker.id, lat, marker.lng)"
           @update:lng="(lng) => updateMarker(marker.id, marker.lat, lng)"
           @click="selectShape('marker', marker.id)"
+          @dragstart="selectShape('marker', marker.id)"
         />
 
         <LeafletCircle
@@ -4672,6 +4849,7 @@ const handleBoundingBoxRotateEnd = () => {
           :editable="editableShapes.polylines"
           @update:latlngs="(latlngs) => updatePolyline(polyline.id, latlngs)"
           @click="selectShape('polyline', polyline.id)"
+          @dragstart="selectShape('polyline', polyline.id)"
         />
 
         <LeafletPolygon
@@ -4685,6 +4863,7 @@ const handleBoundingBoxRotateEnd = () => {
           @update:latlngs="(latlngs) => updatePolygon(polygon.id, latlngs)"
           @closed="() => onPolygonClosed(polygon.id)"
           @click="selectShape('polygon', polygon.id)"
+          @dragstart="selectShape('polygon', polygon.id)"
         />
 
         <LeafletRectangle

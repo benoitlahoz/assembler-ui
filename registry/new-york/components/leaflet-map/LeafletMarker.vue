@@ -20,6 +20,7 @@ const emit = defineEmits<{
   'update:lat': [lat: number];
   'update:lng': [lng: number];
   click: [];
+  dragstart: [];
 }>();
 
 const L = inject(LeafletModuleKey, ref());
@@ -54,6 +55,7 @@ const setupMarker = () => {
 
     if (isDraggable) {
       marker.value.on('drag', onDrag);
+      marker.value.on('dragstart', () => emit('dragstart'));
       marker.value.on('dragend', onDragEnd);
     }
 

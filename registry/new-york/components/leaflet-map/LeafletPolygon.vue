@@ -25,6 +25,7 @@ const emit = defineEmits<{
   'update:latlngs': [latlngs: Array<[number, number]>];
   closed: [];
   click: [];
+  dragstart: [];
 }>();
 
 const { getLeafletShapeColors } = useTailwindClassParser();
@@ -211,6 +212,9 @@ const enableDragging = () => {
   polygon.value.on('mousedown', (e: L.LeafletMouseEvent) => {
     L.value!.DomEvent.stopPropagation(e);
     isDragging.value = true;
+
+    // Émettre dragstart
+    emit('dragstart');
 
     // Sauvegarder les positions initiales
     dragStartLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map((ll) =>

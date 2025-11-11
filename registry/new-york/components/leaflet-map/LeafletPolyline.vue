@@ -22,6 +22,7 @@ const props = withDefaults(defineProps<LeafletPolylineProps>(), {
 const emit = defineEmits<{
   'update:latlngs': [latlngs: Array<[number, number]>];
   click: [];
+  dragstart: [];
 }>();
 
 const { getLeafletLineColors } = useTailwindClassParser();
@@ -189,6 +190,9 @@ const enableDragging = () => {
     L.value!.DomEvent.stopPropagation(e);
     isDragging.value = true;
 
+    // Émettre dragstart
+    emit('dragstart');
+
     // Sauvegarder les positions initiales
     dragStartLatLngs = (polyline.value!.getLatLngs() as L.LatLng[]).map((ll) =>
       L.value!.latLng(ll.lat, ll.lng)
@@ -230,6 +234,10 @@ const setupMapDragHandlers = () => {
 
     // Mettre à jour la polyline
     polyline.value!.setLatLngs(newLatLngs);
+
+    // Émettre la mise à jour en temps réel pendant le drag
+    const updatedLatLngs = newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>;
+    emit('update:latlngs', updatedLatLngs);
   };
 
   const onMouseUp = () => {

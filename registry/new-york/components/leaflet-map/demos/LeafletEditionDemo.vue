@@ -742,6 +742,7 @@ const handleBoundingBoxRotateEnd = () => {
           @update:lat="(lat) => updateMarker(marker.id, lat, marker.lng)"
           @update:lng="(lng) => updateMarker(marker.id, marker.lat, lng)"
           @click="selectShape('marker', marker.id)"
+          @dragstart="selectShape('marker', marker.id)"
         />
 
         <LeafletCircle
@@ -769,6 +770,7 @@ const handleBoundingBoxRotateEnd = () => {
           :editable="editableShapes.polylines"
           @update:latlngs="(latlngs) => updatePolyline(polyline.id, latlngs)"
           @click="selectShape('polyline', polyline.id)"
+          @dragstart="selectShape('polyline', polyline.id)"
         />
 
         <LeafletPolygon
@@ -782,6 +784,7 @@ const handleBoundingBoxRotateEnd = () => {
           @update:latlngs="(latlngs) => updatePolygon(polygon.id, latlngs)"
           @closed="() => onPolygonClosed(polygon.id)"
           @click="selectShape('polygon', polygon.id)"
+          @dragstart="selectShape('polygon', polygon.id)"
         />
 
         <LeafletRectangle
