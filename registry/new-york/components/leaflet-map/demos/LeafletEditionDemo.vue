@@ -292,7 +292,10 @@ const onPolygonClosed = (id: number) => {
 };
 
 // Shape selection handlers
-const selectShape = (type: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle', id: number) => {
+const selectShape = (
+  type: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle',
+  id: number
+) => {
   if (currentEditMode.value === 'select') {
     selectedShape.value = { type, id };
   }
@@ -366,8 +369,10 @@ const handleBoundingBoxUpdate = (newBounds: any) => {
   const oldBounds = boundingBox.value;
   if (!oldBounds) return;
 
-  const scaleX = (newBounds.getEast() - newBounds.getWest()) / (oldBounds.getEast() - oldBounds.getWest());
-  const scaleY = (newBounds.getNorth() - newBounds.getSouth()) / (oldBounds.getNorth() - oldBounds.getSouth());
+  const scaleX =
+    (newBounds.getEast() - newBounds.getWest()) / (oldBounds.getEast() - oldBounds.getWest());
+  const scaleY =
+    (newBounds.getNorth() - newBounds.getSouth()) / (oldBounds.getNorth() - oldBounds.getSouth());
   const centerOld = oldBounds.getCenter();
   const centerNew = newBounds.getCenter();
   const deltaLat = centerNew.lat - centerOld.lat;

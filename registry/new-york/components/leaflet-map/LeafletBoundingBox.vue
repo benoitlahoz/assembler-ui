@@ -59,13 +59,15 @@ const createBoundingBox = () => {
   clearHandles();
 
   // Créer le rectangle de bounding box
-  boundingBox.value = L.value.rectangle(props.bounds, {
-    color: '#3388ff',
-    weight: 2,
-    fill: false,
-    dashArray: '5, 5',
-    interactive: false,
-  }).addTo(map.value);
+  boundingBox.value = L.value
+    .rectangle(props.bounds, {
+      color: '#3388ff',
+      weight: 2,
+      fill: false,
+      dashArray: '5, 5',
+      interactive: false,
+    })
+    .addTo(map.value);
 
   // Créer les handles aux coins (pour scale)
   const corners = [
@@ -105,7 +107,7 @@ const createBoundingBox = () => {
 
     handle.on('drag', () => {
       if (!isScaling.value || !scaleStartBounds) return;
-      
+
       const newCorner = handle.getLatLng();
       let newBounds: L.LatLngBounds;
 
@@ -289,7 +291,7 @@ const createBoundingBox = () => {
     // Calcul de l'angle de rotation (à implémenter avec transformation)
     const center = props.bounds.getCenter();
     const handlePos = rotateHandle.value!.getLatLng();
-    
+
     // Calculer l'angle entre le centre et le handle
     const dx = handlePos.lng - center.lng;
     const dy = handlePos.lat - center.lat;
@@ -335,10 +337,7 @@ const updateHandlePositions = (bounds: L.LatLngBounds) => {
 
   // Mettre à jour le handle de rotation
   if (rotateHandle.value) {
-    const centerTop = L.value.latLng(
-      bounds.getNorth(),
-      (bounds.getWest() + bounds.getEast()) / 2
-    );
+    const centerTop = L.value.latLng(bounds.getNorth(), (bounds.getWest() + bounds.getEast()) / 2);
     const centerTopPoint = map.value.latLngToLayerPoint(centerTop);
     const rotateHandlePoint = L.value.point(centerTopPoint.x, centerTopPoint.y - 30);
     const rotateHandleLatLng = map.value.layerPointToLatLng(rotateHandlePoint);
