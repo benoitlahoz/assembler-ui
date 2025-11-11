@@ -327,10 +327,18 @@ const boundingBox = computed(() => {
         const circle = circles.value.find((c) => c.id === id);
         if (!circle) return null;
         const center = L.latLng(circle.lat, circle.lng);
-        const radiusInDegrees = circle.radius / 111320; // Approximate conversion
+
+        // Convert radius in meters to degrees
+        // 1 degree of latitude ≈ 111,320 meters (constant)
+        const radiusInLatDegrees = circle.radius / 111320;
+
+        // 1 degree of longitude varies with latitude: 111,320 * cos(latitude)
+        const radiusInLngDegrees =
+          circle.radius / (111320 * Math.cos((circle.lat * Math.PI) / 180));
+
         return L.latLngBounds(
-          [circle.lat - radiusInDegrees, circle.lng - radiusInDegrees],
-          [circle.lat + radiusInDegrees, circle.lng + radiusInDegrees]
+          [circle.lat - radiusInLatDegrees, circle.lng - radiusInLngDegrees],
+          [circle.lat + radiusInLatDegrees, circle.lng + radiusInLngDegrees]
         );
       }
       case 'polyline': {

@@ -191,6 +191,17 @@ watch(
           }
           if (radiusChanged) {
             circle.value.setRadius(Number(props.radius));
+
+            // Update radius marker position if it exists
+            if (radiusMarker.value && props.editable) {
+              const center = circle.value.getLatLng();
+              const radius = circle.value.getRadius();
+              const radiusLatLng = L.value.latLng(
+                center.lat,
+                center.lng + radius / 111320 / Math.cos((center.lat * Math.PI) / 180)
+              );
+              radiusMarker.value.setLatLng(radiusLatLng);
+            }
           }
         } else {
           circle.value = L.value.circle([Number(props.lat), Number(props.lng)], {
