@@ -253,6 +253,10 @@ const setupMapDragHandlers = () => {
 
     // Mettre à jour le polygone
     polygon.value!.setLatLngs([newLatLngs]);
+
+    // Émettre la mise à jour en temps réel pendant le drag
+    const updatedLatLngs = newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>;
+    emit('update:latlngs', updatedLatLngs);
   };
 
   const onMouseUp = () => {

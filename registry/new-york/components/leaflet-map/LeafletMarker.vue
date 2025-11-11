@@ -53,6 +53,7 @@ const setupMarker = () => {
     });
 
     if (isDraggable) {
+      marker.value.on('drag', onDrag);
       marker.value.on('dragend', onDragEnd);
     }
 
@@ -75,6 +76,14 @@ const updateMarker = (latChanged = false, lngChanged = false) => {
     } else {
       marker.value.dragging?.disable();
     }
+  }
+};
+
+const onDrag = () => {
+  if (marker.value) {
+    const latlng = marker.value.getLatLng();
+    emit('update:lat', latlng.lat);
+    emit('update:lng', latlng.lng);
   }
 };
 

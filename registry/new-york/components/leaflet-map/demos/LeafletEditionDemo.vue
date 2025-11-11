@@ -122,6 +122,8 @@ const handleEditModeChanged = (mode: 'select' | 'directSelect' | null) => {
   // Clear selection when changing modes
   if (mode !== 'select') {
     selectedShape.value = null;
+    rotationStartPositions.value = null;
+    rotationCenter.value = null;
   }
 
   if (mode === 'select') {
@@ -300,16 +302,31 @@ const selectShape = (
   if (currentEditMode.value === 'select') {
     selectedShape.value = { type, id };
     console.log('selectedShape set:', selectedShape.value);
+    // Réinitialiser les positions de rotation quand on change de shape
+    rotationStartPositions.value = null;
+    rotationCenter.value = null;
+  } else {
+    selectedShape.value = null;
   }
 };
 
 // Sauvegarde des positions initiales pour la rotation
 const rotationStartPositions = ref<any>(null);
+const rotationCenter = ref<{ lat: number; lng: number } | null>(null);
 
 const saveRotationStartPositions = () => {
+  console.log('saveRotationStartPositions called, selectedShape:', selectedShape.value);
   if (!selectedShape.value) return;
 
   const { type, id } = selectedShape.value;
+
+  // Sauvegarder aussi le centre de rotation (qui ne doit pas changer pendant la rotation)
+  const bounds = boundingBox.value;
+  if (bounds) {
+    const center = bounds.getCenter();
+    rotationCenter.value = { lat: center.lat, lng: center.lng };
+    console.log('Rotation center saved:', rotationCenter.value);
+  }
 
   switch (type) {
     case 'marker': {
@@ -329,25 +346,37 @@ const saveRotationStartPositions = () => {
     case 'polyline': {
       const polyline = polylines.value.find((p) => p.id === id);
       if (polyline) {
-        rotationStartPositions.value = [...polyline.latlngs];
+        // Copie profonde des positions
+        rotationStartPositions.value = polyline.latlngs.map(
+          (ll) => [ll[0], ll[1]] as [number, number]
+        );
       }
       break;
     }
     case 'polygon': {
       const polygon = polygons.value.find((p) => p.id === id);
       if (polygon) {
-        rotationStartPositions.value = [...polygon.latlngs];
+        // Copie profonde des positions
+        rotationStartPositions.value = polygon.latlngs.map(
+          (ll) => [ll[0], ll[1]] as [number, number]
+        );
+        console.log('Saved polygon positions:', rotationStartPositions.value);
       }
       break;
     }
     case 'rectangle': {
       const rectangle = rectangles.value.find((r) => r.id === id);
       if (rectangle) {
-        rotationStartPositions.value = [[...rectangle.bounds[0]], [...rectangle.bounds[1]]];
+        // Copie profonde des bounds
+        rotationStartPositions.value = [
+          [rectangle.bounds[0][0], rectangle.bounds[0][1]],
+          [rectangle.bounds[1][0], rectangle.bounds[1][1]],
+        ];
       }
       break;
     }
   }
+  console.log('rotationStartPositions after save:', rotationStartPositions.value);
 };
 
 // Computed bounding box
@@ -505,7 +534,11 @@ const handleBoundingBoxUpdate = (newBounds: any) => {
 
 // Handle rotation from bounding box
 const handleBoundingBoxRotate = (angle: number) => {
+  console.log('=== handleBoundingBoxRotate ===');
   console.log('Rotation angle:', angle);
+  console.log('selectedShape:', selectedShape.value);
+  console.log('rotationStartPositions:', rotationStartPositions.value);
+  console.log('rotationCenter:', rotationCenter.value);
 
   if (!selectedShape.value) return;
 
@@ -518,23 +551,32 @@ const handleBoundingBoxRotate = (angle: number) => {
   const L = (window as any).L;
   if (!L) return;
 
-  const oldBounds = boundingBox.value;
-  if (!oldBounds || !rotationStartPositions.value) return;
+  if (!rotationCenter.value || !rotationStartPositions.value) return;
 
-  const center = oldBounds.getCenter();
-  const angleRad = (angle * Math.PI) / 180;
+  const center = rotationCenter.value; // Utiliser le centre fixe sauvegardé
+  const angleRad = (-angle * Math.PI) / 180; // Inverser l'angle pour corriger le sens
 
   // Fonction pour faire tourner un point autour d'un centre
+  // Important: On doit convertir en coordonnées métriques pour que la rotation soit correcte
   const rotatePoint = (lat: number, lng: number) => {
-    const relLat = lat - center.lat;
-    const relLng = lng - center.lng;
+    // Convertir lat/lng en mètres relatifs au centre (approximation simple)
+    // 1 degré de latitude ≈ 111320 mètres
+    // 1 degré de longitude ≈ 111320 * cos(latitude) mètres
+    const metersPerDegreeLat = 111320;
+    const metersPerDegreeLng = 111320 * Math.cos((center.lat * Math.PI) / 180);
 
-    const newRelLat = relLat * Math.cos(angleRad) - relLng * Math.sin(angleRad);
-    const newRelLng = relLat * Math.sin(angleRad) + relLng * Math.cos(angleRad);
+    // Convertir en mètres relatifs
+    const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+    const relMetersX = (lng - center.lng) * metersPerDegreeLng;
 
+    // Appliquer la rotation en coordonnées métriques
+    const newRelMetersY = relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+    const newRelMetersX = relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+
+    // Reconvertir en degrés
     return {
-      lat: center.lat + newRelLat,
-      lng: center.lng + newRelLng,
+      lat: center.lat + newRelMetersY / metersPerDegreeLat,
+      lng: center.lng + newRelMetersX / metersPerDegreeLng,
     };
   };
 
@@ -587,26 +629,24 @@ const handleBoundingBoxRotate = (angle: number) => {
     case 'rectangle': {
       const rectangle = rectangles.value.find((r) => r.id === id);
       if (rectangle) {
-        // Pour le rectangle, faire tourner les 4 coins puis recalculer les bounds
-        const corners = [
-          rotationStartPositions.value[0], // SW
-          [rotationStartPositions.value[1][0], rotationStartPositions.value[0][1]], // NW
-          rotationStartPositions.value[1], // NE
-          [rotationStartPositions.value[0][0], rotationStartPositions.value[1][1]], // SE
-        ] as Array<[number, number]>;
+        // Pour les rectangles, on ne supporte pas vraiment la rotation
+        // (ils resteraient axis-aligned). On peut juste translater le centre.
+        // Si vous voulez vraiment faire tourner un rectangle, il faudrait le convertir en polygon.
 
-        const rotatedCorners = corners.map((corner) => {
-          const rotated = rotatePoint(corner[0], corner[1]);
-          return [rotated.lat, rotated.lng] as [number, number];
-        });
+        // Pour l'instant, on translate juste le rectangle pour suivre le centre tournant
+        const oldCenter = L.latLng(
+          (rotationStartPositions.value[0][0] + rotationStartPositions.value[1][0]) / 2,
+          (rotationStartPositions.value[0][1] + rotationStartPositions.value[1][1]) / 2
+        );
 
-        // Trouver les nouvelles bounds min/max
-        const lats = rotatedCorners.map((c) => c[0]);
-        const lngs = rotatedCorners.map((c) => c[1]);
+        const rotatedCenter = rotatePoint(oldCenter.lat, oldCenter.lng);
+
+        const width = rotationStartPositions.value[1][0] - rotationStartPositions.value[0][0];
+        const height = rotationStartPositions.value[1][1] - rotationStartPositions.value[0][1];
 
         rectangle.bounds = [
-          [Math.min(...lats), Math.min(...lngs)],
-          [Math.max(...lats), Math.max(...lngs)],
+          [rotatedCenter.lat - width / 2, rotatedCenter.lng - height / 2],
+          [rotatedCenter.lat + width / 2, rotatedCenter.lng + height / 2],
         ] as [[number, number], [number, number]];
       }
       break;
@@ -617,6 +657,7 @@ const handleBoundingBoxRotate = (angle: number) => {
 // Handle rotation end - réinitialiser les positions de départ
 const handleBoundingBoxRotateEnd = () => {
   rotationStartPositions.value = null;
+  rotationCenter.value = null;
 };
 </script>
 

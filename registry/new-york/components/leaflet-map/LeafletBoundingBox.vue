@@ -26,6 +26,7 @@ const boundingBox = ref<L.Rectangle | null>(null);
 const cornerHandles = ref<L.Marker[]>([]);
 const edgeHandles = ref<L.Marker[]>([]);
 const rotateHandle = ref<L.Marker | null>(null);
+const centerHandle = ref<L.Marker | null>(null);
 
 const isDragging = ref(false);
 const isRotating = ref(false);
@@ -46,6 +47,10 @@ const clearHandles = () => {
     rotateHandle.value.remove();
     rotateHandle.value = null;
   }
+  if (centerHandle.value) {
+    centerHandle.value.remove();
+    centerHandle.value = null;
+  }
   if (boundingBox.value) {
     boundingBox.value.remove();
     boundingBox.value = null;
@@ -53,7 +58,14 @@ const clearHandles = () => {
 };
 
 const createBoundingBox = () => {
+  console.log('createBoundingBox called, props:', props);
   if (!props.bounds || !L.value || !map.value || !props.visible) {
+    console.log('Bailing out:', {
+      bounds: !!props.bounds,
+      L: !!L.value,
+      map: !!map.value,
+      visible: props.visible,
+    });
     clearHandles();
     return;
   }
@@ -280,16 +292,31 @@ const createBoundingBox = () => {
       draggable: true,
       icon: L.value.divIcon({
         className: 'leaflet-bounding-box-handle leaflet-bounding-box-rotate',
-        html: '<div style="width:12px;height:12px;background:#fff;border:2px solid #3388ff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);cursor:url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJzNC40OCAxMCAxMCAxMCAxMC00LjQ4IDEwLTEwUzE3LjUyIDIgMTIgMnptMCAxOGMtNC40MSAwLTgtMy41OS04LThzMy41OS04IDgtOCA4IDMuNTkgOCA4LTMuNTkgOC04IDh6IiBmaWxsPSIjMzM4OGZmIi8+PHBhdGggZD0iTTEyIDZWMTJsNCAyIiBzdHJva2U9IiMzMzg4ZmYiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==) 12 12, auto;"></div>',
+        html: '<div style="width:12px;height:12px;background:#fff;border:2px solid #3388ff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
         iconSize: [12, 12],
       }),
     })
     .addTo(map.value);
 
+  console.log('Rotate handle created:', rotateHandle.value);
+
+  rotateHandle.value.on('mousedown', () => {
+    console.log('Rotate handle mousedown');
+    if (map.value) {
+      map.value.getContainer().style.cursor = 'grabbing';
+    }
+  });
+
   rotateHandle.value.on('dragstart', () => {
+    console.log('Rotate handle dragstart');
     isRotating.value = true;
     if (map.value && props.bounds) {
       map.value.dragging.disable();
+
+      // Cacher la bounding box et les handles pendant la rotation
+      if (boundingBox.value) boundingBox.value.setStyle({ opacity: 0 });
+      cornerHandles.value.forEach((h) => h.setOpacity(0));
+      edgeHandles.value.forEach((h) => h.setOpacity(0));
 
       // Calculer l'angle initial
       const center = props.bounds.getCenter();
@@ -322,15 +349,49 @@ const createBoundingBox = () => {
   });
 
   rotateHandle.value.on('dragend', () => {
+    console.log('Rotate handle dragend');
     isRotating.value = false;
     if (map.value) {
       map.value.getContainer().style.cursor = '';
       map.value.dragging.enable();
     }
 
+    // Réafficher la bounding box et les handles
+    if (boundingBox.value) boundingBox.value.setStyle({ opacity: 1 });
+    cornerHandles.value.forEach((h) => h.setOpacity(1));
+    edgeHandles.value.forEach((h) => h.setOpacity(1));
+
     // Émettre l'événement de fin de rotation
     emit('rotate-end');
+
+    // Forcer la recréation de la bounding box après la rotation
+    setTimeout(() => {
+      if (props.bounds) {
+        createBoundingBox();
+      }
+    }, 0);
   });
+
+  rotateHandle.value.on('mouseup', () => {
+    if (map.value) {
+      map.value.getContainer().style.cursor = '';
+    }
+  });
+
+  // Créer le handle central orange (non draggable, juste pour visualisation)
+  const center = props.bounds.getCenter();
+  centerHandle.value = L.value
+    .marker(center, {
+      draggable: false,
+      icon: L.value.divIcon({
+        className: 'leaflet-bounding-box-handle leaflet-bounding-box-center',
+        html: '<div style="width:12px;height:12px;background:#ff8800;border:2px solid #fff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
+        iconSize: [12, 12],
+      }),
+    })
+    .addTo(map.value);
+
+  console.log('Center handle created:', centerHandle.value);
 };
 
 const updateHandlePositions = (bounds: L.LatLngBounds) => {
@@ -366,12 +427,61 @@ const updateHandlePositions = (bounds: L.LatLngBounds) => {
     const rotateHandleLatLng = map.value.layerPointToLatLng(rotateHandlePoint);
     rotateHandle.value.setLatLng(rotateHandleLatLng);
   }
+
+  // Mettre à jour le handle central
+  if (centerHandle.value) {
+    const center = bounds.getCenter();
+    centerHandle.value.setLatLng(center);
+  }
 };
 
 watch(
-  () => [props.bounds, props.visible],
   () => {
-    createBoundingBox();
+    // Créer une représentation sérialisable des bounds pour détecter les changements
+    if (props.bounds) {
+      return {
+        visible: props.visible,
+        south: props.bounds.getSouth(),
+        north: props.bounds.getNorth(),
+        west: props.bounds.getWest(),
+        east: props.bounds.getEast(),
+      };
+    }
+    return { visible: props.visible, south: 0, north: 0, west: 0, east: 0 };
+  },
+  (newVal, oldVal) => {
+    // Si on manipule la bounding box (rotation, scale), ne pas recréer
+    if (isRotating.value || isScaling.value) {
+      console.log('Skipping createBoundingBox because manipulation in progress');
+      return;
+    }
+
+    // Vérifier si les bounds ont vraiment changé
+    const boundsChanged =
+      oldVal &&
+      newVal &&
+      (oldVal.south !== newVal.south ||
+        oldVal.north !== newVal.north ||
+        oldVal.west !== newVal.west ||
+        oldVal.east !== newVal.east);
+
+    // Si la bounding box existe déjà et qu'on ne manipule pas, juste mettre à jour visuellement
+    if (
+      boundingBox.value &&
+      props.bounds &&
+      props.visible &&
+      !isDragging.value &&
+      cornerHandles.value.length > 0 &&
+      boundsChanged
+    ) {
+      console.log('Updating bounding box visually', newVal);
+      boundingBox.value.setBounds(props.bounds);
+      updateHandlePositions(props.bounds);
+    } else if (newVal.visible !== oldVal?.visible || !boundingBox.value) {
+      // Sinon recréer complètement si visibility change ou pas encore créé
+      console.log('Recreating bounding box');
+      createBoundingBox();
+    }
   },
   { immediate: true, deep: true }
 );
