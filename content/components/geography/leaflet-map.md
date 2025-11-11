@@ -390,6 +390,7 @@ const props = withDefaults(defineProps<LeafletBoundingBoxProps>(), {
 const emit = defineEmits<{
   "update:bounds": [bounds: L.LatLngBounds];
   rotate: [angle: number];
+  "rotate-end": [];
   scale: [scaleX: number, scaleY: number];
 }>();
 
@@ -409,6 +410,7 @@ let dragStartBounds: L.LatLngBounds | null = null;
 let dragStartMousePoint: L.Point | null = null;
 let scaleStartBounds: L.LatLngBounds | null = null;
 let scaleCornerIndex = -1;
+let rotationStartAngle = 0;
 
 const clearHandles = () => {
   cornerHandles.value.forEach((h) => h.remove());
@@ -522,6 +524,8 @@ const createBoundingBox = () => {
       }
 
       updateHandlePositions(newBounds);
+
+      emit("update:bounds", newBounds);
     });
 
     handle.on("dragend", () => {
@@ -621,6 +625,8 @@ const createBoundingBox = () => {
       }
 
       updateHandlePositions(newBounds);
+
+      emit("update:bounds", newBounds);
     });
 
     handle.on("dragend", () => {
@@ -662,8 +668,14 @@ const createBoundingBox = () => {
 
   rotateHandle.value.on("dragstart", () => {
     isRotating.value = true;
-    if (map.value) {
+    if (map.value && props.bounds) {
       map.value.dragging.disable();
+
+      const center = props.bounds.getCenter();
+      const handlePos = rotateHandle.value!.getLatLng();
+      const dx = handlePos.lng - center.lng;
+      const dy = handlePos.lat - center.lat;
+      rotationStartAngle = Math.atan2(dy, dx) * (180 / Math.PI);
     }
   });
 
@@ -675,9 +687,13 @@ const createBoundingBox = () => {
 
     const dx = handlePos.lng - center.lng;
     const dy = handlePos.lat - center.lat;
-    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    const currentAngle = Math.atan2(dy, dx) * (180 / Math.PI);
 
-    emit("rotate", angle);
+    const rotationAngle = currentAngle - rotationStartAngle;
+
+    console.log("Emitting rotate event:", rotationAngle);
+
+    emit("rotate", rotationAngle);
   });
 
   rotateHandle.value.on("dragend", () => {
@@ -686,6 +702,8 @@ const createBoundingBox = () => {
       map.value.getContainer().style.cursor = "";
       map.value.dragging.enable();
     }
+
+    emit("rotate-end");
   });
 };
 
@@ -4223,12 +4241,70 @@ const selectShape = (
   type: "marker" | "circle" | "polyline" | "polygon" | "rectangle",
   id: number,
 ) => {
+  console.log(
+    "selectShape called:",
+    type,
+    id,
+    "currentEditMode:",
+    currentEditMode.value,
+  );
   if (currentEditMode.value === "select") {
     selectedShape.value = { type, id };
+    console.log("selectedShape set:", selectedShape.value);
+  }
+};
+
+const rotationStartPositions = ref<any>(null);
+
+const saveRotationStartPositions = () => {
+  if (!selectedShape.value) return;
+
+  const { type, id } = selectedShape.value;
+
+  switch (type) {
+    case "marker": {
+      const marker = markers.value.find((m) => m.id === id);
+      if (marker) {
+        rotationStartPositions.value = { lat: marker.lat, lng: marker.lng };
+      }
+      break;
+    }
+    case "circle": {
+      const circle = circles.value.find((c) => c.id === id);
+      if (circle) {
+        rotationStartPositions.value = { lat: circle.lat, lng: circle.lng };
+      }
+      break;
+    }
+    case "polyline": {
+      const polyline = polylines.value.find((p) => p.id === id);
+      if (polyline) {
+        rotationStartPositions.value = [...polyline.latlngs];
+      }
+      break;
+    }
+    case "polygon": {
+      const polygon = polygons.value.find((p) => p.id === id);
+      if (polygon) {
+        rotationStartPositions.value = [...polygon.latlngs];
+      }
+      break;
+    }
+    case "rectangle": {
+      const rectangle = rectangles.value.find((r) => r.id === id);
+      if (rectangle) {
+        rotationStartPositions.value = [
+          [...rectangle.bounds[0]],
+          [...rectangle.bounds[1]],
+        ];
+      }
+      break;
+    }
   }
 };
 
 const boundingBox = computed(() => {
+  console.log("boundingBox computed, selectedShape:", selectedShape.value);
   if (!selectedShape.value || !mapRef.value?.map) return null;
 
   const L = (window as any).L;
@@ -4371,6 +4447,125 @@ const handleBoundingBoxUpdate = (newBounds: any) => {
     }
   }
 };
+
+const handleBoundingBoxRotate = (angle: number) => {
+  console.log("Rotation angle:", angle);
+
+  if (!selectedShape.value) return;
+
+  if (rotationStartPositions.value === null) {
+    saveRotationStartPositions();
+  }
+
+  const { type, id } = selectedShape.value;
+  const L = (window as any).L;
+  if (!L) return;
+
+  const oldBounds = boundingBox.value;
+  if (!oldBounds || !rotationStartPositions.value) return;
+
+  const center = oldBounds.getCenter();
+  const angleRad = (angle * Math.PI) / 180;
+
+  const rotatePoint = (lat: number, lng: number) => {
+    const relLat = lat - center.lat;
+    const relLng = lng - center.lng;
+
+    const newRelLat = relLat * Math.cos(angleRad) - relLng * Math.sin(angleRad);
+    const newRelLng = relLat * Math.sin(angleRad) + relLng * Math.cos(angleRad);
+
+    return {
+      lat: center.lat + newRelLat,
+      lng: center.lng + newRelLng,
+    };
+  };
+
+  switch (type) {
+    case "marker": {
+      const marker = markers.value.find((m) => m.id === id);
+      if (marker) {
+        const rotated = rotatePoint(
+          rotationStartPositions.value.lat,
+          rotationStartPositions.value.lng,
+        );
+        marker.lat = rotated.lat;
+        marker.lng = rotated.lng;
+      }
+      break;
+    }
+    case "circle": {
+      const circle = circles.value.find((c) => c.id === id);
+      if (circle) {
+        const rotated = rotatePoint(
+          rotationStartPositions.value.lat,
+          rotationStartPositions.value.lng,
+        );
+        circle.lat = rotated.lat;
+        circle.lng = rotated.lng;
+      }
+      break;
+    }
+    case "polyline": {
+      const polyline = polylines.value.find((p) => p.id === id);
+      if (polyline) {
+        polyline.latlngs = rotationStartPositions.value.map(
+          (ll: [number, number]) => {
+            const rotated = rotatePoint(ll[0], ll[1]);
+            return [rotated.lat, rotated.lng] as [number, number];
+          },
+        );
+      }
+      break;
+    }
+    case "polygon": {
+      const polygon = polygons.value.find((p) => p.id === id);
+      if (polygon) {
+        polygon.latlngs = rotationStartPositions.value.map(
+          (ll: [number, number]) => {
+            const rotated = rotatePoint(ll[0], ll[1]);
+            return [rotated.lat, rotated.lng] as [number, number];
+          },
+        );
+      }
+      break;
+    }
+    case "rectangle": {
+      const rectangle = rectangles.value.find((r) => r.id === id);
+      if (rectangle) {
+        const corners = [
+          rotationStartPositions.value[0],
+          [
+            rotationStartPositions.value[1][0],
+            rotationStartPositions.value[0][1],
+          ],
+          rotationStartPositions.value[1],
+          [
+            rotationStartPositions.value[0][0],
+            rotationStartPositions.value[1][1],
+          ],
+        ] as Array<[number, number]>;
+
+        const rotatedCorners = corners.map((corner) => {
+          const rotated = rotatePoint(corner[0], corner[1]);
+          return [rotated.lat, rotated.lng] as [number, number];
+        });
+
+        const lats = rotatedCorners.map((c) => c[0]);
+        const lngs = rotatedCorners.map((c) => c[1]);
+
+        rectangle.bounds = [
+          [Math.min(...lats), Math.min(...lngs)],
+          [Math.max(...lats), Math.max(...lngs)],
+        ] as [[number, number], [number, number]];
+      }
+      break;
+    }
+  }
+};
+
+const handleBoundingBoxRotateEnd = () => {
+  rotationStartPositions.value = null;
+};
 </script>
 
 <template>
@@ -4433,9 +4628,11 @@ const handleBoundingBoxUpdate = (newBounds: any) => {
         />
 
         <LeafletBoundingBox
+          v-if="boundingBox"
           :bounds="boundingBox"
-          :visible="currentEditMode === 'select' && !!selectedShape"
           @update:bounds="handleBoundingBoxUpdate"
+          @rotate="handleBoundingBoxRotate"
+          @rotate-end="handleBoundingBoxRotateEnd"
         />
 
         <LeafletMarker

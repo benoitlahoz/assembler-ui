@@ -15,6 +15,7 @@ const props = withDefaults(defineProps<LeafletBoundingBoxProps>(), {
 const emit = defineEmits<{
   'update:bounds': [bounds: L.LatLngBounds];
   rotate: [angle: number];
+  'rotate-end': [];
   scale: [scaleX: number, scaleY: number];
 }>();
 
@@ -34,6 +35,7 @@ let dragStartBounds: L.LatLngBounds | null = null;
 let dragStartMousePoint: L.Point | null = null;
 let scaleStartBounds: L.LatLngBounds | null = null;
 let scaleCornerIndex = -1;
+let rotationStartAngle = 0;
 
 const clearHandles = () => {
   cornerHandles.value.forEach((h) => h.remove());
@@ -142,6 +144,9 @@ const createBoundingBox = () => {
 
       // Mettre à jour les positions des handles
       updateHandlePositions(newBounds);
+
+      // Émettre en temps réel pendant le drag
+      emit('update:bounds', newBounds);
     });
 
     handle.on('dragend', () => {
@@ -240,6 +245,9 @@ const createBoundingBox = () => {
 
       // Mettre à jour les positions des handles
       updateHandlePositions(newBounds);
+
+      // Émettre en temps réel pendant le drag
+      emit('update:bounds', newBounds);
     });
 
     handle.on('dragend', () => {
@@ -280,25 +288,37 @@ const createBoundingBox = () => {
 
   rotateHandle.value.on('dragstart', () => {
     isRotating.value = true;
-    if (map.value) {
+    if (map.value && props.bounds) {
       map.value.dragging.disable();
+
+      // Calculer l'angle initial
+      const center = props.bounds.getCenter();
+      const handlePos = rotateHandle.value!.getLatLng();
+      const dx = handlePos.lng - center.lng;
+      const dy = handlePos.lat - center.lat;
+      rotationStartAngle = Math.atan2(dy, dx) * (180 / Math.PI);
     }
   });
 
   rotateHandle.value.on('drag', () => {
     if (!isRotating.value || !props.bounds) return;
 
-    // Calcul de l'angle de rotation (à implémenter avec transformation)
+    // Calcul de l'angle de rotation
     const center = props.bounds.getCenter();
     const handlePos = rotateHandle.value!.getLatLng();
 
-    // Calculer l'angle entre le centre et le handle
+    // Calculer l'angle actuel entre le centre et le handle
     const dx = handlePos.lng - center.lng;
     const dy = handlePos.lat - center.lat;
-    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    const currentAngle = Math.atan2(dy, dx) * (180 / Math.PI);
 
-    // Émettre l'événement de rotation (pour transformation future)
-    emit('rotate', angle);
+    // Calculer la rotation relative
+    const rotationAngle = currentAngle - rotationStartAngle;
+
+    console.log('Emitting rotate event:', rotationAngle);
+
+    // Émettre l'événement de rotation en temps réel
+    emit('rotate', rotationAngle);
   });
 
   rotateHandle.value.on('dragend', () => {
@@ -307,6 +327,9 @@ const createBoundingBox = () => {
       map.value.getContainer().style.cursor = '';
       map.value.dragging.enable();
     }
+
+    // Émettre l'événement de fin de rotation
+    emit('rotate-end');
   });
 };
 
