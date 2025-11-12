@@ -68,7 +68,7 @@ const onLocationFound = (event: any) => {
           :lat="locationCoords.lat"
           :lng="locationCoords.lng"
           :radius="locationCoords.accuracy"
-          class="bg-red-500 text-red-500 opacity-20"
+          class="bg-red-500/20 border border-red-500"
         />
       </LeafletMap>
     </div>

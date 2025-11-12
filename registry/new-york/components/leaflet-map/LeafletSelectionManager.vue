@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, provide, watch, type Ref } from 'vue';
+import { ref, computed, provide, watch, nextTick, type Ref } from 'vue';
 import LeafletBoundingBox from './LeafletBoundingBox.vue';
 import type { FeatureShapeType } from './LeafletFeaturesEditor.vue';
 import { LeafletSelectionKey } from '.';
@@ -45,6 +45,7 @@ const emit = defineEmits<{
 // Selection state
 const selectedFeature = ref<SelectedFeature | null>(null);
 const featuresRegistry = ref<Map<string | number, FeatureReference>>(new Map());
+const boundingBoxTrigger = ref(0); // Trigger to force bounding box recalculation
 
 // Rotation state
 const rotationStartPositions = ref<any>(null);
@@ -67,6 +68,11 @@ const selectFeature = (type: FeatureShapeType, id: string | number) => {
     selectedFeature.value = { type, id };
     emit('update:selectedFeature', selectedFeature.value);
     emit('selection-changed', selectedFeature.value);
+
+    // Force bounding box recalculation in next tick
+    nextTick(() => {
+      boundingBoxTrigger.value++;
+    });
   }
 };
 
@@ -111,6 +117,9 @@ watch(
 
 // Compute bounding box for selected feature
 const boundingBox = computed(() => {
+  // Use trigger to force recalculation
+  boundingBoxTrigger.value; // eslint-disable-line no-unused-expressions
+
   if (!selectedFeature.value || !props.enabled || props.mode !== 'select') {
     return null;
   }
@@ -119,6 +128,15 @@ const boundingBox = computed(() => {
   if (!feature) return null;
 
   return feature.getBounds();
+});
+
+// Check if selected feature supports rotation
+const showRotateHandle = computed(() => {
+  if (!selectedFeature.value) return false;
+
+  // Only polylines and polygons support rotation
+  // Circles, rectangles, and markers don't support rotation
+  return selectedFeature.value.type === 'polyline' || selectedFeature.value.type === 'polygon';
 });
 
 // Save rotation start positions
@@ -193,6 +211,7 @@ provide(LeafletSelectionKey, context);
     name="bounding-box"
     :bounds="boundingBox"
     :visible="boundingBox !== null && mode === 'select'"
+    :show-rotate-handle="showRotateHandle"
     :on-update="handleBoundingBoxUpdate"
     :on-rotate="handleBoundingBoxRotate"
     :on-rotate-end="handleBoundingBoxRotateEnd"
@@ -201,6 +220,7 @@ provide(LeafletSelectionKey, context);
     <LeafletBoundingBox
       :bounds="boundingBox"
       :visible="boundingBox !== null && mode === 'select'"
+      :show-rotate-handle="showRotateHandle"
       @update:bounds="handleBoundingBoxUpdate"
       @rotate="handleBoundingBoxRotate"
       @rotate-end="handleBoundingBoxRotateEnd"

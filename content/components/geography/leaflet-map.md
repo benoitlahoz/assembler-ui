@@ -77,7 +77,7 @@ const onLocationFound = (event: any) => {
           :lat="locationCoords.lat"
           :lng="locationCoords.lng"
           :radius="locationCoords.accuracy"
-          class="bg-red-500 text-red-500 opacity-20"
+          class="bg-red-500/20 border border-red-500"
         />
       </LeafletMap>
     </div>
@@ -436,11 +436,13 @@ export interface LeafletBoundingBoxStyles {
 export interface LeafletBoundingBoxProps {
   bounds?: L.LatLngBounds | null;
   visible?: boolean;
+  showRotateHandle?: boolean;
 }
 
 const props = withDefaults(defineProps<LeafletBoundingBoxProps>(), {
   bounds: null,
   visible: false,
+  showRotateHandle: true,
 });
 
 const emit = defineEmits<{
@@ -721,88 +723,90 @@ const createBoundingBox = () => {
     edgeHandles.value.push(handle);
   });
 
-  const centerTop = L.value!.latLng(
-    props.bounds.getNorth(),
-    (props.bounds.getWest() + props.bounds.getEast()) / 2,
-  );
+  if (props.showRotateHandle) {
+    const centerTop = L.value!.latLng(
+      props.bounds.getNorth(),
+      (props.bounds.getWest() + props.bounds.getEast()) / 2,
+    );
 
-  const centerTopPoint = map.value.latLngToLayerPoint(centerTop);
-  const rotateHandlePoint = L.value!.point(
-    centerTopPoint.x,
-    centerTopPoint.y - 30,
-  );
-  const rotateHandleLatLng = map.value.layerPointToLatLng(rotateHandlePoint);
+    const centerTopPoint = map.value.latLngToLayerPoint(centerTop);
+    const rotateHandlePoint = L.value!.point(
+      centerTopPoint.x,
+      centerTopPoint.y - 30,
+    );
+    const rotateHandleLatLng = map.value.layerPointToLatLng(rotateHandlePoint);
 
-  rotateHandle.value = L.value
-    .marker(rotateHandleLatLng, {
-      draggable: true,
-      icon: L.value.divIcon(stylesOptions.value.rotate),
-    })
-    .addTo(map.value);
+    rotateHandle.value = L.value
+      .marker(rotateHandleLatLng, {
+        draggable: true,
+        icon: L.value.divIcon(stylesOptions.value.rotate),
+      })
+      .addTo(map.value);
 
-  rotateHandle.value.on("mousedown", () => {
-    if (map.value) {
-      map.value.getContainer().style.cursor = "grabbing";
-    }
-  });
+    rotateHandle.value.on("mousedown", () => {
+      if (map.value) {
+        map.value.getContainer().style.cursor = "grabbing";
+      }
+    });
 
-  rotateHandle.value.on("dragstart", () => {
-    isRotating.value = true;
-    if (map.value && props.bounds) {
-      map.value.dragging.disable();
+    rotateHandle.value.on("dragstart", () => {
+      isRotating.value = true;
+      if (map.value && props.bounds) {
+        map.value.dragging.disable();
 
-      if (boundingBox.value) boundingBox.value.setStyle({ opacity: 0 });
-      cornerHandles.value.forEach((h) => h.setOpacity(0));
-      edgeHandles.value.forEach((h) => h.setOpacity(0));
+        if (boundingBox.value) boundingBox.value.setStyle({ opacity: 0 });
+        cornerHandles.value.forEach((h) => h.setOpacity(0));
+        edgeHandles.value.forEach((h) => h.setOpacity(0));
+
+        const center = props.bounds.getCenter();
+        const handlePos = rotateHandle.value!.getLatLng();
+        const dx = handlePos.lng - center.lng;
+        const dy = handlePos.lat - center.lat;
+        rotationStartAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+      }
+    });
+
+    rotateHandle.value.on("drag", () => {
+      if (!isRotating.value || !props.bounds) return;
 
       const center = props.bounds.getCenter();
       const handlePos = rotateHandle.value!.getLatLng();
+
       const dx = handlePos.lng - center.lng;
       const dy = handlePos.lat - center.lat;
-      rotationStartAngle = Math.atan2(dy, dx) * (180 / Math.PI);
-    }
-  });
+      const currentAngle = Math.atan2(dy, dx) * (180 / Math.PI);
 
-  rotateHandle.value.on("drag", () => {
-    if (!isRotating.value || !props.bounds) return;
+      const rotationAngle = currentAngle - rotationStartAngle;
 
-    const center = props.bounds.getCenter();
-    const handlePos = rotateHandle.value!.getLatLng();
+      emit("rotate", rotationAngle);
+    });
 
-    const dx = handlePos.lng - center.lng;
-    const dy = handlePos.lat - center.lat;
-    const currentAngle = Math.atan2(dy, dx) * (180 / Math.PI);
-
-    const rotationAngle = currentAngle - rotationStartAngle;
-
-    emit("rotate", rotationAngle);
-  });
-
-  rotateHandle.value.on("dragend", () => {
-    isRotating.value = false;
-    if (map.value) {
-      map.value.getContainer().style.cursor = "";
-      map.value.dragging.enable();
-    }
-
-    if (boundingBox.value) boundingBox.value.setStyle({ opacity: 1 });
-    cornerHandles.value.forEach((h) => h.setOpacity(1));
-    edgeHandles.value.forEach((h) => h.setOpacity(1));
-
-    emit("rotate-end");
-
-    setTimeout(() => {
-      if (props.bounds) {
-        createBoundingBox();
+    rotateHandle.value.on("dragend", () => {
+      isRotating.value = false;
+      if (map.value) {
+        map.value.getContainer().style.cursor = "";
+        map.value.dragging.enable();
       }
-    }, 0);
-  });
 
-  rotateHandle.value.on("mouseup", () => {
-    if (map.value) {
-      map.value.getContainer().style.cursor = "";
-    }
-  });
+      if (boundingBox.value) boundingBox.value.setStyle({ opacity: 1 });
+      cornerHandles.value.forEach((h) => h.setOpacity(1));
+      edgeHandles.value.forEach((h) => h.setOpacity(1));
+
+      emit("rotate-end");
+
+      setTimeout(() => {
+        if (props.bounds) {
+          createBoundingBox();
+        }
+      }, 0);
+    });
+
+    rotateHandle.value.on("mouseup", () => {
+      if (map.value) {
+        map.value.getContainer().style.cursor = "";
+      }
+    });
+  }
 
   const center = props.bounds.getCenter();
   centerHandle.value = L.value
@@ -873,13 +877,21 @@ watch(
     if (props.bounds) {
       return {
         visible: props.visible,
+        showRotateHandle: props.showRotateHandle,
         south: props.bounds.getSouth(),
         north: props.bounds.getNorth(),
         west: props.bounds.getWest(),
         east: props.bounds.getEast(),
       };
     }
-    return { visible: props.visible, south: 0, north: 0, west: 0, east: 0 };
+    return {
+      visible: props.visible,
+      showRotateHandle: props.showRotateHandle,
+      south: 0,
+      north: 0,
+      west: 0,
+      east: 0,
+    };
   },
   (newVal, oldVal) => {
     if (isRotating.value || isScaling.value) {
@@ -894,17 +906,25 @@ watch(
         oldVal.west !== newVal.west ||
         oldVal.east !== newVal.east);
 
+    const showRotateHandleChanged =
+      oldVal && newVal && oldVal.showRotateHandle !== newVal.showRotateHandle;
+
     if (
       boundingBox.value &&
       props.bounds &&
       props.visible &&
       !isDragging.value &&
       cornerHandles.value.length > 0 &&
-      boundsChanged
+      boundsChanged &&
+      !showRotateHandleChanged
     ) {
       boundingBox.value.setBounds(props.bounds);
       updateHandlePositions(props.bounds);
-    } else if (newVal.visible !== oldVal?.visible || !boundingBox.value) {
+    } else if (
+      newVal.visible !== oldVal?.visible ||
+      !boundingBox.value ||
+      showRotateHandleChanged
+    ) {
       createBoundingBox();
     }
   },
@@ -3953,7 +3973,7 @@ onBeforeUnmount(() => {
 
 ```vue [src/components/ui/leaflet-map/LeafletSelectionManager.vue]
 <script setup lang="ts">
-import { ref, computed, provide, watch, type Ref } from "vue";
+import { ref, computed, provide, watch, nextTick, type Ref } from "vue";
 import LeafletBoundingBox from "./LeafletBoundingBox.vue";
 import type { FeatureShapeType } from "./LeafletFeaturesEditor.vue";
 import { LeafletSelectionKey } from ".";
@@ -4002,6 +4022,7 @@ const emit = defineEmits<{
 
 const selectedFeature = ref<SelectedFeature | null>(null);
 const featuresRegistry = ref<Map<string | number, FeatureReference>>(new Map());
+const boundingBoxTrigger = ref(0);
 
 const rotationStartPositions = ref<any>(null);
 const rotationCenter = ref<{ lat: number; lng: number } | null>(null);
@@ -4022,6 +4043,10 @@ const selectFeature = (type: FeatureShapeType, id: string | number) => {
     selectedFeature.value = { type, id };
     emit("update:selectedFeature", selectedFeature.value);
     emit("selection-changed", selectedFeature.value);
+
+    nextTick(() => {
+      boundingBoxTrigger.value++;
+    });
   }
 };
 
@@ -4063,6 +4088,8 @@ watch(
 );
 
 const boundingBox = computed(() => {
+  boundingBoxTrigger.value;
+
   if (!selectedFeature.value || !props.enabled || props.mode !== "select") {
     return null;
   }
@@ -4071,6 +4098,15 @@ const boundingBox = computed(() => {
   if (!feature) return null;
 
   return feature.getBounds();
+});
+
+const showRotateHandle = computed(() => {
+  if (!selectedFeature.value) return false;
+
+  return (
+    selectedFeature.value.type === "polyline" ||
+    selectedFeature.value.type === "polygon"
+  );
 });
 
 const saveRotationStartPositions = () => {
@@ -4140,6 +4176,7 @@ provide(LeafletSelectionKey, context);
     name="bounding-box"
     :bounds="boundingBox"
     :visible="boundingBox !== null && mode === 'select'"
+    :show-rotate-handle="showRotateHandle"
     :on-update="handleBoundingBoxUpdate"
     :on-rotate="handleBoundingBoxRotate"
     :on-rotate-end="handleBoundingBoxRotateEnd"
@@ -4147,6 +4184,7 @@ provide(LeafletSelectionKey, context);
     <LeafletBoundingBox
       :bounds="boundingBox"
       :visible="boundingBox !== null && mode === 'select'"
+      :show-rotate-handle="showRotateHandle"
       @update:bounds="handleBoundingBoxUpdate"
       @rotate="handleBoundingBoxRotate"
       @rotate-end="handleBoundingBoxRotateEnd"
@@ -4668,6 +4706,7 @@ export const useLeaflet = async () => {
 |------|------|---------|-------------|
 | `bounds`{.primary .text-primary} | `L.LatLngBounds \| null` |  |  |
 | `visible`{.primary .text-primary} | `boolean` | false |  |
+| `showRotateHandle`{.primary .text-primary} | `boolean` | true |  |
 
   ### Slots
 | Name | Description |
