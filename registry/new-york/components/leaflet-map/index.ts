@@ -4,6 +4,7 @@
  *
  * @demo LeafletSimple
  * @demo LeafletEditionDemo
+ * @demo LeafletVirtualizationDemo
  */
 
 import type { InjectionKey, Ref } from 'vue';
@@ -21,6 +22,8 @@ export { default as LeafletControls } from './LeafletControls.vue';
 export { default as LeafletControlItem } from './LeafletControlItem.vue';
 export { default as LeafletFeaturesEditor } from './LeafletFeaturesEditor.vue';
 export { default as LeafletFeaturesSelector } from './LeafletFeaturesSelector.vue';
+export { default as LeafletVirtualize } from './LeafletVirtualize.vue';
+export { default as LeafletVirtualizeQuadtree } from './LeafletVirtualizeQuadtree.vue';
 export { default as LeafletBoundingBox } from './LeafletBoundingBox.vue';
 export { default as LeafletBoundingBoxRectangle } from './LeafletBoundingBoxRectangle.vue';
 export { default as LeafletFeatureHandle } from './LeafletFeatureHandle.vue';
@@ -76,3 +79,5 @@ export type { LeafletCircleProps } from './LeafletCircle.vue';
 export type { LeafletPolylineProps } from './LeafletPolyline.vue';
 export type { LeafletPolygonProps } from './LeafletPolygon.vue';
 export type { LeafletRectangleProps } from './LeafletRectangle.vue';
+export type { LeafletVirtualizeProps } from './LeafletVirtualize.vue';
+export type { LeafletVirtualizeQuadtreeProps } from './LeafletVirtualizeQuadtree.vue';

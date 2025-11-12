@@ -1,7 +1,9 @@
 ---
 title: LeafletMap
-description: 
+description: Enable/disable virtualization
 ---
+
+  <p class="text-pretty mt-4">   </p>
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
@@ -135,6 +137,8 @@ export { default as LeafletControls } from "./LeafletControls.vue";
 export { default as LeafletControlItem } from "./LeafletControlItem.vue";
 export { default as LeafletFeaturesEditor } from "./LeafletFeaturesEditor.vue";
 export { default as LeafletFeaturesSelector } from "./LeafletFeaturesSelector.vue";
+export { default as LeafletVirtualize } from "./LeafletVirtualize.vue";
+export { default as LeafletVirtualizeQuadtree } from "./LeafletVirtualizeQuadtree.vue";
 export { default as LeafletBoundingBox } from "./LeafletBoundingBox.vue";
 export { default as LeafletBoundingBoxRectangle } from "./LeafletBoundingBoxRectangle.vue";
 export { default as LeafletFeatureHandle } from "./LeafletFeatureHandle.vue";
@@ -195,6 +199,8 @@ export type { LeafletCircleProps } from "./LeafletCircle.vue";
 export type { LeafletPolylineProps } from "./LeafletPolyline.vue";
 export type { LeafletPolygonProps } from "./LeafletPolygon.vue";
 export type { LeafletRectangleProps } from "./LeafletRectangle.vue";
+export type { LeafletVirtualizeProps } from "./LeafletVirtualize.vue";
+export type { LeafletVirtualizeQuadtreeProps } from "./LeafletVirtualizeQuadtree.vue";
 ```
 
 ```vue [src/components/ui/leaflet-map/LeafletMap.vue]
@@ -258,6 +264,7 @@ provide(LeafletModuleKey, L);
 const mapName = computed(() => props.name || "map");
 
 const map = ref<Leaflet.Map | null>(null);
+const mapContainer = ref<HTMLElement | null>(null);
 const errors = ref<Error[]>([]);
 const tileLayers = ref<
   Array<Leaflet.TileLayerOptions & { name: string } & { urlTemplate: string }>
@@ -350,9 +357,10 @@ onMounted(() => {
       L.value = ImportedLeaflet.value;
 
       nextTick(() => {
-        if (!L.value) return;
+        if (!L.value || !mapContainer.value) return;
+
         map.value = L.value
-          .map(mapName.value, { zoomControl: false })
+          .map(mapContainer.value, { zoomControl: false })
           .setView([centerLat.value, centerLng.value], zoom.value);
 
         map.value.on("click", (event: LeafletMouseEvent) => {
@@ -397,6 +405,7 @@ defineExpose<LeafletMapExposed>({
 
 <template>
   <div
+    ref="mapContainer"
     :id="mapName"
     :class="cn('w-full h-full', props.class)"
     :style="props.style"
@@ -1698,14 +1707,11 @@ const unregisterItem = (name: string) => {
 
 const createButton = (container: HTMLElement, name: string, title: string) => {
   if (!L.value) return;
-  console.log("Should create button for", name);
 
   const controlItem = controlsRegistry.value.get(name);
-  console.log("Control", controlItem);
   if (!controlItem) {
     return;
   }
-  console.log("HTML", controlItem.html);
   const button = L.value!.DomUtil.create(
     "div",
     "leaflet-draw-button",
@@ -1766,7 +1772,6 @@ const updateActiveButton = () => {
 
 const createControl = () => {
   if (!L.value || !map.value) return;
-  console.log("Creating controls with", controlsRegistry.value);
 
   const Controls = L.value.Control.extend({
     options: {
@@ -1828,7 +1833,6 @@ watch(
 watch(
   controlsRegistry,
   (newRegistry) => {
-    console.log("Registry changed", newRegistry.size);
     if (newRegistry.size > 0 && map.value && control.value?._map) {
       control.value.remove();
       control.value = null;
@@ -4911,6 +4915,443 @@ watch(
 <template><slot /></template>
 ```
 
+```vue [src/components/ui/leaflet-map/LeafletVirtualize.vue]
+<script setup lang="ts">
+import {
+  ref,
+  inject,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+  computed,
+  watch,
+  useSlots,
+  type Ref,
+} from "vue";
+import { LeafletMapKey, LeafletModuleKey } from ".";
+import type Leaflet from "leaflet";
+
+export interface LeafletVirtualizeProps {
+  enabled?: boolean;
+
+  margin?: number;
+
+  alwaysVisible?: Array<string | number>;
+}
+
+const props = withDefaults(defineProps<LeafletVirtualizeProps>(), {
+  enabled: true,
+  margin: 0.1,
+  alwaysVisible: () => [],
+});
+
+const emit = defineEmits<{
+  "update:visible-count": [count: number];
+  "bounds-changed": [bounds: Leaflet.LatLngBounds];
+}>();
+
+const L = inject(LeafletModuleKey, ref<typeof Leaflet | undefined>(undefined));
+const map = inject<Ref<Leaflet.Map | null>>(LeafletMapKey, ref(null));
+
+const slots = useSlots();
+
+const visibleBounds = ref<Leaflet.LatLngBounds | null>(null);
+const visibleFeatureIds = ref<Set<string | number>>(new Set());
+let updateScheduled = false;
+const visibleCount = ref(0);
+
+const featurePositionsCache = new Map<
+  string | number,
+  { lat: number; lng: number } | { latlngs: Array<[number, number]> }
+>();
+
+const updateVisibleBounds = () => {
+  if (!map.value || !L.value) return;
+
+  if (updateScheduled) return;
+  updateScheduled = true;
+
+  requestAnimationFrame(() => {
+    updateScheduled = false;
+
+    if (!map.value || !L.value) return;
+
+    const bounds = map.value.getBounds();
+
+    if (props.enabled && props.margin > 0) {
+      const margin = props.margin;
+      const extendedBounds = L.value.latLngBounds(
+        L.value.latLng(bounds.getSouth() - margin, bounds.getWest() - margin),
+        L.value.latLng(bounds.getNorth() + margin, bounds.getEast() + margin),
+      );
+      visibleBounds.value = extendedBounds;
+    } else {
+      visibleBounds.value = bounds;
+    }
+
+    updateVisibleCount();
+
+    emit("bounds-changed", visibleBounds.value);
+  });
+};
+
+const updateVisibleCount = () => {
+  if (!props.enabled) {
+    const children = slots.default?.() || [];
+    visibleCount.value = children.length;
+    visibleFeatureIds.value.clear();
+    return;
+  }
+
+  const children = slots.default?.() || [];
+  const newVisibleIds = new Set<string | number>();
+  let count = 0;
+
+  for (const child of children) {
+    const id = child.props?.id;
+
+    if (id !== undefined && !featurePositionsCache.has(id)) {
+      const position = getChildPosition(child);
+      if (
+        (position.lat !== undefined && position.lng !== undefined) ||
+        position.latlngs !== undefined
+      ) {
+        featurePositionsCache.set(id, position as any);
+      }
+    }
+
+    const isVisible = shouldRenderChild(child);
+    if (isVisible) {
+      count++;
+      if (id !== undefined) {
+        newVisibleIds.add(id);
+      }
+    }
+  }
+
+  visibleFeatureIds.value = newVisibleIds;
+  visibleCount.value = count;
+  emit("update:visible-count", count);
+};
+
+const isFeatureVisible = (
+  lat: number,
+  lng: number,
+  featureId?: string | number,
+): boolean => {
+  if (!props.enabled) return true;
+
+  if (!visibleBounds.value) return true;
+
+  if (featureId !== undefined && props.alwaysVisible.includes(featureId))
+    return true;
+
+  if (!L.value) return true;
+
+  const point = L.value.latLng(lat, lng);
+  return visibleBounds.value.contains(point);
+};
+
+const isPolygonVisible = (
+  latlngs: Array<[number, number]>,
+  featureId?: string | number,
+): boolean => {
+  if (!props.enabled) return true;
+
+  if (!visibleBounds.value) return true;
+
+  if (featureId !== undefined && props.alwaysVisible.includes(featureId))
+    return true;
+
+  if (!L.value || !latlngs || latlngs.length === 0) return true;
+
+  for (const [lat, lng] of latlngs) {
+    const point = L.value.latLng(lat, lng);
+    if (visibleBounds.value.contains(point)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const getChildPosition = (
+  child: any,
+): { lat?: number; lng?: number; latlngs?: Array<[number, number]> } => {
+  if (!child.props) return {};
+
+  if (child.props.lat !== undefined && child.props.lng !== undefined) {
+    return {
+      lat:
+        typeof child.props.lat === "string"
+          ? parseFloat(child.props.lat)
+          : child.props.lat,
+      lng:
+        typeof child.props.lng === "string"
+          ? parseFloat(child.props.lng)
+          : child.props.lng,
+    };
+  }
+
+  if (child.props.latlngs !== undefined) {
+    return { latlngs: child.props.latlngs };
+  }
+
+  return {};
+};
+
+const shouldRenderChild = (child: any): boolean => {
+  if (!props.enabled) return true;
+
+  const id = child.props?.id;
+
+  if (id !== undefined && visibleFeatureIds.value.size > 0) {
+    return visibleFeatureIds.value.has(id);
+  }
+
+  const position =
+    id !== undefined && featurePositionsCache.has(id)
+      ? featurePositionsCache.get(id)!
+      : getChildPosition(child);
+
+  if (
+    "lat" in position &&
+    position.lat !== undefined &&
+    "lng" in position &&
+    position.lng !== undefined
+  ) {
+    return isFeatureVisible(position.lat, position.lng, id);
+  }
+
+  if ("latlngs" in position && position.latlngs !== undefined) {
+    return isPolygonVisible(position.latlngs, id);
+  }
+
+  return true;
+};
+
+onMounted(() => {
+  nextTick(() => {
+    if (map.value) {
+      updateVisibleBounds();
+
+      map.value.on("moveend", updateVisibleBounds);
+      map.value.on("zoomend", updateVisibleBounds);
+    }
+  });
+});
+
+onBeforeUnmount(() => {
+  if (map.value) {
+    map.value.off("moveend", updateVisibleBounds);
+    map.value.off("zoomend", updateVisibleBounds);
+  }
+});
+
+watch(
+  () => props.enabled,
+  () => {
+    updateVisibleCount();
+  },
+);
+
+watch(
+  () => props.margin,
+  () => {
+    updateVisibleBounds();
+  },
+);
+
+defineExpose({
+  isFeatureVisible,
+  visibleBounds,
+});
+</script>
+
+<template>
+  <template v-if="!enabled">
+    <slot />
+  </template>
+  <template v-else>
+    <template
+      v-for="child in $slots.default?.()"
+      :key="child.props?.id ?? child.key"
+    >
+      <component :is="child" v-if="shouldRenderChild(child)" />
+    </template>
+  </template>
+</template>
+```
+
+```vue [src/components/ui/leaflet-map/LeafletVirtualizeQuadtree.vue]
+<script setup lang="ts">
+import {
+  ref,
+  inject,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+  watch,
+  computed,
+  type Ref,
+} from "vue";
+import { LeafletMapKey, LeafletModuleKey } from ".";
+import type Leaflet from "leaflet";
+import type {
+  UseQuadtreeReturn,
+  Rect,
+} from "~~/registry/new-york/composables/use-quadtree/useQuadtree";
+
+export interface LeafletVirtualizeQuadtreeProps {
+  enabled?: boolean;
+
+  margin?: number;
+
+  quadtree?: UseQuadtreeReturn<any>;
+
+  alwaysVisible?: Array<string | number>;
+}
+
+const props = withDefaults(defineProps<LeafletVirtualizeQuadtreeProps>(), {
+  enabled: true,
+  margin: 0.1,
+  alwaysVisible: () => [],
+});
+
+const emit = defineEmits<{
+  "update:visible-count": [count: number];
+  "bounds-changed": [bounds: Leaflet.LatLngBounds];
+}>();
+
+const L = inject(LeafletModuleKey, ref<typeof Leaflet | undefined>(undefined));
+const map = inject<Ref<Leaflet.Map | null>>(LeafletMapKey, ref(null));
+
+const visibleBounds = ref<Leaflet.LatLngBounds | null>(null);
+const visibleFeatureIds = ref<Set<string | number>>(new Set());
+let updateScheduled = false;
+
+const updateVisibleBounds = () => {
+  if (!map.value || !L.value) return;
+
+  if (updateScheduled) return;
+  updateScheduled = true;
+
+  requestAnimationFrame(() => {
+    updateScheduled = false;
+
+    if (!map.value || !L.value) return;
+
+    const bounds = map.value.getBounds();
+
+    if (props.enabled && props.margin > 0) {
+      const margin = props.margin;
+      const extendedBounds = L.value.latLngBounds(
+        L.value.latLng(bounds.getSouth() - margin, bounds.getWest() - margin),
+        L.value.latLng(bounds.getNorth() + margin, bounds.getEast() + margin),
+      );
+      visibleBounds.value = extendedBounds;
+    } else {
+      visibleBounds.value = bounds;
+    }
+
+    updateVisibleFeatures();
+
+    emit("bounds-changed", visibleBounds.value);
+  });
+};
+
+const updateVisibleFeatures = () => {
+  if (!props.enabled || !props.quadtree || !visibleBounds.value) {
+    visibleFeatureIds.value.clear();
+    return;
+  }
+
+  const bounds = visibleBounds.value;
+
+  const queryRect: Rect = {
+    x: bounds.getWest(),
+    y: bounds.getSouth(),
+    width: bounds.getEast() - bounds.getWest(),
+    height: bounds.getNorth() - bounds.getSouth(),
+  };
+
+  const visibleItems = props.quadtree.retrieve(queryRect);
+
+  const newVisibleIds = new Set<string | number>();
+  for (const item of visibleItems) {
+    newVisibleIds.add(item.id);
+  }
+
+  for (const id of props.alwaysVisible) {
+    newVisibleIds.add(id);
+  }
+
+  visibleFeatureIds.value = newVisibleIds;
+  emit("update:visible-count", newVisibleIds.size);
+};
+
+const isFeatureVisible = (featureId: string | number): boolean => {
+  if (!props.enabled) return true;
+  if (!props.quadtree) return true;
+  return visibleFeatureIds.value.has(featureId);
+};
+
+onMounted(() => {
+  nextTick(() => {
+    if (map.value) {
+      updateVisibleBounds();
+
+      map.value.on("moveend", updateVisibleBounds);
+      map.value.on("zoomend", updateVisibleBounds);
+    }
+  });
+});
+
+onBeforeUnmount(() => {
+  if (map.value) {
+    map.value.off("moveend", updateVisibleBounds);
+    map.value.off("zoomend", updateVisibleBounds);
+  }
+});
+
+watch(
+  () => props.enabled,
+  () => {
+    updateVisibleFeatures();
+  },
+);
+
+watch(
+  () => props.margin,
+  () => {
+    updateVisibleBounds();
+  },
+);
+
+watch(
+  () => props.quadtree,
+  () => {
+    updateVisibleFeatures();
+  },
+);
+
+defineExpose({
+  isFeatureVisible,
+  visibleBounds,
+  visibleFeatureIds,
+});
+</script>
+
+<template>
+  <template v-if="!enabled || !quadtree">
+    <slot />
+  </template>
+  <template v-else>
+    <slot :is-visible="isFeatureVisible" :visible-ids="visibleFeatureIds" />
+  </template>
+</template>
+```
+
 ```vue [src/components/ui/leaflet-map/LeafletZoomControl.vue]
 <script setup lang="ts">
 import { ref, inject, type Ref, watch, onBeforeUnmount } from "vue";
@@ -4950,6 +5391,244 @@ onBeforeUnmount(() => {
 <template>
   <div></div>
 </template>
+```
+
+```ts [src/components/ui/leaflet-map/utils/quadtree-builder.ts]
+import { Quadtree, type Bounds, type QuadtreeItem } from "./quadtree";
+
+export interface Feature {
+  id: string | number;
+  lat: number;
+  lng: number;
+  [key: string]: any;
+}
+
+export interface BuildProgress {
+  processed: number;
+  total: number;
+  percent: number;
+}
+
+export async function buildQuadtreeProgressive<T extends Feature>(
+  features: T[],
+  bounds: Bounds,
+  onProgress?: (progress: BuildProgress) => void,
+  chunkSize = 500,
+): Promise<Quadtree<T>> {
+  const quadtree = new Quadtree<T>(bounds, 8);
+  const total = features.length;
+  let processed = 0;
+
+  for (let i = 0; i < features.length; i += chunkSize) {
+    const chunk = features.slice(i, Math.min(i + chunkSize, features.length));
+
+    for (const feature of chunk) {
+      const item: QuadtreeItem<T> = {
+        id: feature.id,
+        lat: feature.lat,
+        lng: feature.lng,
+        data: feature,
+      };
+      quadtree.insert(item);
+    }
+
+    processed += chunk.length;
+
+    if (onProgress) {
+      onProgress({
+        processed,
+        total,
+        percent: Math.floor((processed / total) * 100),
+      });
+    }
+
+    await new Promise((resolve) => {
+      if ("requestIdleCallback" in window) {
+        requestIdleCallback(resolve as any);
+      } else {
+        setTimeout(resolve, 0);
+      }
+    });
+  }
+
+  return quadtree;
+}
+
+export async function buildMultipleQuadtrees(
+  featureGroups: { name: string; features: Feature[] }[],
+  bounds: Bounds,
+  onProgress?: (name: string, progress: BuildProgress) => void,
+): Promise<Map<string, Quadtree<any>>> {
+  const quadtrees = new Map<string, Quadtree<any>>();
+
+  for (const group of featureGroups) {
+    const quadtree = await buildQuadtreeProgressive(
+      group.features,
+      bounds,
+      onProgress ? (progress) => onProgress(group.name, progress) : undefined,
+    );
+    quadtrees.set(group.name, quadtree);
+  }
+
+  return quadtrees;
+}
+```
+
+```ts [src/components/ui/leaflet-map/utils/quadtree.ts]
+export interface Bounds {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}
+
+export interface QuadtreeItem<T = any> {
+  id: string | number;
+  lat: number;
+  lng: number;
+  data: T;
+}
+
+export class Quadtree<T = any> {
+  private bounds: Bounds;
+  private capacity: number;
+  private items: QuadtreeItem<T>[] = [];
+  private divided = false;
+  private northeast?: Quadtree<T>;
+  private northwest?: Quadtree<T>;
+  private southeast?: Quadtree<T>;
+  private southwest?: Quadtree<T>;
+
+  constructor(bounds: Bounds, capacity = 4) {
+    this.bounds = bounds;
+    this.capacity = capacity;
+  }
+
+  insert(item: QuadtreeItem<T>): boolean {
+    if (!this.contains(item.lat, item.lng)) {
+      return false;
+    }
+
+    if (this.items.length < this.capacity && !this.divided) {
+      this.items.push(item);
+      return true;
+    }
+
+    if (!this.divided) {
+      this.subdivide();
+    }
+
+    if (this.northeast!.insert(item)) return true;
+    if (this.northwest!.insert(item)) return true;
+    if (this.southeast!.insert(item)) return true;
+    if (this.southwest!.insert(item)) return true;
+
+    return false;
+  }
+
+  query(bounds: Bounds, found: QuadtreeItem<T>[] = []): QuadtreeItem<T>[] {
+    if (!this.intersects(bounds)) {
+      return found;
+    }
+
+    for (const item of this.items) {
+      if (this.containsInBounds(item.lat, item.lng, bounds)) {
+        found.push(item);
+      }
+    }
+
+    if (this.divided) {
+      this.northeast!.query(bounds, found);
+      this.northwest!.query(bounds, found);
+      this.southeast!.query(bounds, found);
+      this.southwest!.query(bounds, found);
+    }
+
+    return found;
+  }
+
+  private subdivide(): void {
+    const { north, south, east, west } = this.bounds;
+    const midLat = (north + south) / 2;
+    const midLng = (east + west) / 2;
+
+    this.northeast = new Quadtree(
+      { north, south: midLat, east, west: midLng },
+      this.capacity,
+    );
+    this.northwest = new Quadtree(
+      { north, south: midLat, east: midLng, west },
+      this.capacity,
+    );
+    this.southeast = new Quadtree(
+      { north: midLat, south, east, west: midLng },
+      this.capacity,
+    );
+    this.southwest = new Quadtree(
+      { north: midLat, south, east: midLng, west },
+      this.capacity,
+    );
+
+    this.divided = true;
+
+    const itemsToRedistribute = [...this.items];
+    this.items = [];
+
+    for (const item of itemsToRedistribute) {
+      this.northeast.insert(item) ||
+        this.northwest.insert(item) ||
+        this.southeast.insert(item) ||
+        this.southwest.insert(item);
+    }
+  }
+
+  private contains(lat: number, lng: number): boolean {
+    return (
+      lat >= this.bounds.south &&
+      lat <= this.bounds.north &&
+      lng >= this.bounds.west &&
+      lng <= this.bounds.east
+    );
+  }
+
+  private containsInBounds(lat: number, lng: number, bounds: Bounds): boolean {
+    return (
+      lat >= bounds.south &&
+      lat <= bounds.north &&
+      lng >= bounds.west &&
+      lng <= bounds.east
+    );
+  }
+
+  private intersects(bounds: Bounds): boolean {
+    return !(
+      bounds.west > this.bounds.east ||
+      bounds.east < this.bounds.west ||
+      bounds.north < this.bounds.south ||
+      bounds.south > this.bounds.north
+    );
+  }
+
+  size(): number {
+    let count = this.items.length;
+    if (this.divided) {
+      count += this.northeast!.size();
+      count += this.northwest!.size();
+      count += this.southeast!.size();
+      count += this.southwest!.size();
+    }
+    return count;
+  }
+
+  clear(): void {
+    this.items = [];
+    this.divided = false;
+    this.northeast = undefined;
+    this.northwest = undefined;
+    this.southeast = undefined;
+    this.southwest = undefined;
+  }
+}
 ```
 
 ```ts [src/composables/use-css-parser/useCssParser.ts]
@@ -5305,6 +5984,244 @@ export const useLeaflet = async () => {
     lngDegreesToRadius,
   };
 };
+```
+
+```ts [src/components/ui/use-quadtree/useQuadtree.ts]
+import { ref, readonly, type Ref } from "vue";
+
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  [key: string]: any;
+}
+
+export interface QuadtreeBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface QuadtreeConfig {
+  bounds: QuadtreeBounds;
+
+  maxObjects?: number;
+
+  maxLevels?: number;
+}
+
+class QuadtreeNode<T extends Rect = Rect> {
+  private maxObjects: number;
+  private maxLevels: number;
+  private level: number;
+  private bounds: QuadtreeBounds;
+  private objects: T[] = [];
+  private nodes: QuadtreeNode<T>[] = [];
+
+  constructor(
+    bounds: QuadtreeBounds,
+    maxObjects = 10,
+    maxLevels = 4,
+    level = 0,
+  ) {
+    this.maxObjects = maxObjects;
+    this.maxLevels = maxLevels;
+    this.level = level;
+    this.bounds = bounds;
+  }
+
+  private split(): void {
+    const nextLevel = this.level + 1;
+    const subWidth = this.bounds.width / 2;
+    const subHeight = this.bounds.height / 2;
+    const x = this.bounds.x;
+    const y = this.bounds.y;
+
+    this.nodes[0] = new QuadtreeNode<T>(
+      { x: x + subWidth, y, width: subWidth, height: subHeight },
+      this.maxObjects,
+      this.maxLevels,
+      nextLevel,
+    );
+
+    this.nodes[1] = new QuadtreeNode<T>(
+      { x, y, width: subWidth, height: subHeight },
+      this.maxObjects,
+      this.maxLevels,
+      nextLevel,
+    );
+
+    this.nodes[2] = new QuadtreeNode<T>(
+      { x, y: y + subHeight, width: subWidth, height: subHeight },
+      this.maxObjects,
+      this.maxLevels,
+      nextLevel,
+    );
+
+    this.nodes[3] = new QuadtreeNode<T>(
+      { x: x + subWidth, y: y + subHeight, width: subWidth, height: subHeight },
+      this.maxObjects,
+      this.maxLevels,
+      nextLevel,
+    );
+  }
+
+  private getIndex(rect: Rect): number[] {
+    const indexes: number[] = [];
+    const verticalMidpoint = this.bounds.x + this.bounds.width / 2;
+    const horizontalMidpoint = this.bounds.y + this.bounds.height / 2;
+
+    const startIsNorth = rect.y < horizontalMidpoint;
+    const startIsWest = rect.x < verticalMidpoint;
+    const endIsEast = rect.x + rect.width > verticalMidpoint;
+    const endIsSouth = rect.y + rect.height > horizontalMidpoint;
+
+    if (startIsNorth && endIsEast) {
+      indexes.push(0);
+    }
+
+    if (startIsWest && startIsNorth) {
+      indexes.push(1);
+    }
+
+    if (startIsWest && endIsSouth) {
+      indexes.push(2);
+    }
+
+    if (endIsEast && endIsSouth) {
+      indexes.push(3);
+    }
+
+    return indexes;
+  }
+
+  insert(rect: T): void {
+    if (this.nodes.length) {
+      const indexes = this.getIndex(rect);
+      for (const index of indexes) {
+        this.nodes[index]?.insert(rect);
+      }
+      return;
+    }
+
+    this.objects.push(rect);
+
+    if (this.objects.length > this.maxObjects && this.level < this.maxLevels) {
+      if (!this.nodes.length) {
+        this.split();
+      }
+
+      for (const obj of this.objects) {
+        const indexes = this.getIndex(obj);
+        for (const index of indexes) {
+          this.nodes[index]?.insert(obj);
+        }
+      }
+
+      this.objects = [];
+    }
+  }
+
+  retrieve(rect: Rect): T[] {
+    const indexes = this.getIndex(rect);
+    let returnObjects = [...this.objects];
+
+    if (this.nodes.length) {
+      for (const index of indexes) {
+        const nodeResults = this.nodes[index]?.retrieve(rect);
+        if (nodeResults) {
+          returnObjects = returnObjects.concat(nodeResults);
+        }
+      }
+    }
+
+    if (this.level === 0) {
+      return Array.from(new Set(returnObjects));
+    }
+
+    return returnObjects;
+  }
+
+  clear(): void {
+    this.objects = [];
+
+    for (const node of this.nodes) {
+      node?.clear();
+    }
+
+    this.nodes = [];
+  }
+
+  size(): number {
+    let count = this.objects.length;
+
+    if (this.nodes.length) {
+      for (const node of this.nodes) {
+        count += node.size();
+      }
+    }
+
+    return count;
+  }
+
+  getBounds(): QuadtreeBounds {
+    return { ...this.bounds };
+  }
+}
+
+export function useQuadtree<T extends Rect = Rect>(config: QuadtreeConfig) {
+  const { bounds, maxObjects = 10, maxLevels = 4 } = config;
+
+  const tree = ref<QuadtreeNode<T>>(
+    new QuadtreeNode<T>(bounds, maxObjects, maxLevels, 0),
+  ) as Ref<QuadtreeNode<T>>;
+
+  const insert = (rect: T): void => {
+    tree.value.insert(rect);
+  };
+
+  const retrieve = (rect: Rect): T[] => {
+    return tree.value.retrieve(rect);
+  };
+
+  const clear = (): void => {
+    tree.value.clear();
+  };
+
+  const size = (): number => {
+    return tree.value.size();
+  };
+
+  const getBounds = (): QuadtreeBounds => {
+    return tree.value.getBounds();
+  };
+
+  const recreate = (newConfig?: Partial<QuadtreeConfig>): void => {
+    const cfg = { bounds, maxObjects, maxLevels, ...newConfig };
+    tree.value = new QuadtreeNode<T>(
+      cfg.bounds,
+      cfg.maxObjects,
+      cfg.maxLevels,
+      0,
+    );
+  };
+
+  return {
+    tree: readonly(tree),
+    insert,
+    retrieve,
+    clear,
+    size,
+    getBounds,
+    recreate,
+  };
+}
+
+export type UseQuadtreeReturn<T extends Rect = Rect> = ReturnType<
+  typeof useQuadtree<T>
+>;
 ```
 :::
 
@@ -5781,6 +6698,80 @@ export const useLeaflet = async () => {
 
 ---
 
+## LeafletVirtualize
+::hr-underline
+::
+
+Enable/disable virtualization
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `enabled`{.primary .text-primary} | `boolean` | true | Enable/disable virtualization |
+| `margin`{.primary .text-primary} | `number` | 0.1 | Margin in degrees to add to visible bounds for pre-loading features
+Larger margin = more features pre-loaded = less &#34;pop-in&#34; but more DOM elements
+@default 0.1 (approximately 11km at the equator) |
+| `alwaysVisible`{.primary .text-primary} | `Array<string \| number>` |  | Array of feature IDs that should always be rendered, regardless of visibility
+Useful for selected features or important landmarks |
+
+  ### Slots
+| Name | Description |
+|------|-------------|
+| `default`{.primary .text-primary} | — |
+
+  ### Inject
+| Key | Default | Type | Description |
+|-----|--------|------|-------------|
+| `LeafletModuleKey`{.primary .text-primary} | `ref<typeof Leaflet \| undefined>(undefined)` | `any` | — |
+| `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
+
+  ### Expose
+| Name | Type | Description |
+|------|------|-------------|
+| `isFeatureVisible`{.primary .text-primary} | `(lat: number, lng: number, featureId: string \| number) => boolean` | — |
+| `visibleBounds`{.primary .text-primary} | `Ref<Leaflet.LatLngBounds \| null>` | — |
+
+---
+
+## LeafletVirtualizeQuadtree
+::hr-underline
+::
+
+Enable/disable virtualization
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `enabled`{.primary .text-primary} | `boolean` | true | Enable/disable virtualization |
+| `margin`{.primary .text-primary} | `number` | 0.1 | Margin in degrees to add to visible bounds for pre-loading features
+@default 0.1 (approximately 11km at the equator) |
+| `quadtree`{.primary .text-primary} | `UseQuadtreeReturn<any>` | - | Quadtree composable return value for spatial indexing |
+| `alwaysVisible`{.primary .text-primary} | `Array<string \| number>` |  | Array of feature IDs that should always be rendered |
+
+  ### Slots
+| Name | Description |
+|------|-------------|
+| `default`{.primary .text-primary} | Fallback: render all children if disabled or no quadtree |
+
+  ### Inject
+| Key | Default | Type | Description |
+|-----|--------|------|-------------|
+| `LeafletModuleKey`{.primary .text-primary} | `ref<typeof Leaflet \| undefined>(undefined)` | `any` | — |
+| `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
+
+  ### Expose
+| Name | Type | Description |
+|------|------|-------------|
+| `isFeatureVisible`{.primary .text-primary} | `(featureId: string \| number) => boolean` | — |
+| `visibleBounds`{.primary .text-primary} | `Ref<Leaflet.LatLngBounds \| null>` | — |
+| `visibleFeatureIds`{.primary .text-primary} | `Ref<Set<string \| number>>` | — |
+
+---
+
 ## LeafletZoomControl
 ::hr-underline
 ::
@@ -5912,15 +6903,11 @@ const rectangles = ref([
 ]);
 
 const handleModeSelected = (mode: string | null) => {
-  console.log("Mode selected:", mode, "Current mode:", currentMode.value);
-
   if (currentMode.value === mode) {
     currentMode.value = null;
   } else {
     currentMode.value = mode as FeatureShapeType | FeatureSelectMode | null;
   }
-
-  console.log("New current mode:", currentMode.value);
 };
 
 const handleShapeCreated = (event: FeatureDrawEvent) => {
@@ -6208,6 +7195,258 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
         </LeafletFeaturesEditor>
       </LeafletMap>
     </div>
+  </div>
+</template>
+```
+  :::
+::
+
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <leaflet-virtualization-demo />
+  :::
+
+  :::tabs-item{icon="i-lucide-code" label="Code"}
+```vue
+<script setup lang="ts">
+import { ref, computed, onMounted } from "vue";
+import { Button } from "@/components/ui/button";
+import {
+  LeafletMap,
+  LeafletTileLayer,
+  LeafletZoomControl,
+  LeafletVirtualizeQuadtree,
+  LeafletMarker,
+  LeafletCircle,
+  LeafletPolygon,
+  type LeafletMapExposed,
+} from "@/components/ui/leaflet-map";
+import { loadVirtualizationDemoData } from "./virtualization-demo-loader";
+import type {
+  DemoMarker,
+  DemoCircle,
+  DemoPolygon,
+} from "./virtualization-demo-loader";
+import type { UseQuadtreeReturn } from "~~/registry/new-york/composables/use-quadtree";
+
+const mapRef = ref<LeafletMapExposed | null>(null);
+
+const virtualizationEnabled = ref(true);
+const virtualizationMargin = ref(0.1);
+const visibleMarkersCount = ref(0);
+const visibleCirclesCount = ref(0);
+const visibleShapesCount = computed(
+  () =>
+    visibleMarkersCount.value +
+    visibleCirclesCount.value +
+    polygons.value.length,
+);
+
+const isLoading = ref(true);
+const loadingProgress = ref(0);
+const loadingStage = ref("Starting...");
+const markers = ref<DemoMarker[]>([]);
+const circles = ref<DemoCircle[]>([]);
+const polygons = ref<DemoPolygon[]>([]);
+
+let markersQuadtree: UseQuadtreeReturn<DemoMarker> | null = null;
+let circlesQuadtree: UseQuadtreeReturn<DemoCircle> | null = null;
+
+const totalShapes = computed(
+  () => markers.value.length + circles.value.length + polygons.value.length,
+);
+
+onMounted(async () => {
+  const data = await loadVirtualizationDemoData(
+    (progress: number, stage: string) => {
+      loadingProgress.value = progress;
+      loadingStage.value = stage;
+    },
+  );
+  markers.value = data.markers;
+  circles.value = data.circles;
+  polygons.value = data.polygons;
+  markersQuadtree = data.quadtrees.markers;
+  circlesQuadtree = data.quadtrees.circles;
+  isLoading.value = false;
+});
+
+const stats = ref({
+  fps: 0,
+});
+
+let lastTime = performance.now();
+let frames = 0;
+const updateFPS = () => {
+  frames++;
+  const now = performance.now();
+  if (now >= lastTime + 1000) {
+    stats.value.fps = Math.round((frames * 1000) / (now - lastTime));
+    frames = 0;
+    lastTime = now;
+  }
+  requestAnimationFrame(updateFPS);
+};
+updateFPS();
+</script>
+
+<template>
+  <div class="w-full h-full flex flex-col gap-4">
+    <div
+      v-if="isLoading"
+      class="flex flex-col items-center justify-center p-8 gap-4"
+    >
+      <div class="text-lg font-semibold">{{ loadingStage }}</div>
+      <div class="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div
+          class="h-full bg-blue-500 transition-all duration-300"
+          :style="{ width: `${loadingProgress}%` }"
+        />
+      </div>
+      <div class="text-sm text-gray-600">{{ loadingProgress }}%</div>
+    </div>
+
+    <template v-else>
+      <div class="rounded flex items-center justify-between gap-4 p-4">
+        <div class="flex items-center gap-4">
+          <div class="text-sm">
+            <strong>Total shapes:</strong>
+            {{ totalShapes.toLocaleString() }}
+          </div>
+          <div class="text-sm">
+            <strong>Rendered:</strong>
+            {{ visibleShapesCount.toLocaleString() }}
+          </div>
+          <div class="text-sm">
+            <strong>FPS:</strong>
+            {{ stats.fps }}
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <Button
+            @click="virtualizationEnabled = !virtualizationEnabled"
+            :class="
+              virtualizationEnabled
+                ? 'bg-green-500 text-white hover:bg-green-600'
+                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+            "
+          >
+            {{
+              virtualizationEnabled ? "Virtualization ON" : "Virtualization OFF"
+            }}
+          </Button>
+
+          <div class="flex items-center gap-2">
+            <label class="text-sm">Margin:</label>
+            <input
+              v-model.number="virtualizationMargin"
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              class="w-32"
+            />
+            <span class="text-sm w-12"
+              >{{ virtualizationMargin.toFixed(2) }}°</span
+            >
+          </div>
+        </div>
+      </div>
+
+      <div class="flex-1 relative">
+        <LeafletMap
+          ref="mapRef"
+          name="virtualization-demo"
+          class="w-full h-[600px] rounded-lg shadow-lg"
+          tile-layer="osm"
+          :center-lat="48.8566"
+          :center-lng="2.3522"
+          :zoom="15"
+        >
+          <LeafletTileLayer
+            name="osm"
+            url-template="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          />
+
+          <LeafletZoomControl position="topleft" />
+
+          <LeafletVirtualizeQuadtree
+            v-if="markersQuadtree"
+            :enabled="virtualizationEnabled"
+            :margin="virtualizationMargin"
+            :quadtree="markersQuadtree"
+            @update:visible-count="visibleMarkersCount = $event"
+          >
+            <template #default="{ isVisible }">
+              <LeafletMarker
+                v-for="marker in markers"
+                v-show="isVisible(marker.id)"
+                :key="marker.id"
+                :id="marker.id"
+                v-model:lat="marker.lat"
+                v-model:lng="marker.lng"
+              />
+            </template>
+          </LeafletVirtualizeQuadtree>
+
+          <LeafletVirtualizeQuadtree
+            v-if="circlesQuadtree"
+            :enabled="virtualizationEnabled"
+            :margin="virtualizationMargin"
+            :quadtree="circlesQuadtree"
+            @update:visible-count="visibleCirclesCount = $event"
+          >
+            <template #default="{ isVisible }">
+              <LeafletCircle
+                v-for="circle in circles"
+                v-show="isVisible(circle.id)"
+                :key="circle.id"
+                :id="circle.id"
+                v-model:lat="circle.lat"
+                v-model:lng="circle.lng"
+                v-model:radius="circle.radius"
+                :class="circle.class"
+              />
+            </template>
+          </LeafletVirtualizeQuadtree>
+
+          <LeafletPolygon
+            v-for="polygon in polygons"
+            :key="polygon.id"
+            :id="polygon.id"
+            v-model:latlngs="polygon.latlngs"
+            :class="polygon.class"
+          />
+        </LeafletMap>
+      </div>
+
+      <div class="text-sm text-gray-600 p-4 rounded">
+        <p>
+          <strong>Note:</strong> Cette démo utilise
+          {{ totalShapes.toLocaleString() }} shapes pré-générées ({{
+            markers.length.toLocaleString()
+          }}
+          markers, {{ circles.length.toLocaleString() }} circles,
+          {{ polygons.length.toLocaleString() }} polygons) autour de Paris.
+        </p>
+        <p class="mt-2">
+          Avec la virtualisation <strong>activée</strong>, seules les shapes
+          visibles dans la viewport (+ marge) sont rendues, ce qui améliore
+          considérablement les performances.
+        </p>
+        <p class="mt-2">
+          Avec la virtualisation <strong>désactivée</strong>, toutes les shapes
+          sont rendues en même temps, ce qui peut causer des lags importants
+          lors du zoom/déplacement.
+        </p>
+        <p class="mt-2 text-orange-600">
+          <strong>Astuce:</strong> Zoomez et déplacez-vous sur la carte pour
+          voir la différence de performance entre les deux modes.
+        </p>
+      </div>
+    </template>
   </div>
 </template>
 ```
