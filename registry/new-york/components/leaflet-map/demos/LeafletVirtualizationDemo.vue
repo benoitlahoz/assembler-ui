@@ -278,7 +278,7 @@ updateFPS();
           <LeafletZoomControl position="topleft" />
 
           <!-- Markers with Quadtree Virtualization -->
-                    <LeafletVirtualize
+          <LeafletVirtualize
             v-if="markersQuadtree"
             :enabled="virtualizationEnabled"
             :quadtree="markersQuadtree"

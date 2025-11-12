@@ -88,7 +88,7 @@ const metersToDegreesLat = (meters: number): number => {
 };
 
 const metersToDegreesLng = (meters: number, latitude: number): number => {
-  return meters / (111320 * Math.cos(latitude * Math.PI / 180));
+  return meters / (111320 * Math.cos((latitude * Math.PI) / 180));
 };
 
 /**
@@ -100,10 +100,10 @@ const calculateDynamicMargin = (zoom: number): number => {
   // Base formula: larger margin at low zoom, smaller at high zoom
   // Clamp between zoom 1 and 20
   const clampedZoom = Math.max(1, Math.min(20, zoom));
-  
+
   // At zoom 5: ~1500m, zoom 10: ~1000m, zoom 15: ~500m, zoom 18: ~200m
   const baseMargin = (20 - clampedZoom) * 100;
-  
+
   // Apply user-defined ratio
   return baseMargin * props.marginZoomRatio;
 };
@@ -130,12 +130,12 @@ const updateVisibleBounds = () => {
       // Use fixed margin if provided, otherwise calculate dynamically based on zoom
       const zoom = map.value.getZoom();
       const marginInMeters = props.marginMeters ?? calculateDynamicMargin(zoom);
-      
+
       if (marginInMeters > 0) {
         const center = bounds.getCenter();
         const marginLat = metersToDegreesLat(marginInMeters);
         const marginLng = metersToDegreesLng(marginInMeters, center.lat);
-        
+
         const extendedBounds = L.value.latLngBounds(
           L.value.latLng(bounds.getSouth() - marginLat, bounds.getWest() - marginLng),
           L.value.latLng(bounds.getNorth() + marginLat, bounds.getEast() + marginLng)
