@@ -7056,7 +7056,7 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
 
 <template>
   <div class="w-full h-full flex flex-col gap-4">
-    <div class="rounded flex items-center justify-between">
+    <div class="rounded flex items-center justify-between gap-4">
       <Button
         @click="editMode = !editMode"
         class="px-4 py-2 rounded transition-colors"
@@ -7068,6 +7068,34 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
       >
         {{ editMode ? "Disable edition" : "Enable edition" }}
       </Button>
+
+      <div
+        v-if="measureMode && lastMeasurement"
+        class="px-4 py-2 bg-orange-50 border border-orange-200 rounded-lg shadow-sm"
+      >
+        <div class="text-sm font-medium text-orange-900">
+          Measurement Result:
+        </div>
+        <div class="text-xs text-orange-700 mt-1">
+          <span class="font-semibold">Distance:</span>
+          {{
+            lastMeasurement.distance > 1000
+              ? `${(lastMeasurement.distance / 1000).toFixed(2)} km`
+              : `${lastMeasurement.distance.toFixed(2)} m`
+          }}
+        </div>
+        <div
+          v-if="lastMeasurement.area !== undefined"
+          class="text-xs text-orange-700"
+        >
+          <span class="font-semibold">Area:</span>
+          {{
+            lastMeasurement.area > 10000
+              ? `${(lastMeasurement.area / 1000000).toFixed(2)} km²`
+              : `${lastMeasurement.area.toFixed(2)} m²`
+          }}
+        </div>
+      </div>
     </div>
 
     <div class="flex-1 relative">
