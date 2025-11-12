@@ -99,16 +99,12 @@ const rectangles = ref([
 
 // Handle mode selection from DrawControl and LeafletControls
 const handleModeSelected = (mode: string | null) => {
-  console.log('Mode selected:', mode, 'Current mode:', currentMode.value);
-
   // Toggle behavior: if clicking the same mode, deactivate it
   if (currentMode.value === mode) {
     currentMode.value = null;
   } else {
     currentMode.value = mode as FeatureShapeType | FeatureSelectMode | null;
   }
-
-  console.log('New current mode:', currentMode.value);
 };
 
 // Gestion de la création de nouvelles formes

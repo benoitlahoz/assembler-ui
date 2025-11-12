@@ -61,14 +61,11 @@ const unregisterItem = (name: string) => {
 
 const createButton = (container: HTMLElement, name: string, title: string) => {
   if (!L.value) return;
-  console.log('Should create button for', name);
 
   const controlItem = controlsRegistry.value.get(name);
-  console.log('Control', controlItem);
   if (!controlItem) {
     return;
   }
-  console.log('HTML', controlItem.html);
   const button = L.value!.DomUtil.create('div', 'leaflet-draw-button', container);
   button.title = title;
   button.innerHTML = controlItem.html;
@@ -125,7 +122,6 @@ const updateActiveButton = () => {
 
 const createControl = () => {
   if (!L.value || !map.value) return;
-  console.log('Creating controls with', controlsRegistry.value);
 
   const Controls = L.value.Control.extend({
     options: {
@@ -192,7 +188,6 @@ watch(
 watch(
   controlsRegistry,
   (newRegistry) => {
-    console.log('Registry changed', newRegistry.size);
     if (newRegistry.size > 0 && map.value && control.value?._map) {
       // Remove old control and recreate with updated items
       control.value.remove();
