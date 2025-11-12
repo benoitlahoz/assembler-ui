@@ -1,7 +1,7 @@
 # Résumé de la Simplification de LeafletEditionDemo
 
 ## 🎯 Objectif
-Simplifier le fichier de démonstration `LeafletEditionDemo.vue` en utilisant le nouveau composant `LeafletSelectionManager` au lieu de gérer manuellement toute la logique de sélection, transformation et rotation.
+Simplifier le fichier de démonstration `LeafletEditionDemo.vue` en utilisant le nouveau composant `LeafletFeaturesSelector` au lieu de gérer manuellement toute la logique de sélection, transformation et rotation.
 
 ## 📊 Résultats
 
@@ -59,7 +59,7 @@ Simplifier le fichier de démonstration `LeafletEditionDemo.vue` en utilisant le
 LeafletMap
 ├── LeafletDrawControl (UI buttons)
 └── LeafletFeaturesEditor (drawing logic)
-    └── LeafletSelectionManager (selection/transform/rotate)
+    └── LeafletFeaturesSelector (selection/transform/rotate)
         └── Shapes (with conditional props)
 ```
 
@@ -91,7 +91,7 @@ const isSelectMode = computed(() => selectionMode.value !== null);
 
 ## ✨ Fonctionnalités Préservées
 
-Toutes les fonctionnalités sont préservées grâce au `LeafletSelectionManager`:
+Toutes les fonctionnalités sont préservées grâce au `LeafletFeaturesSelector`:
 
 ✅ **Sélection:**
 - Click sur shape → bounding box apparaît immédiatement
@@ -151,16 +151,16 @@ Pour migrer une démo similaire:
    - Props conditionnelles manuelles
 
 2. **Ajouter:**
-   - Import `LeafletSelectionManager`
+   - Import `LeafletFeaturesSelector`
    - Computed `selectionMode` et `isSelectMode`
    
 3. **Wrapper shapes:**
    ```vue
    <LeafletFeaturesEditor>
-     <LeafletSelectionManager :enabled="isSelectMode" :mode="selectionMode">
+     <LeafletFeaturesSelector :enabled="isSelectMode" :mode="selectionMode">
        <LeafletMarker :selectable="..." :editable="..." :draggable="..." />
        <!-- autres shapes -->
-     </LeafletSelectionManager>
+     </LeafletFeaturesSelector>
    </LeafletFeaturesEditor>
    ```
 
@@ -192,13 +192,13 @@ Pour migrer une démo similaire:
 ## 📚 Fichiers Modifiés
 
 - ✅ `LeafletEditionDemo.vue` - Simplifié de 794 → 375 lignes
-- ✅ `LeafletSelectionManager.vue` - Composant central de sélection
+- ✅ `LeafletFeaturesSelector.vue` - Composant central de sélection
 - ✅ `LeafletBoundingBox.vue` - Ajout prop `showRotateHandle`
 - ✅ Shapes (Marker, Circle, Polyline, Polygon, Rectangle) - Ajout props `id`, `selectable`
 
 ## 🎓 Conclusion
 
-Cette refactorisation démontre la puissance d'un composant bien conçu pour simplifier le code applicatif. Le `LeafletSelectionManager` encapsule ~400 lignes de logique complexe en une interface simple et déclarative.
+Cette refactorisation démontre la puissance d'un composant bien conçu pour simplifier le code applicatif. Le `LeafletFeaturesSelector` encapsule ~400 lignes de logique complexe en une interface simple et déclarative.
 
 L'architecture finale est:
 - **Plus simple:** Props conditionnelles au lieu de logique manuelle

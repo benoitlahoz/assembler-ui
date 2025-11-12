@@ -2,7 +2,7 @@
 import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount, type HTMLAttributes } from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from '.';
-import type { FeatureReference } from './LeafletSelectionManager.vue';
+import type { FeatureReference } from './LeafletFeaturesSelector.vue';
 import './leaflet-editing.css';
 
 export interface LeafletPolygonProps {

@@ -28,12 +28,12 @@ export interface LeafletSelectionContext {
   notifyFeatureUpdate: (id: string | number) => void;
 }
 
-export interface LeafletSelectionManagerProps {
+export interface LeafletFeaturesSelectorProps {
   enabled?: boolean;
   mode?: 'select' | 'directSelect' | null;
 }
 
-const props = withDefaults(defineProps<LeafletSelectionManagerProps>(), {
+const props = withDefaults(defineProps<LeafletFeaturesSelectorProps>(), {
   enabled: false,
   mode: null,
 });

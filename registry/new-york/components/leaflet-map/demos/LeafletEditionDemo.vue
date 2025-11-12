@@ -7,7 +7,7 @@ import {
   LeafletZoomControl,
   LeafletDrawControl,
   LeafletFeaturesEditor,
-  LeafletSelectionManager,
+  LeafletFeaturesSelector,
   LeafletFeatureHandle,
   LeafletBoundingBoxRectangle,
   LeafletMarker,
@@ -29,7 +29,7 @@ const editMode = ref(true); // Start with edit mode enabled
 // Current mode from DrawControl (can be drawing mode or selection mode)
 const currentMode = ref<FeatureShapeType | FeatureSelectMode | null>('select'); // Start in select mode
 
-// Computed selection mode for LeafletSelectionManager (only 'select' or 'directSelect')
+// Computed selection mode for LeafletFeaturesSelector (only 'select' or 'directSelect')
 const selectionMode = computed<FeatureSelectMode | null>(() => {
   if (currentMode.value === 'select') return 'select';
   if (currentMode.value === 'directSelect') return 'directSelect';
@@ -240,7 +240,7 @@ const onPolygonClosed = (id: number) => {
           @draw:created="handleShapeCreated"
         >
           <!-- Selection Manager - Selection, bounding box, transformation, rotation -->
-          <LeafletSelectionManager :enabled="isSelectMode" :mode="selectionMode">
+          <LeafletFeaturesSelector :enabled="isSelectMode" :mode="selectionMode">
             <!-- Shapes with conditional props based on currentMode -->
             <LeafletMarker
               v-for="marker in markers"
@@ -330,7 +330,7 @@ const onPolygonClosed = (id: number) => {
                 :size="12"
               />
             </template>
-          </LeafletSelectionManager>
+          </LeafletFeaturesSelector>
         </LeafletFeaturesEditor>
       </LeafletMap>
     </div>

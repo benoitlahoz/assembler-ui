@@ -8,7 +8,7 @@ import {
   LeafletPolyline,
   LeafletPolygon,
   LeafletRectangle,
-  LeafletSelectionManager,
+  LeafletFeaturesSelector,
   LeafletBoundingBoxRectangle,
   LeafletFeatureHandle,
 } from '~~/registry/new-york/components/leaflet-map';
@@ -97,7 +97,7 @@ const selectMode = ref<'select' | 'directSelect' | null>('select');
           url-template="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        <LeafletSelectionManager :enabled="editMode" :mode="selectMode">
+        <LeafletFeaturesSelector :enabled="editMode" :mode="selectMode">
           <!-- Markers -->
           <LeafletMarker
             v-for="marker in markers"
@@ -188,7 +188,7 @@ const selectMode = ref<'select' | 'directSelect' | null>('select');
               :size="12"
             />
           </template>
-        </LeafletSelectionManager>
+        </LeafletFeaturesSelector>
       </LeafletMap>
     </div>
   </div>

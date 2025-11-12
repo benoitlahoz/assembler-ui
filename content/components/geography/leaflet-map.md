@@ -124,7 +124,7 @@ import type { InjectionKey, Ref } from "vue";
 import type * as L from "leaflet";
 import type { Map, TileLayerOptions } from "leaflet";
 import type { LeafletBoundingBoxStyles } from "./LeafletBoundingBox.vue";
-import type { LeafletSelectionContext } from "./LeafletSelectionManager.vue";
+import type { LeafletSelectionContext } from "./LeafletFeaturesSelector.vue";
 type L = typeof L;
 
 export { default as LeafletMap } from "./LeafletMap.vue";
@@ -142,12 +142,12 @@ export { default as LeafletPolygon } from "./LeafletPolygon.vue";
 export { default as LeafletRectangle } from "./LeafletRectangle.vue";
 
 export {
-  default as LeafletSelectionManager,
+  default as LeafletFeaturesSelector,
   type LeafletSelectionContext,
   type SelectedFeature,
   type FeatureReference,
-  type LeafletSelectionManagerProps,
-} from "./LeafletSelectionManager.vue";
+  type LeafletFeaturesSelectorProps,
+} from "./LeafletFeaturesSelector.vue";
 
 export const LeafletModuleKey: InjectionKey<Ref<L | undefined>> =
   Symbol("LeafletModule");
@@ -1087,7 +1087,7 @@ import {
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
-import type { FeatureReference } from "./LeafletSelectionManager.vue";
+import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
 
 export interface LeafletCircleProps {
@@ -2566,6 +2566,250 @@ onBeforeUnmount(() => {
 </template>
 ```
 
+```vue [src/components/ui/leaflet-map/LeafletFeaturesSelector.vue]
+<script setup lang="ts">
+import { ref, computed, provide, watch, nextTick, type Ref } from "vue";
+import LeafletBoundingBox from "./LeafletBoundingBox.vue";
+import type { FeatureShapeType } from "./LeafletFeaturesEditor.vue";
+import { LeafletSelectionKey } from ".";
+
+export interface SelectedFeature {
+  type: FeatureShapeType;
+  id: string | number;
+}
+
+export interface FeatureReference {
+  id: string | number;
+  type: FeatureShapeType;
+  getBounds: () => L.LatLngBounds | null;
+  getInitialData?: () => any;
+  applyTransform: (bounds: L.LatLngBounds) => void;
+  applyRotation?: (
+    angle: number,
+    center: { lat: number; lng: number },
+    initialData: any,
+  ) => void;
+}
+
+export interface LeafletSelectionContext {
+  selectedFeature: Ref<SelectedFeature | null>;
+  featuresRegistry: Ref<Map<string | number, FeatureReference>>;
+  selectFeature: (type: FeatureShapeType, id: string | number) => void;
+  deselectAll: () => void;
+  registerFeature: (feature: FeatureReference) => void;
+  unregisterFeature: (id: string | number) => void;
+  notifyFeatureUpdate: (id: string | number) => void;
+}
+
+export interface LeafletFeaturesSelectorProps {
+  enabled?: boolean;
+  mode?: "select" | "directSelect" | null;
+}
+
+const props = withDefaults(defineProps<LeafletFeaturesSelectorProps>(), {
+  enabled: false,
+  mode: null,
+});
+
+const emit = defineEmits<{
+  "update:selectedFeature": [feature: SelectedFeature | null];
+  "selection-changed": [feature: SelectedFeature | null];
+}>();
+
+const selectedFeature = ref<SelectedFeature | null>(null);
+const featuresRegistry = ref<Map<string | number, FeatureReference>>(new Map());
+const boundingBoxTrigger = ref(0);
+
+const rotationStartPositions = ref<any>(null);
+const rotationCenter = ref<{ lat: number; lng: number } | null>(null);
+
+const selectFeature = (type: FeatureShapeType, id: string | number) => {
+  if (props.mode !== "select") {
+    deselectAll();
+    return;
+  }
+
+  rotationStartPositions.value = null;
+  rotationCenter.value = null;
+
+  const isSameFeature =
+    selectedFeature.value?.type === type && selectedFeature.value?.id === id;
+
+  if (!isSameFeature) {
+    selectedFeature.value = { type, id };
+    emit("update:selectedFeature", selectedFeature.value);
+    emit("selection-changed", selectedFeature.value);
+
+    nextTick(() => {
+      boundingBoxTrigger.value++;
+    });
+  }
+};
+
+const deselectAll = () => {
+  selectedFeature.value = null;
+  rotationStartPositions.value = null;
+  rotationCenter.value = null;
+  emit("update:selectedFeature", null);
+  emit("selection-changed", null);
+};
+
+const registerFeature = (feature: FeatureReference) => {
+  featuresRegistry.value.set(feature.id, feature);
+};
+
+const unregisterFeature = (id: string | number) => {
+  featuresRegistry.value.delete(id);
+  if (selectedFeature.value?.id === id) {
+    deselectAll();
+  }
+};
+
+const notifyFeatureUpdate = (id: string | number) => {
+  if (selectedFeature.value?.id === id) {
+    boundingBoxTrigger.value++;
+  }
+};
+
+watch(
+  () => props.mode,
+  (mode) => {
+    if (mode !== "select") {
+      deselectAll();
+    }
+  },
+);
+
+watch(
+  () => props.enabled,
+  (enabled) => {
+    if (!enabled) {
+      deselectAll();
+    }
+  },
+);
+
+const boundingBox = computed(() => {
+  boundingBoxTrigger.value;
+
+  if (!selectedFeature.value || !props.enabled || props.mode !== "select") {
+    return null;
+  }
+
+  if (selectedFeature.value.type === "marker") {
+    return null;
+  }
+
+  const feature = featuresRegistry.value.get(selectedFeature.value.id);
+  if (!feature) return null;
+
+  return feature.getBounds();
+});
+
+const showRotateHandle = computed(() => {
+  if (!selectedFeature.value) return false;
+
+  return (
+    selectedFeature.value.type === "polyline" ||
+    selectedFeature.value.type === "polygon"
+  );
+});
+
+const constrainSquare = computed(() => {
+  if (!selectedFeature.value) return false;
+
+  return selectedFeature.value.type === "circle";
+});
+
+const saveRotationStartPositions = () => {
+  if (!selectedFeature.value) return;
+
+  const bounds = boundingBox.value;
+  if (bounds) {
+    const center = bounds.getCenter();
+    rotationCenter.value = { lat: center.lat, lng: center.lng };
+  }
+
+  const feature = featuresRegistry.value.get(selectedFeature.value.id);
+  if (feature && feature.getInitialData) {
+    rotationStartPositions.value = feature.getInitialData();
+  }
+};
+
+const handleBoundingBoxUpdate = (newBounds: L.LatLngBounds) => {
+  if (!selectedFeature.value) return;
+
+  const feature = featuresRegistry.value.get(selectedFeature.value.id);
+  if (feature) {
+    feature.applyTransform(newBounds);
+  }
+};
+
+const handleBoundingBoxRotate = (angle: number) => {
+  if (!selectedFeature.value) return;
+
+  if (rotationStartPositions.value === null) {
+    saveRotationStartPositions();
+  }
+
+  if (!rotationCenter.value || !rotationStartPositions.value) return;
+
+  const feature = featuresRegistry.value.get(selectedFeature.value.id);
+  if (feature && feature.applyRotation) {
+    feature.applyRotation(
+      angle,
+      rotationCenter.value,
+      rotationStartPositions.value,
+    );
+  }
+};
+
+const handleBoundingBoxRotateEnd = () => {
+  rotationStartPositions.value = null;
+  rotationCenter.value = null;
+};
+
+const context: LeafletSelectionContext = {
+  selectedFeature,
+  featuresRegistry,
+  selectFeature,
+  deselectAll,
+  registerFeature,
+  unregisterFeature,
+  notifyFeatureUpdate,
+};
+
+provide(LeafletSelectionKey, context);
+</script>
+
+<template>
+  <slot :selection="context" />
+
+  <slot
+    name="bounding-box"
+    :bounds="boundingBox"
+    :visible="boundingBox !== null && mode === 'select'"
+    :show-rotate-handle="showRotateHandle"
+    :constrain-square="constrainSquare"
+    :on-update="handleBoundingBoxUpdate"
+    :on-rotate="handleBoundingBoxRotate"
+    :on-rotate-end="handleBoundingBoxRotateEnd"
+  >
+    <LeafletBoundingBox
+      :bounds="boundingBox"
+      :visible="boundingBox !== null && mode === 'select'"
+      :show-rotate-handle="showRotateHandle"
+      :constrain-square="constrainSquare"
+      @update:bounds="handleBoundingBoxUpdate"
+      @rotate="handleBoundingBoxRotate"
+      @rotate-end="handleBoundingBoxRotateEnd"
+    >
+      <slot name="bounding-box-styles" />
+    </LeafletBoundingBox>
+  </slot>
+</template>
+```
+
 ```vue [src/components/ui/leaflet-map/LeafletMarker.vue]
 <script setup lang="ts">
 import {
@@ -2578,7 +2822,7 @@ import {
   onMounted,
 } from "vue";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
-import type { FeatureReference } from "./LeafletSelectionManager.vue";
+import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 
 export interface LeafletMarkerProps {
   id?: string | number;
@@ -2821,7 +3065,7 @@ import {
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
-import type { FeatureReference } from "./LeafletSelectionManager.vue";
+import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
 
 export interface LeafletPolygonProps {
@@ -3336,7 +3580,7 @@ import {
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
-import type { FeatureReference } from "./LeafletSelectionManager.vue";
+import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
 
 export interface LeafletPolylineProps {
@@ -3831,7 +4075,7 @@ import {
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
-import type { FeatureReference } from "./LeafletSelectionManager.vue";
+import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
 
 export interface LeafletRectangleProps {
@@ -4218,250 +4462,6 @@ onBeforeUnmount(() => {
 </script>
 
 <template><slot /></template>
-```
-
-```vue [src/components/ui/leaflet-map/LeafletSelectionManager.vue]
-<script setup lang="ts">
-import { ref, computed, provide, watch, nextTick, type Ref } from "vue";
-import LeafletBoundingBox from "./LeafletBoundingBox.vue";
-import type { FeatureShapeType } from "./LeafletFeaturesEditor.vue";
-import { LeafletSelectionKey } from ".";
-
-export interface SelectedFeature {
-  type: FeatureShapeType;
-  id: string | number;
-}
-
-export interface FeatureReference {
-  id: string | number;
-  type: FeatureShapeType;
-  getBounds: () => L.LatLngBounds | null;
-  getInitialData?: () => any;
-  applyTransform: (bounds: L.LatLngBounds) => void;
-  applyRotation?: (
-    angle: number,
-    center: { lat: number; lng: number },
-    initialData: any,
-  ) => void;
-}
-
-export interface LeafletSelectionContext {
-  selectedFeature: Ref<SelectedFeature | null>;
-  featuresRegistry: Ref<Map<string | number, FeatureReference>>;
-  selectFeature: (type: FeatureShapeType, id: string | number) => void;
-  deselectAll: () => void;
-  registerFeature: (feature: FeatureReference) => void;
-  unregisterFeature: (id: string | number) => void;
-  notifyFeatureUpdate: (id: string | number) => void;
-}
-
-export interface LeafletSelectionManagerProps {
-  enabled?: boolean;
-  mode?: "select" | "directSelect" | null;
-}
-
-const props = withDefaults(defineProps<LeafletSelectionManagerProps>(), {
-  enabled: false,
-  mode: null,
-});
-
-const emit = defineEmits<{
-  "update:selectedFeature": [feature: SelectedFeature | null];
-  "selection-changed": [feature: SelectedFeature | null];
-}>();
-
-const selectedFeature = ref<SelectedFeature | null>(null);
-const featuresRegistry = ref<Map<string | number, FeatureReference>>(new Map());
-const boundingBoxTrigger = ref(0);
-
-const rotationStartPositions = ref<any>(null);
-const rotationCenter = ref<{ lat: number; lng: number } | null>(null);
-
-const selectFeature = (type: FeatureShapeType, id: string | number) => {
-  if (props.mode !== "select") {
-    deselectAll();
-    return;
-  }
-
-  rotationStartPositions.value = null;
-  rotationCenter.value = null;
-
-  const isSameFeature =
-    selectedFeature.value?.type === type && selectedFeature.value?.id === id;
-
-  if (!isSameFeature) {
-    selectedFeature.value = { type, id };
-    emit("update:selectedFeature", selectedFeature.value);
-    emit("selection-changed", selectedFeature.value);
-
-    nextTick(() => {
-      boundingBoxTrigger.value++;
-    });
-  }
-};
-
-const deselectAll = () => {
-  selectedFeature.value = null;
-  rotationStartPositions.value = null;
-  rotationCenter.value = null;
-  emit("update:selectedFeature", null);
-  emit("selection-changed", null);
-};
-
-const registerFeature = (feature: FeatureReference) => {
-  featuresRegistry.value.set(feature.id, feature);
-};
-
-const unregisterFeature = (id: string | number) => {
-  featuresRegistry.value.delete(id);
-  if (selectedFeature.value?.id === id) {
-    deselectAll();
-  }
-};
-
-const notifyFeatureUpdate = (id: string | number) => {
-  if (selectedFeature.value?.id === id) {
-    boundingBoxTrigger.value++;
-  }
-};
-
-watch(
-  () => props.mode,
-  (mode) => {
-    if (mode !== "select") {
-      deselectAll();
-    }
-  },
-);
-
-watch(
-  () => props.enabled,
-  (enabled) => {
-    if (!enabled) {
-      deselectAll();
-    }
-  },
-);
-
-const boundingBox = computed(() => {
-  boundingBoxTrigger.value;
-
-  if (!selectedFeature.value || !props.enabled || props.mode !== "select") {
-    return null;
-  }
-
-  if (selectedFeature.value.type === "marker") {
-    return null;
-  }
-
-  const feature = featuresRegistry.value.get(selectedFeature.value.id);
-  if (!feature) return null;
-
-  return feature.getBounds();
-});
-
-const showRotateHandle = computed(() => {
-  if (!selectedFeature.value) return false;
-
-  return (
-    selectedFeature.value.type === "polyline" ||
-    selectedFeature.value.type === "polygon"
-  );
-});
-
-const constrainSquare = computed(() => {
-  if (!selectedFeature.value) return false;
-
-  return selectedFeature.value.type === "circle";
-});
-
-const saveRotationStartPositions = () => {
-  if (!selectedFeature.value) return;
-
-  const bounds = boundingBox.value;
-  if (bounds) {
-    const center = bounds.getCenter();
-    rotationCenter.value = { lat: center.lat, lng: center.lng };
-  }
-
-  const feature = featuresRegistry.value.get(selectedFeature.value.id);
-  if (feature && feature.getInitialData) {
-    rotationStartPositions.value = feature.getInitialData();
-  }
-};
-
-const handleBoundingBoxUpdate = (newBounds: L.LatLngBounds) => {
-  if (!selectedFeature.value) return;
-
-  const feature = featuresRegistry.value.get(selectedFeature.value.id);
-  if (feature) {
-    feature.applyTransform(newBounds);
-  }
-};
-
-const handleBoundingBoxRotate = (angle: number) => {
-  if (!selectedFeature.value) return;
-
-  if (rotationStartPositions.value === null) {
-    saveRotationStartPositions();
-  }
-
-  if (!rotationCenter.value || !rotationStartPositions.value) return;
-
-  const feature = featuresRegistry.value.get(selectedFeature.value.id);
-  if (feature && feature.applyRotation) {
-    feature.applyRotation(
-      angle,
-      rotationCenter.value,
-      rotationStartPositions.value,
-    );
-  }
-};
-
-const handleBoundingBoxRotateEnd = () => {
-  rotationStartPositions.value = null;
-  rotationCenter.value = null;
-};
-
-const context: LeafletSelectionContext = {
-  selectedFeature,
-  featuresRegistry,
-  selectFeature,
-  deselectAll,
-  registerFeature,
-  unregisterFeature,
-  notifyFeatureUpdate,
-};
-
-provide(LeafletSelectionKey, context);
-</script>
-
-<template>
-  <slot :selection="context" />
-
-  <slot
-    name="bounding-box"
-    :bounds="boundingBox"
-    :visible="boundingBox !== null && mode === 'select'"
-    :show-rotate-handle="showRotateHandle"
-    :constrain-square="constrainSquare"
-    :on-update="handleBoundingBoxUpdate"
-    :on-rotate="handleBoundingBoxRotate"
-    :on-rotate-end="handleBoundingBoxRotateEnd"
-  >
-    <LeafletBoundingBox
-      :bounds="boundingBox"
-      :visible="boundingBox !== null && mode === 'select'"
-      :show-rotate-handle="showRotateHandle"
-      :constrain-square="constrainSquare"
-      @update:bounds="handleBoundingBoxUpdate"
-      @rotate="handleBoundingBoxRotate"
-      @rotate-end="handleBoundingBoxRotateEnd"
-    >
-      <slot name="bounding-box-styles" />
-    </LeafletBoundingBox>
-  </slot>
-</template>
 ```
 
 ```vue [src/components/ui/leaflet-map/LeafletTileLayer.vue]
@@ -5138,6 +5138,35 @@ export const useLeaflet = async () => {
 
 ---
 
+## LeafletFeaturesSelector
+::hr-underline
+::
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `enabled`{.primary .text-primary} | `boolean` | false |  |
+| `mode`{.primary .text-primary} | `'select' \| 'directSelect' \| null` |  |  |
+
+  ### Slots
+| Name | Description |
+|------|-------------|
+| `default`{.primary .text-primary} | Default slot for features |
+| `bounding-box`{.primary .text-primary} | Bounding box with customization slot |
+
+  ### Provide
+| Key | Value | Type | Description |
+|-----|-------|------|-------------|
+| `LeafletSelectionKey`{.primary .text-primary} | `context` | `any` | — |
+
+  ### Child Components
+
+  `LeafletBoundingBox`{.primary .text-primary}
+
+---
+
 ## LeafletMarker
 ::hr-underline
 ::
@@ -5261,35 +5290,6 @@ export const useLeaflet = async () => {
 
 ---
 
-## LeafletSelectionManager
-::hr-underline
-::
-
-**API**: composition
-
-  ### Props
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `enabled`{.primary .text-primary} | `boolean` | false |  |
-| `mode`{.primary .text-primary} | `'select' \| 'directSelect' \| null` |  |  |
-
-  ### Slots
-| Name | Description |
-|------|-------------|
-| `default`{.primary .text-primary} | Default slot for features |
-| `bounding-box`{.primary .text-primary} | Bounding box with customization slot |
-
-  ### Provide
-| Key | Value | Type | Description |
-|-----|-------|------|-------------|
-| `LeafletSelectionKey`{.primary .text-primary} | `context` | `any` | — |
-
-  ### Child Components
-
-  `LeafletBoundingBox`{.primary .text-primary}
-
----
-
 ## LeafletTileLayer
 ::hr-underline
 ::
@@ -5356,7 +5356,7 @@ import {
   LeafletZoomControl,
   LeafletDrawControl,
   LeafletFeaturesEditor,
-  LeafletSelectionManager,
+  LeafletFeaturesSelector,
   LeafletFeatureHandle,
   LeafletBoundingBoxRectangle,
   LeafletMarker,
@@ -5595,7 +5595,7 @@ const onPolygonClosed = (id: number) => {
           :shape-options="{ color: '#3388ff', fillOpacity: 0.2 }"
           @draw:created="handleShapeCreated"
         >
-          <LeafletSelectionManager
+          <LeafletFeaturesSelector
             :enabled="isSelectMode"
             :mode="selectionMode"
           >
@@ -5689,7 +5689,7 @@ const onPolygonClosed = (id: number) => {
                 :size="12"
               />
             </template>
-          </LeafletSelectionManager>
+          </LeafletFeaturesSelector>
         </LeafletFeaturesEditor>
       </LeafletMap>
     </div>
@@ -5716,7 +5716,7 @@ import {
   LeafletPolyline,
   LeafletPolygon,
   LeafletRectangle,
-  LeafletSelectionManager,
+  LeafletFeaturesSelector,
   LeafletBoundingBoxRectangle,
   LeafletFeatureHandle,
 } from "@/components/ui/leaflet-map";
@@ -5803,7 +5803,7 @@ const selectMode = ref<"select" | "directSelect" | null>("select");
           url-template="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        <LeafletSelectionManager :enabled="editMode" :mode="selectMode">
+        <LeafletFeaturesSelector :enabled="editMode" :mode="selectMode">
           <LeafletMarker
             v-for="marker in markers"
             :key="marker.id"
@@ -5891,7 +5891,7 @@ const selectMode = ref<"select" | "directSelect" | null>("select");
               :size="12"
             />
           </template>
-        </LeafletSelectionManager>
+        </LeafletFeaturesSelector>
       </LeafletMap>
     </div>
   </div>
