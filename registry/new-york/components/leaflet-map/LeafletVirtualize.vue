@@ -31,17 +31,27 @@ export interface LeafletVirtualizeProps {
    * Useful for selected features or important landmarks
    */
   alwaysVisible?: Array<string | number>;
+
+  /**
+   * Delay in milliseconds before applying virtualization changes
+   * Helps smooth transitions when toggling virtualization on/off
+   * @default 50
+   */
+  transitionDelay?: number;
 }
 
 const props = withDefaults(defineProps<LeafletVirtualizeProps>(), {
   enabled: true,
   margin: 0.1,
   alwaysVisible: () => [],
+  transitionDelay: 50,
 });
 
 const emit = defineEmits<{
   'update:visible-count': [count: number];
   'bounds-changed': [bounds: Leaflet.LatLngBounds];
+  'transition-start': [];
+  'transition-end': [];
 }>();
 
 const L = inject(LeafletModuleKey, ref<typeof Leaflet | undefined>(undefined));
@@ -50,6 +60,7 @@ const map = inject<Ref<Leaflet.Map | null>>(LeafletMapKey, ref(null));
 // Virtualization state
 const visibleBounds = ref<Leaflet.LatLngBounds | null>(null);
 const visibleFeatureIds = ref<Set<string | number>>(new Set());
+const isTransitioning = ref(false);
 let updateScheduled = false;
 
 /**
@@ -172,8 +183,21 @@ onBeforeUnmount(() => {
 // Watch for props changes
 watch(
   () => props.enabled,
-  () => {
+  async () => {
+    // Emit transition start
+    isTransitioning.value = true;
+    emit('transition-start');
+
+    // Debounce the update to avoid freezing when toggling
+    await new Promise((resolve) => setTimeout(resolve, props.transitionDelay));
     updateVisibleFeaturesQuadtree();
+
+    // Wait a bit more for Vue to process
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    // Emit transition end
+    isTransitioning.value = false;
+    emit('transition-end');
   }
 );
 
@@ -201,6 +225,7 @@ watch(
 defineExpose({
   visibleBounds,
   visibleFeatureIds,
+  isTransitioning,
 });
 </script>
 

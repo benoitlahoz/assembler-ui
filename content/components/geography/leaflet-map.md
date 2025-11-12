@@ -4939,17 +4939,22 @@ export interface LeafletVirtualizeProps {
   margin?: number;
 
   alwaysVisible?: Array<string | number>;
+
+  transitionDelay?: number;
 }
 
 const props = withDefaults(defineProps<LeafletVirtualizeProps>(), {
   enabled: true,
   margin: 0.1,
   alwaysVisible: () => [],
+  transitionDelay: 50,
 });
 
 const emit = defineEmits<{
   "update:visible-count": [count: number];
   "bounds-changed": [bounds: Leaflet.LatLngBounds];
+  "transition-start": [];
+  "transition-end": [];
 }>();
 
 const L = inject(LeafletModuleKey, ref<typeof Leaflet | undefined>(undefined));
@@ -4957,6 +4962,7 @@ const map = inject<Ref<Leaflet.Map | null>>(LeafletMapKey, ref(null));
 
 const visibleBounds = ref<Leaflet.LatLngBounds | null>(null);
 const visibleFeatureIds = ref<Set<string | number>>(new Set());
+const isTransitioning = ref(false);
 let updateScheduled = false;
 
 const updateVisibleBounds = () => {
@@ -5063,8 +5069,17 @@ onBeforeUnmount(() => {
 
 watch(
   () => props.enabled,
-  () => {
+  async () => {
+    isTransitioning.value = true;
+    emit("transition-start");
+
+    await new Promise((resolve) => setTimeout(resolve, props.transitionDelay));
     updateVisibleFeaturesQuadtree();
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    isTransitioning.value = false;
+    emit("transition-end");
   },
 );
 
@@ -5089,6 +5104,7 @@ watch(
 defineExpose({
   visibleBounds,
   visibleFeatureIds,
+  isTransitioning,
 });
 </script>
 
@@ -6229,6 +6245,9 @@ Larger margin = more features pre-loaded = less &#34;pop-in&#34; but more DOM el
 @default 0.1 (approximately 11km at the equator) |
 | `alwaysVisible`{.primary .text-primary} | `Array<string \| number>` |  | Array of feature IDs that should always be rendered, regardless of visibility
 Useful for selected features or important landmarks |
+| `transitionDelay`{.primary .text-primary} | `number` | 50 | Delay in milliseconds before applying virtualization changes
+Helps smooth transitions when toggling virtualization on/off
+@default 50 |
 
   ### Inject
 | Key | Default | Type | Description |
@@ -6241,6 +6260,7 @@ Useful for selected features or important landmarks |
 |------|------|-------------|
 | `visibleBounds`{.primary .text-primary} | `Ref<Leaflet.LatLngBounds \| null>` | — |
 | `visibleFeatureIds`{.primary .text-primary} | `Ref<Set<string \| number>>` | — |
+| `isTransitioning`{.primary .text-primary} | `Ref<any>` | — |
 
 ---
 
@@ -6708,6 +6728,7 @@ import type { UseQuadtreeReturn } from "~~/registry/new-york/composables/use-qua
 const mapRef = ref<LeafletMapExposed | null>(null);
 
 const virtualizationEnabled = ref(true);
+const isTransitioning = ref(false);
 const virtualizationMargin = ref(0.1);
 const visibleMarkersCount = ref(0);
 const visibleCirclesCount = ref(0);
@@ -6776,6 +6797,10 @@ onMounted(async () => {
 const stats = ref({
   fps: 0,
 });
+
+const toggleVirtualization = () => {
+  virtualizationEnabled.value = !virtualizationEnabled.value;
+};
 
 let lastTime = performance.now();
 let frames = 0;
@@ -6867,16 +6892,18 @@ updateFPS();
 
         <div class="flex items-center gap-4">
           <Button
-            @click="virtualizationEnabled = !virtualizationEnabled"
+            @click="toggleVirtualization"
+            :disabled="isTransitioning"
             :class="
               virtualizationEnabled
                 ? 'bg-green-500 text-white hover:bg-green-600'
                 : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
             "
           >
-            {{
+            <span v-if="isTransitioning">Switching...</span>
+            <span v-else>{{
               virtualizationEnabled ? "Virtualization ON" : "Virtualization OFF"
-            }}
+            }}</span>
           </Button>
 
           <div class="flex items-center gap-2">
@@ -6888,6 +6915,7 @@ updateFPS();
               max="1"
               step="0.05"
               class="w-32"
+              :disabled="isTransitioning"
             />
             <span class="text-sm w-12"
               >{{ virtualizationMargin.toFixed(2) }}°</span
@@ -6897,6 +6925,25 @@ updateFPS();
       </div>
 
       <div class="flex-1 relative">
+        <div
+          v-if="isTransitioning"
+          class="absolute inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-lg"
+        >
+          <div
+            class="bg-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3"
+          >
+            <div
+              class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
+            ></div>
+            <span class="text-sm font-medium">
+              {{
+                virtualizationEnabled ? "Enabling" : "Disabling"
+              }}
+              virtualization...
+            </span>
+          </div>
+        </div>
+
         <LeafletMap
           ref="mapRef"
           name="virtualization-demo"
@@ -6904,7 +6951,7 @@ updateFPS();
           tile-layer="osm"
           :center-lat="48.8566"
           :center-lng="2.3522"
-          :zoom="11"
+          :zoom="15"
         >
           <LeafletTileLayer
             name="osm"
@@ -6920,6 +6967,8 @@ updateFPS();
             :margin="virtualizationMargin"
             :quadtree="markersQuadtree"
             @update:visible-count="visibleMarkersCount = $event"
+            @transition-start="isTransitioning = true"
+            @transition-end="isTransitioning = false"
             v-slot="{ visibleIds }"
           >
             <template v-for="marker in markers" :key="marker.id">

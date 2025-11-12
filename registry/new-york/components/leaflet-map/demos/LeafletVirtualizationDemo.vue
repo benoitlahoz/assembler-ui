@@ -27,6 +27,7 @@ const mapRef = ref<LeafletMapExposed | null>(null);
 
 // Mode de virtualisation
 const virtualizationEnabled = ref(true);
+const isTransitioning = ref(false); // État de transition
 const virtualizationMargin = ref(0.1); // 0.1 degrees margin
 const visibleMarkersCount = ref(0);
 const visibleCirclesCount = ref(0);
@@ -90,6 +91,12 @@ onMounted(async () => {
 const stats = ref({
   fps: 0,
 });
+
+// Toggle virtualization with transition handling
+const toggleVirtualization = () => {
+  // Just toggle - LeafletVirtualize handles the transition
+  virtualizationEnabled.value = !virtualizationEnabled.value;
+};
 
 // FPS counter
 let lastTime = performance.now();
@@ -180,14 +187,18 @@ updateFPS();
         <!-- Controls row -->
         <div class="flex items-center gap-4">
           <Button
-            @click="virtualizationEnabled = !virtualizationEnabled"
+            @click="toggleVirtualization"
+            :disabled="isTransitioning"
             :class="
               virtualizationEnabled
                 ? 'bg-green-500 text-white hover:bg-green-600'
                 : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
             "
           >
-            {{ virtualizationEnabled ? 'Virtualization ON' : 'Virtualization OFF' }}
+            <span v-if="isTransitioning">Switching...</span>
+            <span v-else>{{
+              virtualizationEnabled ? 'Virtualization ON' : 'Virtualization OFF'
+            }}</span>
           </Button>
 
           <div class="flex items-center gap-2">
@@ -199,6 +210,7 @@ updateFPS();
               max="1"
               step="0.05"
               class="w-32"
+              :disabled="isTransitioning"
             />
             <span class="text-sm w-12">{{ virtualizationMargin.toFixed(2) }}°</span>
           </div>
@@ -207,6 +219,21 @@ updateFPS();
 
       <!-- Map -->
       <div class="flex-1 relative">
+        <!-- Transition overlay -->
+        <div
+          v-if="isTransitioning"
+          class="absolute inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-lg"
+        >
+          <div class="bg-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
+            <div
+              class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
+            ></div>
+            <span class="text-sm font-medium">
+              {{ virtualizationEnabled ? 'Enabling' : 'Disabling' }} virtualization...
+            </span>
+          </div>
+        </div>
+
         <LeafletMap
           ref="mapRef"
           name="virtualization-demo"
@@ -231,6 +258,8 @@ updateFPS();
             :margin="virtualizationMargin"
             :quadtree="markersQuadtree"
             @update:visible-count="visibleMarkersCount = $event"
+            @transition-start="isTransitioning = true"
+            @transition-end="isTransitioning = false"
             v-slot="{ visibleIds }"
           >
             <template v-for="marker in markers" :key="marker.id">
