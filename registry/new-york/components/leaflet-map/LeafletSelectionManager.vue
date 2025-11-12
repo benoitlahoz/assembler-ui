@@ -124,6 +124,11 @@ const boundingBox = computed(() => {
     return null;
   }
 
+  // Markers don't need bounding box (they are just draggable)
+  if (selectedFeature.value.type === 'marker') {
+    return null;
+  }
+
   const feature = featuresRegistry.value.get(selectedFeature.value.id);
   if (!feature) return null;
 
@@ -137,6 +142,14 @@ const showRotateHandle = computed(() => {
   // Only polylines and polygons support rotation
   // Circles, rectangles, and markers don't support rotation
   return selectedFeature.value.type === 'polyline' || selectedFeature.value.type === 'polygon';
+});
+
+// Check if bounding box should be constrained to square
+const constrainSquare = computed(() => {
+  if (!selectedFeature.value) return false;
+
+  // Circles should have square bounding boxes
+  return selectedFeature.value.type === 'circle';
 });
 
 // Save rotation start positions
@@ -212,6 +225,7 @@ provide(LeafletSelectionKey, context);
     :bounds="boundingBox"
     :visible="boundingBox !== null && mode === 'select'"
     :show-rotate-handle="showRotateHandle"
+    :constrain-square="constrainSquare"
     :on-update="handleBoundingBoxUpdate"
     :on-rotate="handleBoundingBoxRotate"
     :on-rotate-end="handleBoundingBoxRotateEnd"
@@ -221,6 +235,7 @@ provide(LeafletSelectionKey, context);
       :bounds="boundingBox"
       :visible="boundingBox !== null && mode === 'select'"
       :show-rotate-handle="showRotateHandle"
+      :constrain-square="constrainSquare"
       @update:bounds="handleBoundingBoxUpdate"
       @rotate="handleBoundingBoxRotate"
       @rotate-end="handleBoundingBoxRotateEnd"

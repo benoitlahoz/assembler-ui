@@ -29,12 +29,14 @@ export interface LeafletBoundingBoxProps {
   bounds?: L.LatLngBounds | null;
   visible?: boolean;
   showRotateHandle?: boolean;
+  constrainSquare?: boolean;
 }
 
 const props = withDefaults(defineProps<LeafletBoundingBoxProps>(), {
   bounds: null,
   visible: false,
   showRotateHandle: true,
+  constrainSquare: false,
 });
 
 const emit = defineEmits<{
@@ -113,6 +115,33 @@ const clearHandles = () => {
   }
 };
 
+// Helper function to constrain bounds to a square
+const constrainToSquare = (bounds: L.LatLngBounds, center?: L.LatLng): L.LatLngBounds => {
+  if (!L.value) return bounds;
+
+  const currentCenter = center || bounds.getCenter();
+  const latDiff = bounds.getNorth() - bounds.getSouth();
+  const lngDiff = bounds.getEast() - bounds.getWest();
+
+  // Convert to metric coordinates to get true visual dimensions
+  // 1 degree latitude ≈ 111320 meters
+  // 1 degree longitude ≈ 111320 * cos(latitude) meters
+  const latMeters = latDiff * 111320;
+  const lngMeters = lngDiff * 111320 * Math.cos((currentCenter.lat * Math.PI) / 180);
+
+  // Use the maximum dimension to create a visual square
+  const maxMeters = Math.max(latMeters, lngMeters);
+
+  // Convert back to degrees
+  const halfLatDiff = maxMeters / 2 / 111320;
+  const halfLngDiff = maxMeters / 2 / (111320 * Math.cos((currentCenter.lat * Math.PI) / 180));
+
+  return L.value.latLngBounds(
+    [currentCenter.lat - halfLatDiff, currentCenter.lng - halfLngDiff],
+    [currentCenter.lat + halfLatDiff, currentCenter.lng + halfLngDiff]
+  );
+};
+
 const createBoundingBox = () => {
   if (!props.bounds || !L.value || !map.value || !props.visible) {
     clearHandles();
@@ -184,6 +213,11 @@ const createBoundingBox = () => {
           break;
         default:
           return;
+      }
+
+      // Constrain to square if needed (for circles)
+      if (props.constrainSquare) {
+        newBounds = constrainToSquare(newBounds, scaleStartBounds.getCenter());
       }
 
       // Mettre à jour la bounding box
@@ -281,6 +315,11 @@ const createBoundingBox = () => {
             [scaleStartBounds.getNorth(), scaleStartBounds.getEast()]
           );
           break;
+      }
+
+      // Constrain to square if needed (for circles)
+      if (props.constrainSquare) {
+        newBounds = constrainToSquare(newBounds, scaleStartBounds.getCenter());
       }
 
       // Mettre à jour la bounding box

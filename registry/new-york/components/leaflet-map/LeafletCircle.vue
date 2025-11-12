@@ -191,15 +191,38 @@ const registerWithSelection = () => {
     id: circleId.value,
     type: 'circle',
     getBounds: () => {
-      if (!circle.value) return null;
-      return circle.value.getBounds();
+      if (!circle.value || !L.value) return null;
+
+      // Return a visually square bounding box for circles
+      const center = circle.value.getLatLng();
+      const radius = circle.value.getRadius(); // in meters
+
+      // Convert radius from meters to degrees
+      // 1 degree latitude ≈ 111320 meters (constant)
+      // 1 degree longitude ≈ 111320 * cos(latitude) meters (varies by latitude)
+      const radiusInLatDegrees = radius / 111320;
+      const radiusInLngDegrees = radius / (111320 * Math.cos((center.lat * Math.PI) / 180));
+
+      // Create square bounds: use radius in lat degrees for both dimensions
+      // This ensures the box is visually square on the map
+      return L.value.latLngBounds(
+        [center.lat - radiusInLatDegrees, center.lng - radiusInLngDegrees],
+        [center.lat + radiusInLatDegrees, center.lng + radiusInLngDegrees]
+      );
     },
     applyTransform: (bounds: L.LatLngBounds) => {
       if (!circle.value) return;
       const center = bounds.getCenter();
-      const sw = bounds.getSouthWest();
-      const ne = bounds.getNorthEast();
-      const radius = center.distanceTo(sw);
+
+      // Calculate radius from the square bounding box
+      // Use the average of width/height to get the radius
+      const latDiff = bounds.getNorth() - bounds.getSouth();
+      const lngDiff = bounds.getEast() - bounds.getWest();
+
+      // Convert back to meters (use average to handle both lat/lng)
+      const radiusLat = (latDiff / 2) * 111320;
+      const radiusLng = (lngDiff / 2) * 111320 * Math.cos((center.lat * Math.PI) / 180);
+      const radius = (radiusLat + radiusLng) / 2;
 
       circle.value.setLatLng(center);
       circle.value.setRadius(radius);

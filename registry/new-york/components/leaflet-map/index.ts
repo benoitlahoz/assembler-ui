@@ -3,6 +3,7 @@
  * @category geography
  *
  * @demo LeafletSimple
+ * @demo LeafletEditionDemo
  * @demo LeafletSelectionDemo
  */
 
