@@ -23,6 +23,7 @@ export interface LeafletControlsProps {
   class?: HTMLAttributes['class'];
   style?: HTMLAttributes['style'];
   activeItem?: string | null;
+  enabled?: boolean;
 }
 
 const props = withDefaults(defineProps<LeafletControlsProps>(), {
@@ -30,6 +31,7 @@ const props = withDefaults(defineProps<LeafletControlsProps>(), {
   class: 'rounded-[4px] shadow-(--leaflet-control-bar-shadow) bg-white',
   style: '',
   activeItem: null,
+  enabled: true,
 });
 
 const emit = defineEmits<{
@@ -156,10 +158,9 @@ const createControl = () => {
 };
 
 watch(
-  () => map.value,
-  () => {
-    console.log('Map changed', map.value, control.value);
-    if (map.value) {
+  [() => map.value, () => props.enabled],
+  ([newMap, newEnabled]) => {
+    if (newMap && newEnabled) {
       if (!control.value) {
         // Wait a bit for initial items to register
         nextTick(() => {
@@ -168,7 +169,7 @@ watch(
           }, 150);
         });
       } else if (!control.value._map) {
-        control.value.addTo(map.value);
+        control.value.addTo(newMap);
       }
     } else if (control.value && control.value._map) {
       control.value.remove();

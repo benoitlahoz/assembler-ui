@@ -242,6 +242,7 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
 
         <LeafletControls
           position="topleft"
+          :enabled="editMode"
           :active-item="currentMode"
           @item-clicked="handleModeSelected"
         >
