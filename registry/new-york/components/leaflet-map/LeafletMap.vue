@@ -54,6 +54,7 @@ provide(LeafletModuleKey, L);
 const mapName = computed(() => props.name || 'map');
 
 const map = ref<Leaflet.Map | null>(null);
+const mapContainer = ref<HTMLElement | null>(null);
 const errors = ref<Error[]>([]);
 const tileLayers = ref<
   Array<Leaflet.TileLayerOptions & { name: string } & { urlTemplate: string }>
@@ -145,9 +146,10 @@ onMounted(() => {
       L.value = ImportedLeaflet.value;
 
       nextTick(() => {
-        if (!L.value) return;
+        if (!L.value || !mapContainer.value) return;
+
         map.value = L.value
-          .map(mapName.value, { zoomControl: false })
+          .map(mapContainer.value, { zoomControl: false })
           .setView([centerLat.value, centerLng.value], zoom.value);
 
         map.value.on('click', (event: LeafletMouseEvent) => {
@@ -191,7 +193,12 @@ defineExpose<LeafletMapExposed>({
 </script>
 
 <template>
-  <div :id="mapName" :class="cn('w-full h-full', props.class)" :style="props.style">
+  <div
+    ref="mapContainer"
+    :id="mapName"
+    :class="cn('w-full h-full', props.class)"
+    :style="props.style"
+  >
     <slot :map="map" :errors="errors" :locate="locate" />
   </div>
 </template>

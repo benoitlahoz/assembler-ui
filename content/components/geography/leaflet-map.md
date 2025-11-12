@@ -1,7 +1,9 @@
 ---
 title: LeafletMap
-description: 
+description: Quadtree composable return value for spatial indexing (required)
 ---
+
+  <p class="text-pretty mt-4">Uses O(log n) quadtree queries for efficient virtualization<br>   </p>
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
@@ -135,6 +137,7 @@ export { default as LeafletControls } from "./LeafletControls.vue";
 export { default as LeafletControlItem } from "./LeafletControlItem.vue";
 export { default as LeafletFeaturesEditor } from "./LeafletFeaturesEditor.vue";
 export { default as LeafletFeaturesSelector } from "./LeafletFeaturesSelector.vue";
+export { default as LeafletVirtualize } from "./LeafletVirtualize.vue";
 export { default as LeafletBoundingBox } from "./LeafletBoundingBox.vue";
 export { default as LeafletBoundingBoxRectangle } from "./LeafletBoundingBoxRectangle.vue";
 export { default as LeafletFeatureHandle } from "./LeafletFeatureHandle.vue";
@@ -195,6 +198,7 @@ export type { LeafletCircleProps } from "./LeafletCircle.vue";
 export type { LeafletPolylineProps } from "./LeafletPolyline.vue";
 export type { LeafletPolygonProps } from "./LeafletPolygon.vue";
 export type { LeafletRectangleProps } from "./LeafletRectangle.vue";
+export type { LeafletVirtualizeProps } from "./LeafletVirtualize.vue";
 ```
 
 ```vue [src/components/ui/leaflet-map/LeafletMap.vue]
@@ -258,6 +262,7 @@ provide(LeafletModuleKey, L);
 const mapName = computed(() => props.name || "map");
 
 const map = ref<Leaflet.Map | null>(null);
+const mapContainer = ref<HTMLElement | null>(null);
 const errors = ref<Error[]>([]);
 const tileLayers = ref<
   Array<Leaflet.TileLayerOptions & { name: string } & { urlTemplate: string }>
@@ -350,9 +355,10 @@ onMounted(() => {
       L.value = ImportedLeaflet.value;
 
       nextTick(() => {
-        if (!L.value) return;
+        if (!L.value || !mapContainer.value) return;
+
         map.value = L.value
-          .map(mapName.value, { zoomControl: false })
+          .map(mapContainer.value, { zoomControl: false })
           .setView([centerLat.value, centerLng.value], zoom.value);
 
         map.value.on("click", (event: LeafletMouseEvent) => {
@@ -397,6 +403,7 @@ defineExpose<LeafletMapExposed>({
 
 <template>
   <div
+    ref="mapContainer"
     :id="mapName"
     :class="cn('w-full h-full', props.class)"
     :style="props.style"
@@ -1698,14 +1705,11 @@ const unregisterItem = (name: string) => {
 
 const createButton = (container: HTMLElement, name: string, title: string) => {
   if (!L.value) return;
-  console.log("Should create button for", name);
 
   const controlItem = controlsRegistry.value.get(name);
-  console.log("Control", controlItem);
   if (!controlItem) {
     return;
   }
-  console.log("HTML", controlItem.html);
   const button = L.value!.DomUtil.create(
     "div",
     "leaflet-draw-button",
@@ -1766,7 +1770,6 @@ const updateActiveButton = () => {
 
 const createControl = () => {
   if (!L.value || !map.value) return;
-  console.log("Creating controls with", controlsRegistry.value);
 
   const Controls = L.value.Control.extend({
     options: {
@@ -1828,7 +1831,6 @@ watch(
 watch(
   controlsRegistry,
   (newRegistry) => {
-    console.log("Registry changed", newRegistry.size);
     if (newRegistry.size > 0 && map.value && control.value?._map) {
       control.value.remove();
       control.value = null;
@@ -4911,6 +4913,252 @@ watch(
 <template><slot /></template>
 ```
 
+```vue [src/components/ui/leaflet-map/LeafletVirtualize.vue]
+<script setup lang="ts">
+import {
+  ref,
+  inject,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+  watch,
+  type Ref,
+} from "vue";
+import { LeafletMapKey, LeafletModuleKey } from ".";
+import type Leaflet from "leaflet";
+import type {
+  UseQuadtreeReturn,
+  Rect,
+} from "~~/registry/new-york/composables/use-quadtree/useQuadtree";
+
+export interface LeafletVirtualizeProps {
+  quadtree: UseQuadtreeReturn<any>;
+
+  enabled?: boolean;
+
+  marginMeters?: number;
+
+  marginZoomRatio?: number;
+
+  alwaysVisible?: Array<string | number>;
+
+  transitionDelay?: number;
+}
+
+const props = withDefaults(defineProps<LeafletVirtualizeProps>(), {
+  enabled: true,
+  marginMeters: undefined,
+  marginZoomRatio: 1.0,
+  alwaysVisible: () => [],
+  transitionDelay: 50,
+});
+
+const emit = defineEmits<{
+  "update:visible-count": [count: number];
+  "bounds-changed": [bounds: Leaflet.LatLngBounds];
+  "transition-start": [];
+  "transition-end": [];
+}>();
+
+const L = inject(LeafletModuleKey, ref<typeof Leaflet | undefined>(undefined));
+const map = inject<Ref<Leaflet.Map | null>>(LeafletMapKey, ref(null));
+
+const visibleBounds = ref<Leaflet.LatLngBounds | null>(null);
+const visibleFeatureIds = ref<Set<string | number>>(new Set());
+const isTransitioning = ref(false);
+let updateScheduled = false;
+
+const metersToDegreesLat = (meters: number): number => {
+  return meters / 111320;
+};
+
+const metersToDegreesLng = (meters: number, latitude: number): number => {
+  return meters / (111320 * Math.cos((latitude * Math.PI) / 180));
+};
+
+const calculateDynamicMargin = (zoom: number): number => {
+  const clampedZoom = Math.max(1, Math.min(20, zoom));
+
+  const baseMargin = (20 - clampedZoom) * 100;
+
+  return baseMargin * props.marginZoomRatio;
+};
+
+const updateVisibleBounds = () => {
+  if (!map.value || !L.value) return;
+
+  if (updateScheduled) return;
+  updateScheduled = true;
+
+  requestAnimationFrame(() => {
+    updateScheduled = false;
+
+    if (!map.value || !L.value) return;
+
+    const bounds = map.value.getBounds();
+
+    if (props.enabled) {
+      const zoom = map.value.getZoom();
+      const marginInMeters = props.marginMeters ?? calculateDynamicMargin(zoom);
+
+      if (marginInMeters > 0) {
+        const center = bounds.getCenter();
+        const marginLat = metersToDegreesLat(marginInMeters);
+        const marginLng = metersToDegreesLng(marginInMeters, center.lat);
+
+        const extendedBounds = L.value.latLngBounds(
+          L.value.latLng(
+            bounds.getSouth() - marginLat,
+            bounds.getWest() - marginLng,
+          ),
+          L.value.latLng(
+            bounds.getNorth() + marginLat,
+            bounds.getEast() + marginLng,
+          ),
+        );
+        visibleBounds.value = extendedBounds;
+      } else {
+        visibleBounds.value = bounds;
+      }
+    } else {
+      visibleBounds.value = bounds;
+    }
+
+    updateVisibleFeaturesQuadtree();
+
+    emit("bounds-changed", visibleBounds.value);
+  });
+};
+
+const updateVisibleFeaturesQuadtree = () => {
+  if (!visibleBounds.value) {
+    visibleFeatureIds.value.clear();
+    emit("update:visible-count", 0);
+    return;
+  }
+
+  if (!props.enabled) {
+    const allItems = props.quadtree.retrieve({
+      x: -180,
+      y: -90,
+      width: 360,
+      height: 180,
+    });
+    const allIds = new Set<string | number>();
+    for (const item of allItems) {
+      allIds.add(item.id);
+    }
+    visibleFeatureIds.value = allIds;
+    emit("update:visible-count", allIds.size);
+    return;
+  }
+
+  const bounds = visibleBounds.value;
+
+  const queryRect: Rect = {
+    x: bounds.getWest(),
+    y: bounds.getSouth(),
+    width: bounds.getEast() - bounds.getWest(),
+    height: bounds.getNorth() - bounds.getSouth(),
+  };
+
+  const visibleItems = props.quadtree.retrieve(queryRect);
+
+  const newVisibleIds = new Set<string | number>();
+  for (const item of visibleItems) {
+    newVisibleIds.add(item.id);
+  }
+
+  for (const id of props.alwaysVisible) {
+    newVisibleIds.add(id);
+  }
+
+  visibleFeatureIds.value = newVisibleIds;
+  emit("update:visible-count", newVisibleIds.size);
+};
+onMounted(() => {
+  if (map.value) {
+    updateVisibleBounds();
+    map.value.on("moveend", updateVisibleBounds);
+    map.value.on("zoomend", updateVisibleBounds);
+  }
+});
+
+watch(
+  map,
+  (newMap) => {
+    if (newMap) {
+      updateVisibleBounds();
+      newMap.on("moveend", updateVisibleBounds);
+      newMap.on("zoomend", updateVisibleBounds);
+    }
+  },
+  { immediate: true },
+);
+onBeforeUnmount(() => {
+  if (map.value) {
+    map.value.off("moveend", updateVisibleBounds);
+    map.value.off("zoomend", updateVisibleBounds);
+  }
+});
+
+watch(
+  () => props.enabled,
+  async () => {
+    isTransitioning.value = true;
+    emit("transition-start");
+
+    await new Promise((resolve) => setTimeout(resolve, props.transitionDelay));
+    updateVisibleFeaturesQuadtree();
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    isTransitioning.value = false;
+    emit("transition-end");
+  },
+);
+
+watch(
+  () => props.marginMeters,
+  () => {
+    updateVisibleBounds();
+  },
+);
+
+watch(
+  () => props.marginZoomRatio,
+  () => {
+    updateVisibleBounds();
+  },
+);
+
+watch(
+  () => props.quadtree,
+  () => {
+    if (map.value) {
+      nextTick(() => {
+        updateVisibleBounds();
+      });
+    }
+  },
+);
+
+defineExpose({
+  visibleBounds,
+  visibleFeatureIds,
+  isTransitioning,
+});
+</script>
+
+<template>
+  <slot
+    :is-visible="(id: string | number) => visibleFeatureIds.has(id)"
+    :visible-ids="visibleFeatureIds"
+    :visible-count="visibleFeatureIds.size"
+  />
+</template>
+```
+
 ```vue [src/components/ui/leaflet-map/LeafletZoomControl.vue]
 <script setup lang="ts">
 import { ref, inject, type Ref, watch, onBeforeUnmount } from "vue";
@@ -5305,6 +5553,244 @@ export const useLeaflet = async () => {
     lngDegreesToRadius,
   };
 };
+```
+
+```ts [src/components/ui/use-quadtree/useQuadtree.ts]
+import { ref, readonly, type Ref } from "vue";
+
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  [key: string]: any;
+}
+
+export interface QuadtreeBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface QuadtreeConfig {
+  bounds: QuadtreeBounds;
+
+  maxObjects?: number;
+
+  maxLevels?: number;
+}
+
+class QuadtreeNode<T extends Rect = Rect> {
+  private maxObjects: number;
+  private maxLevels: number;
+  private level: number;
+  private bounds: QuadtreeBounds;
+  private objects: T[] = [];
+  private nodes: QuadtreeNode<T>[] = [];
+
+  constructor(
+    bounds: QuadtreeBounds,
+    maxObjects = 10,
+    maxLevels = 4,
+    level = 0,
+  ) {
+    this.maxObjects = maxObjects;
+    this.maxLevels = maxLevels;
+    this.level = level;
+    this.bounds = bounds;
+  }
+
+  private split(): void {
+    const nextLevel = this.level + 1;
+    const subWidth = this.bounds.width / 2;
+    const subHeight = this.bounds.height / 2;
+    const x = this.bounds.x;
+    const y = this.bounds.y;
+
+    this.nodes[0] = new QuadtreeNode<T>(
+      { x: x + subWidth, y, width: subWidth, height: subHeight },
+      this.maxObjects,
+      this.maxLevels,
+      nextLevel,
+    );
+
+    this.nodes[1] = new QuadtreeNode<T>(
+      { x, y, width: subWidth, height: subHeight },
+      this.maxObjects,
+      this.maxLevels,
+      nextLevel,
+    );
+
+    this.nodes[2] = new QuadtreeNode<T>(
+      { x, y: y + subHeight, width: subWidth, height: subHeight },
+      this.maxObjects,
+      this.maxLevels,
+      nextLevel,
+    );
+
+    this.nodes[3] = new QuadtreeNode<T>(
+      { x: x + subWidth, y: y + subHeight, width: subWidth, height: subHeight },
+      this.maxObjects,
+      this.maxLevels,
+      nextLevel,
+    );
+  }
+
+  private getIndex(rect: Rect): number[] {
+    const indexes: number[] = [];
+    const verticalMidpoint = this.bounds.x + this.bounds.width / 2;
+    const horizontalMidpoint = this.bounds.y + this.bounds.height / 2;
+
+    const startIsNorth = rect.y < horizontalMidpoint;
+    const startIsWest = rect.x < verticalMidpoint;
+    const endIsEast = rect.x + rect.width > verticalMidpoint;
+    const endIsSouth = rect.y + rect.height > horizontalMidpoint;
+
+    if (startIsNorth && endIsEast) {
+      indexes.push(0);
+    }
+
+    if (startIsWest && startIsNorth) {
+      indexes.push(1);
+    }
+
+    if (startIsWest && endIsSouth) {
+      indexes.push(2);
+    }
+
+    if (endIsEast && endIsSouth) {
+      indexes.push(3);
+    }
+
+    return indexes;
+  }
+
+  insert(rect: T): void {
+    if (this.nodes.length) {
+      const indexes = this.getIndex(rect);
+      for (const index of indexes) {
+        this.nodes[index]?.insert(rect);
+      }
+      return;
+    }
+
+    this.objects.push(rect);
+
+    if (this.objects.length > this.maxObjects && this.level < this.maxLevels) {
+      if (!this.nodes.length) {
+        this.split();
+      }
+
+      for (const obj of this.objects) {
+        const indexes = this.getIndex(obj);
+        for (const index of indexes) {
+          this.nodes[index]?.insert(obj);
+        }
+      }
+
+      this.objects = [];
+    }
+  }
+
+  retrieve(rect: Rect): T[] {
+    const indexes = this.getIndex(rect);
+    let returnObjects = [...this.objects];
+
+    if (this.nodes.length) {
+      for (const index of indexes) {
+        const nodeResults = this.nodes[index]?.retrieve(rect);
+        if (nodeResults) {
+          returnObjects = returnObjects.concat(nodeResults);
+        }
+      }
+    }
+
+    if (this.level === 0) {
+      return Array.from(new Set(returnObjects));
+    }
+
+    return returnObjects;
+  }
+
+  clear(): void {
+    this.objects = [];
+
+    for (const node of this.nodes) {
+      node?.clear();
+    }
+
+    this.nodes = [];
+  }
+
+  size(): number {
+    let count = this.objects.length;
+
+    if (this.nodes.length) {
+      for (const node of this.nodes) {
+        count += node.size();
+      }
+    }
+
+    return count;
+  }
+
+  getBounds(): QuadtreeBounds {
+    return { ...this.bounds };
+  }
+}
+
+export function useQuadtree<T extends Rect = Rect>(config: QuadtreeConfig) {
+  const { bounds, maxObjects = 10, maxLevels = 4 } = config;
+
+  const tree = ref<QuadtreeNode<T>>(
+    new QuadtreeNode<T>(bounds, maxObjects, maxLevels, 0),
+  ) as Ref<QuadtreeNode<T>>;
+
+  const insert = (rect: T): void => {
+    tree.value.insert(rect);
+  };
+
+  const retrieve = (rect: Rect): T[] => {
+    return tree.value.retrieve(rect);
+  };
+
+  const clear = (): void => {
+    tree.value.clear();
+  };
+
+  const size = (): number => {
+    return tree.value.size();
+  };
+
+  const getBounds = (): QuadtreeBounds => {
+    return tree.value.getBounds();
+  };
+
+  const recreate = (newConfig?: Partial<QuadtreeConfig>): void => {
+    const cfg = { bounds, maxObjects, maxLevels, ...newConfig };
+    tree.value = new QuadtreeNode<T>(
+      cfg.bounds,
+      cfg.maxObjects,
+      cfg.maxLevels,
+      0,
+    );
+  };
+
+  return {
+    tree: readonly(tree),
+    insert,
+    retrieve,
+    clear,
+    size,
+    getBounds,
+    recreate,
+  };
+}
+
+export type UseQuadtreeReturn<T extends Rect = Rect> = ReturnType<
+  typeof useQuadtree<T>
+>;
 ```
 :::
 
@@ -5781,6 +6267,55 @@ export const useLeaflet = async () => {
 
 ---
 
+## LeafletVirtualize
+::hr-underline
+::
+
+Quadtree composable return value for spatial indexing (required)
+Uses O(log n) quadtree queries for efficient virtualization
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `quadtree`{.primary .text-primary} | `UseQuadtreeReturn<any>` | - | Quadtree composable return value for spatial indexing (required)
+Uses O(log n) quadtree queries for efficient virtualization |
+| `enabled`{.primary .text-primary} | `boolean` | true | Enable/disable virtualization |
+| `marginMeters`{.primary .text-primary} | `number` | — | Margin in meters to add to visible bounds for pre-loading features
+Larger margin = more features pre-loaded = less &#34;pop-in&#34; but more DOM elements
+If not set, margin will be calculated dynamically based on zoom level
+@default undefined (auto-calculated based on zoom) |
+| `marginZoomRatio`{.primary .text-primary} | `number` | 1 | Ratio to scale margin based on zoom level (only used when marginMeters is not set)
+Higher ratio = larger margin at low zoom levels
+Formula: margin = marginZoomRatio * (20 - zoom) * 100 meters
+@default 1.0
+@example
+- zoom 5: margin ≈ 1500m (1.5km)
+- zoom 10: margin ≈ 1000m (1km)
+- zoom 15: margin ≈ 500m (0.5km)
+- zoom 18: margin ≈ 200m |
+| `alwaysVisible`{.primary .text-primary} | `Array<string \| number>` |  | Array of feature IDs that should always be rendered, regardless of visibility
+Useful for selected features or important landmarks |
+| `transitionDelay`{.primary .text-primary} | `number` | 50 | Delay in milliseconds before applying virtualization changes
+Helps smooth transitions when toggling virtualization on/off
+@default 50 |
+
+  ### Inject
+| Key | Default | Type | Description |
+|-----|--------|------|-------------|
+| `LeafletModuleKey`{.primary .text-primary} | `ref<typeof Leaflet \| undefined>(undefined)` | `any` | — |
+| `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
+
+  ### Expose
+| Name | Type | Description |
+|------|------|-------------|
+| `visibleBounds`{.primary .text-primary} | `Ref<Leaflet.LatLngBounds \| null>` | — |
+| `visibleFeatureIds`{.primary .text-primary} | `Ref<Set<string \| number>>` | — |
+| `isTransitioning`{.primary .text-primary} | `Ref<any>` | — |
+
+---
+
 ## LeafletZoomControl
 ::hr-underline
 ::
@@ -5912,15 +6447,11 @@ const rectangles = ref([
 ]);
 
 const handleModeSelected = (mode: string | null) => {
-  console.log("Mode selected:", mode, "Current mode:", currentMode.value);
-
   if (currentMode.value === mode) {
     currentMode.value = null;
   } else {
     currentMode.value = mode as FeatureShapeType | FeatureSelectMode | null;
   }
-
-  console.log("New current mode:", currentMode.value);
 };
 
 const handleShapeCreated = (event: FeatureDrawEvent) => {
@@ -6208,6 +6739,471 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
         </LeafletFeaturesEditor>
       </LeafletMap>
     </div>
+  </div>
+</template>
+```
+  :::
+::
+
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <leaflet-virtualization-demo />
+  :::
+
+  :::tabs-item{icon="i-lucide-code" label="Code"}
+```vue
+<script setup lang="ts">
+import { ref, computed, onMounted, shallowRef } from "vue";
+import { Button } from "@/components/ui/button";
+import {
+  LeafletMap,
+  LeafletTileLayer,
+  LeafletZoomControl,
+  LeafletVirtualize,
+  LeafletMarker,
+  LeafletCircle,
+  LeafletPolygon,
+  LeafletPolyline,
+  LeafletRectangle,
+  type LeafletMapExposed,
+} from "@/components/ui/leaflet-map";
+import { loadVirtualizationDemoData } from "./virtualization-demo-loader";
+import type {
+  DemoMarker,
+  DemoCircle,
+  DemoPolygon,
+  DemoPolyline,
+  DemoRectangle,
+} from "./virtualization-demo-loader";
+import type { UseQuadtreeReturn } from "~~/registry/new-york/composables/use-quadtree/useQuadtree";
+
+const mapRef = ref<LeafletMapExposed | null>(null);
+
+const virtualizationEnabled = ref(true);
+const isTransitioning = ref(false);
+const autoMargin = ref(true);
+const virtualizationMargin = ref(1000);
+const marginZoomRatio = ref(1.0);
+const visibleMarkersCount = ref(0);
+const visibleCirclesCount = ref(0);
+const visiblePolygonsCount = ref(0);
+const visiblePolylinesCount = ref(0);
+const visibleRectanglesCount = ref(0);
+const visibleShapesCount = computed(
+  () =>
+    visibleMarkersCount.value +
+    visibleCirclesCount.value +
+    visiblePolygonsCount.value +
+    visiblePolylinesCount.value +
+    visibleRectanglesCount.value,
+);
+
+const isLoading = ref(true);
+const loadingProgress = ref(0);
+const loadingStage = ref("Starting...");
+const markers = ref<DemoMarker[]>([]);
+const circles = ref<DemoCircle[]>([]);
+const polygons = ref<DemoPolygon[]>([]);
+const polylines = ref<DemoPolyline[]>([]);
+const rectangles = ref<DemoRectangle[]>([]);
+
+const markersQuadtree = shallowRef<UseQuadtreeReturn<DemoMarker> | null>(null);
+const circlesQuadtree = shallowRef<UseQuadtreeReturn<DemoCircle> | null>(null);
+const polygonsQuadtree = shallowRef<UseQuadtreeReturn<DemoPolygon> | null>(
+  null,
+);
+const polylinesQuadtree = shallowRef<UseQuadtreeReturn<DemoPolyline> | null>(
+  null,
+);
+const rectanglesQuadtree = shallowRef<UseQuadtreeReturn<DemoRectangle> | null>(
+  null,
+);
+
+const totalShapes = computed(
+  () =>
+    markers.value.length +
+    circles.value.length +
+    polygons.value.length +
+    polylines.value.length +
+    rectangles.value.length,
+);
+
+onMounted(async () => {
+  const data = await loadVirtualizationDemoData(
+    (progress: number, stage: string) => {
+      loadingProgress.value = progress;
+      loadingStage.value = stage;
+    },
+  );
+  markers.value = data.markers;
+  circles.value = data.circles;
+  polygons.value = data.polygons;
+  polylines.value = data.polylines;
+  rectangles.value = data.rectangles;
+  markersQuadtree.value = data.quadtrees.markers;
+  circlesQuadtree.value = data.quadtrees.circles;
+  polygonsQuadtree.value = data.quadtrees.polygons;
+  polylinesQuadtree.value = data.quadtrees.polylines;
+  rectanglesQuadtree.value = data.quadtrees.rectangles;
+  isLoading.value = false;
+});
+
+const stats = ref({
+  fps: 0,
+});
+
+const toggleVirtualization = () => {
+  virtualizationEnabled.value = !virtualizationEnabled.value;
+};
+
+let lastTime = performance.now();
+let frames = 0;
+const updateFPS = () => {
+  frames++;
+  const now = performance.now();
+  if (now >= lastTime + 1000) {
+    stats.value.fps = Math.round((frames * 1000) / (now - lastTime));
+    frames = 0;
+    lastTime = now;
+  }
+  requestAnimationFrame(updateFPS);
+};
+updateFPS();
+</script>
+
+<template>
+  <div class="w-full h-full flex flex-col gap-4">
+    <div
+      v-if="isLoading"
+      class="flex flex-col items-center justify-center p-8 gap-4"
+    >
+      <div class="text-lg font-semibold">{{ loadingStage }}</div>
+      <div class="w-64 h-2 rounded-full overflow-hidden">
+        <div
+          class="h-full bg-blue-500 transition-all duration-300"
+          :style="{ width: `${loadingProgress}%` }"
+        />
+      </div>
+      <div class="text-sm text-gray-600">{{ loadingProgress }}%</div>
+    </div>
+
+    <template v-else>
+      <div class="rounded flex flex-col gap-4 p-4">
+        <div class="flex items-center gap-6">
+          <div class="text-sm">
+            <strong>Total:</strong>
+            {{ totalShapes }} shapes
+          </div>
+          <div
+            class="text-sm"
+            :class="virtualizationEnabled ? 'text-green-600' : 'text-red-600'"
+          >
+            <strong>Rendered:</strong>
+            {{ visibleShapesCount }}
+            <span class="text-xs"
+              >({{
+                Math.round((visibleShapesCount / totalShapes) * 100)
+              }}%)</span
+            >
+          </div>
+          <div
+            class="text-sm"
+            :class="
+              stats.fps < 30
+                ? 'text-red-600'
+                : stats.fps < 50
+                  ? 'text-orange-600'
+                  : 'text-green-600'
+            "
+          >
+            <strong>FPS:</strong>
+            {{ stats.fps }}
+          </div>
+        </div>
+
+        <div class="flex items-center gap-6 text-xs text-gray-600">
+          <div>
+            <strong>Markers:</strong>
+            {{ visibleMarkersCount }} / {{ markers.length }}
+          </div>
+          <div>
+            <strong>Circles:</strong>
+            {{ visibleCirclesCount }} / {{ circles.length }}
+          </div>
+          <div>
+            <strong>Polygons:</strong>
+            {{ visiblePolygonsCount }} / {{ polygons.length }}
+          </div>
+          <div>
+            <strong>Polylines:</strong>
+            {{ visiblePolylinesCount }} / {{ polylines.length }}
+          </div>
+          <div>
+            <strong>Rectangles:</strong>
+            {{ visibleRectanglesCount }} / {{ rectangles.length }}
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <Button
+            @click="toggleVirtualization"
+            :disabled="isTransitioning"
+            :class="
+              virtualizationEnabled
+                ? 'bg-green-500 text-white hover:bg-green-600'
+                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+            "
+          >
+            <span v-if="isTransitioning">Switching...</span>
+            <span v-else>{{
+              virtualizationEnabled ? "Virtualization ON" : "Virtualization OFF"
+            }}</span>
+          </Button>
+
+          <div class="flex items-center gap-2">
+            <label class="text-sm">Auto Margin:</label>
+            <input
+              v-model="autoMargin"
+              type="checkbox"
+              class="w-4 h-4"
+              :disabled="isTransitioning"
+            />
+          </div>
+
+          <div v-if="autoMargin" class="flex items-center gap-2">
+            <label class="text-sm">Zoom Ratio:</label>
+            <input
+              v-model.number="marginZoomRatio"
+              type="range"
+              min="0.5"
+              max="2"
+              step="0.1"
+              class="w-32"
+              :disabled="isTransitioning"
+            />
+            <span class="text-sm w-12">{{ marginZoomRatio.toFixed(1) }}x</span>
+          </div>
+
+          <div v-else class="flex items-center gap-2">
+            <label class="text-sm">Margin:</label>
+            <input
+              v-model.number="virtualizationMargin"
+              type="range"
+              min="0"
+              max="5000"
+              step="250"
+              class="w-32"
+              :disabled="isTransitioning"
+            />
+            <span class="text-sm w-16">{{ virtualizationMargin }} m</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex-1 relative">
+        <div
+          v-if="isTransitioning"
+          class="absolute inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-lg"
+        >
+          <div
+            class="bg-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3"
+          >
+            <div
+              class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
+            ></div>
+            <span class="text-sm font-medium">
+              {{
+                virtualizationEnabled ? "Enabling" : "Disabling"
+              }}
+              virtualization...
+            </span>
+          </div>
+        </div>
+
+        <LeafletMap
+          ref="mapRef"
+          name="virtualization-demo"
+          class="w-full h-[600px] rounded-lg shadow-lg"
+          tile-layer="osm"
+          :center-lat="48.8566"
+          :center-lng="2.3522"
+          :zoom="15"
+        >
+          <LeafletTileLayer
+            name="osm"
+            url-template="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          />
+
+          <LeafletZoomControl position="topleft" />
+
+          <LeafletVirtualize
+            v-if="markersQuadtree"
+            :enabled="virtualizationEnabled"
+            :quadtree="markersQuadtree"
+            :margin-meters="autoMargin ? undefined : virtualizationMargin"
+            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
+            @update:visible-count="visibleMarkersCount = $event"
+            @transition-start="isTransitioning = true"
+            @transition-end="isTransitioning = false"
+            v-slot="{ visibleIds }"
+          >
+            <template v-for="marker in markers" :key="marker.id">
+              <LeafletMarker
+                v-if="visibleIds.has(marker.id)"
+                :id="marker.id"
+                v-model:lat="marker.lat"
+                v-model:lng="marker.lng"
+              />
+            </template>
+          </LeafletVirtualize>
+
+          <LeafletVirtualize
+            v-if="circlesQuadtree"
+            :enabled="virtualizationEnabled"
+            :margin-meters="autoMargin ? undefined : virtualizationMargin"
+            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
+            :quadtree="circlesQuadtree"
+            @update:visible-count="visibleCirclesCount = $event"
+            @transition-start="isTransitioning = true"
+            @transition-end="isTransitioning = false"
+            v-slot="{ visibleIds }"
+          >
+            <template v-for="circle in circles" :key="circle.id">
+              <LeafletCircle
+                v-if="visibleIds.has(circle.id)"
+                :id="circle.id"
+                v-model:lat="circle.lat"
+                v-model:lng="circle.lng"
+                v-model:radius="circle.radius"
+                :class="
+                  circle.colorIndex === 0
+                    ? 'bg-blue-500/30 border border-blue-700'
+                    : circle.colorIndex === 1
+                      ? 'bg-green-500/30 border border-green-700'
+                      : 'bg-red-500/30 border border-red-700'
+                "
+              />
+            </template>
+          </LeafletVirtualize>
+
+          <LeafletVirtualize
+            v-if="polygonsQuadtree"
+            :enabled="virtualizationEnabled"
+            :margin-meters="autoMargin ? undefined : virtualizationMargin"
+            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
+            :quadtree="polygonsQuadtree"
+            @update:visible-count="visiblePolygonsCount = $event"
+            @transition-start="isTransitioning = true"
+            @transition-end="isTransitioning = false"
+            v-slot="{ visibleIds }"
+          >
+            <template v-for="polygon in polygons" :key="polygon.id">
+              <LeafletPolygon
+                v-if="visibleIds.has(polygon.id)"
+                :id="polygon.id"
+                v-model:latlngs="polygon.latlngs"
+                :class="
+                  polygon.colorIndex === 0
+                    ? 'bg-purple-500/30 border border-purple-700'
+                    : 'bg-orange-500/30 border border-orange-700'
+                "
+              />
+            </template>
+          </LeafletVirtualize>
+
+          <LeafletVirtualize
+            v-if="polylinesQuadtree"
+            :enabled="virtualizationEnabled"
+            :margin-meters="autoMargin ? undefined : virtualizationMargin"
+            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
+            :quadtree="polylinesQuadtree"
+            @update:visible-count="visiblePolylinesCount = $event"
+            @transition-start="isTransitioning = true"
+            @transition-end="isTransitioning = false"
+            v-slot="{ visibleIds }"
+          >
+            <template v-for="polyline in polylines" :key="polyline.id">
+              <LeafletPolyline
+                v-if="visibleIds.has(polyline.id)"
+                :id="polyline.id"
+                v-model:latlngs="polyline.latlngs"
+                :class="
+                  polyline.colorIndex === 0
+                    ? 'border border-yellow-600'
+                    : polyline.colorIndex === 1
+                      ? 'border border-pink-600'
+                      : 'border border-cyan-600'
+                "
+              />
+            </template>
+          </LeafletVirtualize>
+
+          <LeafletVirtualize
+            v-if="rectanglesQuadtree"
+            :enabled="virtualizationEnabled"
+            :margin-meters="autoMargin ? undefined : virtualizationMargin"
+            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
+            :quadtree="rectanglesQuadtree"
+            @update:visible-count="visibleRectanglesCount = $event"
+            @transition-start="isTransitioning = true"
+            @transition-end="isTransitioning = false"
+            v-slot="{ visibleIds }"
+          >
+            <template v-for="rectangle in rectangles" :key="rectangle.id">
+              <LeafletRectangle
+                v-if="visibleIds.has(rectangle.id)"
+                :id="rectangle.id"
+                v-model:bounds="rectangle.bounds"
+                :class="
+                  rectangle.colorIndex === 0
+                    ? 'bg-indigo-500/30 border border-indigo-700'
+                    : 'bg-teal-500/30 border border-teal-700'
+                "
+              />
+            </template>
+          </LeafletVirtualize>
+        </LeafletMap>
+      </div>
+
+      <div class="text-sm text-gray-600 p-4 rounded border">
+        <p>
+          <strong>Note:</strong> Cette démo utilise {{ totalShapes }} shapes
+          pré-générées ({{ markers.length }} markers,
+          {{ circles.length }} circles, {{ polygons.length }} polygons,
+          {{ polylines.length }} polylines, {{ rectangles.length }} rectangles)
+          autour de Paris.
+        </p>
+        <p class="mt-2">
+          Avec la virtualisation
+          <strong class="text-green-600">activée</strong>, seules les shapes
+          visibles dans la viewport (+ marge) sont rendues. Regardez le compteur
+          "Rendered" pour voir combien de shapes sont actuellement montées.
+        </p>
+        <p class="mt-2">
+          Avec la virtualisation
+          <strong class="text-red-600">désactivée</strong>, TOUTES les
+          {{ totalShapes }} shapes sont rendues en même temps, ce qui peut
+          causer des lags importants lors du zoom/déplacement.
+        </p>
+        <p class="mt-2 text-orange-600 font-semibold">
+          <strong>Pour tester:</strong>
+        </p>
+        <ol class="mt-1 ml-4 list-decimal text-orange-600">
+          <li>
+            Activez la virtualisation → Déplacez la carte → Notez le FPS et le %
+            de shapes rendues
+          </li>
+          <li>
+            Désactivez la virtualisation → Déplacez la carte → Comparez le FPS
+            (devrait chuter !)
+          </li>
+          <li>
+            Zoomez/dézoomez pour voir comment le nombre de shapes rendues change
+          </li>
+        </ol>
+      </div>
+    </template>
   </div>
 </template>
 ```
