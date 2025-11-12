@@ -25,82 +25,93 @@ import type { UseQuadtreeReturn } from '~~/registry/new-york/composables/use-qua
 
 const mapRef = ref<LeafletMapExposed | null>(null);
 
-// Mode de virtualisation
-const virtualizationEnabled = ref(true);
-const isTransitioning = ref(false); // État de transition
-const autoMargin = ref(true); // Auto-adjust margin based on zoom
-const virtualizationMargin = ref(1000); // Margin in meters (when not auto)
-const marginZoomRatio = ref(1.0); // Zoom-based margin scaling factor
+// Virtualization controls
+const virtualizationConfig = ref({
+  enabled: true,
+  isTransitioning: false,
+  autoMargin: true,
+  marginMeters: 1000,
+  marginZoomRatio: 1.0,
+});
 
 // Zoom level controls for each feature type
-const markersMinZoom = ref<number | undefined>(12);
-const markersMaxZoom = ref<number | undefined>(undefined);
-const circlesMinZoom = ref<number | undefined>(undefined);
-const circlesMaxZoom = ref<number | undefined>(undefined);
-const polygonsMinZoom = ref<number | undefined>(undefined);
-const polygonsMaxZoom = ref<number | undefined>(14);
-const polylinesMinZoom = ref<number | undefined>(undefined);
-const polylinesMaxZoom = ref<number | undefined>(undefined);
-const rectanglesMinZoom = ref<number | undefined>(undefined);
-const rectanglesMaxZoom = ref<number | undefined>(undefined);
+const zoomLevels = ref({
+  markers: { min: 12, max: undefined as number | undefined },
+  circles: { min: undefined as number | undefined, max: undefined as number | undefined },
+  polygons: { min: undefined as number | undefined, max: 14 },
+  polylines: { min: undefined as number | undefined, max: undefined as number | undefined },
+  rectangles: { min: undefined as number | undefined, max: undefined as number | undefined },
+});
 
-const visibleMarkersCount = ref(0);
-const visibleCirclesCount = ref(0);
-const visiblePolygonsCount = ref(0);
-const visiblePolylinesCount = ref(0);
-const visibleRectanglesCount = ref(0);
+// Visible counts for each feature type
+const visibleCounts = ref({
+  markers: 0,
+  circles: 0,
+  polygons: 0,
+  polylines: 0,
+  rectangles: 0,
+});
+
 const visibleShapesCount = computed(
   () =>
-    visibleMarkersCount.value +
-    visibleCirclesCount.value +
-    visiblePolygonsCount.value +
-    visiblePolylinesCount.value +
-    visibleRectanglesCount.value
+    visibleCounts.value.markers +
+    visibleCounts.value.circles +
+    visibleCounts.value.polygons +
+    visibleCounts.value.polylines +
+    visibleCounts.value.rectangles
 );
 
 // Data loading state
-const isLoading = ref(true);
-const loadingProgress = ref(0);
-const loadingStage = ref('Starting...');
-const markers = ref<DemoMarker[]>([]);
-const circles = ref<DemoCircle[]>([]);
-const polygons = ref<DemoPolygon[]>([]);
-const polylines = ref<DemoPolyline[]>([]);
-const rectangles = ref<DemoRectangle[]>([]);
+const loadingState = ref({
+  isLoading: true,
+  progress: 0,
+  stage: 'Starting...',
+});
+
+// Feature data
+const features = ref({
+  markers: [] as DemoMarker[],
+  circles: [] as DemoCircle[],
+  polygons: [] as DemoPolygon[],
+  polylines: [] as DemoPolyline[],
+  rectangles: [] as DemoRectangle[],
+});
 
 // Quadtrees for spatial indexing (using shallowRef to track object replacement)
-const markersQuadtree = shallowRef<UseQuadtreeReturn<DemoMarker> | null>(null);
-const circlesQuadtree = shallowRef<UseQuadtreeReturn<DemoCircle> | null>(null);
-const polygonsQuadtree = shallowRef<UseQuadtreeReturn<DemoPolygon> | null>(null);
-const polylinesQuadtree = shallowRef<UseQuadtreeReturn<DemoPolyline> | null>(null);
-const rectanglesQuadtree = shallowRef<UseQuadtreeReturn<DemoRectangle> | null>(null);
+const quadtrees = shallowRef({
+  markers: null as UseQuadtreeReturn<DemoMarker> | null,
+  circles: null as UseQuadtreeReturn<DemoCircle> | null,
+  polygons: null as UseQuadtreeReturn<DemoPolygon> | null,
+  polylines: null as UseQuadtreeReturn<DemoPolyline> | null,
+  rectangles: null as UseQuadtreeReturn<DemoRectangle> | null,
+});
 
 const totalShapes = computed(
   () =>
-    markers.value.length +
-    circles.value.length +
-    polygons.value.length +
-    polylines.value.length +
-    rectangles.value.length
+    features.value.markers.length +
+    features.value.circles.length +
+    features.value.polygons.length +
+    features.value.polylines.length +
+    features.value.rectangles.length
 );
 
 // Load data asynchronously
 onMounted(async () => {
   const data = await loadVirtualizationDemoData((progress: number, stage: string) => {
-    loadingProgress.value = progress;
-    loadingStage.value = stage;
+    loadingState.value.progress = progress;
+    loadingState.value.stage = stage;
   });
-  markers.value = data.markers;
-  circles.value = data.circles;
-  polygons.value = data.polygons;
-  polylines.value = data.polylines;
-  rectangles.value = data.rectangles;
-  markersQuadtree.value = data.quadtrees.markers;
-  circlesQuadtree.value = data.quadtrees.circles;
-  polygonsQuadtree.value = data.quadtrees.polygons;
-  polylinesQuadtree.value = data.quadtrees.polylines;
-  rectanglesQuadtree.value = data.quadtrees.rectangles;
-  isLoading.value = false;
+  features.value.markers = data.markers;
+  features.value.circles = data.circles;
+  features.value.polygons = data.polygons;
+  features.value.polylines = data.polylines;
+  features.value.rectangles = data.rectangles;
+  quadtrees.value.markers = data.quadtrees.markers;
+  quadtrees.value.circles = data.quadtrees.circles;
+  quadtrees.value.polygons = data.quadtrees.polygons;
+  quadtrees.value.polylines = data.quadtrees.polylines;
+  quadtrees.value.rectangles = data.quadtrees.rectangles;
+  loadingState.value.isLoading = false;
 });
 
 const stats = ref({
@@ -110,7 +121,7 @@ const stats = ref({
 // Toggle virtualization with transition handling
 const toggleVirtualization = () => {
   // Just toggle - LeafletVirtualize handles the transition
-  virtualizationEnabled.value = !virtualizationEnabled.value;
+  virtualizationConfig.value.enabled = !virtualizationConfig.value.enabled;
 };
 
 // FPS counter
@@ -132,15 +143,15 @@ updateFPS();
 <template>
   <div class="w-full h-full flex flex-col gap-4">
     <!-- Loading state -->
-    <div v-if="isLoading" class="flex flex-col items-center justify-center p-8 gap-4">
-      <div class="text-lg font-semibold">{{ loadingStage }}</div>
+    <div v-if="loadingState.isLoading" class="flex flex-col items-center justify-center p-8 gap-4">
+      <div class="text-lg font-semibold">{{ loadingState.stage }}</div>
       <div class="w-64 h-2 rounded-full overflow-hidden">
         <div
           class="h-full bg-blue-500 transition-all duration-300"
-          :style="{ width: `${loadingProgress}%` }"
+          :style="{ width: `${loadingState.progress}%` }"
         />
       </div>
-      <div class="text-sm text-gray-600">{{ loadingProgress }}%</div>
+      <div class="text-sm text-gray-600">{{ loadingState.progress }}%</div>
     </div>
 
     <!-- Demo content -->
@@ -153,7 +164,10 @@ updateFPS();
             <strong>Total:</strong>
             {{ totalShapes }} shapes
           </div>
-          <div class="text-sm" :class="virtualizationEnabled ? 'text-green-600' : 'text-red-600'">
+          <div
+            class="text-sm"
+            :class="virtualizationConfig.enabled ? 'text-green-600' : 'text-red-600'"
+          >
             <strong>Rendered:</strong>
             {{ visibleShapesCount }}
             <span class="text-xs"
@@ -179,23 +193,23 @@ updateFPS();
         <div class="flex items-center gap-6 text-xs text-gray-600">
           <div>
             <strong>Markers:</strong>
-            {{ visibleMarkersCount }} / {{ markers.length }}
+            {{ visibleCounts.markers }} / {{ features.markers.length }}
           </div>
           <div>
             <strong>Circles:</strong>
-            {{ visibleCirclesCount }} / {{ circles.length }}
+            {{ visibleCounts.circles }} / {{ features.circles.length }}
           </div>
           <div>
             <strong>Polygons:</strong>
-            {{ visiblePolygonsCount }} / {{ polygons.length }}
+            {{ visibleCounts.polygons }} / {{ features.polygons.length }}
           </div>
           <div>
             <strong>Polylines:</strong>
-            {{ visiblePolylinesCount }} / {{ polylines.length }}
+            {{ visibleCounts.polylines }} / {{ features.polylines.length }}
           </div>
           <div>
             <strong>Rectangles:</strong>
-            {{ visibleRectanglesCount }} / {{ rectangles.length }}
+            {{ visibleCounts.rectangles }} / {{ features.rectangles.length }}
           </div>
         </div>
 
@@ -203,55 +217,55 @@ updateFPS();
         <div class="flex items-center gap-4">
           <Button
             @click="toggleVirtualization"
-            :disabled="isTransitioning"
+            :disabled="virtualizationConfig.isTransitioning"
             :class="
-              virtualizationEnabled
+              virtualizationConfig.enabled
                 ? 'bg-green-500 text-white hover:bg-green-600'
                 : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
             "
           >
-            <span v-if="isTransitioning">Switching...</span>
+            <span v-if="virtualizationConfig.isTransitioning">Switching...</span>
             <span v-else>{{
-              virtualizationEnabled ? 'Virtualization ON' : 'Virtualization OFF'
+              virtualizationConfig.enabled ? 'Virtualization ON' : 'Virtualization OFF'
             }}</span>
           </Button>
 
           <div class="flex items-center gap-2">
             <label class="text-sm">Auto Margin:</label>
             <input
-              v-model="autoMargin"
+              v-model="virtualizationConfig.autoMargin"
               type="checkbox"
               class="w-4 h-4"
-              :disabled="isTransitioning"
+              :disabled="virtualizationConfig.isTransitioning"
             />
           </div>
 
-          <div v-if="autoMargin" class="flex items-center gap-2">
+          <div v-if="virtualizationConfig.autoMargin" class="flex items-center gap-2">
             <label class="text-sm">Zoom Ratio:</label>
             <input
-              v-model.number="marginZoomRatio"
+              v-model.number="virtualizationConfig.marginZoomRatio"
               type="range"
               min="0.5"
               max="2"
               step="0.1"
               class="w-32"
-              :disabled="isTransitioning"
+              :disabled="virtualizationConfig.isTransitioning"
             />
-            <span class="text-sm w-12">{{ marginZoomRatio.toFixed(1) }}x</span>
+            <span class="text-sm w-12">{{ virtualizationConfig.marginZoomRatio.toFixed(1) }}x</span>
           </div>
 
           <div v-else class="flex items-center gap-2">
             <label class="text-sm">Margin:</label>
             <input
-              v-model.number="virtualizationMargin"
+              v-model.number="virtualizationConfig.marginMeters"
               type="range"
               min="0"
               max="5000"
               step="250"
               class="w-32"
-              :disabled="isTransitioning"
+              :disabled="virtualizationConfig.isTransitioning"
             />
-            <span class="text-sm w-16">{{ virtualizationMargin }} m</span>
+            <span class="text-sm w-16">{{ virtualizationConfig.marginMeters }} m</span>
           </div>
 
           <!-- Zoom Levels Controls (collapsible) -->
@@ -264,7 +278,7 @@ updateFPS();
               <div class="flex items-center gap-3 text-xs">
                 <span class="w-20 font-medium">Markers:</span>
                 <input
-                  v-model.number="markersMinZoom"
+                  v-model.number="zoomLevels.markers.min"
                   type="number"
                   min="0"
                   max="20"
@@ -273,7 +287,7 @@ updateFPS();
                 />
                 <span class="text-gray-400">→</span>
                 <input
-                  v-model.number="markersMaxZoom"
+                  v-model.number="zoomLevels.markers.max"
                   type="number"
                   min="0"
                   max="20"
@@ -286,7 +300,7 @@ updateFPS();
               <div class="flex items-center gap-3 text-xs">
                 <span class="w-20 font-medium">Circles:</span>
                 <input
-                  v-model.number="circlesMinZoom"
+                  v-model.number="zoomLevels.circles.min"
                   type="number"
                   min="0"
                   max="20"
@@ -295,7 +309,7 @@ updateFPS();
                 />
                 <span class="text-gray-400">→</span>
                 <input
-                  v-model.number="circlesMaxZoom"
+                  v-model.number="zoomLevels.circles.max"
                   type="number"
                   min="0"
                   max="20"
@@ -308,7 +322,7 @@ updateFPS();
               <div class="flex items-center gap-3 text-xs">
                 <span class="w-20 font-medium">Polygons:</span>
                 <input
-                  v-model.number="polygonsMinZoom"
+                  v-model.number="zoomLevels.polygons.min"
                   type="number"
                   min="0"
                   max="20"
@@ -317,7 +331,7 @@ updateFPS();
                 />
                 <span class="text-gray-400">→</span>
                 <input
-                  v-model.number="polygonsMaxZoom"
+                  v-model.number="zoomLevels.polygons.max"
                   type="number"
                   min="0"
                   max="20"
@@ -330,7 +344,7 @@ updateFPS();
               <div class="flex items-center gap-3 text-xs">
                 <span class="w-20 font-medium">Polylines:</span>
                 <input
-                  v-model.number="polylinesMinZoom"
+                  v-model.number="zoomLevels.polylines.min"
                   type="number"
                   min="0"
                   max="20"
@@ -339,7 +353,7 @@ updateFPS();
                 />
                 <span class="text-gray-400">→</span>
                 <input
-                  v-model.number="polylinesMaxZoom"
+                  v-model.number="zoomLevels.polylines.max"
                   type="number"
                   min="0"
                   max="20"
@@ -352,7 +366,7 @@ updateFPS();
               <div class="flex items-center gap-3 text-xs">
                 <span class="w-20 font-medium">Rectangles:</span>
                 <input
-                  v-model.number="rectanglesMinZoom"
+                  v-model.number="zoomLevels.rectangles.min"
                   type="number"
                   min="0"
                   max="20"
@@ -361,7 +375,7 @@ updateFPS();
                 />
                 <span class="text-gray-400">→</span>
                 <input
-                  v-model.number="rectanglesMaxZoom"
+                  v-model.number="zoomLevels.rectangles.max"
                   type="number"
                   min="0"
                   max="20"
@@ -384,7 +398,7 @@ updateFPS();
       <div class="flex-1 relative">
         <!-- Transition overlay -->
         <div
-          v-if="isTransitioning"
+          v-if="virtualizationConfig.isTransitioning"
           class="absolute inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-lg"
         >
           <div class="bg-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
@@ -392,7 +406,7 @@ updateFPS();
               class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
             ></div>
             <span class="text-sm font-medium">
-              {{ virtualizationEnabled ? 'Enabling' : 'Disabling' }} virtualization...
+              {{ virtualizationConfig.enabled ? 'Enabling' : 'Disabling' }} virtualization...
             </span>
           </div>
         </div>
@@ -416,19 +430,23 @@ updateFPS();
 
           <!-- Markers with Quadtree Virtualization -->
           <LeafletVirtualize
-            v-if="markersQuadtree"
-            :enabled="virtualizationEnabled"
-            :quadtree="markersQuadtree"
-            :margin-meters="autoMargin ? undefined : virtualizationMargin"
-            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
-            :min-zoom="markersMinZoom"
-            :max-zoom="markersMaxZoom"
-            @update:visible-count="visibleMarkersCount = $event"
-            @transition-start="isTransitioning = true"
-            @transition-end="isTransitioning = false"
+            v-if="quadtrees.markers"
+            :enabled="virtualizationConfig.enabled"
+            :quadtree="quadtrees.markers"
+            :margin-meters="
+              virtualizationConfig.autoMargin ? undefined : virtualizationConfig.marginMeters
+            "
+            :margin-zoom-ratio="
+              virtualizationConfig.autoMargin ? virtualizationConfig.marginZoomRatio : undefined
+            "
+            :min-zoom="zoomLevels.markers.min"
+            :max-zoom="zoomLevels.markers.max"
+            @update:visible-count="visibleCounts.markers = $event"
+            @transition-start="virtualizationConfig.isTransitioning = true"
+            @transition-end="virtualizationConfig.isTransitioning = false"
             v-slot="{ visibleIds }"
           >
-            <template v-for="marker in markers" :key="marker.id">
+            <template v-for="marker in features.markers" :key="marker.id">
               <LeafletMarker
                 v-if="visibleIds.has(marker.id)"
                 :id="marker.id"
@@ -440,19 +458,23 @@ updateFPS();
 
           <!-- Circles with Quadtree Virtualization -->
           <LeafletVirtualize
-            v-if="circlesQuadtree"
-            :enabled="virtualizationEnabled"
-            :margin-meters="autoMargin ? undefined : virtualizationMargin"
-            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
-            :quadtree="circlesQuadtree"
-            :min-zoom="circlesMinZoom"
-            :max-zoom="circlesMaxZoom"
-            @update:visible-count="visibleCirclesCount = $event"
-            @transition-start="isTransitioning = true"
-            @transition-end="isTransitioning = false"
+            v-if="quadtrees.circles"
+            :enabled="virtualizationConfig.enabled"
+            :margin-meters="
+              virtualizationConfig.autoMargin ? undefined : virtualizationConfig.marginMeters
+            "
+            :margin-zoom-ratio="
+              virtualizationConfig.autoMargin ? virtualizationConfig.marginZoomRatio : undefined
+            "
+            :quadtree="quadtrees.circles"
+            :min-zoom="zoomLevels.circles.min"
+            :max-zoom="zoomLevels.circles.max"
+            @update:visible-count="visibleCounts.circles = $event"
+            @transition-start="virtualizationConfig.isTransitioning = true"
+            @transition-end="virtualizationConfig.isTransitioning = false"
             v-slot="{ visibleIds }"
           >
-            <template v-for="circle in circles" :key="circle.id">
+            <template v-for="circle in features.circles" :key="circle.id">
               <LeafletCircle
                 v-if="visibleIds.has(circle.id)"
                 :id="circle.id"
@@ -472,19 +494,23 @@ updateFPS();
 
           <!-- Polygons with Quadtree Virtualization -->
           <LeafletVirtualize
-            v-if="polygonsQuadtree"
-            :enabled="virtualizationEnabled"
-            :margin-meters="autoMargin ? undefined : virtualizationMargin"
-            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
-            :quadtree="polygonsQuadtree"
-            :min-zoom="polygonsMinZoom"
-            :max-zoom="polygonsMaxZoom"
-            @update:visible-count="visiblePolygonsCount = $event"
-            @transition-start="isTransitioning = true"
-            @transition-end="isTransitioning = false"
+            v-if="quadtrees.polygons"
+            :enabled="virtualizationConfig.enabled"
+            :margin-meters="
+              virtualizationConfig.autoMargin ? undefined : virtualizationConfig.marginMeters
+            "
+            :margin-zoom-ratio="
+              virtualizationConfig.autoMargin ? virtualizationConfig.marginZoomRatio : undefined
+            "
+            :quadtree="quadtrees.polygons"
+            :min-zoom="zoomLevels.polygons.min"
+            :max-zoom="zoomLevels.polygons.max"
+            @update:visible-count="visibleCounts.polygons = $event"
+            @transition-start="virtualizationConfig.isTransitioning = true"
+            @transition-end="virtualizationConfig.isTransitioning = false"
             v-slot="{ visibleIds }"
           >
-            <template v-for="polygon in polygons" :key="polygon.id">
+            <template v-for="polygon in features.polygons" :key="polygon.id">
               <LeafletPolygon
                 v-if="visibleIds.has(polygon.id)"
                 :id="polygon.id"
@@ -500,19 +526,23 @@ updateFPS();
 
           <!-- Polylines with Quadtree Virtualization -->
           <LeafletVirtualize
-            v-if="polylinesQuadtree"
-            :enabled="virtualizationEnabled"
-            :margin-meters="autoMargin ? undefined : virtualizationMargin"
-            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
-            :quadtree="polylinesQuadtree"
-            :min-zoom="polylinesMinZoom"
-            :max-zoom="polylinesMaxZoom"
-            @update:visible-count="visiblePolylinesCount = $event"
-            @transition-start="isTransitioning = true"
-            @transition-end="isTransitioning = false"
+            v-if="quadtrees.polylines"
+            :enabled="virtualizationConfig.enabled"
+            :margin-meters="
+              virtualizationConfig.autoMargin ? undefined : virtualizationConfig.marginMeters
+            "
+            :margin-zoom-ratio="
+              virtualizationConfig.autoMargin ? virtualizationConfig.marginZoomRatio : undefined
+            "
+            :quadtree="quadtrees.polylines"
+            :min-zoom="zoomLevels.polylines.min"
+            :max-zoom="zoomLevels.polylines.max"
+            @update:visible-count="visibleCounts.polylines = $event"
+            @transition-start="virtualizationConfig.isTransitioning = true"
+            @transition-end="virtualizationConfig.isTransitioning = false"
             v-slot="{ visibleIds }"
           >
-            <template v-for="polyline in polylines" :key="polyline.id">
+            <template v-for="polyline in features.polylines" :key="polyline.id">
               <LeafletPolyline
                 v-if="visibleIds.has(polyline.id)"
                 :id="polyline.id"
@@ -530,19 +560,23 @@ updateFPS();
 
           <!-- Rectangles with Quadtree Virtualization -->
           <LeafletVirtualize
-            v-if="rectanglesQuadtree"
-            :enabled="virtualizationEnabled"
-            :margin-meters="autoMargin ? undefined : virtualizationMargin"
-            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
-            :quadtree="rectanglesQuadtree"
-            :min-zoom="rectanglesMinZoom"
-            :max-zoom="rectanglesMaxZoom"
-            @update:visible-count="visibleRectanglesCount = $event"
-            @transition-start="isTransitioning = true"
-            @transition-end="isTransitioning = false"
+            v-if="quadtrees.rectangles"
+            :enabled="virtualizationConfig.enabled"
+            :margin-meters="
+              virtualizationConfig.autoMargin ? undefined : virtualizationConfig.marginMeters
+            "
+            :margin-zoom-ratio="
+              virtualizationConfig.autoMargin ? virtualizationConfig.marginZoomRatio : undefined
+            "
+            :quadtree="quadtrees.rectangles"
+            :min-zoom="zoomLevels.rectangles.min"
+            :max-zoom="zoomLevels.rectangles.max"
+            @update:visible-count="visibleCounts.rectangles = $event"
+            @transition-start="virtualizationConfig.isTransitioning = true"
+            @transition-end="virtualizationConfig.isTransitioning = false"
             v-slot="{ visibleIds }"
           >
-            <template v-for="rectangle in rectangles" :key="rectangle.id">
+            <template v-for="rectangle in features.rectangles" :key="rectangle.id">
               <LeafletRectangle
                 v-if="visibleIds.has(rectangle.id)"
                 :id="rectangle.id"
@@ -562,10 +596,11 @@ updateFPS();
       <div class="text-sm text-gray-600 p-4 rounded border">
         <p>
           <strong>Note:</strong> Cette démo utilise {{ totalShapes }} shapes pré-générées ({{
-            markers.length
+            features.markers.length
           }}
-          markers, {{ circles.length }} circles, {{ polygons.length }} polygons,
-          {{ polylines.length }} polylines, {{ rectangles.length }} rectangles) autour de Paris.
+          markers, {{ features.circles.length }} circles, {{ features.polygons.length }} polygons,
+          {{ features.polylines.length }} polylines, {{ features.rectangles.length }} rectangles)
+          autour de Paris.
         </p>
         <p class="mt-2">
           Avec la virtualisation <strong class="text-green-600">activée</strong>, seules les shapes
