@@ -6,6 +6,8 @@ import {
   LeafletTileLayer,
   LeafletZoomControl,
   LeafletDrawControl,
+  LeafletControls,
+  LeafletControlItem,
   LeafletFeaturesEditor,
   LeafletFeaturesSelector,
   LeafletFeatureHandle,
@@ -20,6 +22,8 @@ import {
   type FeatureShapeType,
   type FeatureSelectMode,
 } from '~~/registry/new-york/components/leaflet-map';
+import { MapPin } from 'lucide-vue-next';
+import { Icon } from '@iconify/vue';
 
 const mapRef = ref<LeafletMapExposed | null>(null);
 
@@ -29,10 +33,10 @@ const editMode = ref(true); // Start with edit mode enabled
 // Current mode from DrawControl (can be drawing mode or selection mode)
 const currentMode = ref<FeatureShapeType | FeatureSelectMode | null>('select'); // Start in select mode
 
-// Computed selection mode for LeafletFeaturesSelector (only 'select' or 'directSelect')
+// Computed selection mode for LeafletFeaturesSelector (only 'select' or 'direct-select')
 const selectionMode = computed<FeatureSelectMode | null>(() => {
   if (currentMode.value === 'select') return 'select';
-  if (currentMode.value === 'directSelect') return 'directSelect';
+  if (currentMode.value === 'direct-select') return 'direct-select';
   return null;
 });
 
@@ -175,10 +179,6 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
   // so the newly created shape becomes selectable immediately
   currentMode.value = 'select';
 };
-
-const onPolygonClosed = (id: number) => {
-  console.log('Polygon closed:', id);
-};
 </script>
 
 <template>
@@ -232,6 +232,18 @@ const onPolygonClosed = (id: number) => {
           @mode-selected="handleModeSelected"
         />
 
+        <LeafletControls position="topleft">
+          <LeafletControlItem name="select">
+            <Icon icon="gis:arrow" class="w-4 h-4 text-yellow-500" />
+          </LeafletControlItem>
+          <LeafletControlItem name="direct-select">
+            <Icon icon="gis:arrow-o" class="w-4 h-4 text-yellow-500" />
+          </LeafletControlItem>
+          <LeafletControlItem name="marker">
+            <Icon icon="gis:poi" class="w-4 h-4 text-yellow-500" />
+          </LeafletControlItem>
+        </LeafletControls>
+
         <!-- Features Editor - Drawing logic -->
         <LeafletFeaturesEditor
           :enabled="editMode"
@@ -249,7 +261,7 @@ const onPolygonClosed = (id: number) => {
               v-model:lat="marker.lat"
               v-model:lng="marker.lng"
               :selectable="currentMode === 'select'"
-              :editable="currentMode === 'directSelect'"
+              :editable="currentMode === 'direct-select'"
               :draggable="currentMode === 'select'"
             />
 
@@ -262,7 +274,7 @@ const onPolygonClosed = (id: number) => {
               v-model:radius="circle.radius"
               :class="circle.class"
               :selectable="currentMode === 'select'"
-              :editable="currentMode === 'directSelect'"
+              :editable="currentMode === 'direct-select'"
               :draggable="currentMode === 'select'"
             />
 
@@ -274,7 +286,7 @@ const onPolygonClosed = (id: number) => {
               :weight="polyline.weight"
               :class="polyline.class"
               :selectable="currentMode === 'select'"
-              :editable="currentMode === 'directSelect'"
+              :editable="currentMode === 'direct-select'"
               :draggable="currentMode === 'select'"
             />
 
@@ -285,10 +297,9 @@ const onPolygonClosed = (id: number) => {
               v-model:latlngs="polygon.latlngs"
               :class="polygon.class"
               :selectable="currentMode === 'select'"
-              :editable="currentMode === 'directSelect'"
+              :editable="currentMode === 'direct-select'"
               :draggable="currentMode === 'select'"
               :auto-close="true"
-              @closed="() => onPolygonClosed(polygon.id)"
             />
 
             <LeafletRectangle
@@ -298,11 +309,11 @@ const onPolygonClosed = (id: number) => {
               v-model:bounds="rectangle.bounds"
               :class="rectangle.class"
               :selectable="currentMode === 'select'"
-              :editable="currentMode === 'directSelect'"
+              :editable="currentMode === 'direct-select'"
               :draggable="currentMode === 'select'"
             />
 
-            <!-- Custom bounding box styling -->
+            <!-- Custom bounding box styling. Note that a default bounding box component is inserted in the `#bounding-box` slot -->
             <template #bounding-box-styles>
               <LeafletBoundingBoxRectangle class="border-2 border-orange-400" :dashed="[5, 5]" />
 

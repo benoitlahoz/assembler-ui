@@ -68,7 +68,7 @@ LeafletMap
 <LeafletMarker
   :id="`marker-${marker.id}`"
   :selectable="currentMode === 'select'"
-  :editable="currentMode === 'directSelect'"
+  :editable="currentMode === 'direct-select'"
   :draggable="currentMode === 'select'"
 />
 ```
@@ -81,7 +81,7 @@ const currentMode = ref<FeatureShapeType | FeatureSelectMode | null>(null);
 // Mode sélection uniquement (pour SelectionManager)
 const selectionMode = computed<FeatureSelectMode | null>(() => {
   if (currentMode.value === 'select') return 'select';
-  if (currentMode.value === 'directSelect') return 'directSelect';
+  if (currentMode.value === 'direct-select') return 'direct-select';
   return null;
 });
 
@@ -166,7 +166,7 @@ Pour migrer une démo similaire:
 
 4. **Remplacer props:**
    - `:draggable="moveableShapes.markers"` → `:draggable="currentMode === 'select'"`
-   - `:editable="editableShapes.markers"` → `:editable="currentMode === 'directSelect'"`
+   - `:editable="editableShapes.markers"` → `:editable="currentMode === 'direct-select'"`
    - Ajouter `:selectable="currentMode === 'select'"`
    - Ajouter `:id="..."` pour chaque shape
 

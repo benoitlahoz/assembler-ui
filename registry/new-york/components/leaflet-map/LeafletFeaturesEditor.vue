@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, inject, watch, onBeforeUnmount } from 'vue';
 import type { Layer, LatLng, LeafletMouseEvent } from 'leaflet';
-import { LeafletMapKey, LeafletModuleKey } from '.';
+import { LeafletMapKey, LeafletModuleKey, type FeatureSelectMode } from '.';
 
 export interface FeatureDrawEvent {
   layer: Layer;
@@ -48,8 +48,6 @@ export type FeatureShapeOptions =
         northEast: { lat: number; lng: number };
       };
     };
-
-export type FeatureSelectMode = 'select' | 'directSelect';
 
 export interface LeafletFeaturesEditorProps {
   enabled?: boolean;
@@ -675,13 +673,13 @@ watch(
     }
 
     // Handle edit modes (select and directSelect)
-    if (newMode === 'select' || newMode === 'directSelect') {
+    if (newMode === 'select' || newMode === 'direct-select') {
       emit('edit-mode-changed', newMode);
       return;
     }
 
     // If switching away from edit modes
-    if (oldMode === 'select' || oldMode === 'directSelect') {
+    if (oldMode === 'select' || oldMode === 'direct-select') {
       emit('edit-mode-changed', null);
     }
 

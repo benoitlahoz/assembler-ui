@@ -125,12 +125,16 @@ import type * as L from "leaflet";
 import type { Map, TileLayerOptions } from "leaflet";
 import type { LeafletBoundingBoxStyles } from "./LeafletBoundingBox.vue";
 import type { LeafletSelectionContext } from "./LeafletFeaturesSelector.vue";
+import type { LeafletControlsContext } from "./LeafletControls.vue";
 type L = typeof L;
 
 export { default as LeafletMap } from "./LeafletMap.vue";
 export { default as LeafletZoomControl } from "./LeafletZoomControl.vue";
 export { default as LeafletDrawControl } from "./LeafletDrawControl.vue";
+export { default as LeafletControls } from "./LeafletControls.vue";
+export { default as LeafletControlItem } from "./LeafletControlItem.vue";
 export { default as LeafletFeaturesEditor } from "./LeafletFeaturesEditor.vue";
+export { default as LeafletFeaturesSelector } from "./LeafletFeaturesSelector.vue";
 export { default as LeafletBoundingBox } from "./LeafletBoundingBox.vue";
 export { default as LeafletBoundingBoxRectangle } from "./LeafletBoundingBoxRectangle.vue";
 export { default as LeafletFeatureHandle } from "./LeafletFeatureHandle.vue";
@@ -140,14 +144,6 @@ export { default as LeafletCircle } from "./LeafletCircle.vue";
 export { default as LeafletPolyline } from "./LeafletPolyline.vue";
 export { default as LeafletPolygon } from "./LeafletPolygon.vue";
 export { default as LeafletRectangle } from "./LeafletRectangle.vue";
-
-export {
-  default as LeafletFeaturesSelector,
-  type LeafletSelectionContext,
-  type SelectedFeature,
-  type FeatureReference,
-  type LeafletFeaturesSelectorProps,
-} from "./LeafletFeaturesSelector.vue";
 
 export const LeafletModuleKey: InjectionKey<Ref<L | undefined>> =
   Symbol("LeafletModule");
@@ -163,6 +159,9 @@ export const LeafletBoundingBoxStylesKey: InjectionKey<
 > = Symbol("LeafletFeatureHandles");
 export const LeafletSelectionKey: InjectionKey<LeafletSelectionContext> =
   Symbol("LeafletSelection");
+export const LeafletControlsKey: InjectionKey<
+  LeafletControlsContext | undefined
+> = Symbol("LeafletControls");
 
 export type { LeafletMapProps } from "./LeafletMap.vue";
 export type { LeafletMapExposed } from "./LeafletMap.vue";
@@ -171,9 +170,15 @@ export type { LeafletDrawControlProps } from "./LeafletDrawControl.vue";
 export type {
   LeafletFeaturesEditorProps,
   FeatureDrawEvent,
-  FeatureSelectMode,
   FeatureShapeType,
 } from "./LeafletFeaturesEditor.vue";
+export {
+  type FeatureSelectMode,
+  type LeafletSelectionContext,
+  type SelectedFeature,
+  type FeatureReference,
+  type LeafletFeaturesSelectorProps,
+} from "./LeafletFeaturesSelector.vue";
 export type {
   LeafletBoundingBoxProps,
   LeafletBoundingBoxStyles,
@@ -1454,11 +1459,242 @@ onBeforeUnmount(() => {
 <template><slot /></template>
 ```
 
+```vue [src/components/ui/leaflet-map/LeafletControlItem.vue]
+<script setup lang="ts">
+import { inject, unref, useTemplateRef, watch, nextTick } from "vue";
+import { LeafletControlsKey } from ".";
+
+export interface LeafletControlItemProps {
+  name: string;
+  title?: string;
+  type?: "push" | "toggle";
+}
+
+const props = withDefaults(defineProps<LeafletControlItemProps>(), {
+  title: "A control button",
+  type: "toggle",
+});
+
+const wrapperRef = useTemplateRef("wrapperRef");
+
+const controlsContext = inject(LeafletControlsKey);
+
+const getContentHtml = () => {
+  const wrapper = unref(wrapperRef);
+  if (wrapper) {
+    const firstChild = wrapper.firstElementChild;
+    if (firstChild) {
+      return firstChild.outerHTML;
+    }
+  }
+  return "";
+};
+
+watch(
+  () => wrapperRef,
+  () => {
+    nextTick(() => {
+      if (!controlsContext) return;
+
+      const html = getContentHtml();
+      controlsContext?.registerItem({
+        name: props.name,
+        title: props.title || "A control button",
+        html,
+      });
+    });
+  },
+  { immediate: true, deep: true },
+);
+</script>
+
+<template>
+  <div>
+    <div ref="wrapperRef">
+      <slot>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M12 4.5v15m7.5-7.5h-15"
+          />
+        </svg>
+      </slot>
+    </div>
+  </div>
+</template>
+```
+
+```vue [src/components/ui/leaflet-map/LeafletControls.vue]
+<script setup lang="ts">
+import {
+  ref,
+  provide,
+  type Ref,
+  type HTMLAttributes,
+  inject,
+  watch,
+  nextTick,
+} from "vue";
+import { cn } from "@/lib/utils";
+import type { ControlOptions } from "leaflet";
+import { LeafletControlsKey, LeafletMapKey, LeafletModuleKey } from ".";
+
+export interface ControlItemReference {
+  name: string;
+  title: string;
+  html: string;
+}
+
+export interface LeafletControlsContext {
+  controlsRegistry: Ref<Map<string, ControlItemReference>>;
+  registerItem: (item: ControlItemReference) => void;
+  unregisterItem: (name: string) => void;
+}
+
+export interface LeafletControlsProps {
+  position?: ControlOptions["position"];
+  class?: HTMLAttributes["class"];
+  style?: HTMLAttributes["style"];
+}
+
+const props = withDefaults(defineProps<LeafletControlsProps>(), {
+  position: "topleft",
+  class: "rounded-[4px] shadow-(--leaflet-control-bar-shadow) bg-white",
+  style: "",
+});
+
+const L = inject(LeafletModuleKey, ref());
+const map = inject(LeafletMapKey, ref(null));
+
+const control = ref<any>(null);
+
+const controlsRegistry = ref<Map<string, ControlItemReference>>(new Map());
+
+const registerItem = (item: ControlItemReference) => {
+  controlsRegistry.value.set(item.name, item);
+};
+
+const unregisterItem = (name: string) => {
+  controlsRegistry.value.delete(name);
+};
+
+const createButton = (container: HTMLElement, name: string, title: string) => {
+  if (!L.value) return;
+  console.log("Should create button for", name);
+
+  const control = controlsRegistry.value.get(name);
+  console.log("Control", control);
+  if (!control) {
+    return;
+  }
+  console.log("HTML", control.html);
+  const button = L.value!.DomUtil.create(
+    "div",
+    "leaflet-draw-button",
+    container,
+  );
+  button.title = title;
+  button.innerHTML = control.html;
+  button.setAttribute("role", "button");
+  button.setAttribute("aria-label", title);
+  button.setAttribute("tabindex", "0");
+  button.dataset.toolType = name;
+
+  L.value!.DomEvent.on(button, "click", (e: Event) => {
+    L.value!.DomEvent.preventDefault(e);
+    console.log("Click");
+  });
+
+  return button;
+};
+
+const createControl = () => {
+  if (!L.value || !map.value) return;
+  console.log("Creating controls with", controlsRegistry.value);
+
+  const Controls = L.value.Control.extend({
+    options: {
+      position: props.position,
+    },
+
+    onAdd() {
+      const container = L.value!.DomUtil.create(
+        "div",
+        "leaflet-controls-bar leaflet-control leaflet-bar",
+      );
+
+      controlsRegistry.value.forEach((control, name) => {
+        createButton(container, name, control.title);
+      });
+
+      return container;
+    },
+
+    onRemove() {},
+  });
+
+  control.value = new Controls();
+  control.value.addTo(map.value);
+};
+
+watch(
+  () => map.value,
+  () => {
+    console.log("Map changed", map.value, control.value);
+    if (map.value) {
+      if (!control.value) {
+        nextTick(() => {
+          createControl();
+        });
+      } else if (!control.value._map) {
+        control.value.addTo(map.value);
+      }
+    } else if (control.value && control.value._map) {
+      control.value.remove();
+    }
+  },
+  { immediate: true },
+);
+
+const context: LeafletControlsContext = {
+  controlsRegistry,
+  registerItem,
+  unregisterItem,
+};
+
+provide(LeafletControlsKey, context);
+</script>
+
+<template>
+  <slot />
+  <div :class="cn('hidden', props.class)" :style="props.style"></div>
+</template>
+
+<style>
+:root {
+  --leaflet-control-bar-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
+}
+</style>
+```
+
 ```vue [src/components/ui/leaflet-map/LeafletDrawControl.vue]
 <script setup lang="ts">
 import { ref, inject, watch, onBeforeUnmount, nextTick } from "vue";
 import type { ControlOptions } from "leaflet";
-import { LeafletMapKey, LeafletModuleKey } from ".";
+import {
+  LeafletMapKey,
+  LeafletModuleKey,
+  type FeatureSelectMode,
+  type FeatureShapeType,
+} from ".";
 
 export interface DrawButton {
   enabled?: boolean;
@@ -1495,7 +1731,7 @@ const emit = defineEmits<{
       | "polygon"
       | "rectangle"
       | "select"
-      | "directSelect"
+      | "direct-select"
       | null,
   ): void;
 }>();
@@ -1507,22 +1743,16 @@ const control = ref<any>(null);
 
 const shouldEnableButton = (type: string): boolean => {
   if (!props.modes) return false;
-  const config = props.modes[type as keyof typeof props.modes];
+  const config =
+    type === "direct-select"
+      ? props.modes["directSelect"]
+      : props.modes[type as keyof typeof props.modes];
   if (config === undefined) return false;
   if (typeof config === "boolean") return config;
   return config.enabled !== false;
 };
 
-const getIconSvg = (
-  type:
-    | "marker"
-    | "circle"
-    | "polyline"
-    | "polygon"
-    | "rectangle"
-    | "select"
-    | "directSelect",
-): string => {
+const getIconSvg = (type: FeatureShapeType | FeatureSelectMode): string => {
   const color = "#333";
   const svgs: Record<string, string> = {
     marker: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}"/></svg>`,
@@ -1531,21 +1761,14 @@ const getIconSvg = (
     polygon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3 L21 8 L18 17 L6 17 L3 8 Z" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="12" cy="3" r="2.5" fill="${color}"/><circle cx="21" cy="8" r="2.5" fill="${color}"/><circle cx="18" cy="17" r="2.5" fill="${color}"/><circle cx="6" cy="17" r="2.5" fill="${color}"/><circle cx="3" cy="8" r="2.5" fill="${color}"/></svg>`,
     rectangle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="6" width="16" height="12" stroke="${color}" stroke-width="2.5" rx="1" fill="none"/></svg>`,
     select: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 4 L5 17 L10 12.5 L13 18 L15 17 L12 11.5 L18 11.5 Z" fill="${color}" stroke="${color}" stroke-width="1" stroke-linejoin="round"/></svg>`,
-    directSelect: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 4 L5 17 L10 12.5 L13 18 L15 17 L12 11.5 L18 11.5 Z" fill="white" stroke="${color}" stroke-width="2" stroke-linejoin="round"/></svg>`,
+    "direct-select": `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 4 L5 17 L10 12.5 L13 18 L15 17 L12 11.5 L18 11.5 Z" fill="white" stroke="${color}" stroke-width="2" stroke-linejoin="round"/></svg>`,
   };
   return svgs[type] || "";
 };
 
 const createButton = (
   container: HTMLElement,
-  type:
-    | "marker"
-    | "circle"
-    | "polyline"
-    | "polygon"
-    | "rectangle"
-    | "select"
-    | "directSelect",
+  type: FeatureShapeType | FeatureSelectMode,
   title: string,
 ) => {
   const button = L.value!.DomUtil.create(
@@ -1568,16 +1791,7 @@ const createButton = (
   return button;
 };
 
-const toggleDrawMode = (
-  type:
-    | "marker"
-    | "circle"
-    | "polyline"
-    | "polygon"
-    | "rectangle"
-    | "select"
-    | "directSelect",
-) => {
+const toggleDrawMode = (type: FeatureShapeType | FeatureSelectMode) => {
   if (props.activeMode === type) {
     emit("mode-selected", null);
   } else {
@@ -1624,8 +1838,8 @@ const createDrawControl = () => {
         if (shouldEnableButton("select")) {
           createButton(container, "select", "Selection Tool (V)");
         }
-        if (shouldEnableButton("directSelect")) {
-          createButton(container, "directSelect", "Direct Selection Tool (A)");
+        if (shouldEnableButton("direct-select")) {
+          createButton(container, "direct-select", "Direct Selection Tool (A)");
         }
         if (shouldEnableButton("marker")) {
           createButton(container, "marker", "Draw a marker");
@@ -1819,7 +2033,7 @@ watch(
 <script setup lang="ts">
 import { ref, inject, watch, onBeforeUnmount } from "vue";
 import type { Layer, LatLng, LeafletMouseEvent } from "leaflet";
-import { LeafletMapKey, LeafletModuleKey } from ".";
+import { LeafletMapKey, LeafletModuleKey, type FeatureSelectMode } from ".";
 
 export interface FeatureDrawEvent {
   layer: Layer;
@@ -1871,8 +2085,6 @@ export type FeatureShapeOptions =
         northEast: { lat: number; lng: number };
       };
     };
-
-export type FeatureSelectMode = "select" | "directSelect";
 
 export interface LeafletFeaturesEditorProps {
   enabled?: boolean;
@@ -2480,12 +2692,12 @@ watch(
       activeHandler.value = null;
     }
 
-    if (newMode === "select" || newMode === "directSelect") {
+    if (newMode === "select" || newMode === "direct-select") {
       emit("edit-mode-changed", newMode);
       return;
     }
 
-    if (oldMode === "select" || oldMode === "directSelect") {
+    if (oldMode === "select" || oldMode === "direct-select") {
       emit("edit-mode-changed", null);
     }
 
@@ -2573,6 +2785,8 @@ import LeafletBoundingBox from "./LeafletBoundingBox.vue";
 import type { FeatureShapeType } from "./LeafletFeaturesEditor.vue";
 import { LeafletSelectionKey } from ".";
 
+export type FeatureSelectMode = "select" | "direct-select";
+
 export interface SelectedFeature {
   type: FeatureShapeType;
   id: string | number;
@@ -2603,7 +2817,7 @@ export interface LeafletSelectionContext {
 
 export interface LeafletFeaturesSelectorProps {
   enabled?: boolean;
-  mode?: "select" | "directSelect" | null;
+  mode?: "select" | "direct-select" | null;
 }
 
 const props = withDefaults(defineProps<LeafletFeaturesSelectorProps>(), {
@@ -5047,6 +5261,67 @@ export const useLeaflet = async () => {
 
 ---
 
+## LeafletControlItem
+::hr-underline
+::
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `name`{.primary .text-primary} | `string` | - |  |
+| `title`{.primary .text-primary} | `string` | A control button |  |
+| `type`{.primary .text-primary} | `'push' \| 'toggle'` | toggle |  |
+
+  ### Slots
+| Name | Description |
+|------|-------------|
+| `default`{.primary .text-primary} | — |
+
+  ### Inject
+| Key | Default | Type | Description |
+|-----|--------|------|-------------|
+| `LeafletControlsKey`{.primary .text-primary} | — | — | — |
+
+---
+
+## LeafletControls
+::hr-underline
+::
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `position`{.primary .text-primary} | `ControlOptions['position']` | topleft |  |
+| `class`{.primary .text-primary} | `HTMLAttributes['class']` | rounded-[4px] shadow-(--leaflet-control-bar-shadow) bg-white |  |
+| `style`{.primary .text-primary} | `HTMLAttributes['style']` | — |  |
+
+  ### Slots
+| Name | Description |
+|------|-------------|
+| `default`{.primary .text-primary} | — |
+
+  ### Provide
+| Key | Value | Type | Description |
+|-----|-------|------|-------------|
+| `LeafletControlsKey`{.primary .text-primary} | `context` | `any` | — |
+
+  ### Inject
+| Key | Default | Type | Description |
+|-----|--------|------|-------------|
+| `LeafletModuleKey`{.primary .text-primary} | `ref()` | `any` | — |
+| `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
+
+  ### CSS Variables
+| Name | Value | Description |
+|------|-------|-------------|
+| `--leaflet-control-bar-shadow`{.primary .text-primary} | `0 1px 5px rgba(0, 0, 0, 0.65)` | — |
+
+---
+
 ## LeafletDrawControl
 ::hr-underline
 ::
@@ -5148,7 +5423,7 @@ export const useLeaflet = async () => {
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `enabled`{.primary .text-primary} | `boolean` | false |  |
-| `mode`{.primary .text-primary} | `'select' \| 'directSelect' \| null` |  |  |
+| `mode`{.primary .text-primary} | `'select' \| 'direct-select' \| null` |  |  |
 
   ### Slots
 | Name | Description |
@@ -5355,6 +5630,8 @@ import {
   LeafletTileLayer,
   LeafletZoomControl,
   LeafletDrawControl,
+  LeafletControls,
+  LeafletControlItem,
   LeafletFeaturesEditor,
   LeafletFeaturesSelector,
   LeafletFeatureHandle,
@@ -5369,6 +5646,8 @@ import {
   type FeatureShapeType,
   type FeatureSelectMode,
 } from "@/components/ui/leaflet-map";
+import { MapPin } from "lucide-vue-next";
+import { Icon } from "@iconify/vue";
 
 const mapRef = ref<LeafletMapExposed | null>(null);
 
@@ -5378,7 +5657,7 @@ const currentMode = ref<FeatureShapeType | FeatureSelectMode | null>("select");
 
 const selectionMode = computed<FeatureSelectMode | null>(() => {
   if (currentMode.value === "select") return "select";
-  if (currentMode.value === "directSelect") return "directSelect";
+  if (currentMode.value === "direct-select") return "direct-select";
   return null;
 });
 
@@ -5533,10 +5812,6 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
 
   currentMode.value = "select";
 };
-
-const onPolygonClosed = (id: number) => {
-  console.log("Polygon closed:", id);
-};
 </script>
 
 <template>
@@ -5589,6 +5864,18 @@ const onPolygonClosed = (id: number) => {
           @mode-selected="handleModeSelected"
         />
 
+        <LeafletControls position="topleft">
+          <LeafletControlItem name="pin">
+            <Icon icon="gis:arrow" class="w-4 h-4 text-yellow-500" />
+          </LeafletControlItem>
+          <LeafletControlItem name="pin">
+            <Icon icon="gis:arrow-o" class="w-4 h-4 text-yellow-500" />
+          </LeafletControlItem>
+          <LeafletControlItem name="marker">
+            <Icon icon="gis:poi" class="w-4 h-4 text-yellow-500" />
+          </LeafletControlItem>
+        </LeafletControls>
+
         <LeafletFeaturesEditor
           :enabled="editMode"
           :mode="currentMode"
@@ -5606,7 +5893,7 @@ const onPolygonClosed = (id: number) => {
               v-model:lat="marker.lat"
               v-model:lng="marker.lng"
               :selectable="currentMode === 'select'"
-              :editable="currentMode === 'directSelect'"
+              :editable="currentMode === 'direct-select'"
               :draggable="currentMode === 'select'"
             />
 
@@ -5619,7 +5906,7 @@ const onPolygonClosed = (id: number) => {
               v-model:radius="circle.radius"
               :class="circle.class"
               :selectable="currentMode === 'select'"
-              :editable="currentMode === 'directSelect'"
+              :editable="currentMode === 'direct-select'"
               :draggable="currentMode === 'select'"
             />
 
@@ -5631,7 +5918,7 @@ const onPolygonClosed = (id: number) => {
               :weight="polyline.weight"
               :class="polyline.class"
               :selectable="currentMode === 'select'"
-              :editable="currentMode === 'directSelect'"
+              :editable="currentMode === 'direct-select'"
               :draggable="currentMode === 'select'"
             />
 
@@ -5642,10 +5929,9 @@ const onPolygonClosed = (id: number) => {
               v-model:latlngs="polygon.latlngs"
               :class="polygon.class"
               :selectable="currentMode === 'select'"
-              :editable="currentMode === 'directSelect'"
+              :editable="currentMode === 'direct-select'"
               :draggable="currentMode === 'select'"
               :auto-close="true"
-              @closed="() => onPolygonClosed(polygon.id)"
             />
 
             <LeafletRectangle
@@ -5655,7 +5941,7 @@ const onPolygonClosed = (id: number) => {
               v-model:bounds="rectangle.bounds"
               :class="rectangle.class"
               :selectable="currentMode === 'select'"
-              :editable="currentMode === 'directSelect'"
+              :editable="currentMode === 'direct-select'"
               :draggable="currentMode === 'select'"
             />
 
@@ -5768,7 +6054,7 @@ const rectangles = ref([
 ]);
 
 const editMode = ref(true);
-const selectMode = ref<"select" | "directSelect" | null>("select");
+const selectMode = ref<"select" | "direct-select" | null>("select");
 </script>
 
 <template>
@@ -5822,7 +6108,7 @@ const selectMode = ref<"select" | "directSelect" | null>("select");
             v-model:lng="circle.lng"
             v-model:radius="circle.radius"
             :selectable="selectMode === 'select'"
-            :editable="selectMode === 'directSelect'"
+            :editable="selectMode === 'direct-select'"
             :draggable="selectMode === 'select' && editMode"
             class="bg-red-500/30 border border-red-500"
           />
@@ -5833,7 +6119,7 @@ const selectMode = ref<"select" | "directSelect" | null>("select");
             :id="polyline.id"
             v-model:latlngs="polyline.latlngs"
             :selectable="selectMode === 'select'"
-            :editable="selectMode === 'directSelect'"
+            :editable="selectMode === 'direct-select'"
             :draggable="selectMode === 'select' && editMode"
             :weight="4"
             class="border border-blue-500"
@@ -5845,7 +6131,7 @@ const selectMode = ref<"select" | "directSelect" | null>("select");
             :id="polygon.id"
             v-model:latlngs="polygon.latlngs"
             :selectable="selectMode === 'select'"
-            :editable="selectMode === 'directSelect'"
+            :editable="selectMode === 'direct-select'"
             :draggable="selectMode === 'select' && editMode"
             class="bg-green-500/30 border border-green-500/50"
           />
@@ -5856,7 +6142,7 @@ const selectMode = ref<"select" | "directSelect" | null>("select");
             :id="rectangle.id"
             v-model:bounds="rectangle.bounds"
             :selectable="selectMode === 'select'"
-            :editable="selectMode === 'directSelect'"
+            :editable="selectMode === 'direct-select'"
             :draggable="selectMode === 'select' && editMode"
             class="bg-purple-500/50 border border-purple-600"
           />

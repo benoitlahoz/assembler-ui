@@ -4,6 +4,8 @@ import LeafletBoundingBox from './LeafletBoundingBox.vue';
 import type { FeatureShapeType } from './LeafletFeaturesEditor.vue';
 import { LeafletSelectionKey } from '.';
 
+export type FeatureSelectMode = 'select' | 'direct-select';
+
 export interface SelectedFeature {
   type: FeatureShapeType;
   id: string | number;
@@ -30,7 +32,7 @@ export interface LeafletSelectionContext {
 
 export interface LeafletFeaturesSelectorProps {
   enabled?: boolean;
-  mode?: 'select' | 'directSelect' | null;
+  mode?: 'select' | 'direct-select' | null;
 }
 
 const props = withDefaults(defineProps<LeafletFeaturesSelectorProps>(), {

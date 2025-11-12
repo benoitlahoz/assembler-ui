@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, inject, watch, onBeforeUnmount, nextTick } from 'vue';
 import type { ControlOptions } from 'leaflet';
-import { LeafletMapKey, LeafletModuleKey } from '.';
+import { LeafletMapKey, LeafletModuleKey, type FeatureSelectMode, type FeatureShapeType } from '.';
 
 export interface DrawButton {
   enabled?: boolean;
@@ -38,7 +38,7 @@ const emit = defineEmits<{
       | 'polygon'
       | 'rectangle'
       | 'select'
-      | 'directSelect'
+      | 'direct-select'
       | null
   ): void;
 }>();
@@ -50,15 +50,16 @@ const control = ref<any>(null);
 
 const shouldEnableButton = (type: string): boolean => {
   if (!props.modes) return false;
-  const config = props.modes[type as keyof typeof props.modes];
+  const config =
+    type === 'direct-select'
+      ? props.modes['directSelect']
+      : props.modes[type as keyof typeof props.modes];
   if (config === undefined) return false;
   if (typeof config === 'boolean') return config;
   return config.enabled !== false;
 };
 
-const getIconSvg = (
-  type: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'select' | 'directSelect'
-): string => {
+const getIconSvg = (type: FeatureShapeType | FeatureSelectMode): string => {
   const color = '#333';
   const svgs: Record<string, string> = {
     marker: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}"/></svg>`,
@@ -67,14 +68,14 @@ const getIconSvg = (
     polygon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3 L21 8 L18 17 L6 17 L3 8 Z" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="12" cy="3" r="2.5" fill="${color}"/><circle cx="21" cy="8" r="2.5" fill="${color}"/><circle cx="18" cy="17" r="2.5" fill="${color}"/><circle cx="6" cy="17" r="2.5" fill="${color}"/><circle cx="3" cy="8" r="2.5" fill="${color}"/></svg>`,
     rectangle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="6" width="16" height="12" stroke="${color}" stroke-width="2.5" rx="1" fill="none"/></svg>`,
     select: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 4 L5 17 L10 12.5 L13 18 L15 17 L12 11.5 L18 11.5 Z" fill="${color}" stroke="${color}" stroke-width="1" stroke-linejoin="round"/></svg>`,
-    directSelect: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 4 L5 17 L10 12.5 L13 18 L15 17 L12 11.5 L18 11.5 Z" fill="white" stroke="${color}" stroke-width="2" stroke-linejoin="round"/></svg>`,
+    'direct-select': `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 4 L5 17 L10 12.5 L13 18 L15 17 L12 11.5 L18 11.5 Z" fill="white" stroke="${color}" stroke-width="2" stroke-linejoin="round"/></svg>`,
   };
   return svgs[type] || '';
 };
 
 const createButton = (
   container: HTMLElement,
-  type: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'select' | 'directSelect',
+  type: FeatureShapeType | FeatureSelectMode,
   title: string
 ) => {
   const button = L.value!.DomUtil.create('div', 'leaflet-draw-button', container);
@@ -93,9 +94,7 @@ const createButton = (
   return button;
 };
 
-const toggleDrawMode = (
-  type: 'marker' | 'circle' | 'polyline' | 'polygon' | 'rectangle' | 'select' | 'directSelect'
-) => {
+const toggleDrawMode = (type: FeatureShapeType | FeatureSelectMode) => {
   if (props.activeMode === type) {
     emit('mode-selected', null);
   } else {
@@ -140,8 +139,8 @@ const createDrawControl = () => {
         if (shouldEnableButton('select')) {
           createButton(container, 'select', 'Selection Tool (V)');
         }
-        if (shouldEnableButton('directSelect')) {
-          createButton(container, 'directSelect', 'Direct Selection Tool (A)');
+        if (shouldEnableButton('direct-select')) {
+          createButton(container, 'direct-select', 'Direct Selection Tool (A)');
         }
         if (shouldEnableButton('marker')) {
           createButton(container, 'marker', 'Draw a marker');

@@ -65,7 +65,7 @@ const rectangles = ref([
 ]);
 
 const editMode = ref(true);
-const selectMode = ref<'select' | 'directSelect' | null>('select');
+const selectMode = ref<'select' | 'direct-select' | null>('select');
 </script>
 
 <template>
@@ -118,7 +118,7 @@ const selectMode = ref<'select' | 'directSelect' | null>('select');
             v-model:lng="circle.lng"
             v-model:radius="circle.radius"
             :selectable="selectMode === 'select'"
-            :editable="selectMode === 'directSelect'"
+            :editable="selectMode === 'direct-select'"
             :draggable="selectMode === 'select' && editMode"
             class="bg-red-500/30 border border-red-500"
           />
@@ -130,7 +130,7 @@ const selectMode = ref<'select' | 'directSelect' | null>('select');
             :id="polyline.id"
             v-model:latlngs="polyline.latlngs"
             :selectable="selectMode === 'select'"
-            :editable="selectMode === 'directSelect'"
+            :editable="selectMode === 'direct-select'"
             :draggable="selectMode === 'select' && editMode"
             :weight="4"
             class="border border-blue-500"
@@ -143,7 +143,7 @@ const selectMode = ref<'select' | 'directSelect' | null>('select');
             :id="polygon.id"
             v-model:latlngs="polygon.latlngs"
             :selectable="selectMode === 'select'"
-            :editable="selectMode === 'directSelect'"
+            :editable="selectMode === 'direct-select'"
             :draggable="selectMode === 'select' && editMode"
             class="bg-green-500/30 border border-green-500/50"
           />
@@ -155,7 +155,7 @@ const selectMode = ref<'select' | 'directSelect' | null>('select');
             :id="rectangle.id"
             v-model:bounds="rectangle.bounds"
             :selectable="selectMode === 'select'"
-            :editable="selectMode === 'directSelect'"
+            :editable="selectMode === 'direct-select'"
             :draggable="selectMode === 'select' && editMode"
             class="bg-purple-500/50 border border-purple-600"
           />
