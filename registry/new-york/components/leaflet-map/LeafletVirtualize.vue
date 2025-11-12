@@ -184,13 +184,13 @@ const updateVisibleFeaturesQuadtree = () => {
   // Check zoom level constraints
   if (map.value) {
     const currentZoom = map.value.getZoom();
-    
+
     if (props.minZoom !== undefined && currentZoom < props.minZoom) {
       visibleFeatureIds.value.clear();
       emit('update:visible-count', 0);
       return;
     }
-    
+
     if (props.maxZoom !== undefined && currentZoom > props.maxZoom) {
       visibleFeatureIds.value.clear();
       emit('update:visible-count', 0);

@@ -254,127 +254,130 @@ updateFPS();
             <span class="text-sm w-16">{{ virtualizationMargin }} m</span>
           </div>
 
-        <!-- Zoom Levels Controls (collapsible) -->
-        <details class="border rounded p-3">
-          <summary class="cursor-pointer text-sm font-semibold mb-2">🔍 Zoom Levels per Feature Type</summary>
-          
-          <div class="mt-3 space-y-2">
-            <div class="flex items-center gap-3 text-xs">
-              <span class="w-20 font-medium">Markers:</span>
-              <input
-                v-model.number="markersMinZoom"
-                type="number"
-                min="0"
-                max="20"
-                placeholder="min"
-                class="w-16 px-2 py-1 border rounded"
-              />
-              <span class="text-gray-400">→</span>
-              <input
-                v-model.number="markersMaxZoom"
-                type="number"
-                min="0"
-                max="20"
-                placeholder="max"
-                class="w-16 px-2 py-1 border rounded"
-              />
-              <span class="text-gray-500">(zoom ≥12)</span>
+          <!-- Zoom Levels Controls (collapsible) -->
+          <details class="border rounded p-3">
+            <summary class="cursor-pointer text-sm font-semibold mb-2">
+              🔍 Zoom Levels per Feature Type
+            </summary>
+
+            <div class="mt-3 space-y-2">
+              <div class="flex items-center gap-3 text-xs">
+                <span class="w-20 font-medium">Markers:</span>
+                <input
+                  v-model.number="markersMinZoom"
+                  type="number"
+                  min="0"
+                  max="20"
+                  placeholder="min"
+                  class="w-16 px-2 py-1 border rounded"
+                />
+                <span class="text-gray-400">→</span>
+                <input
+                  v-model.number="markersMaxZoom"
+                  type="number"
+                  min="0"
+                  max="20"
+                  placeholder="max"
+                  class="w-16 px-2 py-1 border rounded"
+                />
+                <span class="text-gray-500">(zoom ≥12)</span>
+              </div>
+
+              <div class="flex items-center gap-3 text-xs">
+                <span class="w-20 font-medium">Circles:</span>
+                <input
+                  v-model.number="circlesMinZoom"
+                  type="number"
+                  min="0"
+                  max="20"
+                  placeholder="min"
+                  class="w-16 px-2 py-1 border rounded"
+                />
+                <span class="text-gray-400">→</span>
+                <input
+                  v-model.number="circlesMaxZoom"
+                  type="number"
+                  min="0"
+                  max="20"
+                  placeholder="max"
+                  class="w-16 px-2 py-1 border rounded"
+                />
+                <span class="text-gray-500">(always)</span>
+              </div>
+
+              <div class="flex items-center gap-3 text-xs">
+                <span class="w-20 font-medium">Polygons:</span>
+                <input
+                  v-model.number="polygonsMinZoom"
+                  type="number"
+                  min="0"
+                  max="20"
+                  placeholder="min"
+                  class="w-16 px-2 py-1 border rounded"
+                />
+                <span class="text-gray-400">→</span>
+                <input
+                  v-model.number="polygonsMaxZoom"
+                  type="number"
+                  min="0"
+                  max="20"
+                  placeholder="max"
+                  class="w-16 px-2 py-1 border rounded"
+                />
+                <span class="text-gray-500">(zoom ≤14)</span>
+              </div>
+
+              <div class="flex items-center gap-3 text-xs">
+                <span class="w-20 font-medium">Polylines:</span>
+                <input
+                  v-model.number="polylinesMinZoom"
+                  type="number"
+                  min="0"
+                  max="20"
+                  placeholder="min"
+                  class="w-16 px-2 py-1 border rounded"
+                />
+                <span class="text-gray-400">→</span>
+                <input
+                  v-model.number="polylinesMaxZoom"
+                  type="number"
+                  min="0"
+                  max="20"
+                  placeholder="max"
+                  class="w-16 px-2 py-1 border rounded"
+                />
+                <span class="text-gray-500">(always)</span>
+              </div>
+
+              <div class="flex items-center gap-3 text-xs">
+                <span class="w-20 font-medium">Rectangles:</span>
+                <input
+                  v-model.number="rectanglesMinZoom"
+                  type="number"
+                  min="0"
+                  max="20"
+                  placeholder="min"
+                  class="w-16 px-2 py-1 border rounded"
+                />
+                <span class="text-gray-400">→</span>
+                <input
+                  v-model.number="rectanglesMaxZoom"
+                  type="number"
+                  min="0"
+                  max="20"
+                  placeholder="max"
+                  class="w-16 px-2 py-1 border rounded"
+                />
+                <span class="text-gray-500">(always)</span>
+              </div>
+
+              <div class="text-xs text-gray-500 mt-2 pt-2 border-t">
+                💡 Leave empty for no limit. Example: Markers appear at zoom 12+, Polygons disappear
+                after zoom 14.
+              </div>
             </div>
-            
-            <div class="flex items-center gap-3 text-xs">
-              <span class="w-20 font-medium">Circles:</span>
-              <input
-                v-model.number="circlesMinZoom"
-                type="number"
-                min="0"
-                max="20"
-                placeholder="min"
-                class="w-16 px-2 py-1 border rounded"
-              />
-              <span class="text-gray-400">→</span>
-              <input
-                v-model.number="circlesMaxZoom"
-                type="number"
-                min="0"
-                max="20"
-                placeholder="max"
-                class="w-16 px-2 py-1 border rounded"
-              />
-              <span class="text-gray-500">(always)</span>
-            </div>
-            
-            <div class="flex items-center gap-3 text-xs">
-              <span class="w-20 font-medium">Polygons:</span>
-              <input
-                v-model.number="polygonsMinZoom"
-                type="number"
-                min="0"
-                max="20"
-                placeholder="min"
-                class="w-16 px-2 py-1 border rounded"
-              />
-              <span class="text-gray-400">→</span>
-              <input
-                v-model.number="polygonsMaxZoom"
-                type="number"
-                min="0"
-                max="20"
-                placeholder="max"
-                class="w-16 px-2 py-1 border rounded"
-              />
-              <span class="text-gray-500">(zoom ≤14)</span>
-            </div>
-            
-            <div class="flex items-center gap-3 text-xs">
-              <span class="w-20 font-medium">Polylines:</span>
-              <input
-                v-model.number="polylinesMinZoom"
-                type="number"
-                min="0"
-                max="20"
-                placeholder="min"
-                class="w-16 px-2 py-1 border rounded"
-              />
-              <span class="text-gray-400">→</span>
-              <input
-                v-model.number="polylinesMaxZoom"
-                type="number"
-                min="0"
-                max="20"
-                placeholder="max"
-                class="w-16 px-2 py-1 border rounded"
-              />
-              <span class="text-gray-500">(always)</span>
-            </div>
-            
-            <div class="flex items-center gap-3 text-xs">
-              <span class="w-20 font-medium">Rectangles:</span>
-              <input
-                v-model.number="rectanglesMinZoom"
-                type="number"
-                min="0"
-                max="20"
-                placeholder="min"
-                class="w-16 px-2 py-1 border rounded"
-              />
-              <span class="text-gray-400">→</span>
-              <input
-                v-model.number="rectanglesMaxZoom"
-                type="number"
-                min="0"
-                max="20"
-                placeholder="max"
-                class="w-16 px-2 py-1 border rounded"
-              />
-              <span class="text-gray-500">(always)</span>
-            </div>
-            
-            <div class="text-xs text-gray-500 mt-2 pt-2 border-t">
-              💡 Leave empty for no limit. Example: Markers appear at zoom 12+, Polygons disappear after zoom 14.
-            </div>
-          </div>
-        </details>
-      </div>
+          </details>
+        </div>
       </div>
 
       <!-- Map -->
