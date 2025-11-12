@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount, onMounted } from 'vue';
-import { LeafletMapKey, LeafletModuleKey } from '.';
+import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from '.';
+import type { FeatureReference } from './LeafletSelectionManager.vue';
 
 export interface LeafletMarkerProps {
+  id?: string | number;
   lat?: number | string;
   lng?: number | string;
   editable?: boolean;
   draggable?: boolean;
+  selectable?: boolean;
 }
 
 const props = withDefaults(defineProps<LeafletMarkerProps>(), {
@@ -14,6 +17,7 @@ const props = withDefaults(defineProps<LeafletMarkerProps>(), {
   lng: 5.350242,
   editable: false,
   draggable: false,
+  selectable: false,
 });
 
 const emit = defineEmits<{
@@ -25,8 +29,10 @@ const emit = defineEmits<{
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
+const selectionContext = inject(LeafletSelectionKey, undefined);
 
 const marker = ref<L.Marker | null>(null);
+const markerId = ref<string | number>(props.id ?? `marker-${Date.now()}-${Math.random()}`);
 
 let Icon: any;
 const iconOptions = {
@@ -37,6 +43,34 @@ const iconOptions = {
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
+};
+
+// Selection context integration
+const registerWithSelection = () => {
+  if (!props.selectable || !selectionContext || !marker.value) return;
+
+  const featureRef: FeatureReference = {
+    id: markerId.value,
+    type: 'marker',
+    getBounds: () => {
+      if (!marker.value || !L.value) return null;
+      const latlng = marker.value.getLatLng();
+      const offset = 0.0001; // Small offset for marker bounds
+      return L.value.latLngBounds(
+        [latlng.lat - offset, latlng.lng - offset],
+        [latlng.lat + offset, latlng.lng + offset]
+      );
+    },
+    applyTransform: (bounds: L.LatLngBounds) => {
+      if (!marker.value) return;
+      const center = bounds.getCenter();
+      marker.value.setLatLng(center);
+      emit('update:lat', center.lat);
+      emit('update:lng', center.lng);
+    },
+  };
+
+  selectionContext.registerFeature(featureRef);
 };
 
 const setupMarker = () => {
@@ -59,7 +93,27 @@ const setupMarker = () => {
       marker.value.on('dragend', onDragEnd);
     }
 
+    // Handle selection
+    if (props.selectable && selectionContext) {
+      marker.value.on('click', () => {
+        selectionContext.selectFeature('marker', markerId.value);
+        emit('click');
+      });
+
+      marker.value.on('dragstart', () => {
+        selectionContext.selectFeature('marker', markerId.value);
+        emit('dragstart');
+      });
+    } else {
+      marker.value.on('click', () => emit('click'));
+    }
+
     marker.value.addTo(map.value);
+
+    // Register with selection context if selectable
+    if (props.selectable && selectionContext) {
+      registerWithSelection();
+    }
   }
 };
 
@@ -132,6 +186,11 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  // Unregister from selection context
+  if (props.selectable && selectionContext) {
+    selectionContext.unregisterFeature(markerId.value);
+  }
+
   if (marker.value) {
     marker.value.remove();
   }

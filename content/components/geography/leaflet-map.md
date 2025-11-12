@@ -124,6 +124,7 @@ import type { InjectionKey, Ref } from "vue";
 import type * as L from "leaflet";
 import type { Map, TileLayerOptions } from "leaflet";
 import type { LeafletBoundingBoxStyles } from "./LeafletBoundingBox.vue";
+import type { LeafletSelectionContext } from "./LeafletSelectionManager.vue";
 type L = typeof L;
 
 export { default as LeafletMap } from "./LeafletMap.vue";
@@ -140,6 +141,14 @@ export { default as LeafletPolyline } from "./LeafletPolyline.vue";
 export { default as LeafletPolygon } from "./LeafletPolygon.vue";
 export { default as LeafletRectangle } from "./LeafletRectangle.vue";
 
+export {
+  default as LeafletSelectionManager,
+  type LeafletSelectionContext,
+  type SelectedFeature,
+  type FeatureReference,
+  type LeafletSelectionManagerProps,
+} from "./LeafletSelectionManager.vue";
+
 export const LeafletModuleKey: InjectionKey<Ref<L | undefined>> =
   Symbol("LeafletModule");
 export const LeafletMapKey: InjectionKey<Ref<Map | null>> =
@@ -152,6 +161,8 @@ export const LeafletErrorsKey: InjectionKey<Ref<Error[]>> =
 export const LeafletBoundingBoxStylesKey: InjectionKey<
   Ref<LeafletBoundingBoxStyles | undefined>
 > = Symbol("LeafletBoundingBoxHandles");
+export const LeafletSelectionKey: InjectionKey<LeafletSelectionContext> =
+  Symbol("LeafletSelection");
 
 export type { LeafletMapProps } from "./LeafletMap.vue";
 export type { LeafletMapExposed } from "./LeafletMap.vue";
@@ -1044,7 +1055,6 @@ watch(
   () => [stylesOptions.value, props.class, props.dashed],
   () => {
     const options = tailwindToBoxOptions(props.class || "", props.dashed);
-    console.warn("Options updated:", options);
     if (stylesOptions.value) {
       stylesOptions.value.box = options;
     }
@@ -1055,7 +1065,7 @@ watch(
 
 <template>
   <div
-    data-slot="leaflet-bounding-box-corner-handle"
+    data-slot="leaflet-bounding-box-rectangle"
     :class="cn('hidden -z-50', props.class)"
   ></div>
 </template>
@@ -1074,15 +1084,18 @@ import {
   onMounted,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { LeafletMapKey, LeafletModuleKey } from ".";
+import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
+import type { FeatureReference } from "./LeafletSelectionManager.vue";
 import "./leaflet-editing.css";
 
 export interface LeafletCircleProps {
+  id?: string | number;
   lat?: number | string;
   lng?: number | string;
   radius?: number | string;
   editable?: boolean;
   draggable?: boolean;
+  selectable?: boolean;
   class?: HTMLAttributes["class"];
 }
 
@@ -1092,6 +1105,7 @@ const props = withDefaults(defineProps<LeafletCircleProps>(), {
   radius: 100,
   editable: false,
   draggable: false,
+  selectable: false,
 });
 
 const emit = defineEmits<{
@@ -1106,9 +1120,14 @@ const { getLeafletShapeColors } = useCssParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
+const selectionContext = inject(LeafletSelectionKey, undefined);
+
 const circle = ref<L.Circle | null>(null);
 const centerMarker = ref<L.Marker | null>(null);
 const radiusMarker = ref<L.Marker | null>(null);
+const circleId = ref<string | number>(
+  props.id ?? `circle-${Date.now()}-${Math.random()}`,
+);
 
 const isDragging = ref(false);
 let dragStartLatLng: any = null;
@@ -1235,6 +1254,35 @@ const enableEditing = () => {
   }
 };
 
+const registerWithSelection = () => {
+  if (!props.selectable || !selectionContext || !circle.value) return;
+
+  const featureRef: FeatureReference = {
+    id: circleId.value,
+    type: "circle",
+    getBounds: () => {
+      if (!circle.value) return null;
+      return circle.value.getBounds();
+    },
+    applyTransform: (bounds: L.LatLngBounds) => {
+      if (!circle.value) return;
+      const center = bounds.getCenter();
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
+      const radius = center.distanceTo(sw);
+
+      circle.value.setLatLng(center);
+      circle.value.setRadius(radius);
+
+      emit("update:lat", center.lat);
+      emit("update:lng", center.lng);
+      emit("update:radius", radius);
+    },
+  };
+
+  selectionContext.registerFeature(featureRef);
+};
+
 watch(
   () => [
     map.value,
@@ -1285,11 +1333,27 @@ watch(
           );
           circle.value.addTo(map.value);
 
-          circle.value.on("click", () => {
-            emit("click");
-          });
+          if (props.selectable && selectionContext) {
+            circle.value.on("click", () => {
+              selectionContext.selectFeature("circle", circleId.value);
+              emit("click");
+            });
+            circle.value.on("mousedown", (e: any) => {
+              if (props.draggable) {
+                selectionContext.selectFeature("circle", circleId.value);
+              }
+            });
+          } else {
+            circle.value.on("click", () => {
+              emit("click");
+            });
+          }
 
           setupMapDragHandlers();
+
+          if (props.selectable && selectionContext) {
+            registerWithSelection();
+          }
         }
 
         const colors = getLeafletShapeColors(props.class);
@@ -1324,6 +1388,10 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  if (props.selectable && selectionContext) {
+    selectionContext.unregisterFeature(circleId.value);
+  }
+
   clearEditMarkers();
   if (circle.value) {
     circle.value.remove();
@@ -2384,13 +2452,16 @@ import {
   onBeforeUnmount,
   onMounted,
 } from "vue";
-import { LeafletMapKey, LeafletModuleKey } from ".";
+import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
+import type { FeatureReference } from "./LeafletSelectionManager.vue";
 
 export interface LeafletMarkerProps {
+  id?: string | number;
   lat?: number | string;
   lng?: number | string;
   editable?: boolean;
   draggable?: boolean;
+  selectable?: boolean;
 }
 
 const props = withDefaults(defineProps<LeafletMarkerProps>(), {
@@ -2398,6 +2469,7 @@ const props = withDefaults(defineProps<LeafletMarkerProps>(), {
   lng: 5.350242,
   editable: false,
   draggable: false,
+  selectable: false,
 });
 
 const emit = defineEmits<{
@@ -2409,8 +2481,12 @@ const emit = defineEmits<{
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
+const selectionContext = inject(LeafletSelectionKey, undefined);
 
 const marker = ref<L.Marker | null>(null);
+const markerId = ref<string | number>(
+  props.id ?? `marker-${Date.now()}-${Math.random()}`,
+);
 
 let Icon: any;
 const iconOptions = {
@@ -2422,6 +2498,33 @@ const iconOptions = {
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
+};
+
+const registerWithSelection = () => {
+  if (!props.selectable || !selectionContext || !marker.value) return;
+
+  const featureRef: FeatureReference = {
+    id: markerId.value,
+    type: "marker",
+    getBounds: () => {
+      if (!marker.value || !L.value) return null;
+      const latlng = marker.value.getLatLng();
+      const offset = 0.0001;
+      return L.value.latLngBounds(
+        [latlng.lat - offset, latlng.lng - offset],
+        [latlng.lat + offset, latlng.lng + offset],
+      );
+    },
+    applyTransform: (bounds: L.LatLngBounds) => {
+      if (!marker.value) return;
+      const center = bounds.getCenter();
+      marker.value.setLatLng(center);
+      emit("update:lat", center.lat);
+      emit("update:lng", center.lng);
+    },
+  };
+
+  selectionContext.registerFeature(featureRef);
 };
 
 const setupMarker = () => {
@@ -2444,7 +2547,25 @@ const setupMarker = () => {
       marker.value.on("dragend", onDragEnd);
     }
 
+    if (props.selectable && selectionContext) {
+      marker.value.on("click", () => {
+        selectionContext.selectFeature("marker", markerId.value);
+        emit("click");
+      });
+
+      marker.value.on("dragstart", () => {
+        selectionContext.selectFeature("marker", markerId.value);
+        emit("dragstart");
+      });
+    } else {
+      marker.value.on("click", () => emit("click"));
+    }
+
     marker.value.addTo(map.value);
+
+    if (props.selectable && selectionContext) {
+      registerWithSelection();
+    }
   }
 };
 
@@ -2515,6 +2636,10 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  if (props.selectable && selectionContext) {
+    selectionContext.unregisterFeature(markerId.value);
+  }
+
   if (marker.value) {
     marker.value.remove();
   }
@@ -2536,13 +2661,16 @@ import {
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { LeafletMapKey, LeafletModuleKey } from ".";
+import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
+import type { FeatureReference } from "./LeafletSelectionManager.vue";
 import "./leaflet-editing.css";
 
 export interface LeafletPolygonProps {
+  id?: string | number;
   latlngs?: Array<[number, number]> | Array<{ lat: number; lng: number }>;
   editable?: boolean;
   draggable?: boolean;
+  selectable?: boolean;
   interactive?: boolean;
   autoClose?: boolean;
   class?: HTMLAttributes["class"];
@@ -2552,6 +2680,7 @@ const props = withDefaults(defineProps<LeafletPolygonProps>(), {
   latlngs: () => [],
   editable: false,
   draggable: false,
+  selectable: false,
   interactive: true,
   autoClose: true,
 });
@@ -2567,11 +2696,16 @@ const { getLeafletShapeColors } = useCssParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
+const selectionContext = inject(LeafletSelectionKey, undefined);
+
 const polygon = ref<L.Polygon | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
 const midpointMarkers = ref<L.Marker[]>([]);
 const firstPointMarker = ref<L.Marker | null>(null);
 const isDragging = ref(false);
+const polygonId = ref<string | number>(
+  props.id ?? `polygon-${Date.now()}-${Math.random()}`,
+);
 
 let dragStartLatLngs: L.LatLng[] = [];
 let dragStartMousePoint: L.Point | null = null;
@@ -2816,6 +2950,93 @@ const setupMapDragHandlers = () => {
   }
 };
 
+const registerWithSelection = () => {
+  if (!props.selectable || !selectionContext || !polygon.value) return;
+
+  const featureRef: FeatureReference = {
+    id: polygonId.value,
+    type: "polygon",
+    getBounds: () => {
+      if (!polygon.value) return null;
+      return polygon.value.getBounds();
+    },
+    getInitialData: () => {
+      if (!polygon.value) return null;
+      const latlngs = polygon.value.getLatLngs()[0] as L.LatLng[];
+      return latlngs.map((ll) => [ll.lat, ll.lng] as [number, number]);
+    },
+    applyTransform: (bounds: L.LatLngBounds) => {
+      if (!polygon.value || !L.value) return;
+
+      const currentBounds = polygon.value.getBounds();
+      const currentCenter = currentBounds.getCenter();
+      const newCenter = bounds.getCenter();
+
+      const currentLatLngs = polygon.value.getLatLngs()[0] as L.LatLng[];
+      const scaleX =
+        (bounds.getEast() - bounds.getWest()) /
+        (currentBounds.getEast() - currentBounds.getWest());
+      const scaleY =
+        (bounds.getNorth() - bounds.getSouth()) /
+        (currentBounds.getNorth() - currentBounds.getSouth());
+
+      const newLatLngs = currentLatLngs.map((latlng) => {
+        const relativeX = (latlng.lng - currentCenter.lng) * scaleX;
+        const relativeY = (latlng.lat - currentCenter.lat) * scaleY;
+        return L.value!.latLng(
+          newCenter.lat + relativeY,
+          newCenter.lng + relativeX,
+        );
+      });
+
+      polygon.value.setLatLngs([newLatLngs]);
+      emit(
+        "update:latlngs",
+        newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
+      );
+    },
+    applyRotation: (
+      angle: number,
+      center: { lat: number; lng: number },
+      initialLatLngs: Array<[number, number]>,
+    ) => {
+      if (!polygon.value || !L.value || !initialLatLngs) return;
+
+      const angleRad = (-angle * Math.PI) / 180;
+
+      const metersPerDegreeLat = 111320;
+      const metersPerDegreeLng =
+        111320 * Math.cos((center.lat * Math.PI) / 180);
+
+      const newLatLngs = initialLatLngs.map((latlng) => {
+        const lat = latlng[0];
+        const lng = latlng[1];
+
+        const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+        const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+
+        const newRelMetersY =
+          relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+        const newRelMetersX =
+          relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+
+        return L.value!.latLng(
+          center.lat + newRelMetersY / metersPerDegreeLat,
+          center.lng + newRelMetersX / metersPerDegreeLng,
+        );
+      });
+
+      polygon.value.setLatLngs([newLatLngs]);
+      emit(
+        "update:latlngs",
+        newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
+      );
+    },
+  };
+
+  selectionContext.registerFeature(featureRef);
+};
+
 watch(
   () => [
     map.value,
@@ -2855,9 +3076,25 @@ watch(
           });
           polygon.value.addTo(map.value);
 
-          polygon.value.on("click", () => {
-            emit("click");
-          });
+          if (props.selectable && selectionContext) {
+            polygon.value.on("click", () => {
+              selectionContext.selectFeature("polygon", polygonId.value);
+              emit("click");
+            });
+            polygon.value.on("mousedown", (e: any) => {
+              if (props.draggable) {
+                selectionContext.selectFeature("polygon", polygonId.value);
+              }
+            });
+          } else {
+            polygon.value.on("click", () => {
+              emit("click");
+            });
+          }
+
+          if (props.selectable && selectionContext) {
+            registerWithSelection();
+          }
         }
 
         if (props.draggable && !props.editable) {
@@ -2905,14 +3142,17 @@ import {
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { LeafletMapKey, LeafletModuleKey } from ".";
+import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
+import type { FeatureReference } from "./LeafletSelectionManager.vue";
 import "./leaflet-editing.css";
 
 export interface LeafletPolylineProps {
+  id?: string | number;
   latlngs?: Array<[number, number]> | Array<{ lat: number; lng: number }>;
   weight?: number;
   editable?: boolean;
   draggable?: boolean;
+  selectable?: boolean;
   class?: HTMLAttributes["class"];
 }
 
@@ -2921,6 +3161,7 @@ const props = withDefaults(defineProps<LeafletPolylineProps>(), {
   weight: 3,
   editable: false,
   draggable: false,
+  selectable: false,
 });
 
 const emit = defineEmits<{
@@ -2933,10 +3174,15 @@ const { getLeafletLineColors } = useCssParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
+const selectionContext = inject(LeafletSelectionKey, undefined);
+
 const polyline = ref<L.Polyline | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
 const midpointMarkers = ref<L.Marker[]>([]);
 const isDragging = ref(false);
+const polylineId = ref<string | number>(
+  props.id ?? `polyline-${Date.now()}-${Math.random()}`,
+);
 
 let dragStartLatLngs: L.LatLng[] = [];
 let dragStartMousePoint: L.Point | null = null;
@@ -3162,6 +3408,93 @@ const setupMapDragHandlers = () => {
   }
 };
 
+const registerWithSelection = () => {
+  if (!props.selectable || !selectionContext || !polyline.value) return;
+
+  const featureRef: FeatureReference = {
+    id: polylineId.value,
+    type: "polyline",
+    getBounds: () => {
+      if (!polyline.value) return null;
+      return polyline.value.getBounds();
+    },
+    getInitialData: () => {
+      if (!polyline.value) return null;
+      const latlngs = polyline.value.getLatLngs() as L.LatLng[];
+      return latlngs.map((ll) => [ll.lat, ll.lng] as [number, number]);
+    },
+    applyTransform: (bounds: L.LatLngBounds) => {
+      if (!polyline.value || !L.value) return;
+
+      const currentBounds = polyline.value.getBounds();
+      const currentCenter = currentBounds.getCenter();
+      const newCenter = bounds.getCenter();
+
+      const currentLatLngs = polyline.value.getLatLngs() as L.LatLng[];
+      const scaleX =
+        (bounds.getEast() - bounds.getWest()) /
+        (currentBounds.getEast() - currentBounds.getWest());
+      const scaleY =
+        (bounds.getNorth() - bounds.getSouth()) /
+        (currentBounds.getNorth() - currentBounds.getSouth());
+
+      const newLatLngs = currentLatLngs.map((latlng) => {
+        const relativeX = (latlng.lng - currentCenter.lng) * scaleX;
+        const relativeY = (latlng.lat - currentCenter.lat) * scaleY;
+        return L.value!.latLng(
+          newCenter.lat + relativeY,
+          newCenter.lng + relativeX,
+        );
+      });
+
+      polyline.value.setLatLngs(newLatLngs);
+      emit(
+        "update:latlngs",
+        newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
+      );
+    },
+    applyRotation: (
+      angle: number,
+      center: { lat: number; lng: number },
+      initialLatLngs: Array<[number, number]>,
+    ) => {
+      if (!polyline.value || !L.value || !initialLatLngs) return;
+
+      const angleRad = (-angle * Math.PI) / 180;
+
+      const metersPerDegreeLat = 111320;
+      const metersPerDegreeLng =
+        111320 * Math.cos((center.lat * Math.PI) / 180);
+
+      const newLatLngs = initialLatLngs.map((latlng) => {
+        const lat = latlng[0];
+        const lng = latlng[1];
+
+        const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+        const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+
+        const newRelMetersY =
+          relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+        const newRelMetersX =
+          relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+
+        return L.value!.latLng(
+          center.lat + newRelMetersY / metersPerDegreeLat,
+          center.lng + newRelMetersX / metersPerDegreeLng,
+        );
+      });
+
+      polyline.value.setLatLngs(newLatLngs);
+      emit(
+        "update:latlngs",
+        newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
+      );
+    },
+  };
+
+  selectionContext.registerFeature(featureRef);
+};
+
 watch(
   () => [
     map.value,
@@ -3200,9 +3533,25 @@ watch(
           });
           polyline.value.addTo(map.value);
 
-          polyline.value.on("click", () => {
-            emit("click");
-          });
+          if (props.selectable && selectionContext) {
+            polyline.value.on("click", () => {
+              selectionContext.selectFeature("polyline", polylineId.value);
+              emit("click");
+            });
+            polyline.value.on("mousedown", (e: any) => {
+              if (props.draggable) {
+                selectionContext.selectFeature("polyline", polylineId.value);
+              }
+            });
+          } else {
+            polyline.value.on("click", () => {
+              emit("click");
+            });
+          }
+
+          if (props.selectable && selectionContext) {
+            registerWithSelection();
+          }
         }
 
         if (props.draggable && !props.editable) {
@@ -3228,6 +3577,10 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  if (props.selectable && selectionContext) {
+    selectionContext.unregisterFeature(polylineId.value);
+  }
+
   clearEditMarkers();
   if (polyline.value) {
     polyline.value.remove();
@@ -3250,13 +3603,16 @@ import {
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { LeafletMapKey, LeafletModuleKey } from ".";
+import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
+import type { FeatureReference } from "./LeafletSelectionManager.vue";
 import "./leaflet-editing.css";
 
 export interface LeafletRectangleProps {
+  id?: string | number;
   bounds?: [[number, number], [number, number]];
   editable?: boolean;
   draggable?: boolean;
+  selectable?: boolean;
   class?: HTMLAttributes["class"];
 }
 
@@ -3267,6 +3623,7 @@ const props = withDefaults(defineProps<LeafletRectangleProps>(), {
   ],
   editable: false,
   draggable: false,
+  selectable: false,
 });
 
 const emit = defineEmits<{
@@ -3279,9 +3636,14 @@ const { getLeafletShapeColors } = useCssParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
+const selectionContext = inject(LeafletSelectionKey, undefined);
+
 const rectangle = ref<L.Rectangle | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
 const isDragging = ref(false);
+const rectangleId = ref<string | number>(
+  props.id ?? `rectangle-${Date.now()}-${Math.random()}`,
+);
 
 let dragStartBounds: L.LatLngBounds | null = null;
 let dragStartMousePoint: L.Point | null = null;
@@ -3470,6 +3832,30 @@ const setupMapDragHandlers = () => {
   }
 };
 
+const registerWithSelection = () => {
+  if (!props.selectable || !selectionContext || !rectangle.value) return;
+
+  const featureRef: FeatureReference = {
+    id: rectangleId.value,
+    type: "rectangle",
+    getBounds: () => {
+      if (!rectangle.value) return null;
+      return rectangle.value.getBounds();
+    },
+    applyTransform: (bounds: L.LatLngBounds) => {
+      if (!rectangle.value) return;
+
+      rectangle.value.setBounds(bounds);
+      emit("update:bounds", [
+        [bounds.getSouth(), bounds.getWest()],
+        [bounds.getNorth(), bounds.getEast()],
+      ] as [[number, number], [number, number]]);
+    },
+  };
+
+  selectionContext.registerFeature(featureRef);
+};
+
 watch(
   () => [map.value, props.bounds, props.editable, props.draggable],
   (newVal, oldVal) => {
@@ -3507,9 +3893,25 @@ watch(
           });
           rectangle.value.addTo(map.value);
 
-          rectangle.value.on("click", () => {
-            emit("click");
-          });
+          if (props.selectable && selectionContext) {
+            rectangle.value.on("click", () => {
+              selectionContext.selectFeature("rectangle", rectangleId.value);
+              emit("click");
+            });
+            rectangle.value.on("mousedown", (e: any) => {
+              if (props.draggable) {
+                selectionContext.selectFeature("rectangle", rectangleId.value);
+              }
+            });
+          } else {
+            rectangle.value.on("click", () => {
+              emit("click");
+            });
+          }
+
+          if (props.selectable && selectionContext) {
+            registerWithSelection();
+          }
         }
 
         if (props.draggable && !props.editable) {
@@ -3535,6 +3937,10 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  if (props.selectable && selectionContext) {
+    selectionContext.unregisterFeature(rectangleId.value);
+  }
+
   clearEditMarkers();
   if (rectangle.value) {
     rectangle.value.remove();
@@ -3543,6 +3949,212 @@ onBeforeUnmount(() => {
 </script>
 
 <template><slot /></template>
+```
+
+```vue [src/components/ui/leaflet-map/LeafletSelectionManager.vue]
+<script setup lang="ts">
+import { ref, computed, provide, watch, type Ref } from "vue";
+import LeafletBoundingBox from "./LeafletBoundingBox.vue";
+import type { FeatureShapeType } from "./LeafletFeaturesEditor.vue";
+import { LeafletSelectionKey } from ".";
+
+export interface SelectedFeature {
+  type: FeatureShapeType;
+  id: string | number;
+}
+
+export interface FeatureReference {
+  id: string | number;
+  type: FeatureShapeType;
+  getBounds: () => L.LatLngBounds | null;
+  getInitialData?: () => any;
+  applyTransform: (bounds: L.LatLngBounds) => void;
+  applyRotation?: (
+    angle: number,
+    center: { lat: number; lng: number },
+    initialData: any,
+  ) => void;
+}
+
+export interface LeafletSelectionContext {
+  selectedFeature: Ref<SelectedFeature | null>;
+  featuresRegistry: Ref<Map<string | number, FeatureReference>>;
+  selectFeature: (type: FeatureShapeType, id: string | number) => void;
+  deselectAll: () => void;
+  registerFeature: (feature: FeatureReference) => void;
+  unregisterFeature: (id: string | number) => void;
+}
+
+export interface LeafletSelectionManagerProps {
+  enabled?: boolean;
+  mode?: "select" | "directSelect" | null;
+}
+
+const props = withDefaults(defineProps<LeafletSelectionManagerProps>(), {
+  enabled: false,
+  mode: null,
+});
+
+const emit = defineEmits<{
+  "update:selectedFeature": [feature: SelectedFeature | null];
+  "selection-changed": [feature: SelectedFeature | null];
+}>();
+
+const selectedFeature = ref<SelectedFeature | null>(null);
+const featuresRegistry = ref<Map<string | number, FeatureReference>>(new Map());
+
+const rotationStartPositions = ref<any>(null);
+const rotationCenter = ref<{ lat: number; lng: number } | null>(null);
+
+const selectFeature = (type: FeatureShapeType, id: string | number) => {
+  if (props.mode !== "select") {
+    deselectAll();
+    return;
+  }
+
+  rotationStartPositions.value = null;
+  rotationCenter.value = null;
+
+  const isSameFeature =
+    selectedFeature.value?.type === type && selectedFeature.value?.id === id;
+
+  if (!isSameFeature) {
+    selectedFeature.value = { type, id };
+    emit("update:selectedFeature", selectedFeature.value);
+    emit("selection-changed", selectedFeature.value);
+  }
+};
+
+const deselectAll = () => {
+  selectedFeature.value = null;
+  rotationStartPositions.value = null;
+  rotationCenter.value = null;
+  emit("update:selectedFeature", null);
+  emit("selection-changed", null);
+};
+
+const registerFeature = (feature: FeatureReference) => {
+  featuresRegistry.value.set(feature.id, feature);
+};
+
+const unregisterFeature = (id: string | number) => {
+  featuresRegistry.value.delete(id);
+  if (selectedFeature.value?.id === id) {
+    deselectAll();
+  }
+};
+
+watch(
+  () => props.mode,
+  (mode) => {
+    if (mode !== "select") {
+      deselectAll();
+    }
+  },
+);
+
+watch(
+  () => props.enabled,
+  (enabled) => {
+    if (!enabled) {
+      deselectAll();
+    }
+  },
+);
+
+const boundingBox = computed(() => {
+  if (!selectedFeature.value || !props.enabled || props.mode !== "select") {
+    return null;
+  }
+
+  const feature = featuresRegistry.value.get(selectedFeature.value.id);
+  if (!feature) return null;
+
+  return feature.getBounds();
+});
+
+const saveRotationStartPositions = () => {
+  if (!selectedFeature.value) return;
+
+  const bounds = boundingBox.value;
+  if (bounds) {
+    const center = bounds.getCenter();
+    rotationCenter.value = { lat: center.lat, lng: center.lng };
+  }
+
+  const feature = featuresRegistry.value.get(selectedFeature.value.id);
+  if (feature && feature.getInitialData) {
+    rotationStartPositions.value = feature.getInitialData();
+  }
+};
+
+const handleBoundingBoxUpdate = (newBounds: L.LatLngBounds) => {
+  if (!selectedFeature.value) return;
+
+  const feature = featuresRegistry.value.get(selectedFeature.value.id);
+  if (feature) {
+    feature.applyTransform(newBounds);
+  }
+};
+
+const handleBoundingBoxRotate = (angle: number) => {
+  if (!selectedFeature.value) return;
+
+  if (rotationStartPositions.value === null) {
+    saveRotationStartPositions();
+  }
+
+  if (!rotationCenter.value || !rotationStartPositions.value) return;
+
+  const feature = featuresRegistry.value.get(selectedFeature.value.id);
+  if (feature && feature.applyRotation) {
+    feature.applyRotation(
+      angle,
+      rotationCenter.value,
+      rotationStartPositions.value,
+    );
+  }
+};
+
+const handleBoundingBoxRotateEnd = () => {
+  rotationStartPositions.value = null;
+  rotationCenter.value = null;
+};
+
+const context: LeafletSelectionContext = {
+  selectedFeature,
+  featuresRegistry,
+  selectFeature,
+  deselectAll,
+  registerFeature,
+  unregisterFeature,
+};
+
+provide(LeafletSelectionKey, context);
+</script>
+
+<template>
+  <slot :selection="context" />
+
+  <slot
+    name="bounding-box"
+    :bounds="boundingBox"
+    :visible="boundingBox !== null && mode === 'select'"
+    :on-update="handleBoundingBoxUpdate"
+    :on-rotate="handleBoundingBoxRotate"
+    :on-rotate-end="handleBoundingBoxRotateEnd"
+  >
+    <LeafletBoundingBox
+      :bounds="boundingBox"
+      :visible="boundingBox !== null && mode === 'select'"
+      @update:bounds="handleBoundingBoxUpdate"
+      @rotate="handleBoundingBoxRotate"
+      @rotate-end="handleBoundingBoxRotateEnd"
+    >
+      <slot name="bounding-box-styles" />
+    </LeafletBoundingBox>
+  </slot>
+</template>
 ```
 
 ```vue [src/components/ui/leaflet-map/LeafletTileLayer.vue]
@@ -3814,6 +4426,7 @@ export const useCssParser = () => {
       const cssValues = withHiddenElement(
         (el) =>
           getTailwindBaseCssValues(el, [
+            "border-color",
             "color",
             "background-color",
             "opacity",
@@ -3822,7 +4435,7 @@ export const useCssParser = () => {
       );
 
       return {
-        color: cssValues["color"] || "#3388ff",
+        color: cssValues["border-color"] || cssValues["color"] || "#3388ff",
         fillColor: cssValues["background-color"] || "#3388ff",
         fillOpacity: cssValues["opacity"]
           ? parseFloat(cssValues["opacity"])
@@ -3859,12 +4472,13 @@ export const useCssParser = () => {
       }
 
       const cssValues = withHiddenElement(
-        (el) => getTailwindBaseCssValues(el, ["color", "opacity"]),
+        (el) =>
+          getTailwindBaseCssValues(el, ["border-color", "color", "opacity"]),
         classList.join(" "),
       );
 
       return {
-        color: cssValues["color"] || "#3388ff",
+        color: cssValues["border-color"] || cssValues["color"] || "#3388ff",
         opacity: cssValues["opacity"] ? parseFloat(cssValues["opacity"]) : 1,
       };
     } catch (err) {
@@ -4121,11 +4735,13 @@ export const useLeaflet = async () => {
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
+| `id`{.primary .text-primary} | `string \| number` | - |  |
 | `lat`{.primary .text-primary} | `number \| string` | 43.280608 |  |
 | `lng`{.primary .text-primary} | `number \| string` | 5.350242 |  |
 | `radius`{.primary .text-primary} | `number \| string` | 100 |  |
 | `editable`{.primary .text-primary} | `boolean` | false |  |
 | `draggable`{.primary .text-primary} | `boolean` | false |  |
+| `selectable`{.primary .text-primary} | `boolean` | false |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
   ### Slots
@@ -4138,6 +4754,7 @@ export const useLeaflet = async () => {
 |-----|--------|------|-------------|
 | `LeafletModuleKey`{.primary .text-primary} | `ref()` | `any` | — |
 | `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
+| `LeafletSelectionKey`{.primary .text-primary} | `undefined` | `any` | — |
 
 ---
 
@@ -4221,10 +4838,12 @@ export const useLeaflet = async () => {
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
+| `id`{.primary .text-primary} | `string \| number` | - |  |
 | `lat`{.primary .text-primary} | `number \| string` | 43.280608 |  |
 | `lng`{.primary .text-primary} | `number \| string` | 5.350242 |  |
 | `editable`{.primary .text-primary} | `boolean` | false |  |
 | `draggable`{.primary .text-primary} | `boolean` | false |  |
+| `selectable`{.primary .text-primary} | `boolean` | false |  |
 
   ### Slots
 | Name | Description |
@@ -4236,6 +4855,7 @@ export const useLeaflet = async () => {
 |-----|--------|------|-------------|
 | `LeafletModuleKey`{.primary .text-primary} | `ref()` | `any` | — |
 | `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
+| `LeafletSelectionKey`{.primary .text-primary} | `undefined` | `any` | — |
 
 ---
 
@@ -4248,9 +4868,11 @@ export const useLeaflet = async () => {
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
+| `id`{.primary .text-primary} | `string \| number` | - |  |
 | `latlngs`{.primary .text-primary} | `Array<[number, number]> \| Array<{ lat: number; lng: number }>` |  |  |
 | `editable`{.primary .text-primary} | `boolean` | false |  |
 | `draggable`{.primary .text-primary} | `boolean` | false |  |
+| `selectable`{.primary .text-primary} | `boolean` | false |  |
 | `interactive`{.primary .text-primary} | `boolean` | true |  |
 | `autoClose`{.primary .text-primary} | `boolean` | true |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
@@ -4265,6 +4887,7 @@ export const useLeaflet = async () => {
 |-----|--------|------|-------------|
 | `LeafletModuleKey`{.primary .text-primary} | `ref()` | `any` | — |
 | `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
+| `LeafletSelectionKey`{.primary .text-primary} | `undefined` | `any` | — |
 
 ---
 
@@ -4277,10 +4900,12 @@ export const useLeaflet = async () => {
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
+| `id`{.primary .text-primary} | `string \| number` | - |  |
 | `latlngs`{.primary .text-primary} | `Array<[number, number]> \| Array<{ lat: number; lng: number }>` |  |  |
 | `weight`{.primary .text-primary} | `number` | 3 |  |
 | `editable`{.primary .text-primary} | `boolean` | false |  |
 | `draggable`{.primary .text-primary} | `boolean` | false |  |
+| `selectable`{.primary .text-primary} | `boolean` | false |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
   ### Slots
@@ -4293,6 +4918,7 @@ export const useLeaflet = async () => {
 |-----|--------|------|-------------|
 | `LeafletModuleKey`{.primary .text-primary} | `ref()` | `any` | — |
 | `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
+| `LeafletSelectionKey`{.primary .text-primary} | `undefined` | `any` | — |
 
 ---
 
@@ -4305,9 +4931,11 @@ export const useLeaflet = async () => {
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
+| `id`{.primary .text-primary} | `string \| number` | - |  |
 | `bounds`{.primary .text-primary} | `[[number, number], [number, number]]` | 0,0,0,0 |  |
 | `editable`{.primary .text-primary} | `boolean` | false |  |
 | `draggable`{.primary .text-primary} | `boolean` | false |  |
+| `selectable`{.primary .text-primary} | `boolean` | false |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
   ### Slots
@@ -4320,6 +4948,36 @@ export const useLeaflet = async () => {
 |-----|--------|------|-------------|
 | `LeafletModuleKey`{.primary .text-primary} | `ref()` | `any` | — |
 | `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
+| `LeafletSelectionKey`{.primary .text-primary} | `undefined` | `any` | — |
+
+---
+
+## LeafletSelectionManager
+::hr-underline
+::
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `enabled`{.primary .text-primary} | `boolean` | false |  |
+| `mode`{.primary .text-primary} | `'select' \| 'directSelect' \| null` |  |  |
+
+  ### Slots
+| Name | Description |
+|------|-------------|
+| `default`{.primary .text-primary} | Default slot for features |
+| `bounding-box`{.primary .text-primary} | Bounding box with customization slot |
+
+  ### Provide
+| Key | Value | Type | Description |
+|-----|-------|------|-------------|
+| `LeafletSelectionKey`{.primary .text-primary} | `context` | `any` | — |
+
+  ### Child Components
+
+  `LeafletBoundingBox`{.primary .text-primary}
 
 ---
 
@@ -4375,811 +5033,198 @@ export const useLeaflet = async () => {
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <leaflet-edition-demo />
+    <leaflet-selection-demo />
   :::
 
   :::tabs-item{icon="i-lucide-code" label="Code"}
 ```vue
 <script setup lang="ts">
-import { ref, watch, computed, nextTick } from "vue";
-import { Button } from "@/components/ui/button";
-import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
+import { ref } from "vue";
 import {
   LeafletMap,
   LeafletTileLayer,
-  LeafletZoomControl,
-  LeafletDrawControl,
-  LeafletFeaturesEditor,
-  LeafletBoundingBox,
-  LeafletBoundingBoxHandle,
-  LeafletBoundingBoxRectangle,
   LeafletMarker,
   LeafletCircle,
   LeafletPolyline,
   LeafletPolygon,
   LeafletRectangle,
-  type LeafletMapExposed,
-  type FeatureDrawEvent,
-  type FeatureSelectMode,
-  type FeatureShapeType,
-} from "@/components/ui/leaflet-map";
+  LeafletSelectionManager,
+  LeafletBoundingBox,
+  LeafletBoundingBoxRectangle,
+  LeafletBoundingBoxHandle,
+} from "..";
 
-const mapRef = ref<LeafletMapExposed | null>(null);
-
-const { L, LatDegreesMeters, radiusToLatDegrees, radiusToLngDegrees } =
-  await useLeaflet();
-
-const selectedShape = ref<{
-  type: "marker" | "circle" | "polyline" | "polygon" | "rectangle";
-  id: number;
-} | null>(null);
-
-const editMode = ref(false);
-
-const currentMode = ref<FeatureShapeType | FeatureSelectMode | null>(null);
-
-const currentEditMode = ref<FeatureSelectMode | null>(null);
+const center = ref([43.280608, 5.350242]);
+const zoom = ref(16);
 
 const markers = ref([
-  { id: 1, lat: 48.8566, lng: 2.3522, label: "Paris" },
-  { id: 2, lat: 48.8738, lng: 2.295, label: "Arc de Triomphe" },
-  { id: 3, lat: 48.8584, lng: 2.2945, label: "Tour Eiffel" },
+  { id: "marker-1", lat: 43.280608, lng: 5.350242 },
+  { id: "marker-2", lat: 43.282, lng: 5.352 },
 ]);
 
 const circles = ref([
-  {
-    id: 1,
-    lat: 48.8566,
-    lng: 2.3522,
-    radius: 500,
-    class: "text-blue-500 bg-blue-500/20",
-  },
-  {
-    id: 2,
-    lat: 48.8738,
-    lng: 2.295,
-    radius: 300,
-    class: "text-green-500 bg-green-500/30",
-  },
+  { id: "circle-1", lat: 43.281, lng: 5.349, radius: 200 },
+  { id: "circle-2", lat: 43.2795, lng: 5.351, radius: 150 },
 ]);
 
 const polylines = ref([
   {
-    id: 1,
+    id: "polyline-1",
     latlngs: [
-      [48.8566, 2.3522],
-      [48.8738, 2.295],
-      [48.8584, 2.2945],
+      [43.279, 5.351],
+      [43.28, 5.353],
+      [43.281, 5.352],
     ] as Array<[number, number]>,
-    class: "text-red-500",
-    weight: 4,
   },
 ]);
 
 const polygons = ref([
   {
-    id: 1,
+    id: "polygon-1",
     latlngs: [
-      [48.86, 2.34],
-      [48.86, 2.36],
-      [48.85, 2.36],
-      [48.85, 2.34],
+      [43.278, 5.348],
+      [43.279, 5.349],
+      [43.2795, 5.35],
+      [43.2785, 5.3495],
     ] as Array<[number, number]>,
-    class: "text-purple-500 bg-purple-500/30",
   },
 ]);
 
 const rectangles = ref([
   {
-    id: 1,
+    id: "rectangle-1",
     bounds: [
-      [48.84, 2.28],
-      [48.845, 2.29],
+      [43.277, 5.345],
+      [43.2785, 5.347],
     ] as [[number, number], [number, number]],
-    class: "text-orange-500 bg-orange-500/20",
   },
 ]);
 
-const moveableShapes = ref({
-  markers: false,
-  circles: false,
-  polylines: false,
-  polygons: false,
-  rectangles: false,
-});
-
-const editableShapes = ref({
-  markers: false,
-  circles: false,
-  polylines: false,
-  polygons: false,
-  rectangles: false,
-});
-
-watch(editMode, (enabled) => {
-  if (!enabled) {
-    Object.keys(moveableShapes.value).forEach((key) => {
-      moveableShapes.value[key as keyof typeof moveableShapes.value] = false;
-    });
-    Object.keys(editableShapes.value).forEach((key) => {
-      editableShapes.value[key as keyof typeof editableShapes.value] = false;
-    });
-  }
-});
-
-const handleEditModeChanged = (mode: FeatureSelectMode | null) => {
-  currentEditMode.value = mode;
-
-  if (mode !== "select") {
-    selectedShape.value = null;
-    rotationStartPositions.value = null;
-    rotationCenter.value = null;
-  }
-
-  if (mode === "select") {
-    Object.keys(moveableShapes.value).forEach((key) => {
-      moveableShapes.value[key as keyof typeof moveableShapes.value] = true;
-    });
-
-    Object.keys(editableShapes.value).forEach((key) => {
-      editableShapes.value[key as keyof typeof editableShapes.value] = false;
-    });
-  } else if (mode === "directSelect") {
-    Object.keys(moveableShapes.value).forEach((key) => {
-      moveableShapes.value[key as keyof typeof moveableShapes.value] = false;
-    });
-
-    Object.keys(editableShapes.value).forEach((key) => {
-      editableShapes.value[key as keyof typeof editableShapes.value] = true;
-    });
-  } else {
-    Object.keys(moveableShapes.value).forEach((key) => {
-      moveableShapes.value[key as keyof typeof moveableShapes.value] = false;
-    });
-    Object.keys(editableShapes.value).forEach((key) => {
-      editableShapes.value[key as keyof typeof editableShapes.value] = false;
-    });
-  }
-};
-
-const handleModeSelected = (
-  mode: FeatureShapeType | FeatureSelectMode | null,
-) => {
-  currentMode.value = mode;
-};
-
-const handleModeChanged = (mode: FeatureShapeType | null) => {
-  currentMode.value = mode;
-};
-
-const handleShapeCreated = (event: FeatureDrawEvent) => {
-  const { layer, layerType } = event;
-
-  switch (layerType) {
-    case "marker": {
-      const latlng = (layer as any).getLatLng();
-      const newId =
-        markers.value.length > 0
-          ? Math.max(...markers.value.map((m) => m.id)) + 1
-          : 1;
-      markers.value.push({
-        id: newId,
-        lat: latlng.lat,
-        lng: latlng.lng,
-        label: `Marker ${newId}`,
-      });
-      break;
-    }
-    case "circle": {
-      const latlng = (layer as any).getLatLng();
-      const radius = (layer as any).getRadius();
-      const newId =
-        circles.value.length > 0
-          ? Math.max(...circles.value.map((c) => c.id)) + 1
-          : 1;
-      circles.value.push({
-        id: newId,
-        lat: latlng.lat,
-        lng: latlng.lng,
-        radius: radius,
-        class: "text-blue-500 bg-blue-500/20",
-      });
-      break;
-    }
-    case "polyline": {
-      const latlngs = (layer as any)
-        .getLatLngs()
-        .map((ll: any) => [ll.lat, ll.lng] as [number, number]);
-      const newId =
-        polylines.value.length > 0
-          ? Math.max(...polylines.value.map((p) => p.id)) + 1
-          : 1;
-      polylines.value.push({
-        id: newId,
-        latlngs: latlngs,
-        class: "text-red-500",
-        weight: 4,
-      });
-      break;
-    }
-    case "polygon": {
-      const latlngs = (layer as any)
-        .getLatLngs()[0]
-        .map((ll: any) => [ll.lat, ll.lng] as [number, number]);
-      const newId =
-        polygons.value.length > 0
-          ? Math.max(...polygons.value.map((p) => p.id)) + 1
-          : 1;
-      polygons.value.push({
-        id: newId,
-        latlngs: latlngs,
-        class: "text-purple-500 bg-purple-500/30",
-      });
-      break;
-    }
-    case "rectangle": {
-      const bounds = (layer as any).getBounds();
-      const newId =
-        rectangles.value.length > 0
-          ? Math.max(...rectangles.value.map((r) => r.id)) + 1
-          : 1;
-      rectangles.value.push({
-        id: newId,
-        bounds: [
-          [bounds.getSouth(), bounds.getWest()],
-          [bounds.getNorth(), bounds.getEast()],
-        ] as [[number, number], [number, number]],
-        class: "text-orange-500 bg-orange-500/20",
-      });
-      break;
-    }
-  }
-};
-
-const updateMarker = (id: number, lat: number, lng: number) => {
-  const marker = markers.value.find((m) => m.id === id);
-  if (marker) {
-    marker.lat = lat;
-    marker.lng = lng;
-  }
-};
-
-const updateCircle = (
-  id: number,
-  updates: { lat?: number; lng?: number; radius?: number },
-) => {
-  const circle = circles.value.find((c) => c.id === id);
-  if (circle) {
-    if (updates.lat !== undefined) circle.lat = updates.lat;
-    if (updates.lng !== undefined) circle.lng = updates.lng;
-    if (updates.radius !== undefined) circle.radius = updates.radius;
-  }
-};
-
-const updatePolyline = (id: number, latlngs: Array<[number, number]>) => {
-  const polyline = polylines.value.find((p) => p.id === id);
-  if (polyline) {
-    polyline.latlngs = latlngs;
-  }
-};
-
-const updatePolygon = (id: number, latlngs: Array<[number, number]>) => {
-  const polygon = polygons.value.find((p) => p.id === id);
-  if (polygon) {
-    polygon.latlngs = latlngs;
-  }
-};
-
-const updateRectangle = (
-  id: number,
-  bounds: [[number, number], [number, number]],
-) => {
-  const rectangle = rectangles.value.find((r) => r.id === id);
-  if (rectangle) {
-    rectangle.bounds = bounds;
-  }
-};
-
-const onPolygonClosed = (id: number) => {
-  editableShapes.value.polygons = false;
-};
-
-const selectShape = (type: FeatureShapeType, id: number) => {
-  if (currentEditMode.value === "select") {
-    rotationStartPositions.value = null;
-    rotationCenter.value = null;
-
-    const isSameShape =
-      selectedShape.value?.type === type && selectedShape.value?.id === id;
-
-    if (!isSameShape) {
-      selectedShape.value = null;
-
-      nextTick(() => {
-        selectedShape.value = { type, id };
-      });
-    }
-  } else {
-    selectedShape.value = null;
-  }
-};
-
-const rotationStartPositions = ref<any>(null);
-const rotationCenter = ref<{ lat: number; lng: number } | null>(null);
-
-const saveRotationStartPositions = () => {
-  if (!selectedShape.value) return;
-
-  const { type, id } = selectedShape.value;
-
-  const bounds = boundingBox.value;
-  if (bounds) {
-    const center = bounds.getCenter();
-    rotationCenter.value = { lat: center.lat, lng: center.lng };
-  }
-
-  switch (type) {
-    case "marker": {
-      const marker = markers.value.find((m) => m.id === id);
-      if (marker) {
-        rotationStartPositions.value = { lat: marker.lat, lng: marker.lng };
-      }
-      break;
-    }
-    case "circle": {
-      const circle = circles.value.find((c) => c.id === id);
-      if (circle) {
-        rotationStartPositions.value = { lat: circle.lat, lng: circle.lng };
-      }
-      break;
-    }
-    case "polyline": {
-      const polyline = polylines.value.find((p) => p.id === id);
-      if (polyline) {
-        rotationStartPositions.value = polyline.latlngs.map(
-          (ll) => [ll[0], ll[1]] as [number, number],
-        );
-      }
-      break;
-    }
-    case "polygon": {
-      const polygon = polygons.value.find((p) => p.id === id);
-      if (polygon) {
-        rotationStartPositions.value = polygon.latlngs.map(
-          (ll) => [ll[0], ll[1]] as [number, number],
-        );
-      }
-      break;
-    }
-    case "rectangle": {
-      const rectangle = rectangles.value.find((r) => r.id === id);
-      if (rectangle) {
-        rotationStartPositions.value = [
-          [rectangle.bounds[0][0], rectangle.bounds[0][1]],
-          [rectangle.bounds[1][0], rectangle.bounds[1][1]],
-        ];
-      }
-      break;
-    }
-  }
-};
-
-const boundingBox = computed(() => {
-  if (!L.value || !selectedShape.value || !mapRef.value?.map) return null;
-
-  const { type, id } = selectedShape.value;
-
-  try {
-    switch (type) {
-      case "marker": {
-        const marker = markers.value.find((m) => m.id === id);
-        if (!marker) return null;
-        const point = L.value.latLng(marker.lat, marker.lng);
-
-        const offset = 0.001;
-        return L.value.latLngBounds(
-          [marker.lat - offset, marker.lng - offset],
-          [marker.lat + offset, marker.lng + offset],
-        );
-      }
-      case "circle": {
-        const circle = circles.value.find((c) => c.id === id);
-        if (!circle) return null;
-
-        const radiusInLatDegrees = radiusToLatDegrees(circle.radius);
-        const radiusInLngDegrees = radiusToLngDegrees(
-          circle.radius,
-          circle.lat,
-        );
-
-        return L.value.latLngBounds(
-          [circle.lat - radiusInLatDegrees, circle.lng - radiusInLngDegrees],
-          [circle.lat + radiusInLatDegrees, circle.lng + radiusInLngDegrees],
-        );
-      }
-      case "polyline": {
-        const polyline = polylines.value.find((p) => p.id === id);
-        if (!polyline || polyline.latlngs.length === 0) return null;
-        return L.value.latLngBounds(
-          polyline.latlngs.map((ll) => L.value!.latLng(ll[0], ll[1])),
-        );
-      }
-      case "polygon": {
-        const polygon = polygons.value.find((p) => p.id === id);
-        if (!polygon || polygon.latlngs.length === 0) return null;
-        const bounds = L.value.latLngBounds(
-          polygon.latlngs.map((ll) => L.value!.latLng(ll[0], ll[1])),
-        );
-        return bounds;
-      }
-      case "rectangle": {
-        const rectangle = rectangles.value.find((r) => r.id === id);
-        if (!rectangle) return null;
-        return L.value.latLngBounds(rectangle.bounds[0], rectangle.bounds[1]);
-      }
-    }
-  } catch (error) {
-    console.error("Error computing bounding box:", error);
-    return null;
-  }
-});
-
-const handleBoundingBoxUpdate = (newBounds: any) => {
-  if (!selectedShape.value) return;
-
-  const { type, id } = selectedShape.value;
-
-  const oldBounds = boundingBox.value;
-  if (!oldBounds) return;
-
-  const scaleX =
-    (newBounds.getEast() - newBounds.getWest()) /
-    (oldBounds.getEast() - oldBounds.getWest());
-  const scaleY =
-    (newBounds.getNorth() - newBounds.getSouth()) /
-    (oldBounds.getNorth() - oldBounds.getSouth());
-  const centerOld = oldBounds.getCenter();
-  const centerNew = newBounds.getCenter();
-  const deltaLat = centerNew.lat - centerOld.lat;
-  const deltaLng = centerNew.lng - centerOld.lng;
-
-  switch (type) {
-    case "marker": {
-      const marker = markers.value.find((m) => m.id === id);
-      if (marker) {
-        marker.lat = centerNew.lat;
-        marker.lng = centerNew.lng;
-      }
-      break;
-    }
-    case "circle": {
-      const circle = circles.value.find((c) => c.id === id);
-      if (circle) {
-        circle.lat += deltaLat;
-        circle.lng += deltaLng;
-        circle.radius *= (scaleX + scaleY) / 2;
-      }
-      break;
-    }
-    case "polyline": {
-      const polyline = polylines.value.find((p) => p.id === id);
-      if (polyline) {
-        polyline.latlngs = polyline.latlngs.map((ll) => {
-          const relLat = (ll[0] - centerOld.lat) * scaleY;
-          const relLng = (ll[1] - centerOld.lng) * scaleX;
-          return [centerNew.lat + relLat, centerNew.lng + relLng] as [
-            number,
-            number,
-          ];
-        });
-      }
-      break;
-    }
-    case "polygon": {
-      const polygon = polygons.value.find((p) => p.id === id);
-      if (polygon) {
-        polygon.latlngs = polygon.latlngs.map((ll) => {
-          const relLat = (ll[0] - centerOld.lat) * scaleY;
-          const relLng = (ll[1] - centerOld.lng) * scaleX;
-          return [centerNew.lat + relLat, centerNew.lng + relLng] as [
-            number,
-            number,
-          ];
-        });
-      }
-      break;
-    }
-    case "rectangle": {
-      const rectangle = rectangles.value.find((r) => r.id === id);
-      if (rectangle) {
-        rectangle.bounds = [
-          [newBounds.getSouth(), newBounds.getWest()],
-          [newBounds.getNorth(), newBounds.getEast()],
-        ] as [[number, number], [number, number]];
-      }
-      break;
-    }
-  }
-};
-
-const handleBoundingBoxRotate = (angle: number) => {
-  if (!L.value || !selectedShape.value) return;
-
-  if (rotationStartPositions.value === null) {
-    saveRotationStartPositions();
-  }
-
-  const { type, id } = selectedShape.value;
-
-  if (!rotationCenter.value || !rotationStartPositions.value) return;
-
-  const center = rotationCenter.value;
-  const angleRad = (-angle * Math.PI) / 180;
-
-  const rotatePoint = (lat: number, lng: number) => {
-    const metersPerDegreeLat = LatDegreesMeters;
-    const metersPerDegreeLng =
-      LatDegreesMeters * Math.cos((center.lat * Math.PI) / 180);
-
-    const relMetersY = (lat - center.lat) * metersPerDegreeLat;
-    const relMetersX = (lng - center.lng) * metersPerDegreeLng;
-
-    const newRelMetersY =
-      relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
-    const newRelMetersX =
-      relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
-
-    return {
-      lat: center.lat + newRelMetersY / metersPerDegreeLat,
-      lng: center.lng + newRelMetersX / metersPerDegreeLng,
-    };
-  };
-
-  switch (type) {
-    case "marker": {
-      const marker = markers.value.find((m) => m.id === id);
-      if (marker) {
-        const rotated = rotatePoint(
-          rotationStartPositions.value.lat,
-          rotationStartPositions.value.lng,
-        );
-        marker.lat = rotated.lat;
-        marker.lng = rotated.lng;
-      }
-      break;
-    }
-    case "circle": {
-      const circle = circles.value.find((c) => c.id === id);
-      if (circle) {
-        const rotated = rotatePoint(
-          rotationStartPositions.value.lat,
-          rotationStartPositions.value.lng,
-        );
-        circle.lat = rotated.lat;
-        circle.lng = rotated.lng;
-      }
-      break;
-    }
-    case "polyline": {
-      const polyline = polylines.value.find((p) => p.id === id);
-      if (polyline) {
-        polyline.latlngs = rotationStartPositions.value.map(
-          (ll: [number, number]) => {
-            const rotated = rotatePoint(ll[0], ll[1]);
-            return [rotated.lat, rotated.lng] as [number, number];
-          },
-        );
-      }
-      break;
-    }
-    case "polygon": {
-      const polygon = polygons.value.find((p) => p.id === id);
-      if (polygon) {
-        polygon.latlngs = rotationStartPositions.value.map(
-          (ll: [number, number]) => {
-            const rotated = rotatePoint(ll[0], ll[1]);
-            return [rotated.lat, rotated.lng] as [number, number];
-          },
-        );
-      }
-      break;
-    }
-    case "rectangle": {
-      const rectangle = rectangles.value.find((r) => r.id === id);
-      if (rectangle) {
-        const oldCenter = L.value.latLng(
-          (rotationStartPositions.value[0][0] +
-            rotationStartPositions.value[1][0]) /
-            2,
-          (rotationStartPositions.value[0][1] +
-            rotationStartPositions.value[1][1]) /
-            2,
-        );
-
-        const rotatedCenter = rotatePoint(oldCenter.lat, oldCenter.lng);
-
-        const width =
-          rotationStartPositions.value[1][0] -
-          rotationStartPositions.value[0][0];
-        const height =
-          rotationStartPositions.value[1][1] -
-          rotationStartPositions.value[0][1];
-
-        rectangle.bounds = [
-          [rotatedCenter.lat - width / 2, rotatedCenter.lng - height / 2],
-          [rotatedCenter.lat + width / 2, rotatedCenter.lng + height / 2],
-        ] as [[number, number], [number, number]];
-      }
-      break;
-    }
-  }
-};
-
-const handleBoundingBoxRotateEnd = () => {
-  rotationStartPositions.value = null;
-  rotationCenter.value = null;
-};
+const editMode = ref(true);
+const selectMode = ref<"select" | "directSelect" | null>("select");
 </script>
 
 <template>
-  <div class="w-full h-full flex flex-col gap-4">
-    <div class="rounded flex items-center justify-between">
-      <Button
-        @click="editMode = !editMode"
-        class="px-4 py-2 rounded transition-colors"
-        :class="
-          editMode
-            ? 'bg-blue-500 text-white hover:bg-blue-600'
-            : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-        "
-      >
-        {{ editMode ? "Disable edition" : "Enable edition" }}
-      </Button>
+  <div class="h-[600px] w-full flex flex-col">
+    <div class="p-4 border-b">
+      <div class="flex gap-4 items-center">
+        <label class="flex items-center gap-2">
+          <input v-model="editMode" type="checkbox" />
+          <span>Edit Mode</span>
+        </label>
+
+        <label class="flex items-center gap-2">
+          <span>Select Mode:</span>
+          <select v-model="selectMode" class="border rounded px-2 py-1">
+            <option :value="null">None</option>
+            <option value="select">Select</option>
+            <option value="directSelect">Direct Select</option>
+          </select>
+        </label>
+      </div>
     </div>
 
-    <div class="flex-1 relative">
+    <div class="flex-1">
       <LeafletMap
-        ref="mapRef"
-        name="shapes-demo"
-        class="w-full h-[600px] rounded-lg shadow-lg"
         tile-layer="osm"
-        :center-lat="48.8566"
-        :center-lng="2.3522"
-        :zoom="13"
+        :center-lat="center[0]"
+        :center-lng="center[1]"
+        :zoom="zoom"
       >
         <LeafletTileLayer
           name="osm"
           url-template="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         />
 
-        <LeafletZoomControl position="topleft" />
+        <LeafletSelectionManager :enabled="editMode" :mode="selectMode">
+          <LeafletMarker
+            v-for="marker in markers"
+            :key="marker.id"
+            :id="marker.id"
+            v-model:lat="marker.lat"
+            v-model:lng="marker.lng"
+            :selectable="selectMode === 'select'"
+            :draggable="editMode"
+          />
 
-        <LeafletDrawControl
-          position="topright"
-          :edit-mode="editMode"
-          :active-mode="currentMode"
-          :modes="{
-            select: true,
-            directSelect: true,
-            marker: true,
-            circle: true,
-            polyline: true,
-            polygon: true,
-            rectangle: true,
-          }"
-          @mode-selected="handleModeSelected"
-        />
+          <LeafletCircle
+            v-for="circle in circles"
+            :key="circle.id"
+            :id="circle.id"
+            v-model:lat="circle.lat"
+            v-model:lng="circle.lng"
+            v-model:radius="circle.radius"
+            :selectable="selectMode === 'select'"
+            :editable="selectMode === 'directSelect'"
+            :draggable="selectMode === 'select' && editMode"
+            class="bg-red-500/30 border border-red-500"
+          />
 
-        <LeafletFeaturesEditor
-          :enabled="editMode"
-          :mode="currentMode"
-          :shape-options="{ color: '#3388ff', fillOpacity: 0.2 }"
-          @draw:created="handleShapeCreated"
-          @mode-changed="handleModeChanged"
-          @edit-mode-changed="handleEditModeChanged"
-        >
-          <LeafletBoundingBox
-            :bounds="boundingBox"
-            :visible="boundingBox !== null && currentEditMode === 'select'"
-            @update:bounds="handleBoundingBoxUpdate"
-            @rotate="handleBoundingBoxRotate"
-            @rotate-end="handleBoundingBoxRotateEnd"
-          >
+          <LeafletPolyline
+            v-for="polyline in polylines"
+            :key="polyline.id"
+            :id="polyline.id"
+            v-model:latlngs="polyline.latlngs"
+            :selectable="selectMode === 'select'"
+            :editable="selectMode === 'directSelect'"
+            :draggable="selectMode === 'select' && editMode"
+            :weight="4"
+            class="border border-blue-500"
+          />
+
+          <LeafletPolygon
+            v-for="polygon in polygons"
+            :key="polygon.id"
+            :id="polygon.id"
+            v-model:latlngs="polygon.latlngs"
+            :selectable="selectMode === 'select'"
+            :editable="selectMode === 'directSelect'"
+            :draggable="selectMode === 'select' && editMode"
+            class="bg-green-500/30 border border-green-500/50"
+          />
+
+          <LeafletRectangle
+            v-for="rectangle in rectangles"
+            :key="rectangle.id"
+            :id="rectangle.id"
+            v-model:bounds="rectangle.bounds"
+            :selectable="selectMode === 'select'"
+            :editable="selectMode === 'directSelect'"
+            :draggable="selectMode === 'select' && editMode"
+            class="bg-purple-500/50 border border-purple-600"
+          />
+
+          <template #bounding-box-styles>
             <LeafletBoundingBoxRectangle
               class="border-2 border-orange-400"
               :dashed="[5, 5]"
             />
+
             <LeafletBoundingBoxHandle
               role="corner"
               class="bg-red-500/30 border border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
               :size="10"
             />
+
             <LeafletBoundingBoxHandle
               role="edge"
               class="bg-blue-500/20 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
               :size="8"
             />
+
             <LeafletBoundingBoxHandle
               role="rotate"
               class="bg-blue-500/40 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
               :size="12"
             />
+
             <LeafletBoundingBoxHandle
               role="center"
               class="bg-orange-500/40 border border-orange-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
               :size="12"
             />
-          </LeafletBoundingBox>
-
-          <LeafletMarker
-            v-for="marker in markers"
-            :key="`marker-${marker.id}`"
-            :lat="marker.lat"
-            :lng="marker.lng"
-            :draggable="moveableShapes.markers"
-            :editable="editableShapes.markers"
-            @update:lat="(lat) => updateMarker(marker.id, lat, marker.lng)"
-            @update:lng="(lng) => updateMarker(marker.id, marker.lat, lng)"
-            @click="selectShape('marker', marker.id)"
-            @dragstart="selectShape('marker', marker.id)"
-          />
-
-          <LeafletCircle
-            v-for="circle in circles"
-            :key="`circle-${circle.id}`"
-            :lat="circle.lat"
-            :lng="circle.lng"
-            :radius="circle.radius"
-            :class="circle.class"
-            :draggable="moveableShapes.circles"
-            :editable="editableShapes.circles"
-            @update:lat="(lat) => updateCircle(circle.id, { lat })"
-            @update:lng="(lng) => updateCircle(circle.id, { lng })"
-            @update:radius="(radius) => updateCircle(circle.id, { radius })"
-            @click="selectShape('circle', circle.id)"
-            @dragstart="selectShape('circle', circle.id)"
-          />
-
-          <LeafletPolyline
-            v-for="polyline in polylines"
-            :key="`polyline-${polyline.id}`"
-            :latlngs="polyline.latlngs"
-            :weight="polyline.weight"
-            :class="polyline.class"
-            :draggable="moveableShapes.polylines"
-            :editable="editableShapes.polylines"
-            @update:latlngs="(latlngs) => updatePolyline(polyline.id, latlngs)"
-            @click="selectShape('polyline', polyline.id)"
-            @dragstart="selectShape('polyline', polyline.id)"
-          />
-
-          <LeafletPolygon
-            v-for="polygon in polygons"
-            :key="`polygon-${polygon.id}`"
-            :latlngs="polygon.latlngs"
-            :class="polygon.class"
-            :draggable="moveableShapes.polygons"
-            :editable="editableShapes.polygons"
-            :auto-close="true"
-            @update:latlngs="(latlngs) => updatePolygon(polygon.id, latlngs)"
-            @closed="() => onPolygonClosed(polygon.id)"
-            @click="selectShape('polygon', polygon.id)"
-            @dragstart="selectShape('polygon', polygon.id)"
-          />
-
-          <LeafletRectangle
-            v-for="rectangle in rectangles"
-            :key="`rectangle-${rectangle.id}`"
-            :bounds="rectangle.bounds"
-            :class="rectangle.class"
-            :draggable="moveableShapes.rectangles"
-            :editable="editableShapes.rectangles"
-            @update:bounds="(bounds) => updateRectangle(rectangle.id, bounds)"
-            @click="selectShape('rectangle', rectangle.id)"
-            @dragstart="selectShape('rectangle', rectangle.id)"
-          />
-        </LeafletFeaturesEditor>
+          </template>
+        </LeafletSelectionManager>
       </LeafletMap>
     </div>
   </div>

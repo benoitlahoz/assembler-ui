@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount, type HTMLAttributes } from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
-import { LeafletMapKey, LeafletModuleKey } from '.';
+import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from '.';
+import type { FeatureReference } from './LeafletSelectionManager.vue';
 import './leaflet-editing.css';
 
 export interface LeafletRectangleProps {
-  bounds?: [[number, number], [number, number]]; // [[latMin, lngMin], [latMax, lngMax]]
+  id?: string | number;
+  bounds?: [[number, number], [number, number]];
   editable?: boolean;
   draggable?: boolean;
+  selectable?: boolean;
   class?: HTMLAttributes['class'];
 }
 
@@ -18,6 +21,7 @@ const props = withDefaults(defineProps<LeafletRectangleProps>(), {
   ],
   editable: false,
   draggable: false,
+  selectable: false,
 });
 
 const emit = defineEmits<{
@@ -30,9 +34,12 @@ const { getLeafletShapeColors } = useCssParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
+const selectionContext = inject(LeafletSelectionKey, undefined);
+
 const rectangle = ref<L.Rectangle | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
 const isDragging = ref(false);
+const rectangleId = ref<string | number>(props.id ?? `rectangle-${Date.now()}-${Math.random()}`);
 
 // Variables pour le drag
 let dragStartBounds: L.LatLngBounds | null = null;
@@ -217,6 +224,32 @@ const setupMapDragHandlers = () => {
   }
 };
 
+// Selection context integration
+const registerWithSelection = () => {
+  if (!props.selectable || !selectionContext || !rectangle.value) return;
+
+  const featureRef: FeatureReference = {
+    id: rectangleId.value,
+    type: 'rectangle',
+    getBounds: () => {
+      if (!rectangle.value) return null;
+      return rectangle.value.getBounds();
+    },
+    applyTransform: (bounds: L.LatLngBounds) => {
+      if (!rectangle.value) return;
+
+      rectangle.value.setBounds(bounds);
+      emit('update:bounds', [
+        [bounds.getSouth(), bounds.getWest()],
+        [bounds.getNorth(), bounds.getEast()],
+      ] as [[number, number], [number, number]]);
+    },
+    // Pas de rotation pour les rectangles (ils restent axis-aligned)
+  };
+
+  selectionContext.registerFeature(featureRef);
+};
+
 watch(
   () => [map.value, props.bounds, props.editable, props.draggable],
   (newVal, oldVal) => {
@@ -255,9 +288,26 @@ watch(
           rectangle.value.addTo(map.value);
 
           // Add click event listener
-          rectangle.value.on('click', () => {
-            emit('click');
-          });
+          if (props.selectable && selectionContext) {
+            rectangle.value.on('click', () => {
+              selectionContext.selectFeature('rectangle', rectangleId.value);
+              emit('click');
+            });
+            rectangle.value.on('mousedown', (e: any) => {
+              if (props.draggable) {
+                selectionContext.selectFeature('rectangle', rectangleId.value);
+              }
+            });
+          } else {
+            rectangle.value.on('click', () => {
+              emit('click');
+            });
+          }
+
+          // Register with selection context if selectable
+          if (props.selectable && selectionContext) {
+            registerWithSelection();
+          }
         }
 
         // Gestion des modes : draggable OU editable, pas les deux
@@ -284,6 +334,11 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  // Unregister from selection context
+  if (props.selectable && selectionContext) {
+    selectionContext.unregisterFeature(rectangleId.value);
+  }
+
   clearEditMarkers();
   if (rectangle.value) {
     rectangle.value.remove();

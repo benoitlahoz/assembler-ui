@@ -10,15 +10,18 @@ import {
   onMounted,
 } from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
-import { LeafletMapKey, LeafletModuleKey } from '.';
+import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from '.';
+import type { FeatureReference } from './LeafletSelectionManager.vue';
 import './leaflet-editing.css';
 
 export interface LeafletCircleProps {
+  id?: string | number;
   lat?: number | string;
   lng?: number | string;
   radius?: number | string;
   editable?: boolean;
   draggable?: boolean;
+  selectable?: boolean;
   class?: HTMLAttributes['class'];
 }
 
@@ -28,6 +31,7 @@ const props = withDefaults(defineProps<LeafletCircleProps>(), {
   radius: 100,
   editable: false,
   draggable: false,
+  selectable: false,
 });
 
 const emit = defineEmits<{
@@ -42,9 +46,12 @@ const { getLeafletShapeColors } = useCssParser();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
+const selectionContext = inject(LeafletSelectionKey, undefined);
+
 const circle = ref<L.Circle | null>(null);
 const centerMarker = ref<L.Marker | null>(null);
 const radiusMarker = ref<L.Marker | null>(null);
+const circleId = ref<string | number>(props.id ?? `circle-${Date.now()}-${Math.random()}`);
 
 // Drag state
 const isDragging = ref(false);
@@ -176,6 +183,36 @@ const enableEditing = () => {
   }
 };
 
+// Selection context integration
+const registerWithSelection = () => {
+  if (!props.selectable || !selectionContext || !circle.value) return;
+
+  const featureRef: FeatureReference = {
+    id: circleId.value,
+    type: 'circle',
+    getBounds: () => {
+      if (!circle.value) return null;
+      return circle.value.getBounds();
+    },
+    applyTransform: (bounds: L.LatLngBounds) => {
+      if (!circle.value) return;
+      const center = bounds.getCenter();
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
+      const radius = center.distanceTo(sw);
+
+      circle.value.setLatLng(center);
+      circle.value.setRadius(radius);
+
+      emit('update:lat', center.lat);
+      emit('update:lng', center.lng);
+      emit('update:radius', radius);
+    },
+  };
+
+  selectionContext.registerFeature(featureRef);
+};
+
 watch(
   () => [map.value, props.lat, props.lng, props.radius, props.editable, props.draggable],
   (newVal, oldVal) => {
@@ -218,12 +255,29 @@ watch(
           circle.value.addTo(map.value);
 
           // Add click event listener
-          circle.value.on('click', () => {
-            emit('click');
-          });
+          if (props.selectable && selectionContext) {
+            circle.value.on('click', () => {
+              selectionContext.selectFeature('circle', circleId.value);
+              emit('click');
+            });
+            circle.value.on('mousedown', (e: any) => {
+              if (props.draggable) {
+                selectionContext.selectFeature('circle', circleId.value);
+              }
+            });
+          } else {
+            circle.value.on('click', () => {
+              emit('click');
+            });
+          }
 
           // Setup map-level drag handlers once
           setupMapDragHandlers();
+
+          // Register with selection context if selectable
+          if (props.selectable && selectionContext) {
+            registerWithSelection();
+          }
         }
 
         // Apply colors
@@ -261,6 +315,11 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  // Unregister from selection context
+  if (props.selectable && selectionContext) {
+    selectionContext.unregisterFeature(circleId.value);
+  }
+
   clearEditMarkers();
   if (circle.value) {
     circle.value.remove();
