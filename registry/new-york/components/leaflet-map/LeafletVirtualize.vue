@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import {
-  ref,
-  inject,
-  onMounted,
-  onBeforeUnmount,
-  nextTick,
-  computed,
-  watch,
-  useSlots,
-  type Ref,
-} from 'vue';
+import { ref, inject, onMounted, onBeforeUnmount, nextTick, watch, type Ref } from 'vue';
 import { LeafletMapKey, LeafletModuleKey } from '.';
 import type Leaflet from 'leaflet';
+import type {
+  UseQuadtreeReturn,
+  Rect,
+} from '~~/registry/new-york/composables/use-quadtree/useQuadtree';
 
 export interface LeafletVirtualizeProps {
+  /**
+   * Quadtree composable return value for spatial indexing (required)
+   * Uses O(log n) quadtree queries for efficient virtualization
+   */
+  quadtree: UseQuadtreeReturn<any>;
+
   /**
    * Enable/disable virtualization
    */
@@ -47,20 +47,10 @@ const emit = defineEmits<{
 const L = inject(LeafletModuleKey, ref<typeof Leaflet | undefined>(undefined));
 const map = inject<Ref<Leaflet.Map | null>>(LeafletMapKey, ref(null));
 
-// Get slots
-const slots = useSlots();
-
 // Virtualization state
 const visibleBounds = ref<Leaflet.LatLngBounds | null>(null);
 const visibleFeatureIds = ref<Set<string | number>>(new Set());
 let updateScheduled = false;
-const visibleCount = ref(0);
-
-// Cache of feature positions for faster lookups
-const featurePositionsCache = new Map<
-  string | number,
-  { lat: number; lng: number } | { latlngs: Array<[number, number]> }
->();
 
 /**
  * Update visible bounds when map moves or zooms
@@ -91,166 +81,48 @@ const updateVisibleBounds = () => {
       visibleBounds.value = bounds;
     }
 
-    // Update visible count
-    updateVisibleCount();
+    // Update visible features using quadtree
+    updateVisibleFeaturesQuadtree();
 
     emit('bounds-changed', visibleBounds.value);
   });
 };
 
 /**
- * Update the count of visible features
+ * Update visible features using quadtree (O(log n))
  */
-const updateVisibleCount = () => {
-  if (!props.enabled) {
-    const children = slots.default?.() || [];
-    visibleCount.value = children.length;
+const updateVisibleFeaturesQuadtree = () => {
+  if (!props.enabled || !visibleBounds.value) {
     visibleFeatureIds.value.clear();
+    emit('update:visible-count', 0);
     return;
   }
 
-  const children = slots.default?.() || [];
+  const bounds = visibleBounds.value;
+
+  // Convert Leaflet bounds to Rect for quadtree query
+  const queryRect: Rect = {
+    x: bounds.getWest(),
+    y: bounds.getSouth(),
+    width: bounds.getEast() - bounds.getWest(),
+    height: bounds.getNorth() - bounds.getSouth(),
+  };
+
+  // Query quadtree - O(log n) instead of O(n) !
+  const visibleItems = props.quadtree.retrieve(queryRect);
+
   const newVisibleIds = new Set<string | number>();
-  let count = 0;
+  for (const item of visibleItems) {
+    newVisibleIds.add(item.id);
+  }
 
-  for (const child of children) {
-    const id = child.props?.id;
-
-    // Cache feature position if not already cached
-    if (id !== undefined && !featurePositionsCache.has(id)) {
-      const position = getChildPosition(child);
-      if (
-        (position.lat !== undefined && position.lng !== undefined) ||
-        position.latlngs !== undefined
-      ) {
-        featurePositionsCache.set(id, position as any);
-      }
-    }
-
-    // Check if visible using cached position
-    const isVisible = shouldRenderChild(child);
-    if (isVisible) {
-      count++;
-      if (id !== undefined) {
-        newVisibleIds.add(id);
-      }
-    }
+  // Add always visible features
+  for (const id of props.alwaysVisible) {
+    newVisibleIds.add(id);
   }
 
   visibleFeatureIds.value = newVisibleIds;
-  visibleCount.value = count;
-  emit('update:visible-count', count);
-};
-
-/**
- * Check if a feature is visible based on its position
- */
-const isFeatureVisible = (lat: number, lng: number, featureId?: string | number): boolean => {
-  // If virtualization is disabled, always return true
-  if (!props.enabled) return true;
-
-  // If no visible bounds yet, show everything (initial render)
-  if (!visibleBounds.value) return true;
-
-  // Always render features in the alwaysVisible list
-  if (featureId !== undefined && props.alwaysVisible.includes(featureId)) return true;
-
-  // Check if point is within visible bounds
-  if (!L.value) return true;
-
-  const point = L.value.latLng(lat, lng);
-  return visibleBounds.value.contains(point);
-};
-
-/**
- * Check if a polygon is visible based on its latlngs
- */
-const isPolygonVisible = (
-  latlngs: Array<[number, number]>,
-  featureId?: string | number
-): boolean => {
-  // If virtualization is disabled, always return true
-  if (!props.enabled) return true;
-
-  // If no visible bounds yet, show everything (initial render)
-  if (!visibleBounds.value) return true;
-
-  // Always render features in the alwaysVisible list
-  if (featureId !== undefined && props.alwaysVisible.includes(featureId)) return true;
-
-  if (!L.value || !latlngs || latlngs.length === 0) return true;
-
-  // Check if any point of the polygon is within visible bounds
-  for (const [lat, lng] of latlngs) {
-    const point = L.value.latLng(lat, lng);
-    if (visibleBounds.value.contains(point)) {
-      return true;
-    }
-  }
-
-  return false;
-};
-
-/**
- * Extract position from child VNode props
- */
-const getChildPosition = (
-  child: any
-): { lat?: number; lng?: number; latlngs?: Array<[number, number]> } => {
-  if (!child.props) return {};
-
-  // Handle markers and circles (lat/lng)
-  if (child.props.lat !== undefined && child.props.lng !== undefined) {
-    return {
-      lat: typeof child.props.lat === 'string' ? parseFloat(child.props.lat) : child.props.lat,
-      lng: typeof child.props.lng === 'string' ? parseFloat(child.props.lng) : child.props.lng,
-    };
-  }
-
-  // Handle polygons (latlngs)
-  if (child.props.latlngs !== undefined) {
-    return { latlngs: child.props.latlngs };
-  }
-
-  return {};
-};
-
-/**
- * Check if a child VNode should be visible (optimized version with cache)
- */
-const shouldRenderChild = (child: any): boolean => {
-  if (!props.enabled) return true;
-
-  const id = child.props?.id;
-
-  // Fast path: check cached visibility by ID
-  if (id !== undefined && visibleFeatureIds.value.size > 0) {
-    return visibleFeatureIds.value.has(id);
-  }
-
-  // Slow path: calculate visibility
-  const position =
-    id !== undefined && featurePositionsCache.has(id)
-      ? featurePositionsCache.get(id)!
-      : getChildPosition(child);
-
-  // If it has lat/lng, check point visibility
-  if (
-    'lat' in position &&
-    position.lat !== undefined &&
-    'lng' in position &&
-    position.lng !== undefined
-  ) {
-    return isFeatureVisible(position.lat, position.lng, id);
-  }
-
-  // If it has latlngs, check polygon visibility
-  if ('latlngs' in position && position.latlngs !== undefined) {
-    return isPolygonVisible(position.latlngs, id);
-  }
-
-  // Unknown feature type, render it
-  return true;
+  emit('update:visible-count', newVisibleIds.size);
 };
 
 // Setup map event listeners for virtualization
@@ -278,7 +150,7 @@ onBeforeUnmount(() => {
 watch(
   () => props.enabled,
   () => {
-    updateVisibleCount();
+    updateVisibleFeaturesQuadtree();
   }
 );
 
@@ -289,10 +161,17 @@ watch(
   }
 );
 
+watch(
+  () => props.quadtree,
+  () => {
+    updateVisibleFeaturesQuadtree();
+  }
+);
+
 // Expose methods for external usage if needed
 defineExpose({
-  isFeatureVisible,
   visibleBounds,
+  visibleFeatureIds,
 });
 </script>
 
@@ -301,9 +180,10 @@ defineExpose({
     <slot />
   </template>
   <template v-else>
-    <!-- Use feature ID as key for stable identity -->
-    <template v-for="child in $slots.default?.()" :key="child.props?.id ?? child.key">
-      <component :is="child" v-if="shouldRenderChild(child)" />
-    </template>
+    <!-- Quadtree mode: use scoped slot for manual control -->
+    <slot
+      :is-visible="(id: string | number) => visibleFeatureIds.has(id)"
+      :visible-ids="visibleFeatureIds"
+    />
   </template>
 </template>

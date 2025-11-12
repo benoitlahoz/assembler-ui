@@ -5,14 +5,22 @@ import {
   LeafletMap,
   LeafletTileLayer,
   LeafletZoomControl,
-  LeafletVirtualizeQuadtree,
+  LeafletVirtualize,
   LeafletMarker,
   LeafletCircle,
   LeafletPolygon,
+  LeafletPolyline,
+  LeafletRectangle,
   type LeafletMapExposed,
 } from '~~/registry/new-york/components/leaflet-map';
 import { loadVirtualizationDemoData } from './virtualization-demo-loader';
-import type { DemoMarker, DemoCircle, DemoPolygon } from './virtualization-demo-loader';
+import type {
+  DemoMarker,
+  DemoCircle,
+  DemoPolygon,
+  DemoPolyline,
+  DemoRectangle,
+} from './virtualization-demo-loader';
 import type { UseQuadtreeReturn } from '~~/registry/new-york/composables/use-quadtree/useQuadtree';
 
 const mapRef = ref<LeafletMapExposed | null>(null);
@@ -22,8 +30,16 @@ const virtualizationEnabled = ref(true);
 const virtualizationMargin = ref(0.1); // 0.1 degrees margin
 const visibleMarkersCount = ref(0);
 const visibleCirclesCount = ref(0);
+const visiblePolygonsCount = ref(0);
+const visiblePolylinesCount = ref(0);
+const visibleRectanglesCount = ref(0);
 const visibleShapesCount = computed(
-  () => visibleMarkersCount.value + visibleCirclesCount.value + polygons.value.length
+  () =>
+    visibleMarkersCount.value +
+    visibleCirclesCount.value +
+    visiblePolygonsCount.value +
+    visiblePolylinesCount.value +
+    visibleRectanglesCount.value
 );
 
 // Data loading state
@@ -33,13 +49,23 @@ const loadingStage = ref('Starting...');
 const markers = ref<DemoMarker[]>([]);
 const circles = ref<DemoCircle[]>([]);
 const polygons = ref<DemoPolygon[]>([]);
+const polylines = ref<DemoPolyline[]>([]);
+const rectangles = ref<DemoRectangle[]>([]);
 
 // Quadtrees for spatial indexing (not wrapped in ref, already reactive)
 let markersQuadtree: UseQuadtreeReturn<DemoMarker> | null = null;
 let circlesQuadtree: UseQuadtreeReturn<DemoCircle> | null = null;
+let polygonsQuadtree: UseQuadtreeReturn<DemoPolygon> | null = null;
+let polylinesQuadtree: UseQuadtreeReturn<DemoPolyline> | null = null;
+let rectanglesQuadtree: UseQuadtreeReturn<DemoRectangle> | null = null;
 
 const totalShapes = computed(
-  () => markers.value.length + circles.value.length + polygons.value.length
+  () =>
+    markers.value.length +
+    circles.value.length +
+    polygons.value.length +
+    polylines.value.length +
+    rectangles.value.length
 );
 
 // Load data asynchronously
@@ -51,8 +77,13 @@ onMounted(async () => {
   markers.value = data.markers;
   circles.value = data.circles;
   polygons.value = data.polygons;
+  polylines.value = data.polylines;
+  rectangles.value = data.rectangles;
   markersQuadtree = data.quadtrees.markers;
   circlesQuadtree = data.quadtrees.circles;
+  polygonsQuadtree = data.quadtrees.polygons;
+  polylinesQuadtree = data.quadtrees.polylines;
+  rectanglesQuadtree = data.quadtrees.rectangles;
   isLoading.value = false;
 });
 
@@ -93,11 +124,12 @@ updateFPS();
     <!-- Demo content -->
     <template v-else>
       <!-- Controls -->
-      <div class="rounded flex items-center justify-between gap-4 p-4">
-        <div class="flex items-center gap-4">
+      <div class="rounded flex flex-col gap-4 p-4">
+        <!-- Stats row -->
+        <div class="flex items-center gap-6">
           <div class="text-sm">
-            <strong>Total shapes:</strong>
-            {{ totalShapes.toLocaleString() }}
+            <strong>Total:</strong>
+            {{ totalShapes.toLocaleString() }} shapes
           </div>
           <div class="text-sm">
             <strong>Rendered:</strong>
@@ -109,6 +141,31 @@ updateFPS();
           </div>
         </div>
 
+        <!-- Shape counts row -->
+        <div class="flex items-center gap-6 text-xs text-gray-600">
+          <div>
+            <strong>Markers:</strong>
+            {{ visibleMarkersCount.toLocaleString() }} / {{ markers.length.toLocaleString() }}
+          </div>
+          <div>
+            <strong>Circles:</strong>
+            {{ visibleCirclesCount.toLocaleString() }} / {{ circles.length.toLocaleString() }}
+          </div>
+          <div>
+            <strong>Polygons:</strong>
+            {{ visiblePolygonsCount.toLocaleString() }} / {{ polygons.length.toLocaleString() }}
+          </div>
+          <div>
+            <strong>Polylines:</strong>
+            {{ visiblePolylinesCount.toLocaleString() }} / {{ polylines.length.toLocaleString() }}
+          </div>
+          <div>
+            <strong>Rectangles:</strong>
+            {{ visibleRectanglesCount.toLocaleString() }} / {{ rectangles.length.toLocaleString() }}
+          </div>
+        </div>
+
+        <!-- Controls row -->
         <div class="flex items-center gap-4">
           <Button
             @click="virtualizationEnabled = !virtualizationEnabled"
@@ -156,7 +213,7 @@ updateFPS();
           <LeafletZoomControl position="topleft" />
 
           <!-- Markers with Quadtree Virtualization -->
-          <LeafletVirtualizeQuadtree
+          <LeafletVirtualize
             v-if="markersQuadtree"
             :enabled="virtualizationEnabled"
             :margin="virtualizationMargin"
@@ -173,10 +230,10 @@ updateFPS();
                 v-model:lng="marker.lng"
               />
             </template>
-          </LeafletVirtualizeQuadtree>
+          </LeafletVirtualize>
 
           <!-- Circles with Quadtree Virtualization -->
-          <LeafletVirtualizeQuadtree
+          <LeafletVirtualize
             v-if="circlesQuadtree"
             :enabled="virtualizationEnabled"
             :margin="virtualizationMargin"
@@ -195,16 +252,67 @@ updateFPS();
                 :class="circle.class"
               />
             </template>
-          </LeafletVirtualizeQuadtree>
+          </LeafletVirtualize>
 
-          <!-- Polygons (no quadtree, rendered directly) -->
-          <LeafletPolygon
-            v-for="polygon in polygons"
-            :key="polygon.id"
-            :id="polygon.id"
-            v-model:latlngs="polygon.latlngs"
-            :class="polygon.class"
-          />
+          <!-- Polygons with Quadtree Virtualization -->
+          <LeafletVirtualize
+            v-if="polygonsQuadtree"
+            :enabled="virtualizationEnabled"
+            :margin="virtualizationMargin"
+            :quadtree="polygonsQuadtree"
+            @update:visible-count="visiblePolygonsCount = $event"
+          >
+            <template #default="{ isVisible }">
+              <LeafletPolygon
+                v-for="polygon in polygons"
+                v-show="isVisible(polygon.id)"
+                :key="polygon.id"
+                :id="polygon.id"
+                v-model:latlngs="polygon.latlngs"
+                :class="polygon.class"
+              />
+            </template>
+          </LeafletVirtualize>
+
+          <!-- Polylines with Quadtree Virtualization -->
+          <LeafletVirtualize
+            v-if="polylinesQuadtree"
+            :enabled="virtualizationEnabled"
+            :margin="virtualizationMargin"
+            :quadtree="polylinesQuadtree"
+            @update:visible-count="visiblePolylinesCount = $event"
+          >
+            <template #default="{ isVisible }">
+              <LeafletPolyline
+                v-for="polyline in polylines"
+                v-show="isVisible(polyline.id)"
+                :key="polyline.id"
+                :id="polyline.id"
+                v-model:latlngs="polyline.latlngs"
+                :class="polyline.class"
+              />
+            </template>
+          </LeafletVirtualize>
+
+          <!-- Rectangles with Quadtree Virtualization -->
+          <LeafletVirtualize
+            v-if="rectanglesQuadtree"
+            :enabled="virtualizationEnabled"
+            :margin="virtualizationMargin"
+            :quadtree="rectanglesQuadtree"
+            @update:visible-count="visibleRectanglesCount = $event"
+          >
+            <template #default="{ isVisible }">
+              <LeafletRectangle
+                v-for="rectangle in rectangles"
+                v-show="isVisible(rectangle.id)"
+                :key="rectangle.id"
+                :id="rectangle.id"
+                v-model:bounds="rectangle.bounds"
+                :class="rectangle.class"
+              />
+            </template>
+          </LeafletVirtualize>
         </LeafletMap>
       </div>
 
@@ -214,7 +322,9 @@ updateFPS();
           <strong>Note:</strong> Cette démo utilise {{ totalShapes.toLocaleString() }} shapes
           pré-générées ({{ markers.length.toLocaleString() }} markers,
           {{ circles.length.toLocaleString() }} circles,
-          {{ polygons.length.toLocaleString() }} polygons) autour de Paris.
+          {{ polygons.length.toLocaleString() }} polygons,
+          {{ polylines.length.toLocaleString() }} polylines,
+          {{ rectangles.length.toLocaleString() }} rectangles) autour de Paris.
         </p>
         <p class="mt-2">
           Avec la virtualisation <strong>activée</strong>, seules les shapes visibles dans la
