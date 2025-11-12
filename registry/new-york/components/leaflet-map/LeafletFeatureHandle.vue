@@ -4,15 +4,15 @@ import { cn } from '@/lib/utils';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
 import { LeafletBoundingBoxStylesKey } from '.';
 
-export type LeafletBoundingBoxHandleRole = 'corner' | 'edge' | 'center' | 'rotate';
+export type LeafletFeatureHandleRole = 'corner' | 'edge' | 'center' | 'rotate';
 
-export interface LeafletBoundingBoxHandleProps {
-  role: LeafletBoundingBoxHandleRole;
+export interface LeafletFeatureHandleProps {
+  role: LeafletFeatureHandleRole;
   class?: HTMLAttributes['class'];
   size?: number | string;
 }
 
-const props = withDefaults(defineProps<LeafletBoundingBoxHandleProps>(), {
+const props = withDefaults(defineProps<LeafletFeatureHandleProps>(), {
   class:
     'bg-red-500 border-2 border-red-500 opacity-30 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]',
   size: 8,

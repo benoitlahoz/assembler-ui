@@ -20,7 +20,7 @@ export { default as LeafletDrawControl } from './LeafletDrawControl.vue';
 export { default as LeafletFeaturesEditor } from './LeafletFeaturesEditor.vue';
 export { default as LeafletBoundingBox } from './LeafletBoundingBox.vue';
 export { default as LeafletBoundingBoxRectangle } from './LeafletBoundingBoxRectangle.vue';
-export { default as LeafletBoundingBoxHandle } from './LeafletBoundingBoxHandle.vue';
+export { default as LeafletFeatureHandle } from './LeafletFeatureHandle.vue';
 export { default as LeafletTileLayer } from './LeafletTileLayer.vue';
 export { default as LeafletMarker } from './LeafletMarker.vue';
 export { default as LeafletCircle } from './LeafletCircle.vue';
@@ -44,7 +44,7 @@ export const LeafletTileLayersKey: InjectionKey<
 > = Symbol('LeafletTileLayerOptions');
 export const LeafletErrorsKey: InjectionKey<Ref<Error[]>> = Symbol('LeafletErrors');
 export const LeafletBoundingBoxStylesKey: InjectionKey<Ref<LeafletBoundingBoxStyles | undefined>> =
-  Symbol('LeafletBoundingBoxHandles');
+  Symbol('LeafletFeatureHandles');
 export const LeafletSelectionKey: InjectionKey<LeafletSelectionContext> =
   Symbol('LeafletSelection');
 
@@ -65,9 +65,9 @@ export type {
   LeafletHandleStyle,
 } from './LeafletBoundingBox.vue';
 export type {
-  LeafletBoundingBoxHandleProps,
-  LeafletBoundingBoxHandleRole,
-} from './LeafletBoundingBoxHandle.vue';
+  LeafletFeatureHandleProps,
+  LeafletFeatureHandleRole,
+} from './LeafletFeatureHandle.vue';
 export type { LeafletTileLayerProps } from './LeafletTileLayer.vue';
 export type { LeafletMarkerProps } from './LeafletMarker.vue';
 export type { LeafletCircleProps } from './LeafletCircle.vue';

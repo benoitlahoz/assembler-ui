@@ -123,10 +123,10 @@ Le template montre comment personnaliser le bounding box via slot:
 ```vue
 <template #bounding-box>
   <LeafletBoundingBoxRectangle class="border-2 border-orange-400" :dashed="[5, 5]" />
-  <LeafletBoundingBoxHandle role="corner" class="bg-red-500/30 ..." :size="10" />
-  <LeafletBoundingBoxHandle role="edge" class="bg-blue-500/20 ..." :size="8" />
-  <LeafletBoundingBoxHandle role="rotate" class="bg-blue-500/40 ..." :size="12" />
-  <LeafletBoundingBoxHandle role="center" class="bg-orange-500/40 ..." :size="12" />
+  <LeafletFeatureHandle role="corner" class="bg-red-500/30 ..." :size="10" />
+  <LeafletFeatureHandle role="edge" class="bg-blue-500/20 ..." :size="8" />
+  <LeafletFeatureHandle role="rotate" class="bg-blue-500/40 ..." :size="12" />
+  <LeafletFeatureHandle role="center" class="bg-orange-500/40 ..." :size="12" />
 </template>
 ```
 

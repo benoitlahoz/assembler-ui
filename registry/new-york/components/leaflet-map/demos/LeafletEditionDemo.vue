@@ -8,7 +8,7 @@ import {
   LeafletDrawControl,
   LeafletFeaturesEditor,
   LeafletSelectionManager,
-  LeafletBoundingBoxHandle,
+  LeafletFeatureHandle,
   LeafletBoundingBoxRectangle,
   LeafletMarker,
   LeafletCircle,
@@ -306,25 +306,25 @@ const onPolygonClosed = (id: number) => {
             <template #bounding-box-styles>
               <LeafletBoundingBoxRectangle class="border-2 border-orange-400" :dashed="[5, 5]" />
 
-              <LeafletBoundingBoxHandle
+              <LeafletFeatureHandle
                 role="corner"
                 class="bg-red-500/30 border border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
                 :size="10"
               />
 
-              <LeafletBoundingBoxHandle
+              <LeafletFeatureHandle
                 role="edge"
                 class="bg-blue-500/20 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
                 :size="8"
               />
 
-              <LeafletBoundingBoxHandle
+              <LeafletFeatureHandle
                 role="rotate"
                 class="bg-blue-500/40 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
                 :size="12"
               />
 
-              <LeafletBoundingBoxHandle
+              <LeafletFeatureHandle
                 role="center"
                 class="bg-orange-500/40 border border-orange-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
                 :size="12"
