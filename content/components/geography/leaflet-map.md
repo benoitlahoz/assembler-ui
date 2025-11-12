@@ -4990,14 +4990,9 @@ const updateVisibleBounds = () => {
 };
 
 const updateVisibleFeaturesQuadtree = () => {
-  console.log("[DEBUG] updateVisibleFeaturesQuadtree called");
-  console.log("[DEBUG] enabled:", props.enabled);
-  console.log("[DEBUG] visibleBounds:", visibleBounds.value);
-
   if (!visibleBounds.value) {
     visibleFeatureIds.value.clear();
     emit("update:visible-count", 0);
-    console.log("[DEBUG] No bounds, emitting 0");
     return;
   }
 
@@ -5014,7 +5009,6 @@ const updateVisibleFeaturesQuadtree = () => {
     }
     visibleFeatureIds.value = allIds;
     emit("update:visible-count", allIds.size);
-    console.log("[DEBUG] Virtualization OFF, emitting all:", allIds.size);
     return;
   }
 
@@ -5027,11 +5021,7 @@ const updateVisibleFeaturesQuadtree = () => {
     height: bounds.getNorth() - bounds.getSouth(),
   };
 
-  console.log("[DEBUG] Query rect:", queryRect);
-
   const visibleItems = props.quadtree.retrieve(queryRect);
-
-  console.log("[DEBUG] Retrieved items:", visibleItems.length);
 
   const newVisibleIds = new Set<string | number>();
   for (const item of visibleItems) {
@@ -5044,9 +5034,7 @@ const updateVisibleFeaturesQuadtree = () => {
 
   visibleFeatureIds.value = newVisibleIds;
   emit("update:visible-count", newVisibleIds.size);
-  console.log("[DEBUG] Emitting visible count:", newVisibleIds.size);
 };
-
 onMounted(() => {
   if (map.value) {
     updateVisibleBounds();
@@ -7065,11 +7053,28 @@ updateFPS();
             <strong>Total:</strong>
             {{ totalShapes }} shapes
           </div>
-          <div class="text-sm">
+          <div
+            class="text-sm"
+            :class="virtualizationEnabled ? 'text-green-600' : 'text-red-600'"
+          >
             <strong>Rendered:</strong>
             {{ visibleShapesCount }}
+            <span class="text-xs"
+              >({{
+                Math.round((visibleShapesCount / totalShapes) * 100)
+              }}%)</span
+            >
           </div>
-          <div class="text-sm">
+          <div
+            class="text-sm"
+            :class="
+              stats.fps < 30
+                ? 'text-red-600'
+                : stats.fps < 50
+                  ? 'text-orange-600'
+                  : 'text-green-600'
+            "
+          >
             <strong>FPS:</strong>
             {{ stats.fps }}
           </div>
@@ -7137,7 +7142,7 @@ updateFPS();
           tile-layer="osm"
           :center-lat="48.8566"
           :center-lng="2.3522"
-          :zoom="15"
+          :zoom="11"
         >
           <LeafletTileLayer
             name="osm"
@@ -7241,7 +7246,7 @@ updateFPS();
         </LeafletMap>
       </div>
 
-      <div class="text-sm text-gray-600 p-4 rounded">
+      <div class="text-sm text-gray-600 p-4 rounded border">
         <p>
           <strong>Note:</strong> Cette démo utilise {{ totalShapes }} shapes
           pré-générées ({{ markers.length }} markers,
@@ -7250,19 +7255,33 @@ updateFPS();
           autour de Paris.
         </p>
         <p class="mt-2">
-          Avec la virtualisation <strong>activée</strong>, seules les shapes
-          visibles dans la viewport (+ marge) sont rendues, ce qui améliore
-          considérablement les performances.
+          Avec la virtualisation
+          <strong class="text-green-600">activée</strong>, seules les shapes
+          visibles dans la viewport (+ marge) sont rendues. Regardez le compteur
+          "Rendered" pour voir combien de shapes sont actuellement montées.
         </p>
         <p class="mt-2">
-          Avec la virtualisation <strong>désactivée</strong>, toutes les shapes
-          sont rendues en même temps, ce qui peut causer des lags importants
-          lors du zoom/déplacement.
+          Avec la virtualisation
+          <strong class="text-red-600">désactivée</strong>, TOUTES les
+          {{ totalShapes }} shapes sont rendues en même temps, ce qui peut
+          causer des lags importants lors du zoom/déplacement.
         </p>
-        <p class="mt-2 text-orange-600">
-          <strong>Astuce:</strong> Zoomez et déplacez-vous sur la carte pour
-          voir la différence de performance entre les deux modes.
+        <p class="mt-2 text-orange-600 font-semibold">
+          <strong>Pour tester:</strong>
         </p>
+        <ol class="mt-1 ml-4 list-decimal text-orange-600">
+          <li>
+            Activez la virtualisation → Déplacez la carte → Notez le FPS et le %
+            de shapes rendues
+          </li>
+          <li>
+            Désactivez la virtualisation → Déplacez la carte → Comparez le FPS
+            (devrait chuter !)
+          </li>
+          <li>
+            Zoomez/dézoomez pour voir comment le nombre de shapes rendues change
+          </li>
+        </ol>
       </div>
     </template>
   </div>

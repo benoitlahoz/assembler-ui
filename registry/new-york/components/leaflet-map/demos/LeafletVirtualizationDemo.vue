@@ -131,11 +131,23 @@ updateFPS();
             <strong>Total:</strong>
             {{ totalShapes }} shapes
           </div>
-          <div class="text-sm">
+          <div class="text-sm" :class="virtualizationEnabled ? 'text-green-600' : 'text-red-600'">
             <strong>Rendered:</strong>
             {{ visibleShapesCount }}
+            <span class="text-xs"
+              >({{ Math.round((visibleShapesCount / totalShapes) * 100) }}%)</span
+            >
           </div>
-          <div class="text-sm">
+          <div
+            class="text-sm"
+            :class="
+              stats.fps < 30
+                ? 'text-red-600'
+                : stats.fps < 50
+                  ? 'text-orange-600'
+                  : 'text-green-600'
+            "
+          >
             <strong>FPS:</strong>
             {{ stats.fps }}
           </div>
@@ -202,7 +214,7 @@ updateFPS();
           tile-layer="osm"
           :center-lat="48.8566"
           :center-lng="2.3522"
-          :zoom="15"
+          :zoom="11"
         >
           <LeafletTileLayer
             name="osm"
@@ -312,7 +324,7 @@ updateFPS();
       </div>
 
       <!-- Info -->
-      <div class="text-sm text-gray-600 p-4 rounded">
+      <div class="text-sm text-gray-600 p-4 rounded border">
         <p>
           <strong>Note:</strong> Cette démo utilise {{ totalShapes }} shapes pré-générées ({{
             markers.length
@@ -321,17 +333,27 @@ updateFPS();
           {{ polylines.length }} polylines, {{ rectangles.length }} rectangles) autour de Paris.
         </p>
         <p class="mt-2">
-          Avec la virtualisation <strong>activée</strong>, seules les shapes visibles dans la
-          viewport (+ marge) sont rendues, ce qui améliore considérablement les performances.
+          Avec la virtualisation <strong class="text-green-600">activée</strong>, seules les shapes
+          visibles dans la viewport (+ marge) sont rendues. Regardez le compteur "Rendered" pour
+          voir combien de shapes sont actuellement montées.
         </p>
         <p class="mt-2">
-          Avec la virtualisation <strong>désactivée</strong>, toutes les shapes sont rendues en même
-          temps, ce qui peut causer des lags importants lors du zoom/déplacement.
+          Avec la virtualisation <strong class="text-red-600">désactivée</strong>, TOUTES les
+          {{ totalShapes }} shapes sont rendues en même temps, ce qui peut causer des lags
+          importants lors du zoom/déplacement.
         </p>
-        <p class="mt-2 text-orange-600">
-          <strong>Astuce:</strong> Zoomez et déplacez-vous sur la carte pour voir la différence de
-          performance entre les deux modes.
+        <p class="mt-2 text-orange-600 font-semibold">
+          <strong>Pour tester:</strong>
         </p>
+        <ol class="mt-1 ml-4 list-decimal text-orange-600">
+          <li>
+            Activez la virtualisation → Déplacez la carte → Notez le FPS et le % de shapes rendues
+          </li>
+          <li>
+            Désactivez la virtualisation → Déplacez la carte → Comparez le FPS (devrait chuter !)
+          </li>
+          <li>Zoomez/dézoomez pour voir comment le nombre de shapes rendues change</li>
+        </ol>
       </div>
     </template>
   </div>

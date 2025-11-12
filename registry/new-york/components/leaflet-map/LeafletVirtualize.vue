@@ -92,14 +92,9 @@ const updateVisibleBounds = () => {
  * Update visible features using quadtree (O(log n))
  */
 const updateVisibleFeaturesQuadtree = () => {
-  console.log('[DEBUG] updateVisibleFeaturesQuadtree called');
-  console.log('[DEBUG] enabled:', props.enabled);
-  console.log('[DEBUG] visibleBounds:', visibleBounds.value);
-
   if (!visibleBounds.value) {
     visibleFeatureIds.value.clear();
     emit('update:visible-count', 0);
-    console.log('[DEBUG] No bounds, emitting 0');
     return;
   }
 
@@ -117,7 +112,6 @@ const updateVisibleFeaturesQuadtree = () => {
     }
     visibleFeatureIds.value = allIds;
     emit('update:visible-count', allIds.size);
-    console.log('[DEBUG] Virtualization OFF, emitting all:', allIds.size);
     return;
   }
 
@@ -131,12 +125,8 @@ const updateVisibleFeaturesQuadtree = () => {
     height: bounds.getNorth() - bounds.getSouth(),
   };
 
-  console.log('[DEBUG] Query rect:', queryRect);
-
   // Query quadtree - O(log n) instead of O(n) !
   const visibleItems = props.quadtree.retrieve(queryRect);
-
-  console.log('[DEBUG] Retrieved items:', visibleItems.length);
 
   const newVisibleIds = new Set<string | number>();
   for (const item of visibleItems) {
@@ -150,10 +140,7 @@ const updateVisibleFeaturesQuadtree = () => {
 
   visibleFeatureIds.value = newVisibleIds;
   emit('update:visible-count', newVisibleIds.size);
-  console.log('[DEBUG] Emitting visible count:', newVisibleIds.size);
-};
-
-// Setup map event listeners for virtualization
+}; // Setup map event listeners for virtualization
 onMounted(() => {
   // If map is already available, set it up immediately
   if (map.value) {
