@@ -526,6 +526,7 @@ const clearHandles = () => {
 const constrainToSquare = (
   bounds: L.LatLngBounds,
   center?: L.LatLng,
+  originalBounds?: L.LatLngBounds,
 ): L.LatLngBounds => {
   if (!L.value) return bounds;
 
@@ -537,11 +538,25 @@ const constrainToSquare = (
   const lngMeters =
     lngDiff * 111320 * Math.cos((currentCenter.lat * Math.PI) / 180);
 
-  const maxMeters = Math.max(latMeters, lngMeters);
+  let targetMeters = latMeters;
+  if (originalBounds) {
+    const origLatDiff = originalBounds.getNorth() - originalBounds.getSouth();
+    const origLngDiff = originalBounds.getEast() - originalBounds.getWest();
+    const origLatMeters = origLatDiff * 111320;
+    const origLngMeters =
+      origLngDiff * 111320 * Math.cos((currentCenter.lat * Math.PI) / 180);
 
-  const halfLatDiff = maxMeters / 2 / 111320;
+    const latChange = Math.abs(latMeters - origLatMeters);
+    const lngChange = Math.abs(lngMeters - origLngMeters);
+
+    targetMeters = lngChange > latChange ? lngMeters : latMeters;
+  } else {
+    targetMeters = (latMeters + lngMeters) / 2;
+  }
+
+  const halfLatDiff = targetMeters / 2 / 111320;
   const halfLngDiff =
-    maxMeters / 2 / (111320 * Math.cos((currentCenter.lat * Math.PI) / 180));
+    targetMeters / 2 / (111320 * Math.cos((currentCenter.lat * Math.PI) / 180));
 
   return L.value.latLngBounds(
     [currentCenter.lat - halfLatDiff, currentCenter.lng - halfLngDiff],
@@ -632,7 +647,11 @@ const createBoundingBox = () => {
       }
 
       if (props.constrainSquare) {
-        newBounds = constrainToSquare(newBounds, scaleStartBounds.getCenter());
+        newBounds = constrainToSquare(
+          newBounds,
+          scaleStartBounds.getCenter(),
+          scaleStartBounds,
+        );
       }
 
       if (boundingBox.value) {
@@ -733,7 +752,11 @@ const createBoundingBox = () => {
       }
 
       if (props.constrainSquare) {
-        newBounds = constrainToSquare(newBounds, scaleStartBounds.getCenter());
+        newBounds = constrainToSquare(
+          newBounds,
+          scaleStartBounds.getCenter(),
+          scaleStartBounds,
+        );
       }
 
       if (boundingBox.value) {

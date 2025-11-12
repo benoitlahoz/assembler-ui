@@ -116,7 +116,11 @@ const clearHandles = () => {
 };
 
 // Helper function to constrain bounds to a square
-const constrainToSquare = (bounds: L.LatLngBounds, center?: L.LatLng): L.LatLngBounds => {
+const constrainToSquare = (
+  bounds: L.LatLngBounds,
+  center?: L.LatLng,
+  originalBounds?: L.LatLngBounds
+): L.LatLngBounds => {
   if (!L.value) return bounds;
 
   const currentCenter = center || bounds.getCenter();
@@ -129,12 +133,28 @@ const constrainToSquare = (bounds: L.LatLngBounds, center?: L.LatLng): L.LatLngB
   const latMeters = latDiff * 111320;
   const lngMeters = lngDiff * 111320 * Math.cos((currentCenter.lat * Math.PI) / 180);
 
-  // Use the maximum dimension to create a visual square
-  const maxMeters = Math.max(latMeters, lngMeters);
+  // Determine which dimension changed more (to allow both growing and shrinking)
+  let targetMeters = latMeters;
+  if (originalBounds) {
+    const origLatDiff = originalBounds.getNorth() - originalBounds.getSouth();
+    const origLngDiff = originalBounds.getEast() - originalBounds.getWest();
+    const origLatMeters = origLatDiff * 111320;
+    const origLngMeters =
+      origLngDiff * 111320 * Math.cos((currentCenter.lat * Math.PI) / 180);
+
+    // Use the dimension that changed the most
+    const latChange = Math.abs(latMeters - origLatMeters);
+    const lngChange = Math.abs(lngMeters - origLngMeters);
+
+    targetMeters = lngChange > latChange ? lngMeters : latMeters;
+  } else {
+    // Fallback to average if no original bounds
+    targetMeters = (latMeters + lngMeters) / 2;
+  }
 
   // Convert back to degrees
-  const halfLatDiff = maxMeters / 2 / 111320;
-  const halfLngDiff = maxMeters / 2 / (111320 * Math.cos((currentCenter.lat * Math.PI) / 180));
+  const halfLatDiff = targetMeters / 2 / 111320;
+  const halfLngDiff = targetMeters / 2 / (111320 * Math.cos((currentCenter.lat * Math.PI) / 180));
 
   return L.value.latLngBounds(
     [currentCenter.lat - halfLatDiff, currentCenter.lng - halfLngDiff],
@@ -217,7 +237,7 @@ const createBoundingBox = () => {
 
       // Constrain to square if needed (for circles)
       if (props.constrainSquare) {
-        newBounds = constrainToSquare(newBounds, scaleStartBounds.getCenter());
+        newBounds = constrainToSquare(newBounds, scaleStartBounds.getCenter(), scaleStartBounds);
       }
 
       // Mettre à jour la bounding box
@@ -319,7 +339,7 @@ const createBoundingBox = () => {
 
       // Constrain to square if needed (for circles)
       if (props.constrainSquare) {
-        newBounds = constrainToSquare(newBounds, scaleStartBounds.getCenter());
+        newBounds = constrainToSquare(newBounds, scaleStartBounds.getCenter(), scaleStartBounds);
       }
 
       // Mettre à jour la bounding box
