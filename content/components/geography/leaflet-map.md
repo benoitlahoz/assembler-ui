@@ -4936,7 +4936,9 @@ export interface LeafletVirtualizeProps {
 
   enabled?: boolean;
 
-  margin?: number;
+  marginMeters?: number;
+
+  marginZoomRatio?: number;
 
   alwaysVisible?: Array<string | number>;
 
@@ -4945,7 +4947,8 @@ export interface LeafletVirtualizeProps {
 
 const props = withDefaults(defineProps<LeafletVirtualizeProps>(), {
   enabled: true,
-  margin: 0.1,
+  marginMeters: undefined,
+  marginZoomRatio: 1.0,
   alwaysVisible: () => [],
   transitionDelay: 50,
 });
@@ -4965,6 +4968,22 @@ const visibleFeatureIds = ref<Set<string | number>>(new Set());
 const isTransitioning = ref(false);
 let updateScheduled = false;
 
+const metersToDegreesLat = (meters: number): number => {
+  return meters / 111320;
+};
+
+const metersToDegreesLng = (meters: number, latitude: number): number => {
+  return meters / (111320 * Math.cos((latitude * Math.PI) / 180));
+};
+
+const calculateDynamicMargin = (zoom: number): number => {
+  const clampedZoom = Math.max(1, Math.min(20, zoom));
+
+  const baseMargin = (20 - clampedZoom) * 100;
+
+  return baseMargin * props.marginZoomRatio;
+};
+
 const updateVisibleBounds = () => {
   if (!map.value || !L.value) return;
 
@@ -4978,13 +4997,29 @@ const updateVisibleBounds = () => {
 
     const bounds = map.value.getBounds();
 
-    if (props.enabled && props.margin > 0) {
-      const margin = props.margin;
-      const extendedBounds = L.value.latLngBounds(
-        L.value.latLng(bounds.getSouth() - margin, bounds.getWest() - margin),
-        L.value.latLng(bounds.getNorth() + margin, bounds.getEast() + margin),
-      );
-      visibleBounds.value = extendedBounds;
+    if (props.enabled) {
+      const zoom = map.value.getZoom();
+      const marginInMeters = props.marginMeters ?? calculateDynamicMargin(zoom);
+
+      if (marginInMeters > 0) {
+        const center = bounds.getCenter();
+        const marginLat = metersToDegreesLat(marginInMeters);
+        const marginLng = metersToDegreesLng(marginInMeters, center.lat);
+
+        const extendedBounds = L.value.latLngBounds(
+          L.value.latLng(
+            bounds.getSouth() - marginLat,
+            bounds.getWest() - marginLng,
+          ),
+          L.value.latLng(
+            bounds.getNorth() + marginLat,
+            bounds.getEast() + marginLng,
+          ),
+        );
+        visibleBounds.value = extendedBounds;
+      } else {
+        visibleBounds.value = bounds;
+      }
     } else {
       visibleBounds.value = bounds;
     }
@@ -5084,7 +5119,14 @@ watch(
 );
 
 watch(
-  () => props.margin,
+  () => props.marginMeters,
+  () => {
+    updateVisibleBounds();
+  },
+);
+
+watch(
+  () => props.marginZoomRatio,
   () => {
     updateVisibleBounds();
   },
@@ -6240,9 +6282,19 @@ Uses O(log n) quadtree queries for efficient virtualization
 | `quadtree`{.primary .text-primary} | `UseQuadtreeReturn<any>` | - | Quadtree composable return value for spatial indexing (required)
 Uses O(log n) quadtree queries for efficient virtualization |
 | `enabled`{.primary .text-primary} | `boolean` | true | Enable/disable virtualization |
-| `margin`{.primary .text-primary} | `number` | 0.1 | Margin in degrees to add to visible bounds for pre-loading features
+| `marginMeters`{.primary .text-primary} | `number` | — | Margin in meters to add to visible bounds for pre-loading features
 Larger margin = more features pre-loaded = less &#34;pop-in&#34; but more DOM elements
-@default 0.1 (approximately 11km at the equator) |
+If not set, margin will be calculated dynamically based on zoom level
+@default undefined (auto-calculated based on zoom) |
+| `marginZoomRatio`{.primary .text-primary} | `number` | 1 | Ratio to scale margin based on zoom level (only used when marginMeters is not set)
+Higher ratio = larger margin at low zoom levels
+Formula: margin = marginZoomRatio * (20 - zoom) * 100 meters
+@default 1.0
+@example
+- zoom 5: margin ≈ 1500m (1.5km)
+- zoom 10: margin ≈ 1000m (1km)
+- zoom 15: margin ≈ 500m (0.5km)
+- zoom 18: margin ≈ 200m |
 | `alwaysVisible`{.primary .text-primary} | `Array<string \| number>` |  | Array of feature IDs that should always be rendered, regardless of visibility
 Useful for selected features or important landmarks |
 | `transitionDelay`{.primary .text-primary} | `number` | 50 | Delay in milliseconds before applying virtualization changes
@@ -6729,7 +6781,9 @@ const mapRef = ref<LeafletMapExposed | null>(null);
 
 const virtualizationEnabled = ref(true);
 const isTransitioning = ref(false);
-const virtualizationMargin = ref(0.1);
+const autoMargin = ref(true);
+const virtualizationMargin = ref(1000);
+const marginZoomRatio = ref(1.0);
 const visibleMarkersCount = ref(0);
 const visibleCirclesCount = ref(0);
 const visiblePolygonsCount = ref(0);
@@ -6907,19 +6961,41 @@ updateFPS();
           </Button>
 
           <div class="flex items-center gap-2">
+            <label class="text-sm">Auto Margin:</label>
+            <input
+              v-model="autoMargin"
+              type="checkbox"
+              class="w-4 h-4"
+              :disabled="isTransitioning"
+            />
+          </div>
+
+          <div v-if="autoMargin" class="flex items-center gap-2">
+            <label class="text-sm">Zoom Ratio:</label>
+            <input
+              v-model.number="marginZoomRatio"
+              type="range"
+              min="0.5"
+              max="2"
+              step="0.1"
+              class="w-32"
+              :disabled="isTransitioning"
+            />
+            <span class="text-sm w-12">{{ marginZoomRatio.toFixed(1) }}x</span>
+          </div>
+
+          <div v-else class="flex items-center gap-2">
             <label class="text-sm">Margin:</label>
             <input
               v-model.number="virtualizationMargin"
               type="range"
               min="0"
-              max="1"
-              step="0.05"
+              max="5000"
+              step="250"
               class="w-32"
               :disabled="isTransitioning"
             />
-            <span class="text-sm w-12"
-              >{{ virtualizationMargin.toFixed(2) }}°</span
-            >
+            <span class="text-sm w-16">{{ virtualizationMargin }} m</span>
           </div>
         </div>
       </div>
@@ -6964,8 +7040,9 @@ updateFPS();
           <LeafletVirtualize
             v-if="markersQuadtree"
             :enabled="virtualizationEnabled"
-            :margin="virtualizationMargin"
             :quadtree="markersQuadtree"
+            :margin-meters="autoMargin ? undefined : virtualizationMargin"
+            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
             @update:visible-count="visibleMarkersCount = $event"
             @transition-start="isTransitioning = true"
             @transition-end="isTransitioning = false"
@@ -6984,9 +7061,12 @@ updateFPS();
           <LeafletVirtualize
             v-if="circlesQuadtree"
             :enabled="virtualizationEnabled"
-            :margin="virtualizationMargin"
+            :margin-meters="autoMargin ? undefined : virtualizationMargin"
+            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
             :quadtree="circlesQuadtree"
             @update:visible-count="visibleCirclesCount = $event"
+            @transition-start="isTransitioning = true"
+            @transition-end="isTransitioning = false"
             v-slot="{ visibleIds }"
           >
             <template v-for="circle in circles" :key="circle.id">
@@ -7010,9 +7090,12 @@ updateFPS();
           <LeafletVirtualize
             v-if="polygonsQuadtree"
             :enabled="virtualizationEnabled"
-            :margin="virtualizationMargin"
+            :margin-meters="autoMargin ? undefined : virtualizationMargin"
+            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
             :quadtree="polygonsQuadtree"
             @update:visible-count="visiblePolygonsCount = $event"
+            @transition-start="isTransitioning = true"
+            @transition-end="isTransitioning = false"
             v-slot="{ visibleIds }"
           >
             <template v-for="polygon in polygons" :key="polygon.id">
@@ -7032,9 +7115,12 @@ updateFPS();
           <LeafletVirtualize
             v-if="polylinesQuadtree"
             :enabled="virtualizationEnabled"
-            :margin="virtualizationMargin"
+            :margin-meters="autoMargin ? undefined : virtualizationMargin"
+            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
             :quadtree="polylinesQuadtree"
             @update:visible-count="visiblePolylinesCount = $event"
+            @transition-start="isTransitioning = true"
+            @transition-end="isTransitioning = false"
             v-slot="{ visibleIds }"
           >
             <template v-for="polyline in polylines" :key="polyline.id">
@@ -7056,9 +7142,12 @@ updateFPS();
           <LeafletVirtualize
             v-if="rectanglesQuadtree"
             :enabled="virtualizationEnabled"
-            :margin="virtualizationMargin"
+            :margin-meters="autoMargin ? undefined : virtualizationMargin"
+            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
             :quadtree="rectanglesQuadtree"
             @update:visible-count="visibleRectanglesCount = $event"
+            @transition-start="isTransitioning = true"
+            @transition-end="isTransitioning = false"
             v-slot="{ visibleIds }"
           >
             <template v-for="rectangle in rectangles" :key="rectangle.id">

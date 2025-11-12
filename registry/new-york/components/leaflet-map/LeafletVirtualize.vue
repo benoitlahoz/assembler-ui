@@ -20,11 +20,25 @@ export interface LeafletVirtualizeProps {
   enabled?: boolean;
 
   /**
-   * Margin in degrees to add to visible bounds for pre-loading features
+   * Margin in meters to add to visible bounds for pre-loading features
    * Larger margin = more features pre-loaded = less "pop-in" but more DOM elements
-   * @default 0.1 (approximately 11km at the equator)
+   * If not set, margin will be calculated dynamically based on zoom level
+   * @default undefined (auto-calculated based on zoom)
    */
-  margin?: number;
+  marginMeters?: number;
+
+  /**
+   * Ratio to scale margin based on zoom level (only used when marginMeters is not set)
+   * Higher ratio = larger margin at low zoom levels
+   * Formula: margin = marginZoomRatio * (20 - zoom) * 100 meters
+   * @default 1.0
+   * @example
+   * - zoom 5: margin ≈ 1500m (1.5km)
+   * - zoom 10: margin ≈ 1000m (1km)
+   * - zoom 15: margin ≈ 500m (0.5km)
+   * - zoom 18: margin ≈ 200m
+   */
+  marginZoomRatio?: number;
 
   /**
    * Array of feature IDs that should always be rendered, regardless of visibility
@@ -42,7 +56,8 @@ export interface LeafletVirtualizeProps {
 
 const props = withDefaults(defineProps<LeafletVirtualizeProps>(), {
   enabled: true,
-  margin: 0.1,
+  marginMeters: undefined,
+  marginZoomRatio: 1.0,
   alwaysVisible: () => [],
   transitionDelay: 50,
 });
@@ -64,6 +79,36 @@ const isTransitioning = ref(false);
 let updateScheduled = false;
 
 /**
+ * Convert meters to degrees at a given latitude
+ * 1 degree of latitude ≈ 111,320 meters (constant)
+ * 1 degree of longitude ≈ 111,320 * cos(latitude) meters (varies by latitude)
+ */
+const metersToDegreesLat = (meters: number): number => {
+  return meters / 111320;
+};
+
+const metersToDegreesLng = (meters: number, latitude: number): number => {
+  return meters / (111320 * Math.cos(latitude * Math.PI / 180));
+};
+
+/**
+ * Calculate dynamic margin based on zoom level
+ * Lower zoom = larger margin (more area to pre-load)
+ * Higher zoom = smaller margin (less area needed)
+ */
+const calculateDynamicMargin = (zoom: number): number => {
+  // Base formula: larger margin at low zoom, smaller at high zoom
+  // Clamp between zoom 1 and 20
+  const clampedZoom = Math.max(1, Math.min(20, zoom));
+  
+  // At zoom 5: ~1500m, zoom 10: ~1000m, zoom 15: ~500m, zoom 18: ~200m
+  const baseMargin = (20 - clampedZoom) * 100;
+  
+  // Apply user-defined ratio
+  return baseMargin * props.marginZoomRatio;
+};
+
+/**
  * Update visible bounds when map moves or zooms
  */
 const updateVisibleBounds = () => {
@@ -81,13 +126,24 @@ const updateVisibleBounds = () => {
     const bounds = map.value.getBounds();
 
     // Add margin if enabled
-    if (props.enabled && props.margin > 0) {
-      const margin = props.margin;
-      const extendedBounds = L.value.latLngBounds(
-        L.value.latLng(bounds.getSouth() - margin, bounds.getWest() - margin),
-        L.value.latLng(bounds.getNorth() + margin, bounds.getEast() + margin)
-      );
-      visibleBounds.value = extendedBounds;
+    if (props.enabled) {
+      // Use fixed margin if provided, otherwise calculate dynamically based on zoom
+      const zoom = map.value.getZoom();
+      const marginInMeters = props.marginMeters ?? calculateDynamicMargin(zoom);
+      
+      if (marginInMeters > 0) {
+        const center = bounds.getCenter();
+        const marginLat = metersToDegreesLat(marginInMeters);
+        const marginLng = metersToDegreesLng(marginInMeters, center.lat);
+        
+        const extendedBounds = L.value.latLngBounds(
+          L.value.latLng(bounds.getSouth() - marginLat, bounds.getWest() - marginLng),
+          L.value.latLng(bounds.getNorth() + marginLat, bounds.getEast() + marginLng)
+        );
+        visibleBounds.value = extendedBounds;
+      } else {
+        visibleBounds.value = bounds;
+      }
     } else {
       visibleBounds.value = bounds;
     }
@@ -202,7 +258,14 @@ watch(
 );
 
 watch(
-  () => props.margin,
+  () => props.marginMeters,
+  () => {
+    updateVisibleBounds();
+  }
+);
+
+watch(
+  () => props.marginZoomRatio,
   () => {
     updateVisibleBounds();
   }

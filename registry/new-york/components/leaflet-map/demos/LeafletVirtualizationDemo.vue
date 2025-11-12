@@ -28,7 +28,9 @@ const mapRef = ref<LeafletMapExposed | null>(null);
 // Mode de virtualisation
 const virtualizationEnabled = ref(true);
 const isTransitioning = ref(false); // État de transition
-const virtualizationMargin = ref(0.1); // 0.1 degrees margin
+const autoMargin = ref(true); // Auto-adjust margin based on zoom
+const virtualizationMargin = ref(1000); // Margin in meters (when not auto)
+const marginZoomRatio = ref(1.0); // Zoom-based margin scaling factor
 const visibleMarkersCount = ref(0);
 const visibleCirclesCount = ref(0);
 const visiblePolygonsCount = ref(0);
@@ -202,17 +204,41 @@ updateFPS();
           </Button>
 
           <div class="flex items-center gap-2">
+            <label class="text-sm">Auto Margin:</label>
+            <input
+              v-model="autoMargin"
+              type="checkbox"
+              class="w-4 h-4"
+              :disabled="isTransitioning"
+            />
+          </div>
+
+          <div v-if="autoMargin" class="flex items-center gap-2">
+            <label class="text-sm">Zoom Ratio:</label>
+            <input
+              v-model.number="marginZoomRatio"
+              type="range"
+              min="0.5"
+              max="2"
+              step="0.1"
+              class="w-32"
+              :disabled="isTransitioning"
+            />
+            <span class="text-sm w-12">{{ marginZoomRatio.toFixed(1) }}x</span>
+          </div>
+
+          <div v-else class="flex items-center gap-2">
             <label class="text-sm">Margin:</label>
             <input
               v-model.number="virtualizationMargin"
               type="range"
               min="0"
-              max="1"
-              step="0.05"
+              max="5000"
+              step="250"
               class="w-32"
               :disabled="isTransitioning"
             />
-            <span class="text-sm w-12">{{ virtualizationMargin.toFixed(2) }}°</span>
+            <span class="text-sm w-16">{{ virtualizationMargin }} m</span>
           </div>
         </div>
       </div>
@@ -252,11 +278,12 @@ updateFPS();
           <LeafletZoomControl position="topleft" />
 
           <!-- Markers with Quadtree Virtualization -->
-          <LeafletVirtualize
+                    <LeafletVirtualize
             v-if="markersQuadtree"
             :enabled="virtualizationEnabled"
-            :margin="virtualizationMargin"
             :quadtree="markersQuadtree"
+            :margin-meters="autoMargin ? undefined : virtualizationMargin"
+            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
             @update:visible-count="visibleMarkersCount = $event"
             @transition-start="isTransitioning = true"
             @transition-end="isTransitioning = false"
@@ -276,9 +303,12 @@ updateFPS();
           <LeafletVirtualize
             v-if="circlesQuadtree"
             :enabled="virtualizationEnabled"
-            :margin="virtualizationMargin"
+            :margin-meters="autoMargin ? undefined : virtualizationMargin"
+            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
             :quadtree="circlesQuadtree"
             @update:visible-count="visibleCirclesCount = $event"
+            @transition-start="isTransitioning = true"
+            @transition-end="isTransitioning = false"
             v-slot="{ visibleIds }"
           >
             <template v-for="circle in circles" :key="circle.id">
@@ -303,9 +333,12 @@ updateFPS();
           <LeafletVirtualize
             v-if="polygonsQuadtree"
             :enabled="virtualizationEnabled"
-            :margin="virtualizationMargin"
+            :margin-meters="autoMargin ? undefined : virtualizationMargin"
+            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
             :quadtree="polygonsQuadtree"
             @update:visible-count="visiblePolygonsCount = $event"
+            @transition-start="isTransitioning = true"
+            @transition-end="isTransitioning = false"
             v-slot="{ visibleIds }"
           >
             <template v-for="polygon in polygons" :key="polygon.id">
@@ -326,9 +359,12 @@ updateFPS();
           <LeafletVirtualize
             v-if="polylinesQuadtree"
             :enabled="virtualizationEnabled"
-            :margin="virtualizationMargin"
+            :margin-meters="autoMargin ? undefined : virtualizationMargin"
+            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
             :quadtree="polylinesQuadtree"
             @update:visible-count="visiblePolylinesCount = $event"
+            @transition-start="isTransitioning = true"
+            @transition-end="isTransitioning = false"
             v-slot="{ visibleIds }"
           >
             <template v-for="polyline in polylines" :key="polyline.id">
@@ -351,9 +387,12 @@ updateFPS();
           <LeafletVirtualize
             v-if="rectanglesQuadtree"
             :enabled="virtualizationEnabled"
-            :margin="virtualizationMargin"
+            :margin-meters="autoMargin ? undefined : virtualizationMargin"
+            :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
             :quadtree="rectanglesQuadtree"
             @update:visible-count="visibleRectanglesCount = $event"
+            @transition-start="isTransitioning = true"
+            @transition-end="isTransitioning = false"
             v-slot="{ visibleIds }"
           >
             <template v-for="rectangle in rectangles" :key="rectangle.id">
