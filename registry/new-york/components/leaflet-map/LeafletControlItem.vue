@@ -6,12 +6,18 @@ export interface LeafletControlItemProps {
   name: string;
   title?: string;
   type?: 'push' | 'toggle';
+  active?: boolean;
 }
 
 const props = withDefaults(defineProps<LeafletControlItemProps>(), {
   title: 'A control button',
   type: 'toggle',
+  active: false,
 });
+
+const emit = defineEmits<{
+  (e: 'click', name: string): void;
+}>();
 
 const wrapperRef = useTemplateRef('wrapperRef');
 
@@ -71,6 +77,8 @@ const registerContent = () => {
       name: props.name,
       title: props.title || 'A control button',
       html,
+      type: props.type,
+      active: props.active,
     });
   }
 };

@@ -22,7 +22,6 @@ import {
   type FeatureShapeType,
   type FeatureSelectMode,
 } from '~~/registry/new-york/components/leaflet-map';
-import { MapPin } from 'lucide-vue-next';
 import { Icon } from '@iconify/vue';
 
 const mapRef = ref<LeafletMapExposed | null>(null);
@@ -98,9 +97,18 @@ const rectangles = ref([
   },
 ]);
 
-// Handle mode selection from DrawControl
+// Handle mode selection from DrawControl and LeafletControls
 const handleModeSelected = (mode: string | null) => {
-  currentMode.value = mode as FeatureShapeType | FeatureSelectMode | null;
+  console.log('Mode selected:', mode, 'Current mode:', currentMode.value);
+
+  // Toggle behavior: if clicking the same mode, deactivate it
+  if (currentMode.value === mode) {
+    currentMode.value = null;
+  } else {
+    currentMode.value = mode as FeatureShapeType | FeatureSelectMode | null;
+  }
+
+  console.log('New current mode:', currentMode.value);
 };
 
 // Gestion de la création de nouvelles formes
@@ -232,18 +240,31 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
           @mode-selected="handleModeSelected"
         />
 
-        <LeafletControls position="topleft">
-          <LeafletControlItem name="foo">
-            <MapPin class="w-4 h-4 text-blue-500" />
-          </LeafletControlItem>
-          <LeafletControlItem name="select">
+        <LeafletControls
+          position="topleft"
+          :active-item="currentMode"
+          @item-clicked="handleModeSelected"
+        >
+          <LeafletControlItem name="select" type="toggle" title="Selection Tool (V)">
             <Icon icon="gis:arrow" class="w-4 h-4 text-black" />
           </LeafletControlItem>
-          <LeafletControlItem name="direct-select">
+          <LeafletControlItem name="direct-select" type="toggle" title="Direct Selection Tool (A)">
             <Icon icon="gis:arrow-o" class="w-4 h-4 text-black" />
           </LeafletControlItem>
-          <LeafletControlItem name="marker">
+          <LeafletControlItem name="marker" type="toggle" title="Draw Marker">
             <Icon icon="gis:poi" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem name="rectangle" type="toggle" title="Draw Rectangle">
+            <Icon icon="gis:rectangle" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem name="circle" type="toggle" title="Draw Circle">
+            <Icon icon="gis:circle" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem name="polyline" type="toggle" title="Draw Polyline">
+            <Icon icon="gis:polyline" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem name="polygon" type="toggle" title="Draw Polygon">
+            <Icon icon="gis:polygon" class="w-4 h-4 text-black" />
           </LeafletControlItem>
         </LeafletControls>
 

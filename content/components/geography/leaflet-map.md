@@ -1475,12 +1475,18 @@ export interface LeafletControlItemProps {
   name: string;
   title?: string;
   type?: "push" | "toggle";
+  active?: boolean;
 }
 
 const props = withDefaults(defineProps<LeafletControlItemProps>(), {
   title: "A control button",
   type: "toggle",
+  active: false,
 });
+
+const emit = defineEmits<{
+  (e: "click", name: string): void;
+}>();
 
 const wrapperRef = useTemplateRef("wrapperRef");
 
@@ -1548,6 +1554,8 @@ const registerContent = () => {
       name: props.name,
       title: props.title || "A control button",
       html,
+      type: props.type,
+      active: props.active,
     });
   }
 };
@@ -1637,6 +1645,8 @@ export interface ControlItemReference {
   name: string;
   title: string;
   html: string;
+  type?: "push" | "toggle";
+  active?: boolean;
 }
 
 export interface LeafletControlsContext {
@@ -1649,13 +1659,19 @@ export interface LeafletControlsProps {
   position?: ControlOptions["position"];
   class?: HTMLAttributes["class"];
   style?: HTMLAttributes["style"];
+  activeItem?: string | null;
 }
 
 const props = withDefaults(defineProps<LeafletControlsProps>(), {
   position: "topleft",
   class: "rounded-[4px] shadow-(--leaflet-control-bar-shadow) bg-white",
   style: "",
+  activeItem: null,
 });
+
+const emit = defineEmits<{
+  (e: "item-clicked", name: string): void;
+}>();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject(LeafletMapKey, ref(null));
@@ -1682,30 +1698,68 @@ const createButton = (container: HTMLElement, name: string, title: string) => {
   if (!L.value) return;
   console.log("Should create button for", name);
 
-  const control = controlsRegistry.value.get(name);
-  console.log("Control", control);
-  if (!control) {
+  const controlItem = controlsRegistry.value.get(name);
+  console.log("Control", controlItem);
+  if (!controlItem) {
     return;
   }
-  console.log("HTML", control.html);
+  console.log("HTML", controlItem.html);
   const button = L.value!.DomUtil.create(
     "div",
     "leaflet-draw-button",
     container,
   );
   button.title = title;
-  button.innerHTML = control.html;
+  button.innerHTML = controlItem.html;
   button.setAttribute("role", "button");
   button.setAttribute("aria-label", title);
   button.setAttribute("tabindex", "0");
   button.dataset.toolType = name;
+  button.dataset.buttonType = controlItem.type || "toggle";
+
+  if (
+    controlItem.type === "toggle" &&
+    (controlItem.active || props.activeItem === name)
+  ) {
+    button.classList.add("leaflet-draw-toolbar-button-enabled");
+  }
 
   L.value!.DomEvent.on(button, "click", (e: Event) => {
     L.value!.DomEvent.preventDefault(e);
-    console.log("Click");
+    handleButtonClick(name, controlItem.type || "toggle");
   });
 
   return button;
+};
+
+const handleButtonClick = (name: string, type: "push" | "toggle") => {
+  if (type === "toggle") {
+    emit("item-clicked", name);
+  } else {
+    emit("item-clicked", name);
+  }
+};
+
+const updateActiveButton = () => {
+  if (!control.value) return;
+
+  const container = control.value.getContainer();
+  if (!container) return;
+
+  const buttons = container.querySelectorAll(".leaflet-draw-button");
+  buttons.forEach((button: Element) => {
+    const htmlButton = button as HTMLElement;
+    const toolType = htmlButton.dataset.toolType;
+    const buttonType = htmlButton.dataset.buttonType;
+
+    if (buttonType === "toggle") {
+      if (toolType === props.activeItem) {
+        htmlButton.classList.add("leaflet-draw-toolbar-button-enabled");
+      } else {
+        htmlButton.classList.remove("leaflet-draw-toolbar-button-enabled");
+      }
+    }
+  });
 };
 
 const createControl = () => {
@@ -1722,6 +1776,9 @@ const createControl = () => {
         "div",
         "leaflet-controls-bar leaflet-control leaflet-bar",
       );
+
+      L.value!.DomEvent.disableClickPropagation(container);
+      L.value!.DomEvent.disableScrollPropagation(container);
 
       controlsRegistry.value.forEach((control, name) => {
         createButton(container, name, control.title);
@@ -1756,6 +1813,15 @@ watch(
     }
   },
   { immediate: true },
+);
+
+watch(
+  () => props.activeItem,
+  () => {
+    nextTick(() => {
+      updateActiveButton();
+    });
+  },
 );
 
 watch(
@@ -5382,6 +5448,12 @@ export const useLeaflet = async () => {
 | `name`{.primary .text-primary} | `string` | - |  |
 | `title`{.primary .text-primary} | `string` | A control button |  |
 | `type`{.primary .text-primary} | `'push' \| 'toggle'` | toggle |  |
+| `active`{.primary .text-primary} | `boolean` | false |  |
+
+  ### Events
+| Name | Description |
+|------|-------------|
+| `click`{.primary .text-primary} | — |
 
   ### Slots
 | Name | Description |
@@ -5407,6 +5479,12 @@ export const useLeaflet = async () => {
 | `position`{.primary .text-primary} | `ControlOptions['position']` | topleft |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | rounded-[4px] shadow-(--leaflet-control-bar-shadow) bg-white |  |
 | `style`{.primary .text-primary} | `HTMLAttributes['style']` | — |  |
+| `activeItem`{.primary .text-primary} | `string \| null` |  |  |
+
+  ### Events
+| Name | Description |
+|------|-------------|
+| `item-clicked`{.primary .text-primary} | — |
 
   ### Slots
 | Name | Description |
@@ -5755,7 +5833,6 @@ import {
   type FeatureShapeType,
   type FeatureSelectMode,
 } from "@/components/ui/leaflet-map";
-import { MapPin } from "lucide-vue-next";
 import { Icon } from "@iconify/vue";
 
 const mapRef = ref<LeafletMapExposed | null>(null);
@@ -5833,7 +5910,15 @@ const rectangles = ref([
 ]);
 
 const handleModeSelected = (mode: string | null) => {
-  currentMode.value = mode as FeatureShapeType | FeatureSelectMode | null;
+  console.log("Mode selected:", mode, "Current mode:", currentMode.value);
+
+  if (currentMode.value === mode) {
+    currentMode.value = null;
+  } else {
+    currentMode.value = mode as FeatureShapeType | FeatureSelectMode | null;
+  }
+
+  console.log("New current mode:", currentMode.value);
 };
 
 const handleShapeCreated = (event: FeatureDrawEvent) => {
@@ -5973,18 +6058,47 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
           @mode-selected="handleModeSelected"
         />
 
-        <LeafletControls position="topleft">
-          <LeafletControlItem name="foo">
-            <MapPin class="w-4 h-4 text-blue-500" />
-          </LeafletControlItem>
-          <LeafletControlItem name="select">
+        <LeafletControls
+          position="topleft"
+          :active-item="currentMode"
+          @item-clicked="handleModeSelected"
+        >
+          <LeafletControlItem
+            name="select"
+            type="toggle"
+            title="Selection Tool (V)"
+          >
             <Icon icon="gis:arrow" class="w-4 h-4 text-black" />
           </LeafletControlItem>
-          <LeafletControlItem name="direct-select">
+          <LeafletControlItem
+            name="direct-select"
+            type="toggle"
+            title="Direct Selection Tool (A)"
+          >
             <Icon icon="gis:arrow-o" class="w-4 h-4 text-black" />
           </LeafletControlItem>
-          <LeafletControlItem name="marker">
+          <LeafletControlItem name="marker" type="toggle" title="Draw Marker">
             <Icon icon="gis:poi" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem
+            name="rectangle"
+            type="toggle"
+            title="Draw Rectangle"
+          >
+            <Icon icon="gis:rectangle" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem name="circle" type="toggle" title="Draw Circle">
+            <Icon icon="gis:circle" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem
+            name="polyline"
+            type="toggle"
+            title="Draw Polyline"
+          >
+            <Icon icon="gis:polyline" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem name="polygon" type="toggle" title="Draw Polygon">
+            <Icon icon="gis:polygon" class="w-4 h-4 text-black" />
           </LeafletControlItem>
         </LeafletControls>
 

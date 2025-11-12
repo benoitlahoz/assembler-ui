@@ -8,6 +8,8 @@ export interface ControlItemReference {
   name: string;
   title: string;
   html: string;
+  type?: 'push' | 'toggle';
+  active?: boolean;
 }
 
 export interface LeafletControlsContext {
@@ -20,13 +22,19 @@ export interface LeafletControlsProps {
   position?: ControlOptions['position'];
   class?: HTMLAttributes['class'];
   style?: HTMLAttributes['style'];
+  activeItem?: string | null;
 }
 
 const props = withDefaults(defineProps<LeafletControlsProps>(), {
   position: 'topleft',
   class: 'rounded-[4px] shadow-(--leaflet-control-bar-shadow) bg-white',
   style: '',
+  activeItem: null,
 });
+
+const emit = defineEmits<{
+  (e: 'item-clicked', name: string): void;
+}>();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject(LeafletMapKey, ref(null));
@@ -53,26 +61,64 @@ const createButton = (container: HTMLElement, name: string, title: string) => {
   if (!L.value) return;
   console.log('Should create button for', name);
 
-  const control = controlsRegistry.value.get(name);
-  console.log('Control', control);
-  if (!control) {
+  const controlItem = controlsRegistry.value.get(name);
+  console.log('Control', controlItem);
+  if (!controlItem) {
     return;
   }
-  console.log('HTML', control.html);
+  console.log('HTML', controlItem.html);
   const button = L.value!.DomUtil.create('div', 'leaflet-draw-button', container);
   button.title = title;
-  button.innerHTML = control.html;
+  button.innerHTML = controlItem.html;
   button.setAttribute('role', 'button');
   button.setAttribute('aria-label', title);
   button.setAttribute('tabindex', '0');
   button.dataset.toolType = name;
+  button.dataset.buttonType = controlItem.type || 'toggle';
+
+  // Set initial active state
+  if (controlItem.type === 'toggle' && (controlItem.active || props.activeItem === name)) {
+    button.classList.add('leaflet-draw-toolbar-button-enabled');
+  }
 
   L.value!.DomEvent.on(button, 'click', (e: Event) => {
     L.value!.DomEvent.preventDefault(e);
-    console.log('Click');
+    handleButtonClick(name, controlItem.type || 'toggle');
   });
 
   return button;
+};
+
+const handleButtonClick = (name: string, type: 'push' | 'toggle') => {
+  if (type === 'toggle') {
+    // For toggle buttons, emit the click and let parent handle active state
+    emit('item-clicked', name);
+  } else {
+    // For push buttons, just emit the click
+    emit('item-clicked', name);
+  }
+};
+
+const updateActiveButton = () => {
+  if (!control.value) return;
+
+  const container = control.value.getContainer();
+  if (!container) return;
+
+  const buttons = container.querySelectorAll('.leaflet-draw-button');
+  buttons.forEach((button: Element) => {
+    const htmlButton = button as HTMLElement;
+    const toolType = htmlButton.dataset.toolType;
+    const buttonType = htmlButton.dataset.buttonType;
+
+    if (buttonType === 'toggle') {
+      if (toolType === props.activeItem) {
+        htmlButton.classList.add('leaflet-draw-toolbar-button-enabled');
+      } else {
+        htmlButton.classList.remove('leaflet-draw-toolbar-button-enabled');
+      }
+    }
+  });
 };
 
 const createControl = () => {
@@ -89,6 +135,9 @@ const createControl = () => {
         'div',
         'leaflet-controls-bar leaflet-control leaflet-bar'
       );
+
+      L.value!.DomEvent.disableClickPropagation(container);
+      L.value!.DomEvent.disableScrollPropagation(container);
 
       controlsRegistry.value.forEach((control, name) => {
         createButton(container, name, control.title);
@@ -126,6 +175,16 @@ watch(
     }
   },
   { immediate: true }
+);
+
+// Watch activeItem to update button states
+watch(
+  () => props.activeItem,
+  () => {
+    nextTick(() => {
+      updateActiveButton();
+    });
+  }
 );
 
 // Watch the registry to recreate control when items change
