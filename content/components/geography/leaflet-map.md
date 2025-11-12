@@ -6799,7 +6799,7 @@ updateFPS();
       class="flex flex-col items-center justify-center p-8 gap-4"
     >
       <div class="text-lg font-semibold">{{ loadingStage }}</div>
-      <div class="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
+      <div class="w-64 h-2 rounded-full overflow-hidden">
         <div
           class="h-full bg-blue-500 transition-all duration-300"
           :style="{ width: `${loadingProgress}%` }"
@@ -6947,7 +6947,13 @@ updateFPS();
                 v-model:lat="circle.lat"
                 v-model:lng="circle.lng"
                 v-model:radius="circle.radius"
-                :class="circle.class"
+                :class="
+                  circle.colorIndex === 0
+                    ? 'bg-blue-500/30 border border-blue-700'
+                    : circle.colorIndex === 1
+                      ? 'bg-green-500/30 border border-green-700'
+                      : 'bg-red-500/30 border border-red-700'
+                "
               />
             </template>
           </LeafletVirtualize>
@@ -6965,7 +6971,11 @@ updateFPS();
                 v-if="visibleIds.has(polygon.id)"
                 :id="polygon.id"
                 v-model:latlngs="polygon.latlngs"
-                :class="polygon.class"
+                :class="
+                  polygon.colorIndex === 0
+                    ? 'bg-purple-500/30 border border-purple-700'
+                    : 'bg-orange-500/30 border border-orange-700'
+                "
               />
             </template>
           </LeafletVirtualize>
@@ -6983,7 +6993,13 @@ updateFPS();
                 v-if="visibleIds.has(polyline.id)"
                 :id="polyline.id"
                 v-model:latlngs="polyline.latlngs"
-                :class="polyline.class"
+                :class="
+                  polyline.colorIndex === 0
+                    ? 'border border-yellow-600'
+                    : polyline.colorIndex === 1
+                      ? 'border border-pink-600'
+                      : 'border border-cyan-600'
+                "
               />
             </template>
           </LeafletVirtualize>
@@ -7001,7 +7017,11 @@ updateFPS();
                 v-if="visibleIds.has(rectangle.id)"
                 :id="rectangle.id"
                 v-model:bounds="rectangle.bounds"
-                :class="rectangle.class"
+                :class="
+                  rectangle.colorIndex === 0
+                    ? 'bg-indigo-500/30 border border-indigo-700'
+                    : 'bg-teal-500/30 border border-teal-700'
+                "
               />
             </template>
           </LeafletVirtualize>

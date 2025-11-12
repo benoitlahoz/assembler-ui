@@ -36,25 +36,25 @@ export interface DemoCircle extends Rect {
   lat: number;
   lng: number;
   radius: number;
-  class: string;
+  colorIndex: number; // 0, 1, or 2 for different colors
 }
 
 export interface DemoPolygon extends Rect {
   id: string;
   latlngs: Array<[number, number]>;
-  class: string;
+  colorIndex: number; // 0 or 1 for different colors
 }
 
 export interface DemoPolyline extends Rect {
   id: string;
   latlngs: Array<[number, number]>;
-  class: string;
+  colorIndex: number; // 0, 1, or 2 for different colors
 }
 
 export interface DemoRectangle extends Rect {
   id: string;
   bounds: [[number, number], [number, number]];
-  class: string;
+  colorIndex: number; // 0 or 1 for different colors
 }
 
 export interface VirtualizationDemoData {
@@ -119,12 +119,6 @@ function generateMarkers(count: number): DemoMarker[] {
  * Generate all circles at once
  */
 function generateCircles(count: number): DemoCircle[] {
-  const classes = [
-    'bg-blue-500/30 border border-blue-700',
-    'bg-green-500/30 border border-green-700',
-    'bg-red-500/30 border border-red-700',
-  ] as const;
-
   const circles: DemoCircle[] = [];
   for (let i = 0; i < count; i++) {
     const lat = randomCoord(PARIS_LAT, RANGE);
@@ -138,7 +132,7 @@ function generateCircles(count: number): DemoCircle[] {
       lat,
       lng,
       radius: radiusMeters,
-      class: classes[Math.floor(Math.random() * classes.length)] as string,
+      colorIndex: Math.floor(Math.random() * 3), // 0, 1, or 2
       // Add Rect properties for quadtree (bounding box of circle)
       x: lng - radiusDeg,
       y: lat - radiusDeg,
@@ -153,11 +147,6 @@ function generateCircles(count: number): DemoCircle[] {
  * Generate all polygons at once
  */
 function generatePolygons(count: number): DemoPolygon[] {
-  const classes = [
-    'bg-purple-500/30 border border-purple-700',
-    'bg-orange-500/30 border border-orange-700',
-  ] as const;
-
   const polygons: DemoPolygon[] = [];
   for (let i = 0; i < count; i++) {
     const centerLat = randomCoord(PARIS_LAT, RANGE);
@@ -182,7 +171,7 @@ function generatePolygons(count: number): DemoPolygon[] {
     polygons.push({
       id: `polygon-${i}`,
       latlngs,
-      class: classes[Math.floor(Math.random() * classes.length)] as string,
+      colorIndex: Math.floor(Math.random() * 2), // 0 or 1
       // Add Rect properties for quadtree (bounding box)
       x: minLng,
       y: minLat,
@@ -197,12 +186,6 @@ function generatePolygons(count: number): DemoPolygon[] {
  * Generate all polylines at once
  */
 function generatePolylines(count: number): DemoPolyline[] {
-  const classes = [
-    'border border-yellow-600',
-    'border border-pink-600',
-    'border border-cyan-600',
-  ] as const;
-
   const polylines: DemoPolyline[] = [];
   for (let i = 0; i < count; i++) {
     const startLat = randomCoord(PARIS_LAT, RANGE);
@@ -232,7 +215,7 @@ function generatePolylines(count: number): DemoPolyline[] {
     polylines.push({
       id: `polyline-${i}`,
       latlngs,
-      class: classes[Math.floor(Math.random() * classes.length)] as string,
+      colorIndex: Math.floor(Math.random() * 3), // 0, 1, or 2
       // Add Rect properties for quadtree (bounding box)
       x: minLng,
       y: minLat,
@@ -247,11 +230,6 @@ function generatePolylines(count: number): DemoPolyline[] {
  * Generate all rectangles at once
  */
 function generateRectangles(count: number): DemoRectangle[] {
-  const classes = [
-    'bg-indigo-500/30 border border-indigo-700',
-    'bg-teal-500/30 border border-teal-700',
-  ] as const;
-
   const rectangles: DemoRectangle[] = [];
   for (let i = 0; i < count; i++) {
     const centerLat = randomCoord(PARIS_LAT, RANGE);
@@ -267,7 +245,7 @@ function generateRectangles(count: number): DemoRectangle[] {
     rectangles.push({
       id: `rectangle-${i}`,
       bounds,
-      class: classes[Math.floor(Math.random() * classes.length)] as string,
+      colorIndex: Math.floor(Math.random() * 2), // 0 or 1
       // Add Rect properties for quadtree
       x: bounds[0][1],
       y: bounds[0][0],
