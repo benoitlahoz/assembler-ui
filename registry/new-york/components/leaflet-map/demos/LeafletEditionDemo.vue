@@ -233,14 +233,17 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
         />
 
         <LeafletControls position="topleft">
+          <LeafletControlItem name="foo">
+            <MapPin class="w-4 h-4 text-blue-500" />
+          </LeafletControlItem>
           <LeafletControlItem name="select">
-            <Icon icon="gis:arrow" class="w-4 h-4 text-yellow-500" />
+            <Icon icon="gis:arrow" class="w-4 h-4 text-black" />
           </LeafletControlItem>
           <LeafletControlItem name="direct-select">
-            <Icon icon="gis:arrow-o" class="w-4 h-4 text-yellow-500" />
+            <Icon icon="gis:arrow-o" class="w-4 h-4 text-black" />
           </LeafletControlItem>
           <LeafletControlItem name="marker">
-            <Icon icon="gis:poi" class="w-4 h-4 text-yellow-500" />
+            <Icon icon="gis:poi" class="w-4 h-4 text-black" />
           </LeafletControlItem>
         </LeafletControls>
 

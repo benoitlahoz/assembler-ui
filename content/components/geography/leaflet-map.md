@@ -1461,7 +1461,14 @@ onBeforeUnmount(() => {
 
 ```vue [src/components/ui/leaflet-map/LeafletControlItem.vue]
 <script setup lang="ts">
-import { inject, unref, useTemplateRef, watch, nextTick } from "vue";
+import {
+  inject,
+  unref,
+  useTemplateRef,
+  watch,
+  nextTick,
+  onBeforeUnmount,
+} from "vue";
 import { LeafletControlsKey } from ".";
 
 export interface LeafletControlItemProps {
@@ -1479,37 +1486,116 @@ const wrapperRef = useTemplateRef("wrapperRef");
 
 const controlsContext = inject(LeafletControlsKey);
 
+let observer: MutationObserver | null = null;
+
 const getContentHtml = () => {
   const wrapper = unref(wrapperRef);
   if (wrapper) {
     const firstChild = wrapper.firstElementChild;
     if (firstChild) {
-      return firstChild.outerHTML;
+      if (firstChild.tagName === "svg" || firstChild.querySelector("svg")) {
+        const svg =
+          firstChild.tagName === "svg"
+            ? firstChild
+            : firstChild.querySelector("svg");
+
+        if (svg && svg.children.length > 0) {
+          const clone = firstChild.cloneNode(true) as HTMLElement;
+          const svgElement =
+            clone.tagName === "svg" ? clone : clone.querySelector("svg");
+
+          if (svgElement) {
+            const computedColor = window.getComputedStyle(firstChild).color;
+
+            svgElement
+              .querySelectorAll("path, circle, rect, polygon, polyline, line")
+              .forEach((el) => {
+                const element = el as SVGElement;
+                if (
+                  element.hasAttribute("fill") &&
+                  element.getAttribute("fill") !== "none"
+                ) {
+                  element.setAttribute("fill", computedColor || "currentColor");
+                }
+                if (
+                  element.hasAttribute("stroke") &&
+                  element.getAttribute("stroke") !== "none"
+                ) {
+                  element.setAttribute(
+                    "stroke",
+                    computedColor || "currentColor",
+                  );
+                }
+              });
+          }
+
+          return clone.outerHTML;
+        }
+      } else {
+        return firstChild.outerHTML;
+      }
     }
   }
   return "";
 };
 
-watch(
-  () => wrapperRef,
-  () => {
-    nextTick(() => {
-      if (!controlsContext) return;
+const registerContent = () => {
+  if (!controlsContext) return;
 
-      const html = getContentHtml();
-      controlsContext?.registerItem({
-        name: props.name,
-        title: props.title || "A control button",
-        html,
+  const html = getContentHtml();
+  if (html) {
+    controlsContext.registerItem({
+      name: props.name,
+      title: props.title || "A control button",
+      html,
+    });
+  }
+};
+
+watch(
+  () => wrapperRef.value,
+  (wrapper) => {
+    if (!wrapper) return;
+
+    nextTick(() => {
+      registerContent();
+
+      observer = new MutationObserver((mutations) => {
+        const hasContent = mutations.some((mutation) => {
+          return (
+            mutation.addedNodes.length > 0 || mutation.type === "attributes"
+          );
+        });
+
+        if (hasContent) {
+          registerContent();
+        }
       });
+
+      const firstChild = wrapper.firstElementChild;
+      if (firstChild) {
+        observer.observe(firstChild, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ["viewBox", "width", "height"],
+        });
+      }
     });
   },
-  { immediate: true, deep: true },
+  { immediate: true },
 );
+
+onBeforeUnmount(() => {
+  if (observer) {
+    observer.disconnect();
+    observer = null;
+  }
+});
 </script>
 
 <template>
-  <div>
+  <div class="hidden">
     <div ref="wrapperRef">
       <slot>
         <svg
@@ -1579,7 +1665,13 @@ const control = ref<any>(null);
 const controlsRegistry = ref<Map<string, ControlItemReference>>(new Map());
 
 const registerItem = (item: ControlItemReference) => {
-  controlsRegistry.value.set(item.name, item);
+  const existing = controlsRegistry.value.get(item.name);
+
+  if (!existing || existing.html !== item.html) {
+    controlsRegistry.value.set(item.name, item);
+
+    controlsRegistry.value = new Map(controlsRegistry.value);
+  }
 };
 
 const unregisterItem = (name: string) => {
@@ -1652,7 +1744,9 @@ watch(
     if (map.value) {
       if (!control.value) {
         nextTick(() => {
-          createControl();
+          setTimeout(() => {
+            createControl();
+          }, 150);
         });
       } else if (!control.value._map) {
         control.value.addTo(map.value);
@@ -1662,6 +1756,21 @@ watch(
     }
   },
   { immediate: true },
+);
+
+watch(
+  controlsRegistry,
+  (newRegistry) => {
+    console.log("Registry changed", newRegistry.size);
+    if (newRegistry.size > 0 && map.value && control.value?._map) {
+      control.value.remove();
+      control.value = null;
+      nextTick(() => {
+        createControl();
+      });
+    }
+  },
+  { deep: true },
 );
 
 const context: LeafletControlsContext = {
@@ -5865,14 +5974,17 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
         />
 
         <LeafletControls position="topleft">
-          <LeafletControlItem name="pin">
-            <Icon icon="gis:arrow" class="w-4 h-4 text-yellow-500" />
+          <LeafletControlItem name="foo">
+            <MapPin class="w-4 h-4 text-blue-500" />
           </LeafletControlItem>
-          <LeafletControlItem name="pin">
-            <Icon icon="gis:arrow-o" class="w-4 h-4 text-yellow-500" />
+          <LeafletControlItem name="select">
+            <Icon icon="gis:arrow" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem name="direct-select">
+            <Icon icon="gis:arrow-o" class="w-4 h-4 text-black" />
           </LeafletControlItem>
           <LeafletControlItem name="marker">
-            <Icon icon="gis:poi" class="w-4 h-4 text-yellow-500" />
+            <Icon icon="gis:poi" class="w-4 h-4 text-black" />
           </LeafletControlItem>
         </LeafletControls>
 

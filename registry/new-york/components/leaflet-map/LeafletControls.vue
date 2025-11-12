@@ -36,7 +36,13 @@ const control = ref<any>(null);
 const controlsRegistry = ref<Map<string, ControlItemReference>>(new Map());
 
 const registerItem = (item: ControlItemReference) => {
-  controlsRegistry.value.set(item.name, item);
+  const existing = controlsRegistry.value.get(item.name);
+  // Only update if content changed
+  if (!existing || existing.html !== item.html) {
+    controlsRegistry.value.set(item.name, item);
+    // Trigger reactivity
+    controlsRegistry.value = new Map(controlsRegistry.value);
+  }
 };
 
 const unregisterItem = (name: string) => {
@@ -106,8 +112,11 @@ watch(
     console.log('Map changed', map.value, control.value);
     if (map.value) {
       if (!control.value) {
+        // Wait a bit for initial items to register
         nextTick(() => {
-          createControl();
+          setTimeout(() => {
+            createControl();
+          }, 150);
         });
       } else if (!control.value._map) {
         control.value.addTo(map.value);
@@ -117,6 +126,23 @@ watch(
     }
   },
   { immediate: true }
+);
+
+// Watch the registry to recreate control when items change
+watch(
+  controlsRegistry,
+  (newRegistry) => {
+    console.log('Registry changed', newRegistry.size);
+    if (newRegistry.size > 0 && map.value && control.value?._map) {
+      // Remove old control and recreate with updated items
+      control.value.remove();
+      control.value = null;
+      nextTick(() => {
+        createControl();
+      });
+    }
+  },
+  { deep: true }
 );
 
 const context: LeafletControlsContext = {
