@@ -4990,9 +4990,31 @@ const updateVisibleBounds = () => {
 };
 
 const updateVisibleFeaturesQuadtree = () => {
-  if (!props.enabled || !visibleBounds.value) {
+  console.log("[DEBUG] updateVisibleFeaturesQuadtree called");
+  console.log("[DEBUG] enabled:", props.enabled);
+  console.log("[DEBUG] visibleBounds:", visibleBounds.value);
+
+  if (!visibleBounds.value) {
     visibleFeatureIds.value.clear();
     emit("update:visible-count", 0);
+    console.log("[DEBUG] No bounds, emitting 0");
+    return;
+  }
+
+  if (!props.enabled) {
+    const allItems = props.quadtree.retrieve({
+      x: -180,
+      y: -90,
+      width: 360,
+      height: 180,
+    });
+    const allIds = new Set<string | number>();
+    for (const item of allItems) {
+      allIds.add(item.id);
+    }
+    visibleFeatureIds.value = allIds;
+    emit("update:visible-count", allIds.size);
+    console.log("[DEBUG] Virtualization OFF, emitting all:", allIds.size);
     return;
   }
 
@@ -5005,7 +5027,11 @@ const updateVisibleFeaturesQuadtree = () => {
     height: bounds.getNorth() - bounds.getSouth(),
   };
 
+  console.log("[DEBUG] Query rect:", queryRect);
+
   const visibleItems = props.quadtree.retrieve(queryRect);
+
+  console.log("[DEBUG] Retrieved items:", visibleItems.length);
 
   const newVisibleIds = new Set<string | number>();
   for (const item of visibleItems) {
@@ -5018,19 +5044,28 @@ const updateVisibleFeaturesQuadtree = () => {
 
   visibleFeatureIds.value = newVisibleIds;
   emit("update:visible-count", newVisibleIds.size);
+  console.log("[DEBUG] Emitting visible count:", newVisibleIds.size);
 };
 
 onMounted(() => {
-  nextTick(() => {
-    if (map.value) {
-      updateVisibleBounds();
-
-      map.value.on("moveend", updateVisibleBounds);
-      map.value.on("zoomend", updateVisibleBounds);
-    }
-  });
+  if (map.value) {
+    updateVisibleBounds();
+    map.value.on("moveend", updateVisibleBounds);
+    map.value.on("zoomend", updateVisibleBounds);
+  }
 });
 
+watch(
+  map,
+  (newMap) => {
+    if (newMap) {
+      updateVisibleBounds();
+      newMap.on("moveend", updateVisibleBounds);
+      newMap.on("zoomend", updateVisibleBounds);
+    }
+  },
+  { immediate: true },
+);
 onBeforeUnmount(() => {
   if (map.value) {
     map.value.off("moveend", updateVisibleBounds);
@@ -5055,7 +5090,11 @@ watch(
 watch(
   () => props.quadtree,
   () => {
-    updateVisibleFeaturesQuadtree();
+    if (map.value) {
+      nextTick(() => {
+        updateVisibleBounds();
+      });
+    }
   },
 );
 
@@ -5066,15 +5105,11 @@ defineExpose({
 </script>
 
 <template>
-  <template v-if="!enabled">
-    <slot />
-  </template>
-  <template v-else>
-    <slot
-      :is-visible="(id: string | number) => visibleFeatureIds.has(id)"
-      :visible-ids="visibleFeatureIds"
-    />
-  </template>
+  <slot
+    :is-visible="(id: string | number) => visibleFeatureIds.has(id)"
+    :visible-ids="visibleFeatureIds"
+    :visible-count="visibleFeatureIds.size"
+  />
 </template>
 ```
 
@@ -6445,11 +6480,6 @@ Larger margin = more features pre-loaded = less &#34;pop-in&#34; but more DOM el
 | `alwaysVisible`{.primary .text-primary} | `Array<string \| number>` |  | Array of feature IDs that should always be rendered, regardless of visibility
 Useful for selected features or important landmarks |
 
-  ### Slots
-| Name | Description |
-|------|-------------|
-| `default`{.primary .text-primary} | — |
-
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
@@ -6901,7 +6931,7 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
   :::tabs-item{icon="i-lucide-code" label="Code"}
 ```vue
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, shallowRef } from "vue";
 import { Button } from "@/components/ui/button";
 import {
   LeafletMap,
@@ -6952,11 +6982,17 @@ const polygons = ref<DemoPolygon[]>([]);
 const polylines = ref<DemoPolyline[]>([]);
 const rectangles = ref<DemoRectangle[]>([]);
 
-let markersQuadtree: UseQuadtreeReturn<DemoMarker> | null = null;
-let circlesQuadtree: UseQuadtreeReturn<DemoCircle> | null = null;
-let polygonsQuadtree: UseQuadtreeReturn<DemoPolygon> | null = null;
-let polylinesQuadtree: UseQuadtreeReturn<DemoPolyline> | null = null;
-let rectanglesQuadtree: UseQuadtreeReturn<DemoRectangle> | null = null;
+const markersQuadtree = shallowRef<UseQuadtreeReturn<DemoMarker> | null>(null);
+const circlesQuadtree = shallowRef<UseQuadtreeReturn<DemoCircle> | null>(null);
+const polygonsQuadtree = shallowRef<UseQuadtreeReturn<DemoPolygon> | null>(
+  null,
+);
+const polylinesQuadtree = shallowRef<UseQuadtreeReturn<DemoPolyline> | null>(
+  null,
+);
+const rectanglesQuadtree = shallowRef<UseQuadtreeReturn<DemoRectangle> | null>(
+  null,
+);
 
 const totalShapes = computed(
   () =>
@@ -6979,11 +7015,11 @@ onMounted(async () => {
   polygons.value = data.polygons;
   polylines.value = data.polylines;
   rectangles.value = data.rectangles;
-  markersQuadtree = data.quadtrees.markers;
-  circlesQuadtree = data.quadtrees.circles;
-  polygonsQuadtree = data.quadtrees.polygons;
-  polylinesQuadtree = data.quadtrees.polylines;
-  rectanglesQuadtree = data.quadtrees.rectangles;
+  markersQuadtree.value = data.quadtrees.markers;
+  circlesQuadtree.value = data.quadtrees.circles;
+  polygonsQuadtree.value = data.quadtrees.polygons;
+  polylinesQuadtree.value = data.quadtrees.polylines;
+  rectanglesQuadtree.value = data.quadtrees.rectangles;
   isLoading.value = false;
 });
 
@@ -7027,11 +7063,11 @@ updateFPS();
         <div class="flex items-center gap-6">
           <div class="text-sm">
             <strong>Total:</strong>
-            {{ totalShapes.toLocaleString() }} shapes
+            {{ totalShapes }} shapes
           </div>
           <div class="text-sm">
             <strong>Rendered:</strong>
-            {{ visibleShapesCount.toLocaleString() }}
+            {{ visibleShapesCount }}
           </div>
           <div class="text-sm">
             <strong>FPS:</strong>
@@ -7042,28 +7078,23 @@ updateFPS();
         <div class="flex items-center gap-6 text-xs text-gray-600">
           <div>
             <strong>Markers:</strong>
-            {{ visibleMarkersCount.toLocaleString() }} /
-            {{ markers.length.toLocaleString() }}
+            {{ visibleMarkersCount }} / {{ markers.length }}
           </div>
           <div>
             <strong>Circles:</strong>
-            {{ visibleCirclesCount.toLocaleString() }} /
-            {{ circles.length.toLocaleString() }}
+            {{ visibleCirclesCount }} / {{ circles.length }}
           </div>
           <div>
             <strong>Polygons:</strong>
-            {{ visiblePolygonsCount.toLocaleString() }} /
-            {{ polygons.length.toLocaleString() }}
+            {{ visiblePolygonsCount }} / {{ polygons.length }}
           </div>
           <div>
             <strong>Polylines:</strong>
-            {{ visiblePolylinesCount.toLocaleString() }} /
-            {{ polylines.length.toLocaleString() }}
+            {{ visiblePolylinesCount }} / {{ polylines.length }}
           </div>
           <div>
             <strong>Rectangles:</strong>
-            {{ visibleRectanglesCount.toLocaleString() }} /
-            {{ rectangles.length.toLocaleString() }}
+            {{ visibleRectanglesCount }} / {{ rectangles.length }}
           </div>
         </div>
 
@@ -7122,12 +7153,11 @@ updateFPS();
             :margin="virtualizationMargin"
             :quadtree="markersQuadtree"
             @update:visible-count="visibleMarkersCount = $event"
+            v-slot="{ visibleIds }"
           >
-            <template #default="{ isVisible }">
+            <template v-for="marker in markers" :key="marker.id">
               <LeafletMarker
-                v-for="marker in markers"
-                v-show="isVisible(marker.id)"
-                :key="marker.id"
+                v-if="visibleIds.has(marker.id)"
                 :id="marker.id"
                 v-model:lat="marker.lat"
                 v-model:lng="marker.lng"
@@ -7141,12 +7171,11 @@ updateFPS();
             :margin="virtualizationMargin"
             :quadtree="circlesQuadtree"
             @update:visible-count="visibleCirclesCount = $event"
+            v-slot="{ visibleIds }"
           >
-            <template #default="{ isVisible }">
+            <template v-for="circle in circles" :key="circle.id">
               <LeafletCircle
-                v-for="circle in circles"
-                v-show="isVisible(circle.id)"
-                :key="circle.id"
+                v-if="visibleIds.has(circle.id)"
                 :id="circle.id"
                 v-model:lat="circle.lat"
                 v-model:lng="circle.lng"
@@ -7162,12 +7191,11 @@ updateFPS();
             :margin="virtualizationMargin"
             :quadtree="polygonsQuadtree"
             @update:visible-count="visiblePolygonsCount = $event"
+            v-slot="{ visibleIds }"
           >
-            <template #default="{ isVisible }">
+            <template v-for="polygon in polygons" :key="polygon.id">
               <LeafletPolygon
-                v-for="polygon in polygons"
-                v-show="isVisible(polygon.id)"
-                :key="polygon.id"
+                v-if="visibleIds.has(polygon.id)"
                 :id="polygon.id"
                 v-model:latlngs="polygon.latlngs"
                 :class="polygon.class"
@@ -7181,12 +7209,11 @@ updateFPS();
             :margin="virtualizationMargin"
             :quadtree="polylinesQuadtree"
             @update:visible-count="visiblePolylinesCount = $event"
+            v-slot="{ visibleIds }"
           >
-            <template #default="{ isVisible }">
+            <template v-for="polyline in polylines" :key="polyline.id">
               <LeafletPolyline
-                v-for="polyline in polylines"
-                v-show="isVisible(polyline.id)"
-                :key="polyline.id"
+                v-if="visibleIds.has(polyline.id)"
                 :id="polyline.id"
                 v-model:latlngs="polyline.latlngs"
                 :class="polyline.class"
@@ -7200,12 +7227,11 @@ updateFPS();
             :margin="virtualizationMargin"
             :quadtree="rectanglesQuadtree"
             @update:visible-count="visibleRectanglesCount = $event"
+            v-slot="{ visibleIds }"
           >
-            <template #default="{ isVisible }">
+            <template v-for="rectangle in rectangles" :key="rectangle.id">
               <LeafletRectangle
-                v-for="rectangle in rectangles"
-                v-show="isVisible(rectangle.id)"
-                :key="rectangle.id"
+                v-if="visibleIds.has(rectangle.id)"
                 :id="rectangle.id"
                 v-model:bounds="rectangle.bounds"
                 :class="rectangle.class"
@@ -7217,14 +7243,11 @@ updateFPS();
 
       <div class="text-sm text-gray-600 p-4 rounded">
         <p>
-          <strong>Note:</strong> Cette démo utilise
-          {{ totalShapes.toLocaleString() }} shapes pré-générées ({{
-            markers.length.toLocaleString()
-          }}
-          markers, {{ circles.length.toLocaleString() }} circles,
-          {{ polygons.length.toLocaleString() }} polygons,
-          {{ polylines.length.toLocaleString() }} polylines,
-          {{ rectangles.length.toLocaleString() }} rectangles) autour de Paris.
+          <strong>Note:</strong> Cette démo utilise {{ totalShapes }} shapes
+          pré-générées ({{ markers.length }} markers,
+          {{ circles.length }} circles, {{ polygons.length }} polygons,
+          {{ polylines.length }} polylines, {{ rectangles.length }} rectangles)
+          autour de Paris.
         </p>
         <p class="mt-2">
           Avec la virtualisation <strong>activée</strong>, seules les shapes

@@ -120,9 +120,9 @@ function generateMarkers(count: number): DemoMarker[] {
  */
 function generateCircles(count: number): DemoCircle[] {
   const classes = [
-    'fill-blue-500 stroke-blue-700',
-    'fill-green-500 stroke-green-700',
-    'fill-red-500 stroke-red-700',
+    'bg-blue-500/30 border border-blue-700',
+    'bg-green-500/30 border border-green-700',
+    'bg-red-500/30 border border-red-700',
   ] as const;
 
   const circles: DemoCircle[] = [];
@@ -154,8 +154,8 @@ function generateCircles(count: number): DemoCircle[] {
  */
 function generatePolygons(count: number): DemoPolygon[] {
   const classes = [
-    'fill-purple-500/30 stroke-purple-700',
-    'fill-orange-500/30 stroke-orange-700',
+    'bg-purple-500/30 border border-purple-700',
+    'bg-orange-500/30 border border-orange-700',
   ] as const;
 
   const polygons: DemoPolygon[] = [];
@@ -197,7 +197,11 @@ function generatePolygons(count: number): DemoPolygon[] {
  * Generate all polylines at once
  */
 function generatePolylines(count: number): DemoPolyline[] {
-  const classes = ['stroke-yellow-600', 'stroke-pink-600', 'stroke-cyan-600'] as const;
+  const classes = [
+    'border border-yellow-600',
+    'border border-pink-600',
+    'border border-cyan-600',
+  ] as const;
 
   const polylines: DemoPolyline[] = [];
   for (let i = 0; i < count; i++) {
@@ -244,8 +248,8 @@ function generatePolylines(count: number): DemoPolyline[] {
  */
 function generateRectangles(count: number): DemoRectangle[] {
   const classes = [
-    'fill-indigo-500/30 stroke-indigo-700',
-    'fill-teal-500/30 stroke-teal-700',
+    'bg-indigo-500/30 border border-indigo-700',
+    'bg-teal-500/30 border border-teal-700',
   ] as const;
 
   const rectangles: DemoRectangle[] = [];
@@ -275,31 +279,129 @@ function generateRectangles(count: number): DemoRectangle[] {
 }
 
 /**
+ * Helper to yield control back to the browser
+ */
+async function yieldToMain(): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
+/**
+ * Generate items progressively in chunks to avoid blocking
+ */
+async function* generateInChunks<T>(
+  generator: (count: number) => T[],
+  totalCount: number,
+  chunkSize: number
+): AsyncGenerator<T[], void, unknown> {
+  for (let i = 0; i < totalCount; i += chunkSize) {
+    const count = Math.min(chunkSize, totalCount - i);
+    yield generator(count);
+    await yieldToMain();
+  }
+}
+
+/**
  * Load demo data and build spatial index progressively
  * @param onProgress - Callback for progress updates (0-100, stage description)
  */
 export async function loadVirtualizationDemoData(
   onProgress?: (percent: number, stage: string) => void
 ): Promise<VirtualizationDemoData> {
-  // Step 1: Generate data quickly (synchronous, but fast)
-  onProgress?.(5, 'Generating markers...');
-  const markers = generateMarkers(3000);
+  const markers: DemoMarker[] = [];
+  const circles: DemoCircle[] = [];
+  const polygons: DemoPolygon[] = [];
+  const polylines: DemoPolyline[] = [];
+  const rectangles: DemoRectangle[] = [];
 
+  // Smaller chunk size to avoid blocking
+  const generationChunkSize = 200;
+  const insertionChunkSize = 100;
+
+  // Step 1: Generate markers progressively
+  onProgress?.(0, 'Generating markers...');
+  const markerTotal = 3000;
+  let markerCount = 0;
+  for await (const chunk of generateInChunks(generateMarkers, markerTotal, generationChunkSize)) {
+    // Adjust IDs to be sequential across chunks
+    chunk.forEach((marker, idx) => {
+      marker.id = `marker-${markerCount + idx}`;
+      marker.label = `Marker ${markerCount + idx}`;
+    });
+    markers.push(...chunk);
+    markerCount += chunk.length;
+    const progress = Math.floor((markerCount / markerTotal) * 10);
+    onProgress?.(progress, `Generating markers (${markerCount}/${markerTotal})...`);
+  }
+
+  // Step 2: Generate circles progressively
   onProgress?.(10, 'Generating circles...');
-  const circles = generateCircles(1500);
+  const circleTotal = 1500;
+  let circleCount = 0;
+  for await (const chunk of generateInChunks(generateCircles, circleTotal, generationChunkSize)) {
+    chunk.forEach((circle, idx) => {
+      circle.id = `circle-${circleCount + idx}`;
+    });
+    circles.push(...chunk);
+    circleCount += chunk.length;
+    const progress = Math.floor((circleCount / circleTotal) * 10) + 10;
+    onProgress?.(progress, `Generating circles (${circleCount}/${circleTotal})...`);
+  }
 
-  onProgress?.(15, 'Generating polygons...');
-  const polygons = generatePolygons(1500);
+  // Step 3: Generate polygons progressively
+  onProgress?.(20, 'Generating polygons...');
+  const polygonTotal = 1500;
+  let polygonCount = 0;
+  for await (const chunk of generateInChunks(generatePolygons, polygonTotal, generationChunkSize)) {
+    chunk.forEach((polygon, idx) => {
+      polygon.id = `polygon-${polygonCount + idx}`;
+    });
+    polygons.push(...chunk);
+    polygonCount += chunk.length;
+    const progress = Math.floor((polygonCount / polygonTotal) * 10) + 20;
+    onProgress?.(progress, `Generating polygons (${polygonCount}/${polygonTotal})...`);
+  }
 
-  onProgress?.(20, 'Generating polylines...');
-  const polylines = generatePolylines(1000);
+  // Step 4: Generate polylines progressively
+  onProgress?.(30, 'Generating polylines...');
+  const polylineTotal = 1000;
+  let polylineCount = 0;
+  for await (const chunk of generateInChunks(
+    generatePolylines,
+    polylineTotal,
+    generationChunkSize
+  )) {
+    chunk.forEach((polyline, idx) => {
+      polyline.id = `polyline-${polylineCount + idx}`;
+    });
+    polylines.push(...chunk);
+    polylineCount += chunk.length;
+    const progress = Math.floor((polylineCount / polylineTotal) * 10) + 30;
+    onProgress?.(progress, `Generating polylines (${polylineCount}/${polylineTotal})...`);
+  }
 
-  onProgress?.(25, 'Generating rectangles...');
-  const rectangles = generateRectangles(1000);
+  // Step 5: Generate rectangles progressively
+  onProgress?.(40, 'Generating rectangles...');
+  const rectangleTotal = 1000;
+  let rectangleCount = 0;
+  for await (const chunk of generateInChunks(
+    generateRectangles,
+    rectangleTotal,
+    generationChunkSize
+  )) {
+    chunk.forEach((rectangle, idx) => {
+      rectangle.id = `rectangle-${rectangleCount + idx}`;
+    });
+    rectangles.push(...chunk);
+    rectangleCount += chunk.length;
+    const progress = Math.floor((rectangleCount / rectangleTotal) * 10) + 40;
+    onProgress?.(progress, `Generating rectangles (${rectangleCount}/${rectangleTotal})...`);
+  }
 
-  onProgress?.(30, 'Building spatial indexes...');
+  onProgress?.(50, 'Building spatial indexes...');
 
-  // Step 2: Create quadtrees using the composable
+  // Step 6: Create quadtrees
   const markersQuadtree = useQuadtree<DemoMarker>({
     bounds: convertLatLngBounds(PARIS_BOUNDS),
     maxObjects: 10,
@@ -330,96 +432,69 @@ export async function loadVirtualizationDemoData(
     maxLevels: 4,
   });
 
-  const chunkSize = 500;
-
-  // Step 3: Insert markers progressively
-  onProgress?.(35, 'Indexing markers...');
-  for (let i = 0; i < markers.length; i += chunkSize) {
-    const chunk = markers.slice(i, Math.min(i + chunkSize, markers.length));
-    for (const marker of chunk) {
-      markersQuadtree.insert(marker);
+  // Step 7: Insert markers progressively (smaller chunks)
+  onProgress?.(50, 'Indexing markers...');
+  for (let i = 0; i < markers.length; i += insertionChunkSize) {
+    const end = Math.min(i + insertionChunkSize, markers.length);
+    for (let j = i; j < end; j++) {
+      const marker = markers[j];
+      if (marker) markersQuadtree.insert(marker);
     }
-    const progress = Math.floor((i / markers.length) * 10) + 35;
-    onProgress?.(progress, 'Indexing markers...');
-    await new Promise((resolve) => {
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(resolve as any);
-      } else {
-        setTimeout(resolve, 0);
-      }
-    });
+    const progress = Math.floor((end / markers.length) * 10) + 50;
+    onProgress?.(progress, `Indexing markers (${end}/${markers.length})...`);
+    await yieldToMain();
   }
 
-  // Step 4: Insert circles progressively
-  onProgress?.(45, 'Indexing circles...');
-  for (let i = 0; i < circles.length; i += chunkSize) {
-    const chunk = circles.slice(i, Math.min(i + chunkSize, circles.length));
-    for (const circle of chunk) {
-      circlesQuadtree.insert(circle);
+  // Step 8: Insert circles progressively
+  onProgress?.(60, 'Indexing circles...');
+  for (let i = 0; i < circles.length; i += insertionChunkSize) {
+    const end = Math.min(i + insertionChunkSize, circles.length);
+    for (let j = i; j < end; j++) {
+      const circle = circles[j];
+      if (circle) circlesQuadtree.insert(circle);
     }
-    const progress = Math.floor((i / circles.length) * 10) + 45;
-    onProgress?.(progress, 'Indexing circles...');
-    await new Promise((resolve) => {
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(resolve as any);
-      } else {
-        setTimeout(resolve, 0);
-      }
-    });
+    const progress = Math.floor((end / circles.length) * 10) + 60;
+    onProgress?.(progress, `Indexing circles (${end}/${circles.length})...`);
+    await yieldToMain();
   }
 
-  // Step 5: Insert polygons progressively
-  onProgress?.(55, 'Indexing polygons...');
-  for (let i = 0; i < polygons.length; i += chunkSize) {
-    const chunk = polygons.slice(i, Math.min(i + chunkSize, polygons.length));
-    for (const polygon of chunk) {
-      polygonsQuadtree.insert(polygon);
+  // Step 9: Insert polygons progressively
+  onProgress?.(70, 'Indexing polygons...');
+  for (let i = 0; i < polygons.length; i += insertionChunkSize) {
+    const end = Math.min(i + insertionChunkSize, polygons.length);
+    for (let j = i; j < end; j++) {
+      const polygon = polygons[j];
+      if (polygon) polygonsQuadtree.insert(polygon);
     }
-    const progress = Math.floor((i / polygons.length) * 15) + 55;
-    onProgress?.(progress, 'Indexing polygons...');
-    await new Promise((resolve) => {
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(resolve as any);
-      } else {
-        setTimeout(resolve, 0);
-      }
-    });
+    const progress = Math.floor((end / polygons.length) * 10) + 70;
+    onProgress?.(progress, `Indexing polygons (${end}/${polygons.length})...`);
+    await yieldToMain();
   }
 
-  // Step 6: Insert polylines progressively
-  onProgress?.(70, 'Indexing polylines...');
-  for (let i = 0; i < polylines.length; i += chunkSize) {
-    const chunk = polylines.slice(i, Math.min(i + chunkSize, polylines.length));
-    for (const polyline of chunk) {
-      polylinesQuadtree.insert(polyline);
+  // Step 10: Insert polylines progressively
+  onProgress?.(80, 'Indexing polylines...');
+  for (let i = 0; i < polylines.length; i += insertionChunkSize) {
+    const end = Math.min(i + insertionChunkSize, polylines.length);
+    for (let j = i; j < end; j++) {
+      const polyline = polylines[j];
+      if (polyline) polylinesQuadtree.insert(polyline);
     }
-    const progress = Math.floor((i / polylines.length) * 15) + 70;
-    onProgress?.(progress, 'Indexing polylines...');
-    await new Promise((resolve) => {
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(resolve as any);
-      } else {
-        setTimeout(resolve, 0);
-      }
-    });
+    const progress = Math.floor((end / polylines.length) * 10) + 80;
+    onProgress?.(progress, `Indexing polylines (${end}/${polylines.length})...`);
+    await yieldToMain();
   }
 
-  // Step 7: Insert rectangles progressively
-  onProgress?.(85, 'Indexing rectangles...');
-  for (let i = 0; i < rectangles.length; i += chunkSize) {
-    const chunk = rectangles.slice(i, Math.min(i + chunkSize, rectangles.length));
-    for (const rectangle of chunk) {
-      rectanglesQuadtree.insert(rectangle);
+  // Step 11: Insert rectangles progressively
+  onProgress?.(90, 'Indexing rectangles...');
+  for (let i = 0; i < rectangles.length; i += insertionChunkSize) {
+    const end = Math.min(i + insertionChunkSize, rectangles.length);
+    for (let j = i; j < end; j++) {
+      const rectangle = rectangles[j];
+      if (rectangle) rectanglesQuadtree.insert(rectangle);
     }
-    const progress = Math.floor((i / rectangles.length) * 15) + 85;
-    onProgress?.(progress, 'Indexing rectangles...');
-    await new Promise((resolve) => {
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(resolve as any);
-      } else {
-        setTimeout(resolve, 0);
-      }
-    });
+    const progress = Math.floor((end / rectangles.length) * 10) + 90;
+    onProgress?.(progress, `Indexing rectangles (${end}/${rectangles.length})...`);
+    await yieldToMain();
   }
 
   onProgress?.(100, 'Ready!');

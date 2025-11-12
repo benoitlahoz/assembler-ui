@@ -92,9 +92,32 @@ const updateVisibleBounds = () => {
  * Update visible features using quadtree (O(log n))
  */
 const updateVisibleFeaturesQuadtree = () => {
-  if (!props.enabled || !visibleBounds.value) {
+  console.log('[DEBUG] updateVisibleFeaturesQuadtree called');
+  console.log('[DEBUG] enabled:', props.enabled);
+  console.log('[DEBUG] visibleBounds:', visibleBounds.value);
+
+  if (!visibleBounds.value) {
     visibleFeatureIds.value.clear();
     emit('update:visible-count', 0);
+    console.log('[DEBUG] No bounds, emitting 0');
+    return;
+  }
+
+  // If virtualization is disabled, show all items
+  if (!props.enabled) {
+    const allItems = props.quadtree.retrieve({
+      x: -180,
+      y: -90,
+      width: 360,
+      height: 180,
+    });
+    const allIds = new Set<string | number>();
+    for (const item of allItems) {
+      allIds.add(item.id);
+    }
+    visibleFeatureIds.value = allIds;
+    emit('update:visible-count', allIds.size);
+    console.log('[DEBUG] Virtualization OFF, emitting all:', allIds.size);
     return;
   }
 
@@ -108,8 +131,12 @@ const updateVisibleFeaturesQuadtree = () => {
     height: bounds.getNorth() - bounds.getSouth(),
   };
 
+  console.log('[DEBUG] Query rect:', queryRect);
+
   // Query quadtree - O(log n) instead of O(n) !
   const visibleItems = props.quadtree.retrieve(queryRect);
+
+  console.log('[DEBUG] Retrieved items:', visibleItems.length);
 
   const newVisibleIds = new Set<string | number>();
   for (const item of visibleItems) {
@@ -123,22 +150,31 @@ const updateVisibleFeaturesQuadtree = () => {
 
   visibleFeatureIds.value = newVisibleIds;
   emit('update:visible-count', newVisibleIds.size);
+  console.log('[DEBUG] Emitting visible count:', newVisibleIds.size);
 };
 
 // Setup map event listeners for virtualization
 onMounted(() => {
-  nextTick(() => {
-    if (map.value) {
-      // Initial bounds
-      updateVisibleBounds();
-
-      // Listen to map move and zoom events
-      map.value.on('moveend', updateVisibleBounds);
-      map.value.on('zoomend', updateVisibleBounds);
-    }
-  });
+  // If map is already available, set it up immediately
+  if (map.value) {
+    updateVisibleBounds();
+    map.value.on('moveend', updateVisibleBounds);
+    map.value.on('zoomend', updateVisibleBounds);
+  }
 });
 
+// Watch for map to become available (it's created asynchronously in LeafletMap)
+watch(
+  map,
+  (newMap) => {
+    if (newMap) {
+      updateVisibleBounds();
+      newMap.on('moveend', updateVisibleBounds);
+      newMap.on('zoomend', updateVisibleBounds);
+    }
+  },
+  { immediate: true }
+);
 onBeforeUnmount(() => {
   if (map.value) {
     map.value.off('moveend', updateVisibleBounds);
@@ -164,7 +200,13 @@ watch(
 watch(
   () => props.quadtree,
   () => {
-    updateVisibleFeaturesQuadtree();
+    // When quadtree changes, update visible features
+    // But only if map is already mounted
+    if (map.value) {
+      nextTick(() => {
+        updateVisibleBounds();
+      });
+    }
   }
 );
 
@@ -176,14 +218,14 @@ defineExpose({
 </script>
 
 <template>
-  <template v-if="!enabled">
-    <slot />
-  </template>
-  <template v-else>
-    <!-- Quadtree mode: use scoped slot for manual control -->
-    <slot
-      :is-visible="(id: string | number) => visibleFeatureIds.has(id)"
-      :visible-ids="visibleFeatureIds"
-    />
-  </template>
+  <!-- 
+    Scoped slot that provides visibility check function and visible IDs set.
+    Use v-if (not v-show) with the isVisible function to ensure components 
+    are properly mounted/unmounted based on viewport visibility.
+  -->
+  <slot
+    :is-visible="(id: string | number) => visibleFeatureIds.has(id)"
+    :visible-ids="visibleFeatureIds"
+    :visible-count="visibleFeatureIds.size"
+  />
 </template>
