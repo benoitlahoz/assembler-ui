@@ -31,6 +31,19 @@ const isTransitioning = ref(false); // État de transition
 const autoMargin = ref(true); // Auto-adjust margin based on zoom
 const virtualizationMargin = ref(1000); // Margin in meters (when not auto)
 const marginZoomRatio = ref(1.0); // Zoom-based margin scaling factor
+
+// Zoom level controls for each feature type
+const markersMinZoom = ref<number | undefined>(12);
+const markersMaxZoom = ref<number | undefined>(undefined);
+const circlesMinZoom = ref<number | undefined>(undefined);
+const circlesMaxZoom = ref<number | undefined>(undefined);
+const polygonsMinZoom = ref<number | undefined>(undefined);
+const polygonsMaxZoom = ref<number | undefined>(14);
+const polylinesMinZoom = ref<number | undefined>(undefined);
+const polylinesMaxZoom = ref<number | undefined>(undefined);
+const rectanglesMinZoom = ref<number | undefined>(undefined);
+const rectanglesMaxZoom = ref<number | undefined>(undefined);
+
 const visibleMarkersCount = ref(0);
 const visibleCirclesCount = ref(0);
 const visiblePolygonsCount = ref(0);
@@ -240,7 +253,128 @@ updateFPS();
             />
             <span class="text-sm w-16">{{ virtualizationMargin }} m</span>
           </div>
-        </div>
+
+        <!-- Zoom Levels Controls (collapsible) -->
+        <details class="border rounded p-3">
+          <summary class="cursor-pointer text-sm font-semibold mb-2">🔍 Zoom Levels per Feature Type</summary>
+          
+          <div class="mt-3 space-y-2">
+            <div class="flex items-center gap-3 text-xs">
+              <span class="w-20 font-medium">Markers:</span>
+              <input
+                v-model.number="markersMinZoom"
+                type="number"
+                min="0"
+                max="20"
+                placeholder="min"
+                class="w-16 px-2 py-1 border rounded"
+              />
+              <span class="text-gray-400">→</span>
+              <input
+                v-model.number="markersMaxZoom"
+                type="number"
+                min="0"
+                max="20"
+                placeholder="max"
+                class="w-16 px-2 py-1 border rounded"
+              />
+              <span class="text-gray-500">(zoom ≥12)</span>
+            </div>
+            
+            <div class="flex items-center gap-3 text-xs">
+              <span class="w-20 font-medium">Circles:</span>
+              <input
+                v-model.number="circlesMinZoom"
+                type="number"
+                min="0"
+                max="20"
+                placeholder="min"
+                class="w-16 px-2 py-1 border rounded"
+              />
+              <span class="text-gray-400">→</span>
+              <input
+                v-model.number="circlesMaxZoom"
+                type="number"
+                min="0"
+                max="20"
+                placeholder="max"
+                class="w-16 px-2 py-1 border rounded"
+              />
+              <span class="text-gray-500">(always)</span>
+            </div>
+            
+            <div class="flex items-center gap-3 text-xs">
+              <span class="w-20 font-medium">Polygons:</span>
+              <input
+                v-model.number="polygonsMinZoom"
+                type="number"
+                min="0"
+                max="20"
+                placeholder="min"
+                class="w-16 px-2 py-1 border rounded"
+              />
+              <span class="text-gray-400">→</span>
+              <input
+                v-model.number="polygonsMaxZoom"
+                type="number"
+                min="0"
+                max="20"
+                placeholder="max"
+                class="w-16 px-2 py-1 border rounded"
+              />
+              <span class="text-gray-500">(zoom ≤14)</span>
+            </div>
+            
+            <div class="flex items-center gap-3 text-xs">
+              <span class="w-20 font-medium">Polylines:</span>
+              <input
+                v-model.number="polylinesMinZoom"
+                type="number"
+                min="0"
+                max="20"
+                placeholder="min"
+                class="w-16 px-2 py-1 border rounded"
+              />
+              <span class="text-gray-400">→</span>
+              <input
+                v-model.number="polylinesMaxZoom"
+                type="number"
+                min="0"
+                max="20"
+                placeholder="max"
+                class="w-16 px-2 py-1 border rounded"
+              />
+              <span class="text-gray-500">(always)</span>
+            </div>
+            
+            <div class="flex items-center gap-3 text-xs">
+              <span class="w-20 font-medium">Rectangles:</span>
+              <input
+                v-model.number="rectanglesMinZoom"
+                type="number"
+                min="0"
+                max="20"
+                placeholder="min"
+                class="w-16 px-2 py-1 border rounded"
+              />
+              <span class="text-gray-400">→</span>
+              <input
+                v-model.number="rectanglesMaxZoom"
+                type="number"
+                min="0"
+                max="20"
+                placeholder="max"
+                class="w-16 px-2 py-1 border rounded"
+              />
+              <span class="text-gray-500">(always)</span>
+            </div>
+            
+            <div class="text-xs text-gray-500 mt-2 pt-2 border-t">
+              💡 Leave empty for no limit. Example: Markers appear at zoom 12+, Polygons disappear after zoom 14.
+            </div>
+          </div>
+        </details>
+      </div>
       </div>
 
       <!-- Map -->
@@ -284,6 +418,8 @@ updateFPS();
             :quadtree="markersQuadtree"
             :margin-meters="autoMargin ? undefined : virtualizationMargin"
             :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
+            :min-zoom="markersMinZoom"
+            :max-zoom="markersMaxZoom"
             @update:visible-count="visibleMarkersCount = $event"
             @transition-start="isTransitioning = true"
             @transition-end="isTransitioning = false"
@@ -306,6 +442,8 @@ updateFPS();
             :margin-meters="autoMargin ? undefined : virtualizationMargin"
             :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
             :quadtree="circlesQuadtree"
+            :min-zoom="circlesMinZoom"
+            :max-zoom="circlesMaxZoom"
             @update:visible-count="visibleCirclesCount = $event"
             @transition-start="isTransitioning = true"
             @transition-end="isTransitioning = false"
@@ -336,6 +474,8 @@ updateFPS();
             :margin-meters="autoMargin ? undefined : virtualizationMargin"
             :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
             :quadtree="polygonsQuadtree"
+            :min-zoom="polygonsMinZoom"
+            :max-zoom="polygonsMaxZoom"
             @update:visible-count="visiblePolygonsCount = $event"
             @transition-start="isTransitioning = true"
             @transition-end="isTransitioning = false"
@@ -362,6 +502,8 @@ updateFPS();
             :margin-meters="autoMargin ? undefined : virtualizationMargin"
             :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
             :quadtree="polylinesQuadtree"
+            :min-zoom="polylinesMinZoom"
+            :max-zoom="polylinesMaxZoom"
             @update:visible-count="visiblePolylinesCount = $event"
             @transition-start="isTransitioning = true"
             @transition-end="isTransitioning = false"
@@ -390,6 +532,8 @@ updateFPS();
             :margin-meters="autoMargin ? undefined : virtualizationMargin"
             :margin-zoom-ratio="autoMargin ? marginZoomRatio : undefined"
             :quadtree="rectanglesQuadtree"
+            :min-zoom="rectanglesMinZoom"
+            :max-zoom="rectanglesMaxZoom"
             @update:visible-count="visibleRectanglesCount = $event"
             @transition-start="isTransitioning = true"
             @transition-end="isTransitioning = false"

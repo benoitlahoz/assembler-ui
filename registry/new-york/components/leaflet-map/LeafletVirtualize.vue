@@ -47,6 +47,20 @@ export interface LeafletVirtualizeProps {
   alwaysVisible?: Array<string | number>;
 
   /**
+   * Minimum zoom level to render features (inclusive)
+   * Below this zoom, features will not be displayed
+   * @default undefined (no minimum)
+   */
+  minZoom?: number;
+
+  /**
+   * Maximum zoom level to render features (inclusive)
+   * Above this zoom, features will not be displayed
+   * @default undefined (no maximum)
+   */
+  maxZoom?: number;
+
+  /**
    * Delay in milliseconds before applying virtualization changes
    * Helps smooth transitions when toggling virtualization on/off
    * @default 50
@@ -59,6 +73,8 @@ const props = withDefaults(defineProps<LeafletVirtualizeProps>(), {
   marginMeters: undefined,
   marginZoomRatio: 1.0,
   alwaysVisible: () => [],
+  minZoom: undefined,
+  maxZoom: undefined,
   transitionDelay: 50,
 });
 
@@ -165,6 +181,23 @@ const updateVisibleFeaturesQuadtree = () => {
     return;
   }
 
+  // Check zoom level constraints
+  if (map.value) {
+    const currentZoom = map.value.getZoom();
+    
+    if (props.minZoom !== undefined && currentZoom < props.minZoom) {
+      visibleFeatureIds.value.clear();
+      emit('update:visible-count', 0);
+      return;
+    }
+    
+    if (props.maxZoom !== undefined && currentZoom > props.maxZoom) {
+      visibleFeatureIds.value.clear();
+      emit('update:visible-count', 0);
+      return;
+    }
+  }
+
   // If virtualization is disabled, show all items
   if (!props.enabled) {
     const allItems = props.quadtree.retrieve({
@@ -266,6 +299,20 @@ watch(
 
 watch(
   () => props.marginZoomRatio,
+  () => {
+    updateVisibleBounds();
+  }
+);
+
+watch(
+  () => props.minZoom,
+  () => {
+    updateVisibleBounds();
+  }
+);
+
+watch(
+  () => props.maxZoom,
   () => {
     updateVisibleBounds();
   }
