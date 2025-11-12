@@ -4,7 +4,6 @@
  *
  * @demo LeafletSimple
  * @demo LeafletEditionDemo
- * @demo LeafletSelectionDemo
  */
 
 import type { InjectionKey, Ref } from 'vue';
