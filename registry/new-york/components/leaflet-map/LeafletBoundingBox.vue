@@ -139,8 +139,7 @@ const constrainToSquare = (
     const origLatDiff = originalBounds.getNorth() - originalBounds.getSouth();
     const origLngDiff = originalBounds.getEast() - originalBounds.getWest();
     const origLatMeters = origLatDiff * 111320;
-    const origLngMeters =
-      origLngDiff * 111320 * Math.cos((currentCenter.lat * Math.PI) / 180);
+    const origLngMeters = origLngDiff * 111320 * Math.cos((currentCenter.lat * Math.PI) / 180);
 
     // Use the dimension that changed the most
     const latChange = Math.abs(latMeters - origLatMeters);

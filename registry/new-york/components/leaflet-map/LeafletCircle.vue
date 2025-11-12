@@ -114,6 +114,11 @@ const setupMapDragHandlers = () => {
     emit('update:lat', newLatLng.lat);
     emit('update:lng', newLatLng.lng);
 
+    // Notify selection manager to update bounding box
+    if (selectionContext) {
+      selectionContext.notifyFeatureUpdate(circleId.value);
+    }
+
     // Update radius marker if in edit mode
     if (radiusMarker.value && props.editable) {
       const radius = circle.value.getRadius();
@@ -237,7 +242,15 @@ const registerWithSelection = () => {
 };
 
 watch(
-  () => [map.value, props.lat, props.lng, props.radius, props.editable, props.draggable],
+  () => [
+    map.value,
+    props.lat,
+    props.lng,
+    props.radius,
+    props.editable,
+    props.draggable,
+    props.selectable,
+  ],
   (newVal, oldVal) => {
     nextTick(() => {
       if (
@@ -300,6 +313,37 @@ watch(
           // Register with selection context if selectable
           if (props.selectable && selectionContext) {
             registerWithSelection();
+          }
+        }
+
+        // Check if selectable changed and we need to register/unregister
+        if (circle.value) {
+          const selectableChanged = oldVal && Boolean(oldVal[6]) !== Boolean(newVal[6]);
+          if (selectableChanged) {
+            // Remove old event listeners
+            circle.value.off('click');
+            circle.value.off('mousedown');
+
+            // Add new event listeners based on selectable state
+            if (props.selectable && selectionContext) {
+              circle.value.on('click', () => {
+                selectionContext.selectFeature('circle', circleId.value);
+                emit('click');
+              });
+              circle.value.on('mousedown', (e: any) => {
+                if (props.draggable) {
+                  selectionContext.selectFeature('circle', circleId.value);
+                }
+              });
+              registerWithSelection();
+            } else {
+              circle.value.on('click', () => {
+                emit('click');
+              });
+              if (selectionContext) {
+                selectionContext.unregisterFeature(circleId.value);
+              }
+            }
           }
         }
 

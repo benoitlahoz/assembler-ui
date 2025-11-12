@@ -245,6 +245,11 @@ const setupMapDragHandlers = () => {
     // Émettre la mise à jour en temps réel pendant le drag
     const updatedLatLngs = newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>;
     emit('update:latlngs', updatedLatLngs);
+
+    // Notify selection manager to update bounding box
+    if (selectionContext) {
+      selectionContext.notifyFeatureUpdate(polylineId.value);
+    }
   };
 
   const onMouseUp = () => {
@@ -359,7 +364,7 @@ const registerWithSelection = () => {
 };
 
 watch(
-  () => [map.value, props.latlngs, props.weight, props.editable, props.draggable],
+  () => [map.value, props.latlngs, props.weight, props.editable, props.draggable, props.selectable],
   (newVal, oldVal) => {
     nextTick(() => {
       if (map.value && L.value && props.latlngs && props.latlngs.length > 0) {
@@ -410,6 +415,37 @@ watch(
           // Register with selection context if selectable
           if (props.selectable && selectionContext) {
             registerWithSelection();
+          }
+        }
+
+        // Check if selectable changed and we need to register/unregister
+        if (polyline.value) {
+          const selectableChanged = oldVal && Boolean(oldVal[5]) !== Boolean(newVal[5]);
+          if (selectableChanged) {
+            // Remove old event listeners
+            polyline.value.off('click');
+            polyline.value.off('mousedown');
+
+            // Add new event listeners based on selectable state
+            if (props.selectable && selectionContext) {
+              polyline.value.on('click', () => {
+                selectionContext.selectFeature('polyline', polylineId.value);
+                emit('click');
+              });
+              polyline.value.on('mousedown', (e: any) => {
+                if (props.draggable) {
+                  selectionContext.selectFeature('polyline', polylineId.value);
+                }
+              });
+              registerWithSelection();
+            } else {
+              polyline.value.on('click', () => {
+                emit('click');
+              });
+              if (selectionContext) {
+                selectionContext.unregisterFeature(polylineId.value);
+              }
+            }
           }
         }
 

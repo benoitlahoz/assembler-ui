@@ -9,10 +9,9 @@ import {
   LeafletPolygon,
   LeafletRectangle,
   LeafletSelectionManager,
-  LeafletBoundingBox,
   LeafletBoundingBoxRectangle,
   LeafletBoundingBoxHandle,
-} from '..';
+} from '~~/registry/new-york/components/leaflet-map';
 
 const center = ref([43.280608, 5.350242]);
 const zoom = ref(16);

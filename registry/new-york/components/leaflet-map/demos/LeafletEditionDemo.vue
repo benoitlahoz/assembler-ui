@@ -24,10 +24,10 @@ import {
 const mapRef = ref<LeafletMapExposed | null>(null);
 
 // Mode édition global
-const editMode = ref(false);
+const editMode = ref(true); // Start with edit mode enabled
 
 // Current mode from DrawControl (can be drawing mode or selection mode)
-const currentMode = ref<FeatureShapeType | FeatureSelectMode | null>(null);
+const currentMode = ref<FeatureShapeType | FeatureSelectMode | null>('select'); // Start in select mode
 
 // Computed selection mode for LeafletSelectionManager (only 'select' or 'directSelect')
 const selectionMode = computed<FeatureSelectMode | null>(() => {
@@ -170,45 +170,10 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
       break;
     }
   }
-};
 
-// Gestion des mises à jour
-const updateMarker = (id: number, lat: number, lng: number) => {
-  const marker = markers.value.find((m) => m.id === id);
-  if (marker) {
-    marker.lat = lat;
-    marker.lng = lng;
-  }
-};
-
-const updateCircle = (id: number, updates: { lat?: number; lng?: number; radius?: number }) => {
-  const circle = circles.value.find((c) => c.id === id);
-  if (circle) {
-    if (updates.lat !== undefined) circle.lat = updates.lat;
-    if (updates.lng !== undefined) circle.lng = updates.lng;
-    if (updates.radius !== undefined) circle.radius = updates.radius;
-  }
-};
-
-const updatePolyline = (id: number, latlngs: Array<[number, number]>) => {
-  const polyline = polylines.value.find((p) => p.id === id);
-  if (polyline) {
-    polyline.latlngs = latlngs;
-  }
-};
-
-const updatePolygon = (id: number, latlngs: Array<[number, number]>) => {
-  const polygon = polygons.value.find((p) => p.id === id);
-  if (polygon) {
-    polygon.latlngs = latlngs;
-  }
-};
-
-const updateRectangle = (id: number, bounds: [[number, number], [number, number]]) => {
-  const rectangle = rectangles.value.find((r) => r.id === id);
-  if (rectangle) {
-    rectangle.bounds = bounds;
-  }
+  // After creating a shape, switch back to select mode
+  // so the newly created shape becomes selectable immediately
+  currentMode.value = 'select';
 };
 
 const onPolygonClosed = (id: number) => {
@@ -281,55 +246,48 @@ const onPolygonClosed = (id: number) => {
               v-for="marker in markers"
               :key="`marker-${marker.id}`"
               :id="`marker-${marker.id}`"
-              :lat="marker.lat"
-              :lng="marker.lng"
+              v-model:lat="marker.lat"
+              v-model:lng="marker.lng"
               :selectable="currentMode === 'select'"
               :editable="currentMode === 'directSelect'"
               :draggable="currentMode === 'select'"
-              @update:lat="(lat) => updateMarker(marker.id, lat, marker.lng)"
-              @update:lng="(lng) => updateMarker(marker.id, marker.lat, lng)"
             />
 
             <LeafletCircle
               v-for="circle in circles"
               :key="`circle-${circle.id}`"
               :id="`circle-${circle.id}`"
-              :lat="circle.lat"
-              :lng="circle.lng"
-              :radius="circle.radius"
+              v-model:lat="circle.lat"
+              v-model:lng="circle.lng"
+              v-model:radius="circle.radius"
               :class="circle.class"
               :selectable="currentMode === 'select'"
               :editable="currentMode === 'directSelect'"
               :draggable="currentMode === 'select'"
-              @update:lat="(lat) => updateCircle(circle.id, { lat })"
-              @update:lng="(lng) => updateCircle(circle.id, { lng })"
-              @update:radius="(radius) => updateCircle(circle.id, { radius })"
             />
 
             <LeafletPolyline
               v-for="polyline in polylines"
               :key="`polyline-${polyline.id}`"
               :id="`polyline-${polyline.id}`"
-              :latlngs="polyline.latlngs"
+              v-model:latlngs="polyline.latlngs"
               :weight="polyline.weight"
               :class="polyline.class"
               :selectable="currentMode === 'select'"
               :editable="currentMode === 'directSelect'"
               :draggable="currentMode === 'select'"
-              @update:latlngs="(latlngs) => updatePolyline(polyline.id, latlngs)"
             />
 
             <LeafletPolygon
               v-for="polygon in polygons"
               :key="`polygon-${polygon.id}`"
               :id="`polygon-${polygon.id}`"
-              :latlngs="polygon.latlngs"
+              v-model:latlngs="polygon.latlngs"
               :class="polygon.class"
               :selectable="currentMode === 'select'"
               :editable="currentMode === 'directSelect'"
               :draggable="currentMode === 'select'"
               :auto-close="true"
-              @update:latlngs="(latlngs) => updatePolygon(polygon.id, latlngs)"
               @closed="() => onPolygonClosed(polygon.id)"
             />
 
@@ -337,15 +295,14 @@ const onPolygonClosed = (id: number) => {
               v-for="rectangle in rectangles"
               :key="`rectangle-${rectangle.id}`"
               :id="`rectangle-${rectangle.id}`"
-              :bounds="rectangle.bounds"
+              v-model:bounds="rectangle.bounds"
               :class="rectangle.class"
               :selectable="currentMode === 'select'"
               :editable="currentMode === 'directSelect'"
               :draggable="currentMode === 'select'"
-              @update:bounds="(bounds) => updateRectangle(rectangle.id, bounds)"
             />
 
-            <!-- Custom bounding box styling (optional). Note that a default LeafletBoundingBox is passed to the #bounding-box slot -->
+            <!-- Custom bounding box styling -->
             <template #bounding-box-styles>
               <LeafletBoundingBoxRectangle class="border-2 border-orange-400" :dashed="[5, 5]" />
 

@@ -25,6 +25,7 @@ export interface LeafletSelectionContext {
   deselectAll: () => void;
   registerFeature: (feature: FeatureReference) => void;
   unregisterFeature: (id: string | number) => void;
+  notifyFeatureUpdate: (id: string | number) => void;
 }
 
 export interface LeafletSelectionManagerProps {
@@ -93,6 +94,14 @@ const unregisterFeature = (id: string | number) => {
   featuresRegistry.value.delete(id);
   if (selectedFeature.value?.id === id) {
     deselectAll();
+  }
+};
+
+// Notify that a feature's properties have changed (for bounding box updates)
+const notifyFeatureUpdate = (id: string | number) => {
+  // Only trigger update if the feature being updated is currently selected
+  if (selectedFeature.value?.id === id) {
+    boundingBoxTrigger.value++;
   }
 };
 
@@ -210,6 +219,7 @@ const context: LeafletSelectionContext = {
   deselectAll,
   registerFeature,
   unregisterFeature,
+  notifyFeatureUpdate,
 };
 
 provide(LeafletSelectionKey, context);

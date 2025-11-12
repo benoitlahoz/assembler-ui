@@ -268,6 +268,11 @@ const setupMapDragHandlers = () => {
     // Émettre la mise à jour en temps réel pendant le drag
     const updatedLatLngs = newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>;
     emit('update:latlngs', updatedLatLngs);
+
+    // Notify selection manager to update bounding box
+    if (selectionContext) {
+      selectionContext.notifyFeatureUpdate(polygonId.value);
+    }
   };
 
   const onMouseUp = () => {
@@ -382,7 +387,14 @@ const registerWithSelection = () => {
 };
 
 watch(
-  () => [map.value, props.latlngs, props.editable, props.draggable, props.interactive],
+  () => [
+    map.value,
+    props.latlngs,
+    props.editable,
+    props.draggable,
+    props.interactive,
+    props.selectable,
+  ],
   (newVal, oldVal) => {
     nextTick(() => {
       if (map.value && L.value && props.latlngs && props.latlngs.length >= 3) {
@@ -434,6 +446,37 @@ watch(
           // Register with selection context if selectable
           if (props.selectable && selectionContext) {
             registerWithSelection();
+          }
+        }
+
+        // Check if selectable changed and we need to register/unregister
+        if (polygon.value) {
+          const selectableChanged = oldVal && Boolean(oldVal[5]) !== Boolean(newVal[5]);
+          if (selectableChanged) {
+            // Remove old event listeners
+            polygon.value.off('click');
+            polygon.value.off('mousedown');
+
+            // Add new event listeners based on selectable state
+            if (props.selectable && selectionContext) {
+              polygon.value.on('click', () => {
+                selectionContext.selectFeature('polygon', polygonId.value);
+                emit('click');
+              });
+              polygon.value.on('mousedown', (e: any) => {
+                if (props.draggable) {
+                  selectionContext.selectFeature('polygon', polygonId.value);
+                }
+              });
+              registerWithSelection();
+            } else {
+              polygon.value.on('click', () => {
+                emit('click');
+              });
+              if (selectionContext) {
+                selectionContext.unregisterFeature(polygonId.value);
+              }
+            }
           }
         }
 

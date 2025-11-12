@@ -190,6 +190,11 @@ const setupMapDragHandlers = () => {
       [newBounds.getSouth(), newBounds.getWest()],
       [newBounds.getNorth(), newBounds.getEast()],
     ]);
+
+    // Notify selection manager to update bounding box
+    if (selectionContext) {
+      selectionContext.notifyFeatureUpdate(rectangleId.value);
+    }
   };
 
   const onMouseUp = () => {
@@ -251,7 +256,7 @@ const registerWithSelection = () => {
 };
 
 watch(
-  () => [map.value, props.bounds, props.editable, props.draggable],
+  () => [map.value, props.bounds, props.editable, props.draggable, props.selectable],
   (newVal, oldVal) => {
     nextTick(() => {
       if (
@@ -307,6 +312,37 @@ watch(
           // Register with selection context if selectable
           if (props.selectable && selectionContext) {
             registerWithSelection();
+          }
+        }
+
+        // Check if selectable changed and we need to register/unregister
+        if (rectangle.value) {
+          const selectableChanged = oldVal && Boolean(oldVal[4]) !== Boolean(newVal[4]);
+          if (selectableChanged) {
+            // Remove old event listeners
+            rectangle.value.off('click');
+            rectangle.value.off('mousedown');
+
+            // Add new event listeners based on selectable state
+            if (props.selectable && selectionContext) {
+              rectangle.value.on('click', () => {
+                selectionContext.selectFeature('rectangle', rectangleId.value);
+                emit('click');
+              });
+              rectangle.value.on('mousedown', (e: any) => {
+                if (props.draggable) {
+                  selectionContext.selectFeature('rectangle', rectangleId.value);
+                }
+              });
+              registerWithSelection();
+            } else {
+              rectangle.value.on('click', () => {
+                emit('click');
+              });
+              if (selectionContext) {
+                selectionContext.unregisterFeature(rectangleId.value);
+              }
+            }
           }
         }
 

@@ -140,6 +140,11 @@ const onDrag = () => {
     const latlng = marker.value.getLatLng();
     emit('update:lat', latlng.lat);
     emit('update:lng', latlng.lng);
+
+    // Notify selection manager to update bounding box
+    if (selectionContext) {
+      selectionContext.notifyFeatureUpdate(markerId.value);
+    }
   }
 };
 
@@ -152,7 +157,7 @@ const onDragEnd = () => {
 };
 
 watch(
-  () => [props.lat, props.lng, props.editable, props.draggable],
+  () => [props.lat, props.lng, props.editable, props.draggable, props.selectable],
   ([newLat, newLng], oldVal) => {
     nextTick(() => {
       if (!L.value) return;
@@ -163,6 +168,32 @@ watch(
           const latChanged = oldVal && Number(oldVal[0]) !== Number(newLat);
           const lngChanged = oldVal && Number(oldVal[1]) !== Number(newLng);
           updateMarker(latChanged, lngChanged);
+
+          // Check if selectable changed
+          const selectableChanged = oldVal && Boolean(oldVal[4]) !== Boolean(props.selectable);
+          if (selectableChanged) {
+            // Remove old event listeners
+            marker.value.off('click');
+            marker.value.off('dragstart');
+
+            // Add new event listeners based on selectable state
+            if (props.selectable && selectionContext) {
+              marker.value.on('click', () => {
+                selectionContext.selectFeature('marker', markerId.value);
+                emit('click');
+              });
+              marker.value.on('dragstart', () => {
+                selectionContext.selectFeature('marker', markerId.value);
+                emit('dragstart');
+              });
+              registerWithSelection();
+            } else {
+              marker.value.on('click', () => emit('click'));
+              if (selectionContext) {
+                selectionContext.unregisterFeature(markerId.value);
+              }
+            }
+          }
         } else {
           setupMarker();
         }
