@@ -3792,6 +3792,10 @@ const enable = () => {
   isActive = true;
   map.value.getContainer().style.cursor = "crosshair";
 
+  if (map.value.dragging) {
+    map.value.dragging.disable();
+  }
+
   if (map.value.doubleClickZoom) {
     map.value.doubleClickZoom.disable();
   }
@@ -3814,6 +3818,10 @@ const disable = () => {
   map.value.off("dblclick", handleDoubleClick);
   map.value.off("contextmenu", handleContextMenu);
   document.removeEventListener("keydown", handleKeyDown);
+
+  if (map.value.dragging) {
+    map.value.dragging.enable();
+  }
 
   if (map.value.doubleClickZoom) {
     map.value.doubleClickZoom.enable();
