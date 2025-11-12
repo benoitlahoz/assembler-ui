@@ -33,16 +33,16 @@ const virtualizationMargin = ref(1000); // Margin in meters (when not auto)
 const marginZoomRatio = ref(1.0); // Zoom-based margin scaling factor
 
 // Zoom level controls for each feature type
-const markersMinZoom = ref<number | undefined>(12);
+const markersMinZoom = ref<number | undefined>(13);
 const markersMaxZoom = ref<number | undefined>(undefined);
-const circlesMinZoom = ref<number | undefined>(undefined);
-const circlesMaxZoom = ref<number | undefined>(undefined);
+const circlesMinZoom = ref<number | undefined>(11);
+const circlesMaxZoom = ref<number | undefined>(15);
 const polygonsMinZoom = ref<number | undefined>(undefined);
-const polygonsMaxZoom = ref<number | undefined>(14);
-const polylinesMinZoom = ref<number | undefined>(undefined);
-const polylinesMaxZoom = ref<number | undefined>(undefined);
-const rectanglesMinZoom = ref<number | undefined>(undefined);
-const rectanglesMaxZoom = ref<number | undefined>(undefined);
+const polygonsMaxZoom = ref<number | undefined>(12);
+const polylinesMinZoom = ref<number | undefined>(12);
+const polylinesMaxZoom = ref<number | undefined>(16);
+const rectanglesMinZoom = ref<number | undefined>(10);
+const rectanglesMaxZoom = ref<number | undefined>(14);
 
 const visibleMarkersCount = ref(0);
 const visibleCirclesCount = ref(0);
@@ -280,7 +280,7 @@ updateFPS();
                   placeholder="max"
                   class="w-16 px-2 py-1 border rounded"
                 />
-                <span class="text-gray-500">(zoom ≥12)</span>
+                <span class="text-gray-500">(zoom ≥13)</span>
               </div>
 
               <div class="flex items-center gap-3 text-xs">
@@ -302,7 +302,7 @@ updateFPS();
                   placeholder="max"
                   class="w-16 px-2 py-1 border rounded"
                 />
-                <span class="text-gray-500">(always)</span>
+                <span class="text-gray-500">(zoom 11-15)</span>
               </div>
 
               <div class="flex items-center gap-3 text-xs">
@@ -324,7 +324,7 @@ updateFPS();
                   placeholder="max"
                   class="w-16 px-2 py-1 border rounded"
                 />
-                <span class="text-gray-500">(zoom ≤14)</span>
+                <span class="text-gray-500">(zoom ≤12)</span>
               </div>
 
               <div class="flex items-center gap-3 text-xs">
@@ -346,7 +346,7 @@ updateFPS();
                   placeholder="max"
                   class="w-16 px-2 py-1 border rounded"
                 />
-                <span class="text-gray-500">(always)</span>
+                <span class="text-gray-500">(zoom 12-16)</span>
               </div>
 
               <div class="flex items-center gap-3 text-xs">
@@ -368,7 +368,7 @@ updateFPS();
                   placeholder="max"
                   class="w-16 px-2 py-1 border rounded"
                 />
-                <span class="text-gray-500">(always)</span>
+                <span class="text-gray-500">(zoom 10-14)</span>
               </div>
 
               <div class="text-xs text-gray-500 mt-2 pt-2 border-t">
