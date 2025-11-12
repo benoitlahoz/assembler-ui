@@ -164,12 +164,13 @@ export const useCssParser = () => {
       }
 
       const cssValues = withHiddenElement(
-        (el) => getTailwindBaseCssValues(el, ['color', 'background-color', 'opacity']),
+        (el) =>
+          getTailwindBaseCssValues(el, ['border-color', 'color', 'background-color', 'opacity']),
         classList.join(' ')
       );
 
       return {
-        color: cssValues['color'] || '#3388ff',
+        color: cssValues['border-color'] || cssValues['color'] || '#3388ff',
         fillColor: cssValues['background-color'] || '#3388ff',
         fillOpacity: cssValues['opacity'] ? parseFloat(cssValues['opacity']) : 0.2,
       };
@@ -202,12 +203,12 @@ export const useCssParser = () => {
       }
 
       const cssValues = withHiddenElement(
-        (el) => getTailwindBaseCssValues(el, ['color', 'opacity']),
+        (el) => getTailwindBaseCssValues(el, ['border-color', 'color', 'opacity']),
         classList.join(' ')
       );
 
       return {
-        color: cssValues['color'] || '#3388ff',
+        color: cssValues['border-color'] || cssValues['color'] || '#3388ff',
         opacity: cssValues['opacity'] ? parseFloat(cssValues['opacity']) : 1,
       };
     } catch (err) {

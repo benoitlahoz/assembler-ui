@@ -4,12 +4,14 @@
  *
  * @demo LeafletSimple
  * @demo LeafletEditionDemo
+ * @demo LeafletSelectionDemo
  */
 
 import type { InjectionKey, Ref } from 'vue';
 import type * as L from 'leaflet';
 import type { Map, TileLayerOptions } from 'leaflet';
 import type { LeafletBoundingBoxStyles } from './LeafletBoundingBox.vue';
+import type { LeafletSelectionContext } from './LeafletSelectionManager.vue';
 type L = typeof L;
 
 export { default as LeafletMap } from './LeafletMap.vue';
@@ -26,6 +28,15 @@ export { default as LeafletPolyline } from './LeafletPolyline.vue';
 export { default as LeafletPolygon } from './LeafletPolygon.vue';
 export { default as LeafletRectangle } from './LeafletRectangle.vue';
 
+// Selection Manager with types
+export {
+  default as LeafletSelectionManager,
+  type LeafletSelectionContext,
+  type SelectedFeature,
+  type FeatureReference,
+  type LeafletSelectionManagerProps,
+} from './LeafletSelectionManager.vue';
+
 export const LeafletModuleKey: InjectionKey<Ref<L | undefined>> = Symbol('LeafletModule');
 export const LeafletMapKey: InjectionKey<Ref<Map | null>> = Symbol('LeafletMap');
 export const LeafletTileLayersKey: InjectionKey<
@@ -34,6 +45,8 @@ export const LeafletTileLayersKey: InjectionKey<
 export const LeafletErrorsKey: InjectionKey<Ref<Error[]>> = Symbol('LeafletErrors');
 export const LeafletBoundingBoxStylesKey: InjectionKey<Ref<LeafletBoundingBoxStyles | undefined>> =
   Symbol('LeafletBoundingBoxHandles');
+export const LeafletSelectionKey: InjectionKey<LeafletSelectionContext> =
+  Symbol('LeafletSelection');
 
 export type { LeafletMapProps } from './LeafletMap.vue';
 export type { LeafletMapExposed } from './LeafletMap.vue';

@@ -28,11 +28,15 @@ export interface LeafletBoundingBoxStyles {
 export interface LeafletBoundingBoxProps {
   bounds?: L.LatLngBounds | null;
   visible?: boolean;
+  showRotateHandle?: boolean;
+  constrainSquare?: boolean;
 }
 
 const props = withDefaults(defineProps<LeafletBoundingBoxProps>(), {
   bounds: null,
   visible: false,
+  showRotateHandle: true,
+  constrainSquare: false,
 });
 
 const emit = defineEmits<{
@@ -111,6 +115,52 @@ const clearHandles = () => {
   }
 };
 
+// Helper function to constrain bounds to a square
+const constrainToSquare = (
+  bounds: L.LatLngBounds,
+  center?: L.LatLng,
+  originalBounds?: L.LatLngBounds
+): L.LatLngBounds => {
+  if (!L.value) return bounds;
+
+  const currentCenter = center || bounds.getCenter();
+  const latDiff = bounds.getNorth() - bounds.getSouth();
+  const lngDiff = bounds.getEast() - bounds.getWest();
+
+  // Convert to metric coordinates to get true visual dimensions
+  // 1 degree latitude ≈ 111320 meters
+  // 1 degree longitude ≈ 111320 * cos(latitude) meters
+  const latMeters = latDiff * 111320;
+  const lngMeters = lngDiff * 111320 * Math.cos((currentCenter.lat * Math.PI) / 180);
+
+  // Determine which dimension changed more (to allow both growing and shrinking)
+  let targetMeters = latMeters;
+  if (originalBounds) {
+    const origLatDiff = originalBounds.getNorth() - originalBounds.getSouth();
+    const origLngDiff = originalBounds.getEast() - originalBounds.getWest();
+    const origLatMeters = origLatDiff * 111320;
+    const origLngMeters = origLngDiff * 111320 * Math.cos((currentCenter.lat * Math.PI) / 180);
+
+    // Use the dimension that changed the most
+    const latChange = Math.abs(latMeters - origLatMeters);
+    const lngChange = Math.abs(lngMeters - origLngMeters);
+
+    targetMeters = lngChange > latChange ? lngMeters : latMeters;
+  } else {
+    // Fallback to average if no original bounds
+    targetMeters = (latMeters + lngMeters) / 2;
+  }
+
+  // Convert back to degrees
+  const halfLatDiff = targetMeters / 2 / 111320;
+  const halfLngDiff = targetMeters / 2 / (111320 * Math.cos((currentCenter.lat * Math.PI) / 180));
+
+  return L.value.latLngBounds(
+    [currentCenter.lat - halfLatDiff, currentCenter.lng - halfLngDiff],
+    [currentCenter.lat + halfLatDiff, currentCenter.lng + halfLngDiff]
+  );
+};
+
 const createBoundingBox = () => {
   if (!props.bounds || !L.value || !map.value || !props.visible) {
     clearHandles();
@@ -182,6 +232,11 @@ const createBoundingBox = () => {
           break;
         default:
           return;
+      }
+
+      // Constrain to square if needed (for circles)
+      if (props.constrainSquare) {
+        newBounds = constrainToSquare(newBounds, scaleStartBounds.getCenter(), scaleStartBounds);
       }
 
       // Mettre à jour la bounding box
@@ -281,6 +336,11 @@ const createBoundingBox = () => {
           break;
       }
 
+      // Constrain to square if needed (for circles)
+      if (props.constrainSquare) {
+        newBounds = constrainToSquare(newBounds, scaleStartBounds.getCenter(), scaleStartBounds);
+      }
+
       // Mettre à jour la bounding box
       if (boundingBox.value) {
         boundingBox.value.setBounds(newBounds);
@@ -307,96 +367,98 @@ const createBoundingBox = () => {
     edgeHandles.value.push(handle);
   });
 
-  // Créer le handle de rotation (au-dessus du centre haut)
-  const centerTop = L.value!.latLng(
-    props.bounds.getNorth(),
-    (props.bounds.getWest() + props.bounds.getEast()) / 2
-  );
+  // Créer le handle de rotation (au-dessus du centre haut) seulement si activé
+  if (props.showRotateHandle) {
+    const centerTop = L.value!.latLng(
+      props.bounds.getNorth(),
+      (props.bounds.getWest() + props.bounds.getEast()) / 2
+    );
 
-  // Calculer la position du handle de rotation (20px au-dessus en pixels)
-  const centerTopPoint = map.value.latLngToLayerPoint(centerTop);
-  const rotateHandlePoint = L.value!.point(centerTopPoint.x, centerTopPoint.y - 30);
-  const rotateHandleLatLng = map.value.layerPointToLatLng(rotateHandlePoint);
+    // Calculer la position du handle de rotation (20px au-dessus en pixels)
+    const centerTopPoint = map.value.latLngToLayerPoint(centerTop);
+    const rotateHandlePoint = L.value!.point(centerTopPoint.x, centerTopPoint.y - 30);
+    const rotateHandleLatLng = map.value.layerPointToLatLng(rotateHandlePoint);
 
-  rotateHandle.value = L.value
-    .marker(rotateHandleLatLng, {
-      draggable: true,
-      icon: L.value.divIcon(stylesOptions.value.rotate),
-    })
-    .addTo(map.value);
+    rotateHandle.value = L.value
+      .marker(rotateHandleLatLng, {
+        draggable: true,
+        icon: L.value.divIcon(stylesOptions.value.rotate),
+      })
+      .addTo(map.value);
 
-  rotateHandle.value.on('mousedown', () => {
-    if (map.value) {
-      map.value.getContainer().style.cursor = 'grabbing';
-    }
-  });
+    rotateHandle.value.on('mousedown', () => {
+      if (map.value) {
+        map.value.getContainer().style.cursor = 'grabbing';
+      }
+    });
 
-  rotateHandle.value.on('dragstart', () => {
-    isRotating.value = true;
-    if (map.value && props.bounds) {
-      map.value.dragging.disable();
+    rotateHandle.value.on('dragstart', () => {
+      isRotating.value = true;
+      if (map.value && props.bounds) {
+        map.value.dragging.disable();
 
-      // Cacher la bounding box et les handles pendant la rotation
-      if (boundingBox.value) boundingBox.value.setStyle({ opacity: 0 });
-      cornerHandles.value.forEach((h) => h.setOpacity(0));
-      edgeHandles.value.forEach((h) => h.setOpacity(0));
+        // Cacher la bounding box et les handles pendant la rotation
+        if (boundingBox.value) boundingBox.value.setStyle({ opacity: 0 });
+        cornerHandles.value.forEach((h) => h.setOpacity(0));
+        edgeHandles.value.forEach((h) => h.setOpacity(0));
 
-      // Calculer l'angle initial
+        // Calculer l'angle initial
+        const center = props.bounds.getCenter();
+        const handlePos = rotateHandle.value!.getLatLng();
+        const dx = handlePos.lng - center.lng;
+        const dy = handlePos.lat - center.lat;
+        rotationStartAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+      }
+    });
+
+    rotateHandle.value.on('drag', () => {
+      if (!isRotating.value || !props.bounds) return;
+
+      // Calcul de l'angle de rotation
       const center = props.bounds.getCenter();
       const handlePos = rotateHandle.value!.getLatLng();
+
+      // Calculer l'angle actuel entre le centre et le handle
       const dx = handlePos.lng - center.lng;
       const dy = handlePos.lat - center.lat;
-      rotationStartAngle = Math.atan2(dy, dx) * (180 / Math.PI);
-    }
-  });
+      const currentAngle = Math.atan2(dy, dx) * (180 / Math.PI);
 
-  rotateHandle.value.on('drag', () => {
-    if (!isRotating.value || !props.bounds) return;
+      // Calculer la rotation relative
+      const rotationAngle = currentAngle - rotationStartAngle;
 
-    // Calcul de l'angle de rotation
-    const center = props.bounds.getCenter();
-    const handlePos = rotateHandle.value!.getLatLng();
+      // Émettre l'événement de rotation en temps réel
+      emit('rotate', rotationAngle);
+    });
 
-    // Calculer l'angle actuel entre le centre et le handle
-    const dx = handlePos.lng - center.lng;
-    const dy = handlePos.lat - center.lat;
-    const currentAngle = Math.atan2(dy, dx) * (180 / Math.PI);
-
-    // Calculer la rotation relative
-    const rotationAngle = currentAngle - rotationStartAngle;
-
-    // Émettre l'événement de rotation en temps réel
-    emit('rotate', rotationAngle);
-  });
-
-  rotateHandle.value.on('dragend', () => {
-    isRotating.value = false;
-    if (map.value) {
-      map.value.getContainer().style.cursor = '';
-      map.value.dragging.enable();
-    }
-
-    // Réafficher la bounding box et les handles
-    if (boundingBox.value) boundingBox.value.setStyle({ opacity: 1 });
-    cornerHandles.value.forEach((h) => h.setOpacity(1));
-    edgeHandles.value.forEach((h) => h.setOpacity(1));
-
-    // Émettre l'événement de fin de rotation
-    emit('rotate-end');
-
-    // Forcer la recréation de la bounding box après la rotation
-    setTimeout(() => {
-      if (props.bounds) {
-        createBoundingBox();
+    rotateHandle.value.on('dragend', () => {
+      isRotating.value = false;
+      if (map.value) {
+        map.value.getContainer().style.cursor = '';
+        map.value.dragging.enable();
       }
-    }, 0);
-  });
 
-  rotateHandle.value.on('mouseup', () => {
-    if (map.value) {
-      map.value.getContainer().style.cursor = '';
-    }
-  });
+      // Réafficher la bounding box et les handles
+      if (boundingBox.value) boundingBox.value.setStyle({ opacity: 1 });
+      cornerHandles.value.forEach((h) => h.setOpacity(1));
+      edgeHandles.value.forEach((h) => h.setOpacity(1));
+
+      // Émettre l'événement de fin de rotation
+      emit('rotate-end');
+
+      // Forcer la recréation de la bounding box après la rotation
+      setTimeout(() => {
+        if (props.bounds) {
+          createBoundingBox();
+        }
+      }, 0);
+    });
+
+    rotateHandle.value.on('mouseup', () => {
+      if (map.value) {
+        map.value.getContainer().style.cursor = '';
+      }
+    });
+  }
 
   // Créer le handle central orange (non draggable, juste pour visualisation)
   const center = props.bounds.getCenter();
@@ -455,13 +517,21 @@ watch(
     if (props.bounds) {
       return {
         visible: props.visible,
+        showRotateHandle: props.showRotateHandle,
         south: props.bounds.getSouth(),
         north: props.bounds.getNorth(),
         west: props.bounds.getWest(),
         east: props.bounds.getEast(),
       };
     }
-    return { visible: props.visible, south: 0, north: 0, west: 0, east: 0 };
+    return {
+      visible: props.visible,
+      showRotateHandle: props.showRotateHandle,
+      south: 0,
+      north: 0,
+      west: 0,
+      east: 0,
+    };
   },
   (newVal, oldVal) => {
     // Si on manipule la bounding box (rotation, scale), ne pas recréer
@@ -478,6 +548,10 @@ watch(
         oldVal.west !== newVal.west ||
         oldVal.east !== newVal.east);
 
+    // Vérifier si showRotateHandle a changé
+    const showRotateHandleChanged =
+      oldVal && newVal && oldVal.showRotateHandle !== newVal.showRotateHandle;
+
     // Si la bounding box existe déjà et qu'on ne manipule pas, juste mettre à jour visuellement
     if (
       boundingBox.value &&
@@ -485,12 +559,17 @@ watch(
       props.visible &&
       !isDragging.value &&
       cornerHandles.value.length > 0 &&
-      boundsChanged
+      boundsChanged &&
+      !showRotateHandleChanged
     ) {
       boundingBox.value.setBounds(props.bounds);
       updateHandlePositions(props.bounds);
-    } else if (newVal.visible !== oldVal?.visible || !boundingBox.value) {
-      // Sinon recréer complètement si visibility change ou pas encore créé
+    } else if (
+      newVal.visible !== oldVal?.visible ||
+      !boundingBox.value ||
+      showRotateHandleChanged
+    ) {
+      // Sinon recréer complètement si visibility change, pas encore créé, ou showRotateHandle a changé
       createBoundingBox();
     }
   },
