@@ -1119,7 +1119,7 @@ const enableEditing = () => {
       draggable: true,
       icon: L.value!.divIcon({
         className: "leaflet-editing-icon",
-        html: '<div style="width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #ff3388;cursor:pointer;"></div>',
+        html: '<div style="background:#fff;border:2px solid #ff3388;"></div>',
         iconSize: [10, 10],
       }),
     }).addTo(map.value!);
@@ -1388,6 +1388,33 @@ const drawWarpedGrid = (corners: Array<{ x: number; y: number }>) => {
   }
 };
 
+const drawOutline = (corners: Array<{ x: number; y: number }>) => {
+  if (!ctx.value) return;
+
+  const colors = getLeafletShapeColors(props.class);
+
+  ctx.value.beginPath();
+
+  if (corners[0]) {
+    ctx.value.moveTo(corners[0].x, corners[0].y);
+  }
+  if (corners[1]) {
+    ctx.value.lineTo(corners[1].x, corners[1].y);
+  }
+  if (corners[2]) {
+    ctx.value.lineTo(corners[2].x, corners[2].y);
+  }
+  if (corners[3]) {
+    ctx.value.lineTo(corners[3].x, corners[3].y);
+  }
+
+  ctx.value.closePath();
+
+  ctx.value.strokeStyle = colors.color || "#3388ff";
+  ctx.value.lineWidth = 2;
+  ctx.value.stroke();
+};
+
 const reset = () => {
   if (!canvasLayer.value || !map.value) return;
 
@@ -1406,6 +1433,10 @@ const draw = () => {
   });
 
   drawWarpedGrid(corners);
+
+  if (props.editable || props.draggable) {
+    drawOutline(corners);
+  }
 };
 
 const handleClick = () => {
@@ -8002,6 +8033,7 @@ const animateCanvas = () => {
             :editable="isEditable"
             :draggable="isDraggable"
             :subdivisions="20"
+            class="border border-purple-500 bg-purple-500/30"
             @canvas-ready="onCanvasReady"
             @update:corners="(corners) => (canvasCorners = corners)"
           />

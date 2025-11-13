@@ -330,6 +330,35 @@ const drawWarpedGrid = (corners: Array<{ x: number; y: number }>) => {
   }
 };
 
+const drawOutline = (corners: Array<{ x: number; y: number }>) => {
+  if (!ctx.value) return;
+
+  // Extraire les couleurs des classes CSS
+  const colors = getLeafletShapeColors(props.class);
+
+  ctx.value.beginPath();
+  
+  if (corners[0]) {
+    ctx.value.moveTo(corners[0].x, corners[0].y);
+  }
+  if (corners[1]) {
+    ctx.value.lineTo(corners[1].x, corners[1].y);
+  }
+  if (corners[2]) {
+    ctx.value.lineTo(corners[2].x, corners[2].y);
+  }
+  if (corners[3]) {
+    ctx.value.lineTo(corners[3].x, corners[3].y);
+  }
+  
+  ctx.value.closePath();
+
+  // Appliquer le stroke avec la couleur extraite
+  ctx.value.strokeStyle = colors.color || '#3388ff';
+  ctx.value.lineWidth = 2;
+  ctx.value.stroke();
+};
+
 const reset = () => {
   if (!canvasLayer.value || !map.value) return;
 
@@ -349,6 +378,11 @@ const draw = () => {
   });
 
   drawWarpedGrid(corners);
+  
+  // Dessiner le contour si en mode édition ou draggable
+  if (props.editable || props.draggable) {
+    drawOutline(corners);
+  }
 };
 
 const handleClick = () => {

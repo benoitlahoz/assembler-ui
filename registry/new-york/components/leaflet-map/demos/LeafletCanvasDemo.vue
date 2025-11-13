@@ -215,6 +215,7 @@ const animateCanvas = () => {
             :editable="isEditable"
             :draggable="isDraggable"
             :subdivisions="20"
+            class="border border-purple-500 bg-purple-500/30"
             @canvas-ready="onCanvasReady"
             @update:corners="(corners) => (canvasCorners = corners)"
           />
