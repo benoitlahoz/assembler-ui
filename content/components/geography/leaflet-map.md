@@ -3455,6 +3455,15 @@ onBeforeUnmount(() => {
 import { ref, inject, watch, onBeforeUnmount, nextTick, type Ref } from "vue";
 import { LeafletMapKey, LeafletModuleKey } from ".";
 import type { LatLng, Polyline, Marker, Circle, DivIcon } from "leaflet";
+import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+
+const {
+  calculateLineDistance,
+  calculatePolygonArea,
+  calculateCentroid,
+  formatDistance: formatDistanceUtil,
+  formatArea: formatAreaUtil,
+} = await useLeaflet();
 
 export interface LeafletMeasureToolProps {
   enabled?: boolean;
@@ -3498,70 +3507,20 @@ const snapCircle = ref<Circle | null>(null);
 let isActive = false;
 
 const calculateDistance = (latlngs: LatLng[]): number => {
-  if (latlngs.length < 2) return 0;
-
-  let totalDistance = 0;
-  for (let i = 0; i < latlngs.length - 1; i++) {
-    const current = latlngs[i];
-    const next = latlngs[i + 1];
-    if (current && next) {
-      totalDistance += current.distanceTo(next);
-    }
-  }
-
-  return props.unit === "metric" ? totalDistance : totalDistance * 3.28084;
+  return calculateLineDistance(latlngs, props.unit);
 };
 
 const calculateArea = (latlngs: LatLng[]): number | undefined => {
-  if (!props.showArea || latlngs.length < 3) return undefined;
-
-  let area = 0;
-  const n = latlngs.length;
-
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    const current = latlngs[i];
-    const next = latlngs[j];
-    if (!current || !next) continue;
-    const xi = current.lat;
-    const yi = current.lng;
-    const xj = next.lat;
-    const yj = next.lng;
-    area += xi * yj - xj * yi;
-  }
-
-  area = Math.abs(area / 2);
-
-  const avgLat = latlngs.reduce((sum, ll) => sum + ll.lat, 0) / n;
-  const latToMeters = 111320;
-  const lngToMeters = 111320 * Math.cos((avgLat * Math.PI) / 180);
-  area = area * latToMeters * lngToMeters;
-
-  return props.unit === "metric" ? area : area * 10.7639;
+  if (!props.showArea) return undefined;
+  return calculatePolygonArea(latlngs, props.unit);
 };
 
-const formatDistance = (distance: number): string => {
-  if (props.unit === "metric") {
-    return distance > 1000
-      ? `${(distance / 1000).toFixed(2)} km`
-      : `${distance.toFixed(2)} m`;
-  } else {
-    return distance > 5280
-      ? `${(distance / 5280).toFixed(2)} mi`
-      : `${distance.toFixed(2)} ft`;
-  }
+const formatDistance = (distanceInMeters: number): string => {
+  return formatDistanceUtil(distanceInMeters, props.unit);
 };
 
-const formatArea = (area: number): string => {
-  if (props.unit === "metric") {
-    return area > 10000
-      ? `${(area / 1000000).toFixed(2)} km²`
-      : `${area.toFixed(2)} m²`;
-  } else {
-    return area > 43560
-      ? `${(area / 43560).toFixed(2)} acres`
-      : `${area.toFixed(2)} ft²`;
-  }
+const formatArea = (areaInM2: number): string => {
+  return formatAreaUtil(areaInM2, props.unit);
 };
 
 const createMeasureMarker = (latlng: LatLng, index: number): Marker | null => {
@@ -3734,22 +3693,15 @@ const finishMeasurement = () => {
   const area = calculateArea(measurementPoints.value);
 
   if (area !== undefined && measurementPoints.value.length >= 3) {
-    const center = measurementPoints.value.reduce(
-      (acc, ll) => {
-        acc.lat += ll.lat;
-        acc.lng += ll.lng;
-        return acc;
-      },
-      { lat: 0, lng: 0 },
-    );
-    center.lat /= measurementPoints.value.length;
-    center.lng /= measurementPoints.value.length;
-
-    const totalLabel = createDistanceLabel(
-      L.value!.latLng(center.lat, center.lng),
-      `${formatDistance(distance)} | ${formatArea(area)}`,
-    );
-    if (totalLabel) measurementLabels.value.push(totalLabel);
+    const center = calculateCentroid(measurementPoints.value);
+    if (center) {
+      const [lng, lat] = center;
+      const totalLabel = createDistanceLabel(
+        L.value!.latLng(lat, lng),
+        `${formatDistance(distance)} | ${formatArea(area)}`,
+      );
+      if (totalLabel) measurementLabels.value.push(totalLabel);
+    }
   }
 
   emit("measurement-complete", {
@@ -5343,6 +5295,9 @@ import type {
   UseQuadtreeReturn,
   Rect,
 } from "~~/registry/new-york/composables/use-quadtree/useQuadtree";
+import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+
+const { radiusToLatDegrees, radiusToLngDegrees } = await useLeaflet();
 
 export interface LeafletVirtualizeProps {
   quadtree: UseQuadtreeReturn<any>;
@@ -5387,14 +5342,6 @@ const visibleFeatureIds = ref<Set<string | number>>(new Set());
 const isTransitioning = ref(false);
 let updateScheduled = false;
 
-const metersToDegreesLat = (meters: number): number => {
-  return meters / 111320;
-};
-
-const metersToDegreesLng = (meters: number, latitude: number): number => {
-  return meters / (111320 * Math.cos((latitude * Math.PI) / 180));
-};
-
 const calculateDynamicMargin = (zoom: number): number => {
   const clampedZoom = Math.max(1, Math.min(20, zoom));
 
@@ -5422,8 +5369,8 @@ const updateVisibleBounds = () => {
 
       if (marginInMeters > 0) {
         const center = bounds.getCenter();
-        const marginLat = metersToDegreesLat(marginInMeters);
-        const marginLng = metersToDegreesLng(marginInMeters, center.lat);
+        const marginLat = radiusToLatDegrees(marginInMeters);
+        const marginLng = radiusToLngDegrees(marginInMeters, center.lat);
 
         const extendedBounds = L.value.latLngBounds(
           L.value.latLng(
@@ -5963,7 +5910,14 @@ export const useCssParser = () => {
 ```ts [src/composables/use-leaflet/useLeaflet.ts]
 import { ref, type Ref } from "vue";
 import type Leaflet from "leaflet";
+import area from "@turf/area";
+import length from "@turf/length";
+import distance from "@turf/distance";
+import centroid from "@turf/centroid";
+import type { Position } from "geojson";
+
 type Leaflet = typeof Leaflet;
+type LatLng = Leaflet.LatLng;
 
 let L: Ref<Leaflet | undefined> = ref(undefined);
 
@@ -5993,13 +5947,141 @@ export const useLeaflet = async () => {
     return lngDegrees * LatDegreesMeters * Math.cos((lat * Math.PI) / 180);
   };
 
+  const toGeoJSONCoords = (latlngs: LatLng[]): Position[] => {
+    return latlngs.map((ll) => [ll.lng, ll.lat]);
+  };
+
+  const calculateLineDistance = (
+    latlngs: LatLng[],
+    unit: "metric" | "imperial" = "metric",
+  ): number => {
+    if (latlngs.length < 2) return 0;
+
+    const coords = toGeoJSONCoords(latlngs);
+    const line = {
+      type: "Feature" as const,
+      properties: {},
+      geometry: {
+        type: "LineString" as const,
+        coordinates: coords,
+      },
+    };
+
+    const distanceKm = length(line, { units: "kilometers" });
+    const distanceMeters = distanceKm * 1000;
+
+    return unit === "metric" ? distanceMeters : distanceMeters * 3.28084;
+  };
+
+  const calculatePolygonArea = (
+    latlngs: LatLng[],
+    unit: "metric" | "imperial" = "metric",
+  ): number | undefined => {
+    if (latlngs.length < 3) return undefined;
+
+    const coords = toGeoJSONCoords(latlngs);
+    const closedCoords = [...coords, coords[0]].filter(
+      (c): c is Position => c !== undefined,
+    );
+
+    const polygon = {
+      type: "Feature" as const,
+      properties: {},
+      geometry: {
+        type: "Polygon" as const,
+        coordinates: [closedCoords],
+      },
+    };
+
+    const areaM2 = area(polygon);
+    return unit === "metric" ? areaM2 : areaM2 * 10.7639;
+  };
+
+  const calculateCentroid = (
+    latlngs: LatLng[],
+  ): [number, number] | undefined => {
+    if (latlngs.length < 3) return undefined;
+
+    const coords = toGeoJSONCoords(latlngs);
+    const closedCoords = [...coords, coords[0]].filter(
+      (c): c is Position => c !== undefined,
+    );
+
+    const polygon = {
+      type: "Feature" as const,
+      properties: {},
+      geometry: {
+        type: "Polygon" as const,
+        coordinates: [closedCoords],
+      },
+    };
+
+    const center = centroid(polygon);
+    return center.geometry.coordinates as [number, number];
+  };
+
+  const calculateDistance = (
+    from: LatLng | [number, number],
+    to: LatLng | [number, number],
+    unit: "metric" | "imperial" = "metric",
+  ): number => {
+    const fromCoords = Array.isArray(from) ? from : [from.lng, from.lat];
+    const toCoords = Array.isArray(to) ? to : [to.lng, to.lat];
+
+    const distanceKm = distance(fromCoords, toCoords, { units: "kilometers" });
+    const distanceMeters = distanceKm * 1000;
+
+    return unit === "metric" ? distanceMeters : distanceMeters * 3.28084;
+  };
+
+  const formatDistance = (
+    distanceInMeters: number,
+    unit: "metric" | "imperial" = "metric",
+  ): string => {
+    if (unit === "metric") {
+      return distanceInMeters > 1000
+        ? `${(distanceInMeters / 1000).toFixed(2)} km`
+        : `${distanceInMeters.toFixed(2)} m`;
+    } else {
+      const distanceFeet = distanceInMeters * 3.28084;
+      return distanceFeet > 5280
+        ? `${(distanceFeet / 5280).toFixed(2)} mi`
+        : `${distanceFeet.toFixed(2)} ft`;
+    }
+  };
+
+  const formatArea = (
+    areaInM2: number,
+    unit: "metric" | "imperial" = "metric",
+  ): string => {
+    if (unit === "metric") {
+      return areaInM2 > 10000
+        ? `${(areaInM2 / 1000000).toFixed(2)} km²`
+        : `${areaInM2.toFixed(2)} m²`;
+    } else {
+      const areaFt2 = areaInM2 * 10.7639;
+      return areaFt2 > 43560
+        ? `${(areaFt2 / 43560).toFixed(2)} acres`
+        : `${areaFt2.toFixed(2)} ft²`;
+    }
+  };
+
   return {
     L,
     LatDegreesMeters,
+
     radiusToLatDegrees,
     latDegreesToRadius,
     radiusToLngDegrees,
     lngDegreesToRadius,
+
+    toGeoJSONCoords,
+    calculateLineDistance,
+    calculatePolygonArea,
+    calculateCentroid,
+    calculateDistance,
+    formatDistance,
+    formatArea,
   };
 };
 ```
@@ -6627,7 +6709,7 @@ export type UseQuadtreeReturn<T extends Rect = Rect> = ReturnType<
   ### Expose
 | Name | Type | Description |
 |------|------|-------------|
-| `finishMeasurement`{.primary .text-primary} | `() => any` | — |
+| `finishMeasurement`{.primary .text-primary} | `() => void` | — |
 | `cleanup`{.primary .text-primary} | `() => void` | — |
 
 ---

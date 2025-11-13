@@ -2,10 +2,15 @@
 import { ref, inject, watch, onBeforeUnmount, nextTick, type Ref } from 'vue';
 import { LeafletMapKey, LeafletModuleKey } from '.';
 import type { LatLng, Polyline, Marker, Circle, DivIcon } from 'leaflet';
-import area from '@turf/area';
-import length from '@turf/length';
-import centroid from '@turf/centroid';
-import type { Position } from 'geojson';
+import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
+
+const {
+  calculateLineDistance,
+  calculatePolygonArea,
+  calculateCentroid,
+  formatDistance: formatDistanceUtil,
+  formatArea: formatAreaUtil,
+} = await useLeaflet();
 
 export interface LeafletMeasureToolProps {
   enabled?: boolean;
@@ -47,71 +52,25 @@ const snapCircle = ref<Circle | null>(null);
 
 let isActive = false;
 
-// Convertir LatLng[] en coordonnées GeoJSON [lng, lat]
-const toGeoJSONCoords = (latlngs: LatLng[]): Position[] => {
-  return latlngs.map((ll) => [ll.lng, ll.lat]);
-};
-
-// Calcul de distance avec Turf.js
+// Calcul de distance (utilise le composable)
 const calculateDistance = (latlngs: LatLng[]): number => {
-  if (latlngs.length < 2) return 0;
-
-  const coords = toGeoJSONCoords(latlngs);
-  const line = {
-    type: 'Feature' as const,
-    properties: {},
-    geometry: {
-      type: 'LineString' as const,
-      coordinates: coords,
-    },
-  };
-
-  // Turf.js calcule en kilomètres par défaut
-  const distanceKm = length(line, { units: 'kilometers' });
-  const distanceMeters = distanceKm * 1000;
-
-  return props.unit === 'metric' ? distanceMeters : distanceMeters * 3.28084;
+  return calculateLineDistance(latlngs, props.unit);
 };
 
-// Calcul d'aire avec Turf.js (géodésique précis)
+// Calcul d'aire (utilise le composable)
 const calculateArea = (latlngs: LatLng[]): number | undefined => {
-  if (!props.showArea || latlngs.length < 3) return undefined;
-
-  const coords = toGeoJSONCoords(latlngs);
-  // Fermer le polygone (premier point = dernier point)
-  const closedCoords = [...coords, coords[0]].filter((c): c is Position => c !== undefined);
-
-  const polygon = {
-    type: 'Feature' as const,
-    properties: {},
-    geometry: {
-      type: 'Polygon' as const,
-      coordinates: [closedCoords],
-    },
-  };
-
-  // Turf.js retourne l'aire en m² (géodésique précis)
-  const areaM2 = area(polygon);
-
-  return props.unit === 'metric' ? areaM2 : areaM2 * 10.7639;
+  if (!props.showArea) return undefined;
+  return calculatePolygonArea(latlngs, props.unit);
 };
 
-// Formatage des distances
-const formatDistance = (distance: number): string => {
-  if (props.unit === 'metric') {
-    return distance > 1000 ? `${(distance / 1000).toFixed(2)} km` : `${distance.toFixed(2)} m`;
-  } else {
-    return distance > 5280 ? `${(distance / 5280).toFixed(2)} mi` : `${distance.toFixed(2)} ft`;
-  }
+// Formatage des distances (utilise le composable)
+const formatDistance = (distanceInMeters: number): string => {
+  return formatDistanceUtil(distanceInMeters, props.unit);
 };
 
-// Formatage des aires
-const formatArea = (area: number): string => {
-  if (props.unit === 'metric') {
-    return area > 10000 ? `${(area / 1000000).toFixed(2)} km²` : `${area.toFixed(2)} m²`;
-  } else {
-    return area > 43560 ? `${(area / 43560).toFixed(2)} acres` : `${area.toFixed(2)} ft²`;
-  }
+// Formatage des aires (utilise le composable)
+const formatArea = (areaInM2: number): string => {
+  return formatAreaUtil(areaInM2, props.unit);
 };
 
 // Créer un marqueur de mesure
@@ -289,25 +248,16 @@ const finishMeasurement = () => {
 
   // Afficher le total si aire disponible
   if (area !== undefined && measurementPoints.value.length >= 3) {
-    // Utiliser Turf.js pour calculer le centroïde précis
-    const coords = toGeoJSONCoords(measurementPoints.value);
-    const closedCoords = [...coords, coords[0]].filter((c): c is Position => c !== undefined);
-    const polygon = {
-      type: 'Feature' as const,
-      properties: {},
-      geometry: {
-        type: 'Polygon' as const,
-        coordinates: [closedCoords],
-      },
-    };
-    const center = centroid(polygon);
-    const [lng, lat] = center.geometry.coordinates;
-
-    const totalLabel = createDistanceLabel(
-      L.value!.latLng(lat!, lng!),
-      `${formatDistance(distance)} | ${formatArea(area)}`
-    );
-    if (totalLabel) measurementLabels.value.push(totalLabel);
+    // Utiliser le centroïde du composable
+    const center = calculateCentroid(measurementPoints.value);
+    if (center) {
+      const [lng, lat] = center;
+      const totalLabel = createDistanceLabel(
+        L.value!.latLng(lat, lng),
+        `${formatDistance(distance)} | ${formatArea(area)}`
+      );
+      if (totalLabel) measurementLabels.value.push(totalLabel);
+    }
   }
 
   emit('measurement-complete', {

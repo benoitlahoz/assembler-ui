@@ -6,6 +6,9 @@ import type {
   UseQuadtreeReturn,
   Rect,
 } from '~~/registry/new-york/composables/use-quadtree/useQuadtree';
+import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
+
+const { radiusToLatDegrees, radiusToLngDegrees } = await useLeaflet();
 
 export interface LeafletVirtualizeProps {
   /**
@@ -95,19 +98,6 @@ const isTransitioning = ref(false);
 let updateScheduled = false;
 
 /**
- * Convert meters to degrees at a given latitude
- * 1 degree of latitude ≈ 111,320 meters (constant)
- * 1 degree of longitude ≈ 111,320 * cos(latitude) meters (varies by latitude)
- */
-const metersToDegreesLat = (meters: number): number => {
-  return meters / 111320;
-};
-
-const metersToDegreesLng = (meters: number, latitude: number): number => {
-  return meters / (111320 * Math.cos((latitude * Math.PI) / 180));
-};
-
-/**
  * Calculate dynamic margin based on zoom level
  * Lower zoom = larger margin (more area to pre-load)
  * Higher zoom = smaller margin (less area needed)
@@ -149,8 +139,8 @@ const updateVisibleBounds = () => {
 
       if (marginInMeters > 0) {
         const center = bounds.getCenter();
-        const marginLat = metersToDegreesLat(marginInMeters);
-        const marginLng = metersToDegreesLng(marginInMeters, center.lat);
+        const marginLat = radiusToLatDegrees(marginInMeters);
+        const marginLng = radiusToLngDegrees(marginInMeters, center.lat);
 
         const extendedBounds = L.value.latLngBounds(
           L.value.latLng(bounds.getSouth() - marginLat, bounds.getWest() - marginLng),
