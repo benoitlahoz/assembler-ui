@@ -1838,6 +1838,11 @@ watch(
 watch(
   controlsRegistry,
   () => {
+    if (control.value && control.value._map) {
+      control.value.remove();
+      control.value = null;
+    }
+
     if (!control.value) {
       tryCreateControl();
     }
