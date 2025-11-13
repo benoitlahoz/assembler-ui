@@ -3,6 +3,7 @@
  * @category geography
  *
  * @demo LeafletSimple
+ * @demo LeafletCanvasDemo
  * @demo LeafletEditionDemo
  * @demo LeafletVirtualizationDemo
  */
@@ -10,8 +11,6 @@
 import type { InjectionKey, Ref } from 'vue';
 import type * as L from 'leaflet';
 import type { Map, TileLayerOptions } from 'leaflet';
-import type { LeafletBoundingBoxStyles } from './LeafletBoundingBox.vue';
-import type { LeafletMeasureToolStyles } from './LeafletMeasureTool.vue';
 import type { LeafletSelectionContext } from './LeafletFeaturesSelector.vue';
 import type { LeafletControlsContext } from './LeafletControls.vue';
 type L = typeof L;
@@ -33,6 +32,7 @@ export { default as LeafletCircle } from './LeafletCircle.vue';
 export { default as LeafletPolyline } from './LeafletPolyline.vue';
 export { default as LeafletPolygon } from './LeafletPolygon.vue';
 export { default as LeafletRectangle } from './LeafletRectangle.vue';
+export { default as LeafletCanvas } from './LeafletCanvas.vue';
 export { default as LeafletMeasureTool } from './LeafletMeasureTool.vue';
 
 export const LeafletModuleKey: InjectionKey<Ref<L | undefined>> = Symbol('LeafletModule');
@@ -80,5 +80,6 @@ export type { LeafletCircleProps } from './LeafletCircle.vue';
 export type { LeafletPolylineProps } from './LeafletPolyline.vue';
 export type { LeafletPolygonProps } from './LeafletPolygon.vue';
 export type { LeafletRectangleProps } from './LeafletRectangle.vue';
+export type { LeafletCanvasProps } from './LeafletCanvas.vue';
 export type { LeafletVirtualizeProps } from './LeafletVirtualize.vue';
 export type { LeafletMeasureToolProps } from './LeafletMeasureTool.vue';
