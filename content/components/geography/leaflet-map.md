@@ -153,6 +153,7 @@ export { default as LeafletPolyline } from "./LeafletPolyline.vue";
 export { default as LeafletPolygon } from "./LeafletPolygon.vue";
 export { default as LeafletRectangle } from "./LeafletRectangle.vue";
 export { default as LeafletCanvas } from "./LeafletCanvas.vue";
+export { default as LeafletCanvasGL } from "./LeafletCanvasGL.vue";
 export { default as LeafletMeasureTool } from "./LeafletMeasureTool.vue";
 
 export const LeafletModuleKey: InjectionKey<Ref<L | undefined>> =
@@ -208,7 +209,7 @@ export type { LeafletCircleProps } from "./LeafletCircle.vue";
 export type { LeafletPolylineProps } from "./LeafletPolyline.vue";
 export type { LeafletPolygonProps } from "./LeafletPolygon.vue";
 export type { LeafletRectangleProps } from "./LeafletRectangle.vue";
-export type { LeafletCanvasProps } from "./LeafletCanvas.vue";
+export type { LeafletCanvasProps } from "./LeafletCanvasGL.vue";
 export type { LeafletVirtualizeProps } from "./LeafletVirtualize.vue";
 export type { LeafletMeasureToolProps } from "./LeafletMeasureTool.vue";
 ```
@@ -1559,6 +1560,802 @@ watch(
 
 onBeforeUnmount(() => {
   clearEditMarkers();
+
+  if (canvasLayer.value) {
+    canvasLayer.value.removeEventListener("click", handleClick);
+    canvasLayer.value.remove();
+  }
+
+  if (map.value) {
+    map.value.off("moveend", reset);
+    map.value.off("zoom", reset);
+    map.value.off("viewreset", reset);
+  }
+
+  if (selectionContext) {
+    selectionContext.unregisterFeature(canvasId.value);
+  }
+});
+
+defineExpose({
+  sourceCanvas,
+  redraw: () => {
+    if (canvasLayer.value && sourceCanvas.value) {
+      draw();
+    }
+  },
+});
+</script>
+
+<template>
+  <slot />
+</template>
+```
+
+```vue [src/components/ui/leaflet-map/LeafletCanvasGL.vue]
+<script setup lang="ts">
+import {
+  inject,
+  watch,
+  ref,
+  type Ref,
+  nextTick,
+  onBeforeUnmount,
+  type HTMLAttributes,
+} from "vue";
+import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
+import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
+import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
+import "./leaflet-editing.css";
+
+const { calculateMidpoint } = await useLeaflet();
+
+export interface LeafletCanvasProps {
+  id?: string | number;
+  corners?: Array<{ lat: number; lng: number }>;
+  width?: number;
+  height?: number;
+  editable?: boolean;
+  draggable?: boolean;
+  selectable?: boolean;
+  subdivisions?: number;
+  opacity?: number;
+  class?: HTMLAttributes["class"];
+}
+
+const props = withDefaults(defineProps<LeafletCanvasProps>(), {
+  corners: () => [
+    { lat: 48.86, lng: 2.35 },
+    { lat: 48.86, lng: 2.36 },
+    { lat: 48.85, lng: 2.36 },
+    { lat: 48.85, lng: 2.35 },
+  ],
+  width: 400,
+  height: 300,
+  editable: false,
+  draggable: false,
+  selectable: false,
+  subdivisions: 20,
+  opacity: 1,
+});
+
+const emit = defineEmits<{
+  "update:corners": [corners: Array<{ lat: number; lng: number }>];
+  "canvas-ready": [canvas: HTMLCanvasElement];
+  click: [];
+  dragstart: [];
+}>();
+
+const { getLeafletShapeColors } = useCssParser();
+
+const L = inject(LeafletModuleKey, ref());
+const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
+const selectionContext = inject(LeafletSelectionKey, undefined);
+
+const canvasLayer = ref<HTMLCanvasElement | null>(null);
+const sourceCanvas = ref<HTMLCanvasElement | null>(null);
+const gl = ref<WebGLRenderingContext | null>(null);
+const overlayCtx = ref<CanvasRenderingContext2D | null>(null);
+const editMarkers = ref<L.Marker[]>([]);
+const canvasId = ref<string | number>(
+  props.id ?? `canvas-${Date.now()}-${Math.random()}`,
+);
+const isDragging = ref(false);
+
+let dragStartCorners: Array<{ lat: number; lng: number }> = [];
+let dragStartMousePoint: L.Point | null = null;
+let texture: WebGLTexture | null = null;
+let program: WebGLProgram | null = null;
+let positionBuffer: WebGLBuffer | null = null;
+let texCoordBuffer: WebGLBuffer | null = null;
+
+const createSourceCanvas = () => {
+  if (sourceCanvas.value) return sourceCanvas.value;
+
+  sourceCanvas.value = document.createElement("canvas");
+  sourceCanvas.value.width = props.width;
+  sourceCanvas.value.height = props.height;
+  const sourceCtx = sourceCanvas.value.getContext("2d");
+
+  if (sourceCtx) {
+    sourceCtx.fillStyle = "#3388ff";
+    sourceCtx.fillRect(0, 0, props.width, props.height);
+    sourceCtx.fillStyle = "white";
+    sourceCtx.font = "20px Arial";
+    sourceCtx.textAlign = "center";
+    sourceCtx.fillText("Canvas déformable", props.width / 2, props.height / 2);
+  }
+
+  emit("canvas-ready", sourceCanvas.value);
+  return sourceCanvas.value;
+};
+
+const clearEditMarkers = () => {
+  editMarkers.value.forEach((marker) => marker.remove());
+  editMarkers.value = [];
+};
+
+const enableEditing = () => {
+  if (!L.value || !map.value) return;
+
+  clearEditMarkers();
+
+  props.corners.forEach((corner, index) => {
+    const marker = L.value!.marker([corner.lat, corner.lng], {
+      draggable: true,
+      icon: L.value!.divIcon({
+        className: "leaflet-editing-icon",
+        html: '<div style="background:#fff;border:2px solid #ff3388;"></div>',
+        iconSize: [10, 10],
+      }),
+    }).addTo(map.value!);
+
+    marker.on("drag", () => {
+      const newCorners = [...props.corners];
+      const newPos = marker.getLatLng();
+      newCorners[index] = { lat: newPos.lat, lng: newPos.lng };
+      emit("update:corners", newCorners);
+
+      if (selectionContext) {
+        selectionContext.notifyFeatureUpdate(canvasId.value);
+      }
+    });
+
+    marker.on("dragend", () => {
+      const newCorners = [...props.corners];
+      const newPos = marker.getLatLng();
+      newCorners[index] = { lat: newPos.lat, lng: newPos.lng };
+      emit("update:corners", newCorners);
+    });
+
+    editMarkers.value.push(marker);
+  });
+};
+
+const disableEditing = () => {
+  clearEditMarkers();
+};
+
+let mouseDownHandler: ((e: MouseEvent) => void) | null = null;
+
+const enableDragging = () => {
+  if (!canvasLayer.value || !map.value || !L.value) return;
+
+  if (mouseDownHandler) {
+    canvasLayer.value.removeEventListener("mousedown", mouseDownHandler);
+  }
+
+  mouseDownHandler = (e: MouseEvent) => {
+    if (!map.value || !L.value) return;
+
+    L.value.DomEvent.stopPropagation(e as any);
+    isDragging.value = true;
+
+    emit("dragstart");
+
+    dragStartCorners = JSON.parse(JSON.stringify(props.corners));
+    dragStartMousePoint = L.value.point(e.clientX, e.clientY);
+
+    setupMapDragHandlers();
+
+    if (map.value) {
+      map.value.getContainer().style.cursor = "move";
+      map.value.dragging.disable();
+    }
+  };
+
+  canvasLayer.value.addEventListener("mousedown", mouseDownHandler);
+};
+
+const disableDragging = () => {
+  if (!canvasLayer.value || !mouseDownHandler) return;
+  canvasLayer.value.removeEventListener("mousedown", mouseDownHandler);
+  mouseDownHandler = null;
+};
+
+const setupMapDragHandlers = () => {
+  if (!map.value || !L.value) return;
+
+  const onMouseMove = (e: L.LeafletMouseEvent) => {
+    if (!isDragging.value || !dragStartMousePoint || !map.value || !L.value)
+      return;
+
+    const currentPoint = L.value.point(
+      e.originalEvent.clientX,
+      e.originalEvent.clientY,
+    );
+    const deltaX = currentPoint.x - dragStartMousePoint.x;
+    const deltaY = currentPoint.y - dragStartMousePoint.y;
+
+    const newCorners = dragStartCorners.map((corner) => {
+      const startPoint = map.value!.latLngToContainerPoint([
+        corner.lat,
+        corner.lng,
+      ]);
+      const newPoint = L.value!.point(
+        startPoint.x + deltaX,
+        startPoint.y + deltaY,
+      );
+      const newLatLng = map.value!.containerPointToLatLng(newPoint);
+      return { lat: newLatLng.lat, lng: newLatLng.lng };
+    });
+
+    emit("update:corners", newCorners);
+
+    if (selectionContext) {
+      selectionContext.notifyFeatureUpdate(canvasId.value);
+    }
+  };
+
+  const onMouseUp = () => {
+    if (!isDragging.value) return;
+
+    isDragging.value = false;
+
+    if (map.value) {
+      map.value.getContainer().style.cursor = "";
+      map.value.dragging.enable();
+      map.value.off("mousemove", onMouseMove as any);
+      map.value.off("mouseup", onMouseUp);
+    }
+
+    emit("update:corners", [...props.corners]);
+  };
+
+  map.value.on("mousemove", onMouseMove as any);
+  map.value.on("mouseup", onMouseUp);
+};
+
+const bilinearInterp = (
+  corners: Array<{ x: number; y: number }>,
+  u: number,
+  v: number,
+) => {
+  if (!corners[0] || !corners[1] || !corners[2] || !corners[3]) {
+    return { x: 0, y: 0 };
+  }
+
+  const x =
+    (1 - u) * (1 - v) * corners[0].x +
+    u * (1 - v) * corners[1].x +
+    u * v * corners[2].x +
+    (1 - u) * v * corners[3].x;
+
+  const y =
+    (1 - u) * (1 - v) * corners[0].y +
+    u * (1 - v) * corners[1].y +
+    u * v * corners[2].y +
+    (1 - u) * v * corners[3].y;
+
+  return { x, y };
+};
+
+const initWebGL = () => {
+  if (!canvasLayer.value) return false;
+
+  gl.value = canvasLayer.value.getContext("webgl", {
+    premultipliedAlpha: false,
+    alpha: true,
+  });
+
+  if (!gl.value) {
+    console.error("WebGL not supported");
+    return false;
+  }
+
+  const vertexShaderSource = `
+    attribute vec2 a_position;
+    attribute vec2 a_texCoord;
+    varying vec2 v_texCoord;
+    uniform vec2 u_resolution;
+    
+    void main() {
+      vec2 clipSpace = ((a_position / u_resolution) * 2.0 - 1.0) * vec2(1, -1);
+      gl_Position = vec4(clipSpace, 0, 1);
+      v_texCoord = a_texCoord;
+    }
+  `;
+
+  const fragmentShaderSource = `
+    precision mediump float;
+    varying vec2 v_texCoord;
+    uniform sampler2D u_texture;
+    uniform float u_opacity;
+    
+    void main() {
+      vec4 texColor = texture2D(u_texture, v_texCoord);
+      gl_FragColor = vec4(texColor.rgb, texColor.a * u_opacity);
+    }
+  `;
+
+  const vertexShader = gl.value.createShader(gl.value.VERTEX_SHADER)!;
+  gl.value.shaderSource(vertexShader, vertexShaderSource);
+  gl.value.compileShader(vertexShader);
+
+  const fragmentShader = gl.value.createShader(gl.value.FRAGMENT_SHADER)!;
+  gl.value.shaderSource(fragmentShader, fragmentShaderSource);
+  gl.value.compileShader(fragmentShader);
+
+  program = gl.value.createProgram()!;
+  gl.value.attachShader(program, vertexShader);
+  gl.value.attachShader(program, fragmentShader);
+  gl.value.linkProgram(program);
+  gl.value.useProgram(program);
+
+  positionBuffer = gl.value.createBuffer();
+  texCoordBuffer = gl.value.createBuffer();
+
+  texture = gl.value.createTexture();
+  gl.value.bindTexture(gl.value.TEXTURE_2D, texture);
+  gl.value.texParameteri(
+    gl.value.TEXTURE_2D,
+    gl.value.TEXTURE_WRAP_S,
+    gl.value.CLAMP_TO_EDGE,
+  );
+  gl.value.texParameteri(
+    gl.value.TEXTURE_2D,
+    gl.value.TEXTURE_WRAP_T,
+    gl.value.CLAMP_TO_EDGE,
+  );
+  gl.value.texParameteri(
+    gl.value.TEXTURE_2D,
+    gl.value.TEXTURE_MIN_FILTER,
+    gl.value.LINEAR,
+  );
+  gl.value.texParameteri(
+    gl.value.TEXTURE_2D,
+    gl.value.TEXTURE_MAG_FILTER,
+    gl.value.LINEAR,
+  );
+
+  gl.value.enable(gl.value.BLEND);
+  gl.value.blendFunc(gl.value.SRC_ALPHA, gl.value.ONE_MINUS_SRC_ALPHA);
+
+  return true;
+};
+
+const updateTexture = () => {
+  if (!gl.value || !texture || !sourceCanvas.value) return;
+
+  gl.value.bindTexture(gl.value.TEXTURE_2D, texture);
+  gl.value.texImage2D(
+    gl.value.TEXTURE_2D,
+    0,
+    gl.value.RGBA,
+    gl.value.RGBA,
+    gl.value.UNSIGNED_BYTE,
+    sourceCanvas.value,
+  );
+};
+
+const drawWarpedGrid = (corners: Array<{ x: number; y: number }>) => {
+  if (!gl.value || !program || !canvasLayer.value || !sourceCanvas.value)
+    return;
+
+  const subs = props.subdivisions;
+
+  gl.value.viewport(0, 0, canvasLayer.value.width, canvasLayer.value.height);
+  gl.value.clearColor(0, 0, 0, 0);
+  gl.value.clear(gl.value.COLOR_BUFFER_BIT);
+
+  updateTexture();
+
+  const resolutionLocation = gl.value.getUniformLocation(
+    program,
+    "u_resolution",
+  );
+  gl.value.uniform2f(
+    resolutionLocation,
+    canvasLayer.value.width,
+    canvasLayer.value.height,
+  );
+
+  const opacityLocation = gl.value.getUniformLocation(program, "u_opacity");
+  gl.value.uniform1f(opacityLocation, props.opacity);
+
+  const positions: number[] = [];
+  const texCoords: number[] = [];
+
+  for (let i = 0; i < subs; i++) {
+    for (let j = 0; j < subs; j++) {
+      const u0 = i / subs;
+      const v0 = j / subs;
+      const u1 = (i + 1) / subs;
+      const v1 = (j + 1) / subs;
+
+      const p0 = bilinearInterp(corners, u0, v0);
+      const p1 = bilinearInterp(corners, u1, v0);
+      const p2 = bilinearInterp(corners, u1, v1);
+      const p3 = bilinearInterp(corners, u0, v1);
+
+      positions.push(p0.x, p0.y, p1.x, p1.y, p2.x, p2.y);
+      texCoords.push(u0, v0, u1, v0, u1, v1);
+
+      positions.push(p0.x, p0.y, p2.x, p2.y, p3.x, p3.y);
+      texCoords.push(u0, v0, u1, v1, u0, v1);
+    }
+  }
+
+  const positionLocation = gl.value.getAttribLocation(program, "a_position");
+  gl.value.bindBuffer(gl.value.ARRAY_BUFFER, positionBuffer);
+  gl.value.bufferData(
+    gl.value.ARRAY_BUFFER,
+    new Float32Array(positions),
+    gl.value.STATIC_DRAW,
+  );
+  gl.value.enableVertexAttribArray(positionLocation);
+  gl.value.vertexAttribPointer(
+    positionLocation,
+    2,
+    gl.value.FLOAT,
+    false,
+    0,
+    0,
+  );
+
+  const texCoordLocation = gl.value.getAttribLocation(program, "a_texCoord");
+  gl.value.bindBuffer(gl.value.ARRAY_BUFFER, texCoordBuffer);
+  gl.value.bufferData(
+    gl.value.ARRAY_BUFFER,
+    new Float32Array(texCoords),
+    gl.value.STATIC_DRAW,
+  );
+  gl.value.enableVertexAttribArray(texCoordLocation);
+  gl.value.vertexAttribPointer(
+    texCoordLocation,
+    2,
+    gl.value.FLOAT,
+    false,
+    0,
+    0,
+  );
+
+  gl.value.drawArrays(gl.value.TRIANGLES, 0, positions.length / 2);
+};
+
+const drawOutline = (corners: Array<{ x: number; y: number }>) => {
+  if (!gl.value || !canvasLayer.value || !program) return;
+
+  const colors = getLeafletShapeColors(props.class);
+
+  const parseColor = (color: string) => {
+    const defaultColor = { r: 0.2, g: 0.53, b: 1.0 };
+
+    if (!color) return defaultColor;
+
+    if (color.startsWith("#")) {
+      const hex = color.replace("#", "");
+      if (hex.length === 3 && hex[0] && hex[1] && hex[2]) {
+        return {
+          r: parseInt(hex[0] + hex[0], 16) / 255,
+          g: parseInt(hex[1] + hex[1], 16) / 255,
+          b: parseInt(hex[2] + hex[2], 16) / 255,
+        };
+      } else if (hex.length === 6) {
+        return {
+          r: parseInt(hex.substring(0, 2), 16) / 255,
+          g: parseInt(hex.substring(2, 4), 16) / 255,
+          b: parseInt(hex.substring(4, 6), 16) / 255,
+        };
+      }
+    }
+
+    const rgbMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (rgbMatch && rgbMatch[1] && rgbMatch[2] && rgbMatch[3]) {
+      return {
+        r: parseInt(rgbMatch[1]) / 255,
+        g: parseInt(rgbMatch[2]) / 255,
+        b: parseInt(rgbMatch[3]) / 255,
+      };
+    }
+
+    return defaultColor;
+  };
+
+  const rgb = parseColor(colors.color || "#3388ff");
+
+  const lineVertexShaderSource = `
+    attribute vec2 a_position;
+    uniform vec2 u_resolution;
+    
+    void main() {
+      vec2 clipSpace = ((a_position / u_resolution) * 2.0 - 1.0) * vec2(1, -1);
+      gl_Position = vec4(clipSpace, 0, 1);
+    }
+  `;
+
+  const lineFragmentShaderSource = `
+    precision mediump float;
+    uniform vec4 u_color;
+    
+    void main() {
+      gl_FragColor = u_color;
+    }
+  `;
+
+  const lineVertexShader = gl.value.createShader(gl.value.VERTEX_SHADER)!;
+  gl.value.shaderSource(lineVertexShader, lineVertexShaderSource);
+  gl.value.compileShader(lineVertexShader);
+
+  const lineFragmentShader = gl.value.createShader(gl.value.FRAGMENT_SHADER)!;
+  gl.value.shaderSource(lineFragmentShader, lineFragmentShaderSource);
+  gl.value.compileShader(lineFragmentShader);
+
+  const lineProgram = gl.value.createProgram()!;
+  gl.value.attachShader(lineProgram, lineVertexShader);
+  gl.value.attachShader(lineProgram, lineFragmentShader);
+  gl.value.linkProgram(lineProgram);
+  gl.value.useProgram(lineProgram);
+
+  const lineWidth = 2;
+  const linePositions: number[] = [];
+
+  const addThickLine = (
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    width: number,
+  ) => {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const nx = -dy / len;
+    const ny = dx / len;
+    const hw = width / 2;
+
+    linePositions.push(
+      x1 + nx * hw,
+      y1 + ny * hw,
+      x1 - nx * hw,
+      y1 - ny * hw,
+      x2 - nx * hw,
+      y2 - ny * hw,
+    );
+
+    linePositions.push(
+      x1 + nx * hw,
+      y1 + ny * hw,
+      x2 - nx * hw,
+      y2 - ny * hw,
+      x2 + nx * hw,
+      y2 + ny * hw,
+    );
+  };
+
+  for (let i = 0; i < corners.length; i++) {
+    const current = corners[i];
+    const next = corners[(i + 1) % corners.length];
+    if (current && next) {
+      addThickLine(current.x, current.y, next.x, next.y, lineWidth);
+    }
+  }
+
+  const linePositionLocation = gl.value.getAttribLocation(
+    lineProgram,
+    "a_position",
+  );
+  const lineBuffer = gl.value.createBuffer();
+  gl.value.bindBuffer(gl.value.ARRAY_BUFFER, lineBuffer);
+  gl.value.bufferData(
+    gl.value.ARRAY_BUFFER,
+    new Float32Array(linePositions),
+    gl.value.STATIC_DRAW,
+  );
+  gl.value.enableVertexAttribArray(linePositionLocation);
+  gl.value.vertexAttribPointer(
+    linePositionLocation,
+    2,
+    gl.value.FLOAT,
+    false,
+    0,
+    0,
+  );
+
+  const lineResolutionLocation = gl.value.getUniformLocation(
+    lineProgram,
+    "u_resolution",
+  );
+  gl.value.uniform2f(
+    lineResolutionLocation,
+    canvasLayer.value.width,
+    canvasLayer.value.height,
+  );
+
+  const lineColorLocation = gl.value.getUniformLocation(lineProgram, "u_color");
+  gl.value.uniform4f(lineColorLocation, rgb.r, rgb.g, rgb.b, 1.0);
+
+  gl.value.drawArrays(gl.value.TRIANGLES, 0, linePositions.length / 2);
+
+  gl.value.deleteBuffer(lineBuffer);
+  gl.value.deleteShader(lineVertexShader);
+  gl.value.deleteShader(lineFragmentShader);
+  gl.value.deleteProgram(lineProgram);
+
+  gl.value.useProgram(program);
+};
+
+const reset = () => {
+  if (!canvasLayer.value || !map.value) return;
+
+  const topLeft = map.value.containerPointToLayerPoint([0, 0]);
+  canvasLayer.value.style.transform = `translate(${topLeft.x}px, ${topLeft.y}px)`;
+
+  draw();
+};
+
+const draw = () => {
+  if (!map.value || !gl.value || !sourceCanvas.value) return;
+
+  const corners = props.corners.map((corner) => {
+    const point = map.value!.latLngToContainerPoint([corner.lat, corner.lng]);
+    return { x: point.x, y: point.y };
+  });
+
+  drawWarpedGrid(corners);
+
+  if (props.editable || props.draggable) {
+    drawOutline(corners);
+  }
+};
+
+const handleClick = () => {
+  if (!isDragging.value) {
+    emit("click");
+  }
+};
+
+const registerWithSelection = () => {
+  if (!props.selectable || !selectionContext) return;
+
+  const feature: FeatureReference = {
+    id: canvasId.value,
+    type: "polygon",
+    getBounds: () => {
+      if (!L.value) return null;
+      const latlngs = props.corners.map((c) => L.value!.latLng(c.lat, c.lng));
+      return L.value!.latLngBounds(latlngs);
+    },
+    applyTransform: () => {},
+  };
+  selectionContext.registerFeature(feature);
+};
+
+let isUpdating = false;
+
+watch(
+  () =>
+    [
+      L.value,
+      map.value,
+      props.corners,
+      props.editable,
+      props.draggable,
+      props.selectable,
+    ] as const,
+  async (
+    [newL, newMap, newCorners, newEditable, newDraggable, newSelectable],
+    oldVal,
+  ) => {
+    if (isUpdating) return;
+    isUpdating = true;
+
+    try {
+      await nextTick();
+
+      if (newL && newMap && newCorners && newCorners.length === 4) {
+        createSourceCanvas();
+
+        const isInitialCreation = !canvasLayer.value;
+
+        if (canvasLayer.value) {
+          draw();
+        } else {
+          canvasLayer.value = document.createElement("canvas");
+          const size = newMap.getSize();
+          canvasLayer.value.width = size.x;
+          canvasLayer.value.height = size.y;
+          canvasLayer.value.style.position = "absolute";
+          canvasLayer.value.style.pointerEvents = "auto";
+          canvasLayer.value.className = "leaflet-canvas-layer";
+
+          if (!initWebGL()) {
+            console.error("Failed to initialize WebGL");
+            return;
+          }
+
+          const leafletPane = newMap.getPanes().overlayPane;
+          leafletPane.appendChild(canvasLayer.value);
+
+          canvasLayer.value.addEventListener("click", handleClick);
+
+          newMap.on("moveend", reset);
+          newMap.on("zoom", reset);
+          newMap.on("viewreset", reset);
+
+          if (newSelectable && selectionContext) {
+            registerWithSelection();
+
+            canvasLayer.value.addEventListener("click", () => {
+              selectionContext.selectFeature("polygon", canvasId.value);
+              emit("click");
+            });
+          }
+
+          reset();
+        }
+
+        if (
+          isInitialCreation ||
+          (oldVal && (oldVal[3] !== newEditable || oldVal[4] !== newDraggable))
+        ) {
+          if (newDraggable && !newEditable) {
+            clearEditMarkers();
+            enableDragging();
+          } else if (newEditable && !newDraggable) {
+            disableDragging();
+            enableEditing();
+          } else {
+            clearEditMarkers();
+            disableDragging();
+          }
+        }
+      } else {
+        if (canvasLayer.value) {
+          canvasLayer.value.remove();
+          canvasLayer.value = null;
+        }
+        clearEditMarkers();
+      }
+    } finally {
+      isUpdating = false;
+    }
+  },
+  { immediate: true, deep: true, flush: "post" },
+);
+
+onBeforeUnmount(() => {
+  clearEditMarkers();
+
+  if (gl.value) {
+    if (texture) {
+      gl.value.deleteTexture(texture);
+      texture = null;
+    }
+    if (program) {
+      gl.value.deleteProgram(program);
+      program = null;
+    }
+    if (positionBuffer) {
+      gl.value.deleteBuffer(positionBuffer);
+      positionBuffer = null;
+    }
+    if (texCoordBuffer) {
+      gl.value.deleteBuffer(texCoordBuffer);
+      texCoordBuffer = null;
+    }
+  }
 
   if (canvasLayer.value) {
     canvasLayer.value.removeEventListener("click", handleClick);
@@ -7312,6 +8109,46 @@ export type UseQuadtreeReturn<T extends Rect = Rect> = ReturnType<
 
 ---
 
+## LeafletCanvasGL
+::hr-underline
+::
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `id`{.primary .text-primary} | `string \| number` | - |  |
+| `corners`{.primary .text-primary} | `Array<{ lat: number; lng: number }>` | [object Object],[object Object],[object Object],[object Object] |  |
+| `width`{.primary .text-primary} | `number` | 400 |  |
+| `height`{.primary .text-primary} | `number` | 300 |  |
+| `editable`{.primary .text-primary} | `boolean` | false |  |
+| `draggable`{.primary .text-primary} | `boolean` | false |  |
+| `selectable`{.primary .text-primary} | `boolean` | false |  |
+| `subdivisions`{.primary .text-primary} | `number` | 20 |  |
+| `opacity`{.primary .text-primary} | `number` | 1 |  |
+| `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
+
+  ### Slots
+| Name | Description |
+|------|-------------|
+| `default`{.primary .text-primary} | — |
+
+  ### Inject
+| Key | Default | Type | Description |
+|-----|--------|------|-------------|
+| `LeafletModuleKey`{.primary .text-primary} | `ref()` | `any` | — |
+| `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
+| `LeafletSelectionKey`{.primary .text-primary} | `undefined` | `any` | — |
+
+  ### Expose
+| Name | Type | Description |
+|------|------|-------------|
+| `sourceCanvas`{.primary .text-primary} | `Ref<HTMLCanvasElement \| null>` | — |
+| `redraw`{.primary .text-primary} | `() => void` | — |
+
+---
+
 ## LeafletCircle
 ::hr-underline
 ::
@@ -7834,7 +8671,7 @@ Helps smooth transitions when toggling virtualization on/off
   :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
-import { ref, type ComponentPublicInstance } from "vue";
+import { ref, watch, type ComponentPublicInstance } from "vue";
 import { ClientOnly } from "#components";
 import {
   LeafletMap,
@@ -7842,7 +8679,7 @@ import {
   LeafletZoomControl,
   LeafletControls,
   LeafletControlItem,
-  LeafletCanvas,
+  LeafletCanvasGL,
   type LeafletMapExposed,
 } from "@/components/ui/leaflet-map";
 import { Icon } from "@iconify/vue";
@@ -7970,6 +8807,15 @@ const animateCanvas = () => {
 
   animate();
 };
+
+watch(
+  () => canvasOpacity.value,
+  () => {
+    if (canvasRef.value) {
+      canvasRef.value.redraw();
+    }
+  },
+);
 </script>
 
 <template>
@@ -8023,7 +8869,7 @@ const animateCanvas = () => {
             type="range"
             min="0"
             max="1"
-            step="0.1"
+            step="0.01"
             v-model.number="canvasOpacity"
             class="w-32"
           />
@@ -8051,7 +8897,7 @@ const animateCanvas = () => {
 
           <LeafletZoomControl position="topleft" />
 
-          <LeafletCanvas
+          <LeafletCanvasGL
             ref="canvasRef"
             :corners="canvasCorners"
             :width="400"

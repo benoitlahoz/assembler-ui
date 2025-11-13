@@ -33,6 +33,7 @@ export { default as LeafletPolyline } from './LeafletPolyline.vue';
 export { default as LeafletPolygon } from './LeafletPolygon.vue';
 export { default as LeafletRectangle } from './LeafletRectangle.vue';
 export { default as LeafletCanvas } from './LeafletCanvas.vue';
+export { default as LeafletCanvasGL } from './LeafletCanvasGL.vue';
 export { default as LeafletMeasureTool } from './LeafletMeasureTool.vue';
 
 export const LeafletModuleKey: InjectionKey<Ref<L | undefined>> = Symbol('LeafletModule');
@@ -80,6 +81,6 @@ export type { LeafletCircleProps } from './LeafletCircle.vue';
 export type { LeafletPolylineProps } from './LeafletPolyline.vue';
 export type { LeafletPolygonProps } from './LeafletPolygon.vue';
 export type { LeafletRectangleProps } from './LeafletRectangle.vue';
-export type { LeafletCanvasProps } from './LeafletCanvas.vue';
+export type { LeafletCanvasProps } from './LeafletCanvasGL.vue';
 export type { LeafletVirtualizeProps } from './LeafletVirtualize.vue';
 export type { LeafletMeasureToolProps } from './LeafletMeasureTool.vue';

@@ -7,7 +7,7 @@ import {
   LeafletZoomControl,
   LeafletControls,
   LeafletControlItem,
-  LeafletCanvas,
+  LeafletCanvasGL,
   type LeafletMapExposed,
 } from '~~/registry/new-york/components/leaflet-map';
 import { Icon } from '@iconify/vue';
@@ -231,7 +231,7 @@ watch(
           <LeafletZoomControl position="topleft" />
 
           <!-- Canvas déformable -->
-          <LeafletCanvas
+          <LeafletCanvasGL
             ref="canvasRef"
             :corners="canvasCorners"
             :width="400"
