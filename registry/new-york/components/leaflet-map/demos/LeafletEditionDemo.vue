@@ -5,13 +5,12 @@ import {
   LeafletMap,
   LeafletTileLayer,
   LeafletZoomControl,
-  LeafletDrawControl,
   LeafletControls,
   LeafletControlItem,
   LeafletFeaturesEditor,
   LeafletFeaturesSelector,
   LeafletFeatureHandle,
-  LeafletBoundingBoxRectangle,
+  LeafletFeatureRectangle,
   LeafletMarker,
   LeafletCircle,
   LeafletPolyline,
@@ -303,7 +302,7 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
 
         <!-- Barre d'outils spécifique pour les outils (mesure, etc.) -->
         <LeafletControls
-          position="bottomright"
+          position="topright"
           :enabled="editMode"
           :active-item="
             measureMode === 'line'
@@ -332,10 +331,16 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
           :mode="measureMode || 'polygon'"
           unit="metric"
           :show-area="true"
-          class="border border-orange-500 bg-orange-500/20"
+          class="border border-blue-500 bg-blue-500/20"
           @measurement-complete="handleMeasurementComplete"
           @measurement-update="(data) => (lastMeasurement = data)"
-        />
+        >
+          <LeafletFeatureHandle
+            role="corner"
+            class="bg-blue-500/20 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+            :size="12"
+          />
+        </LeafletMeasureTool>
 
         <!-- Features Editor - Drawing logic -->
         <LeafletFeaturesEditor
@@ -408,7 +413,7 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
 
             <!-- Custom bounding box styling. Note that a default bounding box component is inserted in the `#bounding-box` slot -->
             <template #bounding-box-styles>
-              <LeafletBoundingBoxRectangle class="border-2 border-orange-400" :dashed="[5, 5]" />
+              <LeafletFeatureRectangle class="border-2 border-orange-400" :dashed="[5, 5]" />
 
               <LeafletFeatureHandle
                 role="corner"

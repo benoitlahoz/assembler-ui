@@ -2,9 +2,15 @@
 import { watch, inject, type HTMLAttributes, ref } from 'vue';
 import { cn } from '@/lib/utils';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
-import { LeafletBoundingBoxStylesKey } from '.';
+import { LeafletStylesKey } from '.';
 
 export type LeafletFeatureHandleRole = 'corner' | 'edge' | 'center' | 'rotate';
+
+export interface LeafletFeatureHandleStyle {
+  className: string;
+  html: string;
+  iconSize: [number, number];
+}
 
 export interface LeafletFeatureHandleProps {
   role: LeafletFeatureHandleRole;
@@ -20,7 +26,7 @@ const props = withDefaults(defineProps<LeafletFeatureHandleProps>(), {
 
 const { fetchStylesFromElementClass, getTailwindBaseCssValues } = useCssParser();
 
-const stylesOptions = inject(LeafletBoundingBoxStylesKey, ref());
+const stylesOptions = inject(LeafletStylesKey, ref());
 
 const tailwindToMarkerHtml = (className: string, size: number | string) => {
   const styles = fetchStylesFromElementClass((el: HTMLElement) => {
@@ -46,7 +52,7 @@ watch(
   () => [stylesOptions.value, props.class, props.size],
   () => {
     const options = {
-      className: `leaflet-bounding-box-handle leaflet-bounding-box-${props.role}`,
+      className: `leaflet-feature-handle leaflet-handle-${props.role}`,
       html: tailwindToMarkerHtml(props.class || '', props.size || 8),
       iconSize: [Number(props.size) || 8, Number(props.size) || 8] as [number, number],
     };
@@ -61,8 +67,5 @@ watch(
 
 <template>
   <!-- To enable Tailwind classes computing -->
-  <div
-    data-slot="leaflet-bounding-box-corner-handle"
-    :class="cn('hidden -z-50', props.class)"
-  ></div>
+  <div data-slot="leaflet-handle-corner" :class="cn('hidden -z-50', props.class)"></div>
 </template>

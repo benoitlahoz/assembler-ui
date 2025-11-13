@@ -11,6 +11,7 @@ import type { InjectionKey, Ref } from 'vue';
 import type * as L from 'leaflet';
 import type { Map, TileLayerOptions } from 'leaflet';
 import type { LeafletBoundingBoxStyles } from './LeafletBoundingBox.vue';
+import type { LeafletMeasureToolStyles } from './LeafletMeasureTool.vue';
 import type { LeafletSelectionContext } from './LeafletFeaturesSelector.vue';
 import type { LeafletControlsContext } from './LeafletControls.vue';
 type L = typeof L;
@@ -24,7 +25,7 @@ export { default as LeafletFeaturesEditor } from './LeafletFeaturesEditor.vue';
 export { default as LeafletFeaturesSelector } from './LeafletFeaturesSelector.vue';
 export { default as LeafletVirtualize } from './LeafletVirtualize.vue';
 export { default as LeafletBoundingBox } from './LeafletBoundingBox.vue';
-export { default as LeafletBoundingBoxRectangle } from './LeafletBoundingBoxRectangle.vue';
+export { default as LeafletFeatureRectangle } from './LeafletFeatureRectangle.vue';
 export { default as LeafletFeatureHandle } from './LeafletFeatureHandle.vue';
 export { default as LeafletTileLayer } from './LeafletTileLayer.vue';
 export { default as LeafletMarker } from './LeafletMarker.vue';
@@ -40,7 +41,7 @@ export const LeafletTileLayersKey: InjectionKey<
   Ref<TileLayerOptions & { name: string } & { urlTemplate: string }>
 > = Symbol('LeafletTileLayerOptions');
 export const LeafletErrorsKey: InjectionKey<Ref<Error[]>> = Symbol('LeafletErrors');
-export const LeafletBoundingBoxStylesKey: InjectionKey<Ref<LeafletBoundingBoxStyles | undefined>> =
+export const LeafletStylesKey: InjectionKey<Ref<Record<string, any> | undefined>> =
   Symbol('LeafletFeatureHandles');
 export const LeafletSelectionKey: InjectionKey<LeafletSelectionContext> =
   Symbol('LeafletSelection');
@@ -63,15 +64,15 @@ export {
   type FeatureReference,
   type LeafletFeaturesSelectorProps,
 } from './LeafletFeaturesSelector.vue';
+export type { LeafletBoundingBoxProps, LeafletBoundingBoxStyles } from './LeafletBoundingBox.vue';
 export type {
-  LeafletBoundingBoxProps,
-  LeafletBoundingBoxStyles,
-  LeafletBoxStyle,
-  LeafletHandleStyle,
-} from './LeafletBoundingBox.vue';
+  LeafletFeatureRectangleProps,
+  LeafletFeatureRectangleStyle,
+} from './LeafletFeatureRectangle.vue';
 export type {
   LeafletFeatureHandleProps,
   LeafletFeatureHandleRole,
+  LeafletFeatureHandleStyle,
 } from './LeafletFeatureHandle.vue';
 export type { LeafletTileLayerProps } from './LeafletTileLayer.vue';
 export type { LeafletMarkerProps } from './LeafletMarker.vue';

@@ -1,31 +1,22 @@
 <script setup lang="ts">
 import { inject, watch, ref, type Ref, onBeforeUnmount, provide } from 'vue';
-import { LeafletBoundingBoxStylesKey, LeafletMapKey, LeafletModuleKey } from '.';
+import {
+  LeafletStylesKey,
+  LeafletMapKey,
+  LeafletModuleKey,
+  type LeafletFeatureRectangleStyle,
+  type LeafletFeatureHandleStyle,
+} from '.';
 import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
 
 const { LatDegreesMeters, radiusToLngDegrees, lngDegreesToRadius } = await useLeaflet();
 
-export interface LeafletHandleStyle {
-  className: string;
-  html: string;
-  iconSize: [number, number];
-}
-
-export interface LeafletBoxStyle {
-  color: string;
-  weight: number;
-  fill: boolean;
-  fillColor?: string;
-  dashArray?: string;
-  interactive: boolean;
-}
-
 export interface LeafletBoundingBoxStyles {
-  box: LeafletBoxStyle;
-  corner: LeafletHandleStyle;
-  edge: LeafletHandleStyle;
-  rotate: LeafletHandleStyle;
-  center: LeafletHandleStyle;
+  rectangle: LeafletFeatureRectangleStyle;
+  corner: LeafletFeatureHandleStyle;
+  edge: LeafletFeatureHandleStyle;
+  rotate: LeafletFeatureHandleStyle;
+  center: LeafletFeatureHandleStyle;
 }
 
 export interface LeafletBoundingBoxProps {
@@ -53,7 +44,7 @@ const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 
 const stylesOptions = ref<LeafletBoundingBoxStyles>({
-  box: {
+  rectangle: {
     color: '#3388ff',
     weight: 2,
     fill: false,
@@ -62,28 +53,28 @@ const stylesOptions = ref<LeafletBoundingBoxStyles>({
     interactive: false,
   },
   corner: {
-    className: 'leaflet-bounding-box-handle leaflet-bounding-box-corner',
+    className: 'leaflet-feature-handle leaflet-handle-corner',
     html: '<div style="width:8px;height:8px;background:#fff;border:2px solid #3388ff;border-radius:2px;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
     iconSize: [8, 8],
   },
   edge: {
-    className: 'leaflet-bounding-box-handle leaflet-bounding-box-edge',
+    className: 'leaflet-feature-handle leaflet-handle-edge',
     html: '<div style="width:8px;height:8px;background:#fff;border:2px solid #3388ff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
     iconSize: [8, 8],
   },
   rotate: {
-    className: 'leaflet-bounding-box-handle leaflet-bounding-box-rotate',
+    className: 'leaflet-feature-handle leaflet-handle-rotate',
     html: '<div style="width:12px;height:12px;background:#fff;border:2px solid #3388ff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
     iconSize: [12, 12],
   },
   center: {
-    className: 'leaflet-bounding-box-handle leaflet-bounding-box-center',
+    className: 'leaflet-feature-handle leaflet-handle-center',
     html: '<div style="width:12px;height:12px;background:#ff8800;border:2px solid #fff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
     iconSize: [12, 12],
   },
 });
 
-provide(LeafletBoundingBoxStylesKey, stylesOptions);
+provide(LeafletStylesKey, stylesOptions);
 
 const boundingBox = ref<L.Rectangle | null>(null);
 const cornerHandles = ref<L.Marker[]>([]);
@@ -171,7 +162,9 @@ const createBoundingBox = () => {
   clearHandles();
 
   // Créer le rectangle de bounding box
-  boundingBox.value = L.value.rectangle(props.bounds, stylesOptions.value.box).addTo(map.value);
+  boundingBox.value = L.value
+    .rectangle(props.bounds, stylesOptions.value.rectangle)
+    .addTo(map.value);
 
   // Créer les handles aux coins (pour scale)
   const corners = [

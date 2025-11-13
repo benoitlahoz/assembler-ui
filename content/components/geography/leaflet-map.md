@@ -126,6 +126,7 @@ import type { InjectionKey, Ref } from "vue";
 import type * as L from "leaflet";
 import type { Map, TileLayerOptions } from "leaflet";
 import type { LeafletBoundingBoxStyles } from "./LeafletBoundingBox.vue";
+import type { LeafletMeasureToolStyles } from "./LeafletMeasureTool.vue";
 import type { LeafletSelectionContext } from "./LeafletFeaturesSelector.vue";
 import type { LeafletControlsContext } from "./LeafletControls.vue";
 type L = typeof L;
@@ -139,7 +140,7 @@ export { default as LeafletFeaturesEditor } from "./LeafletFeaturesEditor.vue";
 export { default as LeafletFeaturesSelector } from "./LeafletFeaturesSelector.vue";
 export { default as LeafletVirtualize } from "./LeafletVirtualize.vue";
 export { default as LeafletBoundingBox } from "./LeafletBoundingBox.vue";
-export { default as LeafletBoundingBoxRectangle } from "./LeafletBoundingBoxRectangle.vue";
+export { default as LeafletFeatureRectangle } from "./LeafletFeatureRectangle.vue";
 export { default as LeafletFeatureHandle } from "./LeafletFeatureHandle.vue";
 export { default as LeafletTileLayer } from "./LeafletTileLayer.vue";
 export { default as LeafletMarker } from "./LeafletMarker.vue";
@@ -158,8 +159,8 @@ export const LeafletTileLayersKey: InjectionKey<
 > = Symbol("LeafletTileLayerOptions");
 export const LeafletErrorsKey: InjectionKey<Ref<Error[]>> =
   Symbol("LeafletErrors");
-export const LeafletBoundingBoxStylesKey: InjectionKey<
-  Ref<LeafletBoundingBoxStyles | undefined>
+export const LeafletStylesKey: InjectionKey<
+  Ref<Record<string, any> | undefined>
 > = Symbol("LeafletFeatureHandles");
 export const LeafletSelectionKey: InjectionKey<LeafletSelectionContext> =
   Symbol("LeafletSelection");
@@ -186,12 +187,15 @@ export {
 export type {
   LeafletBoundingBoxProps,
   LeafletBoundingBoxStyles,
-  LeafletBoxStyle,
-  LeafletHandleStyle,
 } from "./LeafletBoundingBox.vue";
+export type {
+  LeafletFeatureRectangleProps,
+  LeafletFeatureRectangleStyle,
+} from "./LeafletFeatureRectangle.vue";
 export type {
   LeafletFeatureHandleProps,
   LeafletFeatureHandleRole,
+  LeafletFeatureHandleStyle,
 } from "./LeafletFeatureHandle.vue";
 export type { LeafletTileLayerProps } from "./LeafletTileLayer.vue";
 export type { LeafletMarkerProps } from "./LeafletMarker.vue";
@@ -419,36 +423,23 @@ defineExpose<LeafletMapExposed>({
 <script setup lang="ts">
 import { inject, watch, ref, type Ref, onBeforeUnmount, provide } from "vue";
 import {
-  LeafletBoundingBoxStylesKey,
+  LeafletStylesKey,
   LeafletMapKey,
   LeafletModuleKey,
+  type LeafletFeatureRectangleStyle,
+  type LeafletFeatureHandleStyle,
 } from ".";
 import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
 
 const { LatDegreesMeters, radiusToLngDegrees, lngDegreesToRadius } =
   await useLeaflet();
 
-export interface LeafletHandleStyle {
-  className: string;
-  html: string;
-  iconSize: [number, number];
-}
-
-export interface LeafletBoxStyle {
-  color: string;
-  weight: number;
-  fill: boolean;
-  fillColor?: string;
-  dashArray?: string;
-  interactive: boolean;
-}
-
 export interface LeafletBoundingBoxStyles {
-  box: LeafletBoxStyle;
-  corner: LeafletHandleStyle;
-  edge: LeafletHandleStyle;
-  rotate: LeafletHandleStyle;
-  center: LeafletHandleStyle;
+  rectangle: LeafletFeatureRectangleStyle;
+  corner: LeafletFeatureHandleStyle;
+  edge: LeafletFeatureHandleStyle;
+  rotate: LeafletFeatureHandleStyle;
+  center: LeafletFeatureHandleStyle;
 }
 
 export interface LeafletBoundingBoxProps {
@@ -476,7 +467,7 @@ const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 
 const stylesOptions = ref<LeafletBoundingBoxStyles>({
-  box: {
+  rectangle: {
     color: "#3388ff",
     weight: 2,
     fill: false,
@@ -485,28 +476,28 @@ const stylesOptions = ref<LeafletBoundingBoxStyles>({
     interactive: false,
   },
   corner: {
-    className: "leaflet-bounding-box-handle leaflet-bounding-box-corner",
+    className: "leaflet-feature-handle leaflet-handle-corner",
     html: '<div style="width:8px;height:8px;background:#fff;border:2px solid #3388ff;border-radius:2px;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
     iconSize: [8, 8],
   },
   edge: {
-    className: "leaflet-bounding-box-handle leaflet-bounding-box-edge",
+    className: "leaflet-feature-handle leaflet-handle-edge",
     html: '<div style="width:8px;height:8px;background:#fff;border:2px solid #3388ff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
     iconSize: [8, 8],
   },
   rotate: {
-    className: "leaflet-bounding-box-handle leaflet-bounding-box-rotate",
+    className: "leaflet-feature-handle leaflet-handle-rotate",
     html: '<div style="width:12px;height:12px;background:#fff;border:2px solid #3388ff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
     iconSize: [12, 12],
   },
   center: {
-    className: "leaflet-bounding-box-handle leaflet-bounding-box-center",
+    className: "leaflet-feature-handle leaflet-handle-center",
     html: '<div style="width:12px;height:12px;background:#ff8800;border:2px solid #fff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
     iconSize: [12, 12],
   },
 });
 
-provide(LeafletBoundingBoxStylesKey, stylesOptions);
+provide(LeafletStylesKey, stylesOptions);
 
 const boundingBox = ref<L.Rectangle | null>(null);
 const cornerHandles = ref<L.Marker[]>([]);
@@ -588,7 +579,7 @@ const createBoundingBox = () => {
   clearHandles();
 
   boundingBox.value = L.value
-    .rectangle(props.bounds, stylesOptions.value.box)
+    .rectangle(props.bounds, stylesOptions.value.rectangle)
     .addTo(map.value);
 
   const corners = [
@@ -1012,83 +1003,6 @@ onBeforeUnmount(() => {
 
 <template>
   <div data-slot="leaflet-bounding-box"><slot /></div>
-</template>
-```
-
-```vue [src/components/ui/leaflet-map/LeafletBoundingBoxRectangle.vue]
-<script setup lang="ts">
-import { watch, inject, type HTMLAttributes, ref } from "vue";
-import { cn } from "@/lib/utils";
-import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { LeafletBoundingBoxStylesKey, type LeafletBoxStyle } from ".";
-import { removeWhitespaces } from "@assemblerjs/core";
-
-export interface LeafletBoundingBoxRectangleProps {
-  class?: HTMLAttributes["class"];
-  dashed?: number[];
-}
-
-const props = withDefaults(defineProps<LeafletBoundingBoxRectangleProps>(), {
-  class: "border-2 border-blue-500",
-});
-
-const stylesOptions = inject(LeafletBoundingBoxStylesKey, ref());
-
-const { fetchStylesFromElementClass, getTailwindBaseCssValues } =
-  useCssParser();
-
-const tailwindToBoxOptions = (className: string, dashed?: number[]) => {
-  const style = fetchStylesFromElementClass(
-    (el: HTMLElement): LeafletBoxStyle => {
-      const config = getTailwindBaseCssValues(el, [
-        "background-color",
-        "border-color",
-        "border-width",
-        "opacity",
-      ]);
-
-      const color = config["border-color"] || "#3388ff";
-      const weight = config["border-width"]
-        ? parseInt(config["border-width"])
-        : 2;
-      const fill: boolean =
-        !!config["background-color"] &&
-        removeWhitespaces(config["background-color"]) !== "rgba(0,0,0,0)" &&
-        config["opacity"] !== "0";
-      const fillColor = fill ? config["background-color"] : undefined;
-
-      return {
-        color,
-        weight,
-        fill,
-        fillColor,
-        dashArray: dashed ? dashed.join(", ") : undefined,
-        interactive: false,
-      };
-    },
-    className,
-  );
-
-  return style;
-};
-
-watch(
-  () => [stylesOptions.value, props.class, props.dashed],
-  () => {
-    const options = tailwindToBoxOptions(props.class || "", props.dashed);
-    if (stylesOptions.value) {
-      stylesOptions.value.box = options;
-    }
-  },
-  { immediate: true },
-);
-</script>
-
-<template>
-  <div
-    data-slot="leaflet-bounding-box-rectangle"
-    :class="cn('hidden -z-50', props.class)"
-  ></div>
 </template>
 ```
 
@@ -2147,9 +2061,15 @@ onBeforeUnmount(() => {
 import { watch, inject, type HTMLAttributes, ref } from "vue";
 import { cn } from "@/lib/utils";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { LeafletBoundingBoxStylesKey } from ".";
+import { LeafletStylesKey } from ".";
 
 export type LeafletFeatureHandleRole = "corner" | "edge" | "center" | "rotate";
+
+export interface LeafletFeatureHandleStyle {
+  className: string;
+  html: string;
+  iconSize: [number, number];
+}
 
 export interface LeafletFeatureHandleProps {
   role: LeafletFeatureHandleRole;
@@ -2166,7 +2086,7 @@ const props = withDefaults(defineProps<LeafletFeatureHandleProps>(), {
 const { fetchStylesFromElementClass, getTailwindBaseCssValues } =
   useCssParser();
 
-const stylesOptions = inject(LeafletBoundingBoxStylesKey, ref());
+const stylesOptions = inject(LeafletStylesKey, ref());
 
 const tailwindToMarkerHtml = (className: string, size: number | string) => {
   const styles = fetchStylesFromElementClass((el: HTMLElement) => {
@@ -2192,7 +2112,7 @@ watch(
   () => [stylesOptions.value, props.class, props.size],
   () => {
     const options = {
-      className: `leaflet-bounding-box-handle leaflet-bounding-box-${props.role}`,
+      className: `leaflet-feature-handle leaflet-handle-${props.role}`,
       html: tailwindToMarkerHtml(props.class || "", props.size || 8),
       iconSize: [Number(props.size) || 8, Number(props.size) || 8] as [
         number,
@@ -2210,7 +2130,93 @@ watch(
 
 <template>
   <div
-    data-slot="leaflet-bounding-box-corner-handle"
+    data-slot="leaflet-handle-corner"
+    :class="cn('hidden -z-50', props.class)"
+  ></div>
+</template>
+```
+
+```vue [src/components/ui/leaflet-map/LeafletFeatureRectangle.vue]
+<script setup lang="ts">
+import { watch, inject, type HTMLAttributes, ref } from "vue";
+import { cn } from "@/lib/utils";
+import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
+import { LeafletStylesKey } from ".";
+import { removeWhitespaces } from "@assemblerjs/core";
+
+export interface LeafletFeatureRectangleStyle {
+  color: string;
+  weight: number;
+  fill: boolean;
+  fillColor?: string;
+  dashArray?: string;
+  interactive: boolean;
+}
+
+export interface LeafletFeatureRectangleProps {
+  class?: HTMLAttributes["class"];
+  dashed?: number[];
+}
+
+const props = withDefaults(defineProps<LeafletFeatureRectangleProps>(), {
+  class: "border-2 border-blue-500",
+});
+
+const stylesOptions = inject(LeafletStylesKey, ref());
+
+const { fetchStylesFromElementClass, getTailwindBaseCssValues } =
+  useCssParser();
+
+const tailwindToBoxOptions = (className: string, dashed?: number[]) => {
+  const style = fetchStylesFromElementClass(
+    (el: HTMLElement): LeafletFeatureRectangleStyle => {
+      const config = getTailwindBaseCssValues(el, [
+        "background-color",
+        "border-color",
+        "border-width",
+        "opacity",
+      ]);
+
+      const color = config["border-color"] || "#3388ff";
+      const weight = config["border-width"]
+        ? parseInt(config["border-width"])
+        : 2;
+      const fill: boolean =
+        !!config["background-color"] &&
+        removeWhitespaces(config["background-color"]) !== "rgba(0,0,0,0)" &&
+        config["opacity"] !== "0";
+      const fillColor = fill ? config["background-color"] : undefined;
+
+      return {
+        color,
+        weight,
+        fill,
+        fillColor,
+        dashArray: dashed ? dashed.join(", ") : undefined,
+        interactive: false,
+      };
+    },
+    className,
+  );
+
+  return style;
+};
+
+watch(
+  () => [stylesOptions.value, props.class, props.dashed],
+  () => {
+    const options = tailwindToBoxOptions(props.class || "", props.dashed);
+    if (stylesOptions.value) {
+      stylesOptions.value.rectangle = options;
+    }
+  },
+  { immediate: true },
+);
+</script>
+
+<template>
+  <div
+    data-slot="leaflet-handle-rectangle"
     :class="cn('hidden -z-50', props.class)"
   ></div>
 </template>
@@ -3460,27 +3466,25 @@ import {
   inject,
   watch,
   onBeforeUnmount,
-  nextTick,
   type Ref,
   type HTMLAttributes,
   computed,
+  provide,
 } from "vue";
 import { cn } from "@/lib/utils";
-import { LeafletMapKey, LeafletModuleKey } from ".";
+import {
+  LeafletMapKey,
+  LeafletModuleKey,
+  LeafletStylesKey,
+  type LeafletFeatureHandleStyle,
+} from ".";
 import type { LatLng, Marker, Circle, DivIcon } from "leaflet";
 import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 
-const {
-  calculateLineDistance,
-  calculatePolygonArea,
-  calculateCentroid,
-  formatDistance: formatDistanceUtil,
-  formatArea: formatAreaUtil,
-  pixelsToMeters,
-} = await useLeaflet();
-
-const { getLeafletShapeColors, parseHTMLToElement } = useCssParser();
+export interface LeafletMeasureToolStyles {
+  corner: LeafletFeatureHandleStyle;
+}
 
 export interface LeafletMeasureToolProps {
   enabled?: boolean;
@@ -3512,6 +3516,33 @@ const emit = defineEmits<{
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
+
+const {
+  calculateLineDistance,
+  calculatePolygonArea,
+  formatDistance: formatDistanceUtil,
+  formatArea: formatAreaUtil,
+  pixelsToMeters,
+} = await useLeaflet();
+
+const { getLeafletShapeColors, parseHTMLToElement } = useCssParser();
+
+const stylesOptions = ref<LeafletMeasureToolStyles>({
+  corner: {
+    className: "leaflet-feature-handle leaflet-measure-marker",
+    html: `<div style="
+        width: 10px;
+        height: 10px;
+        background: orange;
+        border: 2px solid white;
+        border-radius: 50%;
+        box-shadow: 0 0 4px rgba(0,0,0,0.3);
+      "></div>`,
+    iconSize: [12, 12],
+  },
+});
+
+provide(LeafletStylesKey, stylesOptions);
 
 const measurementPoints = ref<Array<[number, number]>>([]);
 const markers = ref<Marker[]>([]);
@@ -3560,18 +3591,7 @@ const createMeasureMarker = (
 
   return L.value
     .marker([latlng[0], latlng[1]], {
-      icon: L.value.divIcon({
-        className: "leaflet-measure-marker",
-        html: `<div style="
-        width: 10px;
-        height: 10px;
-        background: ${colors.value.color};
-        border: 2px solid white;
-        border-radius: 50%;
-        box-shadow: 0 0 4px rgba(0,0,0,0.3);
-      "></div>`,
-        iconSize: [10, 10],
-      }),
+      icon: L.value.divIcon(stylesOptions.value.corner) as DivIcon,
     })
     .addTo(map.value);
 };
@@ -3993,7 +4013,7 @@ defineExpose({
 </script>
 
 <template>
-  <slot />
+  <div data-slot="leaflet-measure-tool"><slot /></div>
 </template>
 ```
 
@@ -6652,32 +6672,13 @@ export type UseQuadtreeReturn<T extends Rect = Rect> = ReturnType<
   ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-| `LeafletBoundingBoxStylesKey`{.primary .text-primary} | `stylesOptions` | `any` | — |
+| `LeafletStylesKey`{.primary .text-primary} | `stylesOptions` | `any` | — |
 
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
 | `LeafletModuleKey`{.primary .text-primary} | `ref()` | `any` | — |
 | `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
-
----
-
-## LeafletBoundingBoxRectangle
-::hr-underline
-::
-
-**API**: composition
-
-  ### Props
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `class`{.primary .text-primary} | `HTMLAttributes['class']` | border-2 border-blue-500 |  |
-| `dashed`{.primary .text-primary} | `number[]` | - |  |
-
-  ### Inject
-| Key | Default | Type | Description |
-|-----|--------|------|-------------|
-| `LeafletBoundingBoxStylesKey`{.primary .text-primary} | `ref()` | `any` | — |
 
 ---
 
@@ -6838,7 +6839,26 @@ export type UseQuadtreeReturn<T extends Rect = Rect> = ReturnType<
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
-| `LeafletBoundingBoxStylesKey`{.primary .text-primary} | `ref()` | `any` | — |
+| `LeafletStylesKey`{.primary .text-primary} | `ref()` | `any` | — |
+
+---
+
+## LeafletFeatureRectangle
+::hr-underline
+::
+
+**API**: composition
+
+  ### Props
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `class`{.primary .text-primary} | `HTMLAttributes['class']` | border-2 border-blue-500 |  |
+| `dashed`{.primary .text-primary} | `number[]` | - |  |
+
+  ### Inject
+| Key | Default | Type | Description |
+|-----|--------|------|-------------|
+| `LeafletStylesKey`{.primary .text-primary} | `ref()` | `any` | — |
 
 ---
 
@@ -6958,6 +6978,11 @@ export type UseQuadtreeReturn<T extends Rect = Rect> = ReturnType<
 | Name | Description |
 |------|-------------|
 | `default`{.primary .text-primary} | — |
+
+  ### Provide
+| Key | Value | Type | Description |
+|-----|-------|------|-------------|
+| `LeafletStylesKey`{.primary .text-primary} | `stylesOptions` | `any` | — |
 
   ### Inject
 | Key | Default | Type | Description |
@@ -7185,13 +7210,12 @@ import {
   LeafletMap,
   LeafletTileLayer,
   LeafletZoomControl,
-  LeafletDrawControl,
   LeafletControls,
   LeafletControlItem,
   LeafletFeaturesEditor,
   LeafletFeaturesSelector,
   LeafletFeatureHandle,
-  LeafletBoundingBoxRectangle,
+  LeafletFeatureRectangle,
   LeafletMarker,
   LeafletCircle,
   LeafletPolyline,
@@ -7508,7 +7532,7 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
         </LeafletControls>
 
         <LeafletControls
-          position="bottomright"
+          position="topright"
           :enabled="editMode"
           :active-item="
             measureMode === 'line'
@@ -7543,6 +7567,11 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
           class="border border-orange-500 bg-orange-500/20"
           @measurement-complete="handleMeasurementComplete"
           @measurement-update="(data) => (lastMeasurement = data)"
+        />
+        <LeafletFeatureHandle
+          role="edge"
+          class="bg-blue-500/20 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+          :size="8"
         />
 
         <LeafletFeaturesEditor
@@ -7615,7 +7644,7 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
             />
 
             <template #bounding-box-styles>
-              <LeafletBoundingBoxRectangle
+              <LeafletFeatureRectangle
                 class="border-2 border-orange-400"
                 :dashed="[5, 5]"
               />

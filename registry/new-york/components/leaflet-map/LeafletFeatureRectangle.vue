@@ -2,24 +2,33 @@
 import { watch, inject, type HTMLAttributes, ref } from 'vue';
 import { cn } from '@/lib/utils';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
-import { LeafletBoundingBoxStylesKey, type LeafletBoxStyle } from '.';
+import { LeafletStylesKey } from '.';
 import { removeWhitespaces } from '@assemblerjs/core';
 
-export interface LeafletBoundingBoxRectangleProps {
+export interface LeafletFeatureRectangleStyle {
+  color: string;
+  weight: number;
+  fill: boolean;
+  fillColor?: string;
+  dashArray?: string;
+  interactive: boolean;
+}
+
+export interface LeafletFeatureRectangleProps {
   class?: HTMLAttributes['class'];
   dashed?: number[];
 }
 
-const props = withDefaults(defineProps<LeafletBoundingBoxRectangleProps>(), {
+const props = withDefaults(defineProps<LeafletFeatureRectangleProps>(), {
   class: 'border-2 border-blue-500',
 });
 
-const stylesOptions = inject(LeafletBoundingBoxStylesKey, ref());
+const stylesOptions = inject(LeafletStylesKey, ref());
 
 const { fetchStylesFromElementClass, getTailwindBaseCssValues } = useCssParser();
 
 const tailwindToBoxOptions = (className: string, dashed?: number[]) => {
-  const style = fetchStylesFromElementClass((el: HTMLElement): LeafletBoxStyle => {
+  const style = fetchStylesFromElementClass((el: HTMLElement): LeafletFeatureRectangleStyle => {
     const config = getTailwindBaseCssValues(el, [
       'background-color',
       'border-color',
@@ -53,7 +62,7 @@ watch(
   () => {
     const options = tailwindToBoxOptions(props.class || '', props.dashed);
     if (stylesOptions.value) {
-      stylesOptions.value.box = options;
+      stylesOptions.value.rectangle = options;
     }
   },
   { immediate: true }
@@ -62,5 +71,5 @@ watch(
 
 <template>
   <!-- To enable Tailwind classes computing -->
-  <div data-slot="leaflet-bounding-box-rectangle" :class="cn('hidden -z-50', props.class)"></div>
+  <div data-slot="leaflet-handle-rectangle" :class="cn('hidden -z-50', props.class)"></div>
 </template>

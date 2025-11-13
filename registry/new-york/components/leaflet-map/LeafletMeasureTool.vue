@@ -4,27 +4,25 @@ import {
   inject,
   watch,
   onBeforeUnmount,
-  nextTick,
   type Ref,
   type HTMLAttributes,
   computed,
+  provide,
 } from 'vue';
 import { cn } from '@/lib/utils';
-import { LeafletMapKey, LeafletModuleKey } from '.';
+import {
+  LeafletMapKey,
+  LeafletModuleKey,
+  LeafletStylesKey,
+  type LeafletFeatureHandleStyle,
+} from '.';
 import type { LatLng, Marker, Circle, DivIcon } from 'leaflet';
 import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
 
-const {
-  calculateLineDistance,
-  calculatePolygonArea,
-  calculateCentroid,
-  formatDistance: formatDistanceUtil,
-  formatArea: formatAreaUtil,
-  pixelsToMeters,
-} = await useLeaflet();
-
-const { getLeafletShapeColors, parseHTMLToElement } = useCssParser();
+export interface LeafletMeasureToolStyles {
+  corner: LeafletFeatureHandleStyle;
+}
 
 export interface LeafletMeasureToolProps {
   enabled?: boolean;
@@ -54,6 +52,40 @@ const emit = defineEmits<{
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
+
+const {
+  calculateLineDistance,
+  calculatePolygonArea,
+  formatDistance: formatDistanceUtil,
+  pixelsToMeters,
+} = await useLeaflet();
+
+const { getLeafletShapeColors, parseHTMLToElement, fetchStylesFromElementClass } = useCssParser();
+
+const stylesOptions = ref<LeafletMeasureToolStyles>({
+  corner: {
+    className: 'leaflet-feature-handle leaflet-measure-marker',
+    html: `<div style="
+        width: 10px;
+        height: 10px;
+        background: orange;
+        border: 2px solid white;
+        border-radius: 50%;
+        box-shadow: 0 0 4px rgba(0,0,0,0.3);
+      "></div>`,
+    iconSize: [12, 12],
+  },
+});
+
+provide(LeafletStylesKey, stylesOptions);
+
+watch(
+  () => stylesOptions.value,
+  (newStyles) => {
+    console.log(stylesOptions.value);
+  },
+  { deep: true }
+);
 
 // État
 const measurementPoints = ref<Array<[number, number]>>([]);
@@ -88,11 +120,6 @@ const formatDistance = (distanceInMeters: number): string => {
   return formatDistanceUtil(distanceInMeters, props.unit);
 };
 
-// Formatage des aires (utilise le composable)
-const formatArea = (areaInM2: number): string => {
-  return formatAreaUtil(areaInM2, props.unit);
-};
-
 const colors = computed(() => getLeafletShapeColors(props.class));
 
 const createMeasureMarker = (latlng: [number, number], index: number): Marker | null => {
@@ -100,18 +127,7 @@ const createMeasureMarker = (latlng: [number, number], index: number): Marker | 
 
   return L.value
     .marker([latlng[0], latlng[1]], {
-      icon: L.value.divIcon({
-        className: 'leaflet-measure-marker',
-        html: `<div style="
-        width: 10px;
-        height: 10px;
-        background: ${colors.value.color};
-        border: 2px solid white;
-        border-radius: 50%;
-        box-shadow: 0 0 4px rgba(0,0,0,0.3);
-      "></div>`,
-        iconSize: [10, 10],
-      }),
+      icon: L.value.divIcon(stylesOptions.value.corner) as DivIcon,
     })
     .addTo(map.value);
 };
@@ -351,15 +367,20 @@ const handleMouseMove = (e: L.LeafletMouseEvent) => {
   const snapThreshold = 20 * metersPerPixel;
 
   if (distance < snapThreshold) {
-    // Afficher cercle de snap pour fermer le polygone
     if (!snapCircle.value) {
-      const colors = getLeafletShapeColors(props.class);
+      const colors = fetchStylesFromElementClass((el: HTMLElement) => {
+        return {
+          color: getComputedStyle(el).borderColor || 'orange',
+          fillColor: getComputedStyle(el).backgroundColor || 'orange',
+        };
+      }, props.class);
+
       snapCircle.value = L.value
         .circle(firstLatLng, {
           radius: snapThreshold,
           color: colors.color,
           fillColor: colors.fillColor,
-          fillOpacity: 0.3,
+          fillOpacity: 1,
           weight: 2,
         })
         .addTo(map.value);
@@ -529,5 +550,5 @@ defineExpose({
 </script>
 
 <template>
-  <slot />
+  <div data-slot="leaflet-measure-tool"><slot /></div>
 </template>
