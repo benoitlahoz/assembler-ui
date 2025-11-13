@@ -312,7 +312,7 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
           :enabled="measureMode"
           unit="metric"
           :show-area="true"
-          color="#ff6600"
+          class="border border-orange-500 bg-orange-500/20"
           @measurement-complete="handleMeasurementComplete"
           @measurement-update="(data) => (lastMeasurement = data)"
         />

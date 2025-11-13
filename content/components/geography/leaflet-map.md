@@ -3445,10 +3445,20 @@ onBeforeUnmount(() => {
 
 ```vue [src/components/ui/leaflet-map/LeafletMeasureTool.vue]
 <script setup lang="ts">
-import { ref, inject, watch, onBeforeUnmount, nextTick, type Ref } from "vue";
+import {
+  ref,
+  inject,
+  watch,
+  onBeforeUnmount,
+  nextTick,
+  type Ref,
+  type HTMLAttributes,
+} from "vue";
+import { cn } from "@/lib/utils";
 import { LeafletMapKey, LeafletModuleKey } from ".";
-import type { LatLng, Polyline, Marker, Circle, DivIcon } from "leaflet";
+import type { LatLng, Marker, Circle, DivIcon } from "leaflet";
 import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 
 const {
   calculateLineDistance,
@@ -3458,14 +3468,14 @@ const {
   formatArea: formatAreaUtil,
 } = await useLeaflet();
 
+const { getLeafletShapeColors } = useCssParser();
+
 export interface LeafletMeasureToolProps {
   enabled?: boolean;
   unit?: "metric" | "imperial";
   showArea?: boolean;
   showPerimeter?: boolean;
-  color?: string;
-  fillColor?: string;
-  fillOpacity?: number;
+  class?: HTMLAttributes["class"];
 }
 
 const props = withDefaults(defineProps<LeafletMeasureToolProps>(), {
@@ -3473,9 +3483,6 @@ const props = withDefaults(defineProps<LeafletMeasureToolProps>(), {
   unit: "metric",
   showArea: true,
   showPerimeter: true,
-  color: "#ff6600",
-  fillColor: "#ff6600",
-  fillOpacity: 0.2,
 });
 
 const emit = defineEmits<{
@@ -3490,21 +3497,28 @@ const emit = defineEmits<{
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 
-const measurementPoints = ref<LatLng[]>([]);
-const polyline = ref<Polyline | null>(null);
+const measurementPoints = ref<Array<[number, number]>>([]);
 const markers = ref<Marker[]>([]);
 const measurementLabels = ref<Marker[]>([]);
-const tempLine = ref<Polyline | null>(null);
 const snapCircle = ref<Circle | null>(null);
+const tempPolygon = ref<L.Polygon | null>(null);
+const isClosed = ref(false);
 
 let isActive = false;
 
-const calculateDistance = (latlngs: LatLng[]): number => {
+const calculateDistance = (): number => {
+  if (measurementPoints.value.length < 2) return 0;
+  const latlngs = measurementPoints.value.map(([lat, lng]) =>
+    L.value!.latLng(lat, lng),
+  );
   return calculateLineDistance(latlngs, props.unit);
 };
 
-const calculateArea = (latlngs: LatLng[]): number | undefined => {
-  if (!props.showArea) return undefined;
+const calculateArea = (): number | undefined => {
+  if (!props.showArea || measurementPoints.value.length < 3) return undefined;
+  const latlngs = measurementPoints.value.map(([lat, lng]) =>
+    L.value!.latLng(lat, lng),
+  );
   return calculatePolygonArea(latlngs, props.unit);
 };
 
@@ -3516,17 +3530,22 @@ const formatArea = (areaInM2: number): string => {
   return formatAreaUtil(areaInM2, props.unit);
 };
 
-const createMeasureMarker = (latlng: LatLng, index: number): Marker | null => {
+const createMeasureMarker = (
+  latlng: [number, number],
+  index: number,
+): Marker | null => {
   if (!L.value || !map.value) return null;
 
+  const colors = getLeafletShapeColors(props.class);
+
   return L.value
-    .marker(latlng, {
+    .marker([latlng[0], latlng[1]], {
       icon: L.value.divIcon({
         className: "leaflet-measure-marker",
         html: `<div style="
         width: 10px;
         height: 10px;
-        background: ${props.color};
+        background: ${colors.color};
         border: 2px solid white;
         border-radius: 50%;
         box-shadow: 0 0 4px rgba(0,0,0,0.3);
@@ -3537,18 +3556,24 @@ const createMeasureMarker = (latlng: LatLng, index: number): Marker | null => {
     .addTo(map.value);
 };
 
-const createDistanceLabel = (latlng: LatLng, text: string): Marker | null => {
+const createDistanceLabel = (
+  latlng: [number, number],
+  text: string,
+): Marker | null => {
   if (!L.value || !map.value) return null;
 
+  const colors = getLeafletShapeColors(props.class);
+
   return L.value
-    .marker(latlng, {
+    .marker([latlng[0], latlng[1]], {
       icon: L.value.divIcon({
         className: "leaflet-measure-label",
         html: `<div style="
+        color: black;
         background: white;
         padding: 4px 8px;
         border-radius: 4px;
-        border: 2px solid ${props.color};
+        border: 2px solid ${colors.color};
         font-size: 12px;
         font-weight: bold;
         white-space: nowrap;
@@ -3565,40 +3590,68 @@ const handleMapClick = (e: L.LeafletMouseEvent) => {
   if (!isActive || !L.value || !map.value) return;
 
   const latlng = e.latlng;
-  measurementPoints.value.push(latlng);
+
+  if (measurementPoints.value.length >= 3) {
+    const firstPoint = measurementPoints.value[0];
+    if (!firstPoint) return;
+    const firstLatLng = L.value.latLng(firstPoint[0], firstPoint[1]);
+    const distance = firstLatLng.distanceTo(latlng);
+
+    const zoom = map.value.getZoom();
+    const metersPerPixel =
+      (40075016.686 * Math.abs(Math.cos((latlng.lat * Math.PI) / 180))) /
+      Math.pow(2, zoom + 8);
+    const snapThreshold = 20 * metersPerPixel;
+
+    if (distance < snapThreshold) {
+      isClosed.value = true;
+      finishMeasurement();
+      return;
+    }
+  }
+
+  measurementPoints.value.push([latlng.lat, latlng.lng]);
 
   const marker = createMeasureMarker(
-    latlng,
+    [latlng.lat, latlng.lng],
     measurementPoints.value.length - 1,
   );
   if (marker) markers.value.push(marker);
 
-  if (!polyline.value) {
-    polyline.value = L.value
-      .polyline([latlng], {
-        color: props.color,
+  if (!tempPolygon.value && L.value && map.value) {
+    const colors = getLeafletShapeColors(props.class);
+    tempPolygon.value = L.value.polygon(
+      measurementPoints.value as L.LatLngExpression[],
+      {
+        color: colors.color,
+        fillColor: colors.fillColor,
+        fillOpacity: colors.fillOpacity,
         weight: 3,
         dashArray: "10, 5",
-      })
-      .addTo(map.value);
-  } else {
-    polyline.value.addLatLng(latlng);
+        interactive: false,
+      },
+    );
+    tempPolygon.value.addTo(map.value);
+  } else if (tempPolygon.value) {
+    tempPolygon.value.setLatLngs(
+      measurementPoints.value as L.LatLngExpression[],
+    );
   }
 
   if (measurementPoints.value.length >= 2) {
-    const distance = calculateDistance(measurementPoints.value);
+    const distance = calculateDistance();
     const prevPoint =
       measurementPoints.value[measurementPoints.value.length - 2];
     if (!prevPoint) return;
-    const midpoint = L.value.latLng(
-      (latlng.lat + prevPoint.lat) / 2,
-      (latlng.lng + prevPoint.lng) / 2,
-    );
+    const midpoint: [number, number] = [
+      (latlng.lat + prevPoint[0]) / 2,
+      (latlng.lng + prevPoint[1]) / 2,
+    ];
 
     const label = createDistanceLabel(midpoint, formatDistance(distance));
     if (label) measurementLabels.value.push(label);
 
-    const area = calculateArea(measurementPoints.value);
+    const area = calculateArea();
     emit("measurement-update", { distance, area });
   }
 
@@ -3613,46 +3666,60 @@ const handleMouseMove = (e: L.LeafletMouseEvent) => {
     measurementPoints.value.length === 0 ||
     !L.value ||
     !map.value
-  )
-    return;
-
-  const latlng = e.latlng;
-  const points = [...measurementPoints.value, latlng];
-
-  if (!tempLine.value) {
-    tempLine.value = L.value
-      .polyline(points, {
-        color: props.color,
-        weight: 2,
-        dashArray: "5, 5",
-        opacity: 0.5,
-      })
-      .addTo(map.value);
-  } else {
-    tempLine.value.setLatLngs(points);
-  }
-
-  if (measurementPoints.value.length >= 3) {
-    const firstPoint = measurementPoints.value[0];
-    if (!firstPoint) return;
-    const distance = firstPoint.distanceTo(latlng);
-
-    if (distance < 50000) {
-      if (!snapCircle.value) {
-        snapCircle.value = L.value
-          .circle(firstPoint, {
-            radius: 50,
-            color: props.color,
-            fillColor: props.fillColor,
-            fillOpacity: 0.3,
-            weight: 2,
-          })
-          .addTo(map.value);
-      }
-    } else if (snapCircle.value) {
+  ) {
+    if (snapCircle.value) {
       snapCircle.value.remove();
       snapCircle.value = null;
     }
+    return;
+  }
+
+  const latlng = e.latlng;
+
+  if (tempPolygon.value) {
+    const previewPoints: Array<[number, number]> = [
+      ...measurementPoints.value,
+      [latlng.lat, latlng.lng],
+    ];
+    tempPolygon.value.setLatLngs(previewPoints as L.LatLngExpression[]);
+  }
+
+  if (measurementPoints.value.length < 3) {
+    if (snapCircle.value) {
+      snapCircle.value.remove();
+      snapCircle.value = null;
+    }
+    return;
+  }
+
+  const firstPoint = measurementPoints.value[0];
+  if (!firstPoint) return;
+
+  const firstLatLng = L.value.latLng(firstPoint[0], firstPoint[1]);
+  const distance = firstLatLng.distanceTo(latlng);
+
+  const zoom = map.value.getZoom();
+  const metersPerPixel =
+    (40075016.686 * Math.abs(Math.cos((latlng.lat * Math.PI) / 180))) /
+    Math.pow(2, zoom + 8);
+  const snapThreshold = 20 * metersPerPixel;
+
+  if (distance < snapThreshold) {
+    if (!snapCircle.value) {
+      const colors = getLeafletShapeColors(props.class);
+      snapCircle.value = L.value
+        .circle(firstLatLng, {
+          radius: snapThreshold,
+          color: colors.color,
+          fillColor: colors.fillColor,
+          fillOpacity: 0.3,
+          weight: 2,
+        })
+        .addTo(map.value);
+    }
+  } else if (snapCircle.value) {
+    snapCircle.value.remove();
+    snapCircle.value = null;
   }
 };
 
@@ -3682,25 +3749,31 @@ const handleKeyDown = (e: KeyboardEvent) => {
 };
 
 const finishMeasurement = () => {
-  const distance = calculateDistance(measurementPoints.value);
-  const area = calculateArea(measurementPoints.value);
+  const distance = calculateDistance();
+  const area = calculateArea();
 
   if (area !== undefined && measurementPoints.value.length >= 3) {
-    const center = calculateCentroid(measurementPoints.value);
+    const latlngs = measurementPoints.value.map(([lat, lng]) =>
+      L.value!.latLng(lat, lng),
+    );
+    const center = calculateCentroid(latlngs);
     if (center) {
       const [lng, lat] = center;
       const totalLabel = createDistanceLabel(
-        L.value!.latLng(lat, lng),
+        [lat, lng],
         `${formatDistance(distance)} | ${formatArea(area)}`,
       );
       if (totalLabel) measurementLabels.value.push(totalLabel);
     }
   }
 
+  const latlngs = measurementPoints.value.map(([lat, lng]) =>
+    L.value!.latLng(lat, lng),
+  );
   emit("measurement-complete", {
     distance,
     area,
-    points: [...measurementPoints.value],
+    points: latlngs,
   });
 
   cleanup();
@@ -3713,11 +3786,8 @@ const finishMeasurement = () => {
 };
 
 const cleanup = () => {
-  polyline.value?.remove();
-  polyline.value = null;
-
-  tempLine.value?.remove();
-  tempLine.value = null;
+  tempPolygon.value?.remove();
+  tempPolygon.value = null;
 
   snapCircle.value?.remove();
   snapCircle.value = null;
@@ -3729,6 +3799,7 @@ const cleanup = () => {
   measurementLabels.value = [];
 
   measurementPoints.value = [];
+  isClosed.value = false;
 };
 
 const enable = () => {
@@ -6731,9 +6802,7 @@ export type UseQuadtreeReturn<T extends Rect = Rect> = ReturnType<
 | `unit`{.primary .text-primary} | `'metric' \| 'imperial'` | metric |  |
 | `showArea`{.primary .text-primary} | `boolean` | true |  |
 | `showPerimeter`{.primary .text-primary} | `boolean` | true |  |
-| `color`{.primary .text-primary} | `string` | #ff6600 |  |
-| `fillColor`{.primary .text-primary} | `string` | #ff6600 |  |
-| `fillOpacity`{.primary .text-primary} | `number` | 0.2 |  |
+| `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
   ### Slots
 | Name | Description |
@@ -7301,7 +7370,7 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
           :enabled="measureMode"
           unit="metric"
           :show-area="true"
-          color="#ff6600"
+          class="border border-orange-500 bg-orange-500/20"
           @measurement-complete="handleMeasurementComplete"
           @measurement-update="(data) => (lastMeasurement = data)"
         />
