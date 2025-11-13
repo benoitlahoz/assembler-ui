@@ -123,6 +123,8 @@ const updateActiveButton = () => {
 const createControl = () => {
   if (!L.value || !map.value) return;
 
+  const items = Array.from(controlsRegistry.value.values());
+
   const Controls = L.value.Control.extend({
     options: {
       position: props.position,
@@ -153,17 +155,24 @@ const createControl = () => {
   control.value.addTo(map.value);
 };
 
+// Fonction pour créer le contrôle si toutes les conditions sont remplies
+const tryCreateControl = () => {
+  const itemsCount = controlsRegistry.value.size;
+
+  if (map.value && props.enabled && itemsCount > 0 && !control.value) {
+    nextTick(() => {
+      createControl();
+    });
+  }
+};
+
 watch(
   [() => map.value, () => props.enabled],
   ([newMap, newEnabled]) => {
     if (newMap && newEnabled) {
       if (!control.value) {
-        // Wait a bit for initial items to register
-        nextTick(() => {
-          setTimeout(() => {
-            createControl();
-          }, 150);
-        });
+        // Try to create if we have items
+        tryCreateControl();
       } else if (!control.value._map) {
         control.value.addTo(newMap);
       }
@@ -184,17 +193,13 @@ watch(
   }
 );
 
-// Watch the registry to recreate control when items change
+// Watch the registry to create control when items arrive
 watch(
   controlsRegistry,
-  (newRegistry) => {
-    if (newRegistry.size > 0 && map.value && control.value?._map) {
-      // Remove old control and recreate with updated items
-      control.value.remove();
-      control.value = null;
-      nextTick(() => {
-        createControl();
-      });
+  () => {
+    // Try to create if we have the map
+    if (!control.value) {
+      tryCreateControl();
     }
   },
   { deep: true }

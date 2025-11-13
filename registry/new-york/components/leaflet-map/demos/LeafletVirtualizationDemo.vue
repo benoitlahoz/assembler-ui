@@ -13,14 +13,14 @@ import {
   LeafletRectangle,
   type LeafletMapExposed,
 } from '~~/registry/new-york/components/leaflet-map';
-import { loadVirtualizationDemoData } from './virtualization-demo-loader';
+import { loadVirtualizationDemoData } from './fixtures/fixtures.loader';
 import type {
   DemoMarker,
   DemoCircle,
   DemoPolygon,
   DemoPolyline,
   DemoRectangle,
-} from './virtualization-demo-loader';
+} from './fixtures/fixtures.loader';
 import type { UseQuadtreeReturn } from '~~/registry/new-york/composables/use-quadtree/useQuadtree';
 
 const mapRef = ref<LeafletMapExposed | null>(null);
@@ -34,14 +34,60 @@ const virtualizationConfig = ref({
   marginZoomRatio: 1.0,
 });
 
-// Zoom level controls for each feature type
-const zoomLevels = ref({
-  markers: { min: 12, max: undefined as number | undefined },
-  circles: { min: undefined as number | undefined, max: undefined as number | undefined },
-  polygons: { min: undefined as number | undefined, max: 14 },
-  polylines: { min: undefined as number | undefined, max: undefined as number | undefined },
-  rectangles: { min: undefined as number | undefined, max: undefined as number | undefined },
+// Zoom level controls for each feature type (raw values from inputs)
+const zoomLevelsRaw = ref({
+  markers: { min: '12' as string | number, max: '' as string | number },
+  circles: { min: '' as string | number, max: '' as string | number },
+  polygons: { min: '' as string | number, max: '14' as string | number },
+  polylines: { min: '' as string | number, max: '' as string | number },
+  rectangles: { min: '' as string | number, max: '' as string | number },
 });
+
+// Convert empty strings to undefined for proper prop types
+const zoomLevels = computed(() => ({
+  markers: {
+    min:
+      zoomLevelsRaw.value.markers.min === '' ? undefined : Number(zoomLevelsRaw.value.markers.min),
+    max:
+      zoomLevelsRaw.value.markers.max === '' ? undefined : Number(zoomLevelsRaw.value.markers.max),
+  },
+  circles: {
+    min:
+      zoomLevelsRaw.value.circles.min === '' ? undefined : Number(zoomLevelsRaw.value.circles.min),
+    max:
+      zoomLevelsRaw.value.circles.max === '' ? undefined : Number(zoomLevelsRaw.value.circles.max),
+  },
+  polygons: {
+    min:
+      zoomLevelsRaw.value.polygons.min === ''
+        ? undefined
+        : Number(zoomLevelsRaw.value.polygons.min),
+    max:
+      zoomLevelsRaw.value.polygons.max === ''
+        ? undefined
+        : Number(zoomLevelsRaw.value.polygons.max),
+  },
+  polylines: {
+    min:
+      zoomLevelsRaw.value.polylines.min === ''
+        ? undefined
+        : Number(zoomLevelsRaw.value.polylines.min),
+    max:
+      zoomLevelsRaw.value.polylines.max === ''
+        ? undefined
+        : Number(zoomLevelsRaw.value.polylines.max),
+  },
+  rectangles: {
+    min:
+      zoomLevelsRaw.value.rectangles.min === ''
+        ? undefined
+        : Number(zoomLevelsRaw.value.rectangles.min),
+    max:
+      zoomLevelsRaw.value.rectangles.max === ''
+        ? undefined
+        : Number(zoomLevelsRaw.value.rectangles.max),
+  },
+}));
 
 // Visible counts for each feature type
 const visibleCounts = ref({
@@ -278,7 +324,7 @@ updateFPS();
               <div class="flex items-center gap-3 text-xs">
                 <span class="w-20 font-medium">Markers:</span>
                 <input
-                  v-model.number="zoomLevels.markers.min"
+                  v-model="zoomLevelsRaw.markers.min"
                   type="number"
                   min="0"
                   max="20"
@@ -287,7 +333,7 @@ updateFPS();
                 />
                 <span class="text-gray-400">→</span>
                 <input
-                  v-model.number="zoomLevels.markers.max"
+                  v-model="zoomLevelsRaw.markers.max"
                   type="number"
                   min="0"
                   max="20"
@@ -300,7 +346,7 @@ updateFPS();
               <div class="flex items-center gap-3 text-xs">
                 <span class="w-20 font-medium">Circles:</span>
                 <input
-                  v-model.number="zoomLevels.circles.min"
+                  v-model="zoomLevelsRaw.circles.min"
                   type="number"
                   min="0"
                   max="20"
@@ -309,7 +355,7 @@ updateFPS();
                 />
                 <span class="text-gray-400">→</span>
                 <input
-                  v-model.number="zoomLevels.circles.max"
+                  v-model="zoomLevelsRaw.circles.max"
                   type="number"
                   min="0"
                   max="20"
@@ -322,7 +368,7 @@ updateFPS();
               <div class="flex items-center gap-3 text-xs">
                 <span class="w-20 font-medium">Polygons:</span>
                 <input
-                  v-model.number="zoomLevels.polygons.min"
+                  v-model="zoomLevelsRaw.polygons.min"
                   type="number"
                   min="0"
                   max="20"
@@ -331,7 +377,7 @@ updateFPS();
                 />
                 <span class="text-gray-400">→</span>
                 <input
-                  v-model.number="zoomLevels.polygons.max"
+                  v-model="zoomLevelsRaw.polygons.max"
                   type="number"
                   min="0"
                   max="20"
@@ -344,7 +390,7 @@ updateFPS();
               <div class="flex items-center gap-3 text-xs">
                 <span class="w-20 font-medium">Polylines:</span>
                 <input
-                  v-model.number="zoomLevels.polylines.min"
+                  v-model="zoomLevelsRaw.polylines.min"
                   type="number"
                   min="0"
                   max="20"
@@ -353,7 +399,7 @@ updateFPS();
                 />
                 <span class="text-gray-400">→</span>
                 <input
-                  v-model.number="zoomLevels.polylines.max"
+                  v-model="zoomLevelsRaw.polylines.max"
                   type="number"
                   min="0"
                   max="20"
@@ -366,7 +412,7 @@ updateFPS();
               <div class="flex items-center gap-3 text-xs">
                 <span class="w-20 font-medium">Rectangles:</span>
                 <input
-                  v-model.number="zoomLevels.rectangles.min"
+                  v-model="zoomLevelsRaw.rectangles.min"
                   type="number"
                   min="0"
                   max="20"
@@ -375,7 +421,7 @@ updateFPS();
                 />
                 <span class="text-gray-400">→</span>
                 <input
-                  v-model.number="zoomLevels.rectangles.max"
+                  v-model="zoomLevelsRaw.rectangles.max"
                   type="number"
                   min="0"
                   max="20"

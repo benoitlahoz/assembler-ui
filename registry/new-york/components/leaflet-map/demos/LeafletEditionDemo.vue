@@ -17,6 +17,7 @@ import {
   LeafletPolyline,
   LeafletPolygon,
   LeafletRectangle,
+  LeafletMeasureTool,
   type LeafletMapExposed,
   type FeatureDrawEvent,
   type FeatureShapeType,
@@ -31,6 +32,10 @@ const editMode = ref(true); // Start with edit mode enabled
 
 // Current mode from DrawControl (can be drawing mode or selection mode)
 const currentMode = ref<FeatureShapeType | FeatureSelectMode | null>('select'); // Start in select mode
+
+// Mode mesure
+const measureMode = ref(false);
+const lastMeasurement = ref<{ distance: number; area?: number } | null>(null);
 
 // Computed selection mode for LeafletFeaturesSelector (only 'select' or 'direct-select')
 const selectionMode = computed<FeatureSelectMode | null>(() => {
@@ -99,12 +104,29 @@ const rectangles = ref([
 
 // Handle mode selection from DrawControl and LeafletControls
 const handleModeSelected = (mode: string | null) => {
+  // Si on active le mode measure, désactiver les autres modes
+  if (mode === 'measure') {
+    measureMode.value = !measureMode.value;
+    if (measureMode.value) {
+      currentMode.value = null;
+    }
+    return;
+  }
+
+  // Si on sélectionne un autre mode, désactiver measure
+  measureMode.value = false;
+
   // Toggle behavior: if clicking the same mode, deactivate it
   if (currentMode.value === mode) {
     currentMode.value = null;
   } else {
     currentMode.value = mode as FeatureShapeType | FeatureSelectMode | null;
   }
+};
+
+// Gestion des mesures
+const handleMeasurementComplete = (data: { distance: number; area?: number }) => {
+  lastMeasurement.value = data;
 };
 
 // Gestion de la création de nouvelles formes
@@ -187,7 +209,7 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
 
 <template>
   <div class="w-full h-full flex flex-col gap-4">
-    <div class="rounded flex items-center justify-between">
+    <div class="rounded flex items-center justify-between gap-4">
       <Button
         @click="editMode = !editMode"
         class="px-4 py-2 rounded transition-colors"
@@ -199,6 +221,30 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
       >
         {{ editMode ? 'Disable edition' : 'Enable edition' }}
       </Button>
+
+      <!-- Affichage des mesures -->
+      <div
+        v-if="measureMode && lastMeasurement"
+        class="px-4 py-2 bg-orange-50 border border-orange-200 rounded-lg shadow-sm"
+      >
+        <div class="text-sm font-medium text-orange-900">Measurement Result:</div>
+        <div class="text-xs text-orange-700 mt-1">
+          <span class="font-semibold">Distance:</span>
+          {{
+            lastMeasurement.distance > 1000
+              ? `${(lastMeasurement.distance / 1000).toFixed(2)} km`
+              : `${lastMeasurement.distance.toFixed(2)} m`
+          }}
+        </div>
+        <div v-if="lastMeasurement.area !== undefined" class="text-xs text-orange-700">
+          <span class="font-semibold">Area:</span>
+          {{
+            lastMeasurement.area > 10000
+              ? `${(lastMeasurement.area / 1000000).toFixed(2)} km²`
+              : `${lastMeasurement.area.toFixed(2)} m²`
+          }}
+        </div>
+      </div>
     </div>
 
     <div class="flex-1 relative">
@@ -219,23 +265,7 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
 
         <LeafletZoomControl position="topleft" />
 
-        <!-- Draw Control - UI for selecting modes -->
-        <LeafletDrawControl
-          position="topright"
-          :edit-mode="editMode"
-          :active-mode="currentMode"
-          :modes="{
-            select: true,
-            directSelect: true,
-            marker: true,
-            circle: true,
-            polyline: true,
-            polygon: true,
-            rectangle: true,
-          }"
-          @mode-selected="handleModeSelected"
-        />
-
+        <!-- Barre d'outils pour les formes -->
         <LeafletControls
           position="topleft"
           :enabled="editMode"
@@ -264,6 +294,28 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
             <Icon icon="gis:polygon" class="w-4 h-4 text-black" />
           </LeafletControlItem>
         </LeafletControls>
+
+        <!-- Barre d'outils spécifique pour les outils (mesure, etc.) -->
+        <LeafletControls
+          position="topright"
+          :enabled="editMode"
+          :active-item="measureMode ? 'measure' : null"
+          @item-clicked="handleModeSelected"
+        >
+          <LeafletControlItem name="measure" type="toggle" title="Measure Distance & Area">
+            <Icon icon="raphael:ruler" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+        </LeafletControls>
+
+        <!-- Outil de mesure -->
+        <LeafletMeasureTool
+          :enabled="measureMode"
+          unit="metric"
+          :show-area="true"
+          color="#ff6600"
+          @measurement-complete="handleMeasurementComplete"
+          @measurement-update="(data) => (lastMeasurement = data)"
+        />
 
         <!-- Features Editor - Drawing logic -->
         <LeafletFeaturesEditor
