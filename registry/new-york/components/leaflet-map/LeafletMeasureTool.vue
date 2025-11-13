@@ -191,7 +191,8 @@ const handleMapClick = (e: L.LeafletMouseEvent) => {
       // Marquer comme fermé AVANT d'ajouter le label
       isClosed.value = true;
 
-      // Ajouter le dernier segment (retour au premier point) avant de fermer
+      // NE PAS ajouter de point supplémentaire, juste calculer le segment de fermeture
+      // du dernier point existant au premier point
       const firstPt = measurementPoints.value[0];
       const lastPt = measurementPoints.value[measurementPoints.value.length - 1];
 
@@ -296,11 +297,29 @@ const handleMouseMove = (e: L.LeafletMouseEvent) => {
 
   const latlng = e.latlng;
 
+  // Vérifier si on est en zone de snap (en mode polygon avec au moins 3 points)
+  let isInSnapZone = false;
+  if (props.mode === 'polygon' && measurementPoints.value.length >= 3) {
+    const firstPoint = measurementPoints.value[0];
+    if (firstPoint && map.value) {
+      const firstLatLng = L.value.latLng(firstPoint[0], firstPoint[1]);
+      const distance = firstLatLng.distanceTo(latlng);
+      const zoom = map.value.getZoom();
+      const metersPerPixel = pixelsToMeters(zoom, latlng.lat);
+      const snapThreshold = 20 * metersPerPixel;
+      isInSnapZone = distance < snapThreshold;
+    }
+  }
+
   // Mettre à jour le polygone/polyligne temporaire avec la position de la souris
   if (props.mode === 'polygon' && tempPolygon.value) {
+    const previewPoint = isInSnapZone
+      ? measurementPoints.value[0] // Si snap, utiliser le premier point
+      : [latlng.lat, latlng.lng]; // Sinon, utiliser la position de la souris
+
     const previewPoints: Array<[number, number]> = [
       ...measurementPoints.value,
-      [latlng.lat, latlng.lng],
+      previewPoint as [number, number],
     ];
     tempPolygon.value.setLatLngs(previewPoints as L.LatLngExpression[]);
   } else if (props.mode === 'line' && tempPolyline.value) {

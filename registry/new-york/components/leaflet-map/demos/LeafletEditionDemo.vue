@@ -45,7 +45,7 @@ const selectionMode = computed<FeatureSelectMode | null>(() => {
 });
 
 // Check if we're in selection mode
-const isSelectMode = computed(() => selectionMode.value !== null);
+const isSelectMode = computed(() => selectionMode.value !== null); //
 
 // Données pour les différentes shapes
 const markers = ref([

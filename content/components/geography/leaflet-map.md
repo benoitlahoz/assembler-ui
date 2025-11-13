@@ -3518,6 +3518,8 @@ const isClosed = ref(false);
 
 let isActive = false;
 let isFinished = false;
+let lastClickTime = 0;
+const DOUBLE_CLICK_DELAY = 300;
 
 const calculateDistance = (): number => {
   if (measurementPoints.value.length < 2) return 0;
@@ -3619,6 +3621,12 @@ const handleMapClick = (e: L.LeafletMouseEvent) => {
   }
 
   if (!isActive) return;
+
+  const now = Date.now();
+  if (now - lastClickTime < DOUBLE_CLICK_DELAY) {
+    return;
+  }
+  lastClickTime = now;
 
   const latlng = e.latlng;
 
@@ -3755,10 +3763,27 @@ const handleMouseMove = (e: L.LeafletMouseEvent) => {
 
   const latlng = e.latlng;
 
+  let isInSnapZone = false;
+  if (props.mode === "polygon" && measurementPoints.value.length >= 3) {
+    const firstPoint = measurementPoints.value[0];
+    if (firstPoint && map.value) {
+      const firstLatLng = L.value.latLng(firstPoint[0], firstPoint[1]);
+      const distance = firstLatLng.distanceTo(latlng);
+      const zoom = map.value.getZoom();
+      const metersPerPixel = pixelsToMeters(zoom, latlng.lat);
+      const snapThreshold = 20 * metersPerPixel;
+      isInSnapZone = distance < snapThreshold;
+    }
+  }
+
   if (props.mode === "polygon" && tempPolygon.value) {
+    const previewPoint = isInSnapZone
+      ? measurementPoints.value[0]
+      : [latlng.lat, latlng.lng];
+
     const previewPoints: Array<[number, number]> = [
       ...measurementPoints.value,
-      [latlng.lat, latlng.lng],
+      previewPoint as [number, number],
     ];
     tempPolygon.value.setLatLngs(previewPoints as L.LatLngExpression[]);
   } else if (props.mode === "line" && tempPolyline.value) {
