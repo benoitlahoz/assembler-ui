@@ -21,6 +21,7 @@ const {
   calculateCentroid,
   formatDistance: formatDistanceUtil,
   formatArea: formatAreaUtil,
+  pixelsToMeters,
 } = await useLeaflet();
 
 const { getLeafletShapeColors, parseHTMLToElement } = useCssParser();
@@ -30,6 +31,7 @@ export interface LeafletMeasureToolProps {
   unit?: 'metric' | 'imperial';
   showArea?: boolean;
   showPerimeter?: boolean;
+  snap?: string | number;
   class?: HTMLAttributes['class'];
 }
 
@@ -38,6 +40,7 @@ const props = withDefaults(defineProps<LeafletMeasureToolProps>(), {
   unit: 'metric',
   showArea: true,
   showPerimeter: true,
+  snap: 20,
 });
 
 const emit = defineEmits<{
@@ -59,6 +62,7 @@ const tempPolygon = ref<L.Polygon | null>(null);
 const isClosed = ref(false);
 
 let isActive = false;
+let isFinished = false;
 
 // Calcul de distance (utilise le composable)
 const calculateDistance = (): number => {
@@ -86,7 +90,6 @@ const formatArea = (areaInM2: number): string => {
 
 const colors = computed(() => getLeafletShapeColors(props.class));
 
-// Créer un marqueur de mesure
 const createMeasureMarker = (latlng: [number, number], index: number): Marker | null => {
   if (!L.value || !map.value) return null;
 
@@ -108,16 +111,18 @@ const createMeasureMarker = (latlng: [number, number], index: number): Marker | 
     .addTo(map.value);
 };
 
-// Créer un label de distance
 const createDistanceLabel = (latlng: [number, number], text: string): Marker | null => {
   if (!L.value || !map.value) return null;
 
   const html = `<div style="
+        display: flex;
+        align-items-center;
+        justify-content-center;
         color: black;
         background: white;
         padding: 4px 8px;
         border-radius: 4px;
-        border: 2px solid ${colors.value.color};
+        border: 1px solid ${colors.value.color};
         font-size: 12px;
         font-weight: bold;
         white-space: nowrap;
@@ -131,8 +136,6 @@ const createDistanceLabel = (latlng: [number, number], text: string): Marker | n
     ];
   }, html);
 
-  console.log(width, height);
-
   return L.value
     .marker([latlng[0], latlng[1]], {
       icon: L.value.divIcon({
@@ -145,13 +148,20 @@ const createDistanceLabel = (latlng: [number, number], text: string): Marker | n
     .addTo(map.value);
 };
 
-// Gestionnaire de clic
 const handleMapClick = (e: L.LeafletMouseEvent) => {
-  if (!isActive || !L.value || !map.value) return;
+  if (!L.value || !map.value) return;
+
+  // Si une mesure est terminée, nettoyer et commencer une nouvelle
+  if (isFinished) {
+    cleanup();
+    isFinished = false;
+    isActive = true;
+  }
+
+  if (!isActive) return;
 
   const latlng = e.latlng;
 
-  // Vérifier si on clique près du premier point pour fermer le polygone
   if (measurementPoints.value.length >= 3) {
     const firstPoint = measurementPoints.value[0];
     if (!firstPoint) return;
@@ -161,11 +171,28 @@ const handleMapClick = (e: L.LeafletMouseEvent) => {
     // Seuil de snap : 20 pixels converti en mètres selon le zoom
     // À zoom 15, ~20px ≈ 30m; à zoom 10, ~20px ≈ 1000m
     const zoom = map.value.getZoom();
-    const metersPerPixel =
-      (40075016.686 * Math.abs(Math.cos((latlng.lat * Math.PI) / 180))) / Math.pow(2, zoom + 8);
-    const snapThreshold = 20 * metersPerPixel;
+    const metersPerPixel = pixelsToMeters(zoom, latlng.lat);
+    const snapThreshold = Number(props.snap) * metersPerPixel;
 
     if (distance < snapThreshold) {
+      // Ajouter le dernier segment (retour au premier point) avant de fermer
+      const firstPt = measurementPoints.value[0];
+      const lastPt = measurementPoints.value[measurementPoints.value.length - 1];
+
+      if (firstPt && lastPt) {
+        const lastLatLng = L.value.latLng(lastPt[0], lastPt[1]);
+        const firstLatLng = L.value.latLng(firstPt[0], firstPt[1]);
+        const closingDistance = lastLatLng.distanceTo(firstLatLng);
+
+        // Ajouter le label pour le segment de fermeture
+        const midpoint: [number, number] = [
+          (firstPt[0] + lastPt[0]) / 2,
+          (firstPt[1] + lastPt[1]) / 2,
+        ];
+        const label = createDistanceLabel(midpoint, formatDistance(closingDistance));
+        if (label) measurementLabels.value.push(label);
+      }
+
       // Fermer le polygone
       isClosed.value = true;
       finishMeasurement();
@@ -195,22 +222,27 @@ const handleMapClick = (e: L.LeafletMouseEvent) => {
     tempPolygon.value.setLatLngs(measurementPoints.value as L.LatLngExpression[]);
   }
 
-  // Calculer et afficher la distance
+  // Calculer et afficher la distance du segment
   if (measurementPoints.value.length >= 2) {
-    const distance = calculateDistance();
     const prevPoint = measurementPoints.value[measurementPoints.value.length - 2];
     if (!prevPoint) return;
+
+    // Distance du segment uniquement (entre les deux derniers points)
+    const prevLatLng = L.value.latLng(prevPoint[0], prevPoint[1]);
+    const segmentDistance = prevLatLng.distanceTo(latlng);
+
     const midpoint: [number, number] = [
       (latlng.lat + prevPoint[0]) / 2,
       (latlng.lng + prevPoint[1]) / 2,
     ];
 
-    const label = createDistanceLabel(midpoint, formatDistance(distance));
+    const label = createDistanceLabel(midpoint, formatDistance(segmentDistance));
     if (label) measurementLabels.value.push(label);
 
-    // Émettre mise à jour
+    // Émettre mise à jour avec la distance totale
+    const totalDistance = calculateDistance();
     const area = calculateArea();
-    emit('measurement-update', { distance, area });
+    emit('measurement-update', { distance: totalDistance, area });
   }
 
   if (measurementPoints.value.length === 1) {
@@ -257,8 +289,7 @@ const handleMouseMove = (e: L.LeafletMouseEvent) => {
 
   // Seuil de snap : 20 pixels converti en mètres selon le zoom
   const zoom = map.value.getZoom();
-  const metersPerPixel =
-    (40075016.686 * Math.abs(Math.cos((latlng.lat * Math.PI) / 180))) / Math.pow(2, zoom + 8);
+  const metersPerPixel = pixelsToMeters(zoom, latlng.lat);
   const snapThreshold = 20 * metersPerPixel;
 
   if (distance < snapThreshold) {
@@ -314,21 +345,6 @@ const finishMeasurement = () => {
   const distance = calculateDistance();
   const area = calculateArea();
 
-  // Afficher le total si aire disponible
-  if (area !== undefined && measurementPoints.value.length >= 3) {
-    // Utiliser le centroïde du composable
-    const latlngs = measurementPoints.value.map(([lat, lng]) => L.value!.latLng(lat, lng));
-    const center = calculateCentroid(latlngs);
-    if (center) {
-      const [lng, lat] = center;
-      const totalLabel = createDistanceLabel(
-        [lat, lng],
-        `${formatDistance(distance)} | ${formatArea(area)}`
-      );
-      if (totalLabel) measurementLabels.value.push(totalLabel);
-    }
-  }
-
   const latlngs = measurementPoints.value.map(([lat, lng]) => L.value!.latLng(lat, lng));
   emit('measurement-complete', {
     distance,
@@ -336,14 +352,8 @@ const finishMeasurement = () => {
     points: latlngs,
   });
 
-  cleanup();
-
-  if (props.enabled) {
-    // Redémarrer pour une nouvelle mesure
-    nextTick(() => {
-      isActive = true;
-    });
-  }
+  isActive = false;
+  isFinished = true;
 };
 
 // Nettoyage
@@ -362,6 +372,7 @@ const cleanup = () => {
 
   measurementPoints.value = [];
   isClosed.value = false;
+  isFinished = false;
 };
 
 // Activation/désactivation

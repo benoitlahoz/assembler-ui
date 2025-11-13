@@ -237,6 +237,30 @@ export const useLeaflet = async () => {
     };
   };
 
+  /**
+   * Calcule combien de mètres représente un pixel à un niveau de zoom donné
+   * Utilise la circonférence de la Terre (40075016.686m) et le cosinus de la latitude
+   * pour tenir compte de la projection Mercator
+   *
+   * Formule : (circonférence × cos(latitude)) / (2^(zoom + 8))
+   * Le +8 vient de : 256 pixels par tuile = 2^8
+   *
+   * @param zoom - Niveau de zoom de la carte
+   * @param latitude - Latitude du point (pour la correction Mercator)
+   * @returns Nombre de mètres par pixel
+   *
+   * @example
+   * // À zoom 15 à Paris (lat ~48.86)
+   * const meters = pixelsToMeters(15, 48.86);
+   * const snapThreshold = 20 * meters; // 20 pixels en mètres
+   */
+  const pixelsToMeters = (zoom: number, latitude: number): number => {
+    const earthCircumference = 40075016.686; // Circonférence de la Terre en mètres
+    return (
+      (earthCircumference * Math.abs(Math.cos((latitude * Math.PI) / 180))) / Math.pow(2, zoom + 8)
+    );
+  };
+
   return {
     L,
     LatDegreesMeters,
@@ -245,6 +269,7 @@ export const useLeaflet = async () => {
     latDegreesToRadius,
     radiusToLngDegrees,
     lngDegreesToRadius,
+    pixelsToMeters,
     // Fonctions Turf.js (géométrie)
     toGeoJSONCoords,
     calculateLineDistance,

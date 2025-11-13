@@ -231,6 +231,14 @@ export const useLeaflet = async () => {
     };
   };
 
+  const pixelsToMeters = (zoom: number, latitude: number): number => {
+    const earthCircumference = 40075016.686;
+    return (
+      (earthCircumference * Math.abs(Math.cos((latitude * Math.PI) / 180))) /
+      Math.pow(2, zoom + 8)
+    );
+  };
+
   return {
     L,
     LatDegreesMeters,
@@ -239,6 +247,7 @@ export const useLeaflet = async () => {
     latDegreesToRadius,
     radiusToLngDegrees,
     lngDegreesToRadius,
+    pixelsToMeters,
 
     toGeoJSONCoords,
     calculateLineDistance,
@@ -263,6 +272,8 @@ export const useLeaflet = async () => {
 
   ### Returns
 
+Circonférence de la Terre en mètres
+
 | Property | Type | Description |
 |----------|------|-------------|
 | `L`{.primary .text-primary} | `any` | — |
@@ -271,6 +282,7 @@ export const useLeaflet = async () => {
 | `latDegreesToRadius`{.primary .text-primary} | `any` | — |
 | `radiusToLngDegrees`{.primary .text-primary} | `any` | — |
 | `lngDegreesToRadius`{.primary .text-primary} | `any` | — |
+| `pixelsToMeters`{.primary .text-primary} | `any` | — |
 | `toGeoJSONCoords`{.primary .text-primary} | `any` | Fonctions Turf.js (géométrie) |
 | `calculateLineDistance`{.primary .text-primary} | `any` | — |
 | `calculatePolygonArea`{.primary .text-primary} | `any` | — |
