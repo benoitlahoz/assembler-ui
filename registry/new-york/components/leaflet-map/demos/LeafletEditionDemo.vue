@@ -127,7 +127,6 @@ const handleModeSelected = (mode: string | null) => {
 // Gestion des mesures
 const handleMeasurementComplete = (data: { distance: number; area?: number }) => {
   lastMeasurement.value = data;
-  console.log('Measurement complete:', data);
 };
 
 // Gestion de la création de nouvelles formes
@@ -304,7 +303,7 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
           @item-clicked="handleModeSelected"
         >
           <LeafletControlItem name="measure" type="toggle" title="Measure Distance & Area">
-            <Icon icon="mdi:ruler" class="w-4 h-4 text-black" />
+            <Icon icon="raphael:ruler" class="w-4 h-4 text-black" />
           </LeafletControlItem>
         </LeafletControls>
 

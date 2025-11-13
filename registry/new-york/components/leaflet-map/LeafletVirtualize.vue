@@ -307,14 +307,18 @@ watch(
 watch(
   () => props.minZoom,
   () => {
-    updateVisibleBounds();
+    // Directly update visible features when zoom constraints change
+    // since the bounds don't actually change, only the visibility logic
+    updateVisibleFeaturesQuadtree();
   }
 );
 
 watch(
   () => props.maxZoom,
   () => {
-    updateVisibleBounds();
+    // Directly update visible features when zoom constraints change
+    // since the bounds don't actually change, only the visibility logic
+    updateVisibleFeaturesQuadtree();
   }
 );
 
