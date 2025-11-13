@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, type ComponentPublicInstance } from 'vue';
 import { Button } from '@/components/ui/button';
 import {
   LeafletMap,
@@ -17,12 +17,18 @@ import {
   LeafletPolygon,
   LeafletRectangle,
   LeafletMeasureTool,
+  LeafletCanvasGL,
   type LeafletMapExposed,
   type FeatureDrawEvent,
   type FeatureShapeType,
   type FeatureSelectMode,
 } from '~~/registry/new-york/components/leaflet-map';
 import { Icon } from '@iconify/vue';
+
+type LeafletCanvasInstance = ComponentPublicInstance & {
+  sourceCanvas: HTMLCanvasElement | null;
+  redraw: () => void;
+};
 
 const mapRef = ref<LeafletMapExposed | null>(null);
 
@@ -100,6 +106,41 @@ const rectangles = ref([
     class: 'border border-orange-500 bg-orange-500/20',
   },
 ]);
+
+// Canvas GL state
+const canvasRef = ref<LeafletCanvasInstance | null>(null);
+const canvasCorners = ref([
+  { lat: 48.865, lng: 2.34 },
+  { lat: 48.865, lng: 2.365 },
+  { lat: 48.85, lng: 2.365 },
+  { lat: 48.85, lng: 2.34 },
+]);
+const canvasOpacity = ref(0.7);
+const sourceCanvas = ref<HTMLCanvasElement | null>(null);
+
+const onCanvasReady = (canvas: HTMLCanvasElement) => {
+  sourceCanvas.value = canvas;
+
+  // Dessiner un contenu de démonstration
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  // Gradient de fond
+  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  gradient.addColorStop(0, '#667eea');
+  gradient.addColorStop(1, '#764ba2');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Texte
+  ctx.fillStyle = 'white';
+  ctx.font = 'bold 24px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Canvas Overlay', canvas.width / 2, canvas.height / 2 - 10);
+
+  ctx.font = '16px Arial';
+  ctx.fillText('Editable & Draggable', canvas.width / 2, canvas.height / 2 + 20);
+};
 
 // Handle mode selection from DrawControl and LeafletControls
 const handleModeSelected = (mode: string | null) => {
@@ -214,18 +255,20 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
 
 <template>
   <div class="w-full h-full flex flex-col gap-4">
-    <div class="rounded flex items-center justify-between gap-4">
-      <Button
-        @click="editMode = !editMode"
-        class="px-4 py-2 rounded transition-colors"
-        :class="
-          editMode
-            ? 'bg-blue-500 text-white hover:bg-blue-600'
-            : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-        "
-      >
-        {{ editMode ? 'Disable edition' : 'Enable edition' }}
-      </Button>
+    <div class="rounded flex items-center justify-between gap-4 flex-wrap">
+      <div class="flex gap-2 items-center">
+        <Button
+          @click="editMode = !editMode"
+          class="px-4 py-2 rounded transition-colors"
+          :class="
+            editMode
+              ? 'bg-blue-500 text-white hover:bg-blue-600'
+              : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+          "
+        >
+          {{ editMode ? 'Disable edition' : 'Enable edition' }}
+        </Button>
+      </div>
 
       <!-- Affichage des mesures -->
       <div
@@ -441,6 +484,21 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
             </template>
           </LeafletFeaturesSelector>
         </LeafletFeaturesEditor>
+
+        <!-- Canvas GL Overlay - Se comporte comme les autres shapes -->
+        <LeafletCanvasGL
+          ref="canvasRef"
+          :corners="canvasCorners"
+          :width="400"
+          :height="300"
+          :editable="currentMode === 'direct-select'"
+          :draggable="currentMode === 'select'"
+          :subdivisions="20"
+          :opacity="canvasOpacity"
+          class="border border-purple-500"
+          @canvas-ready="onCanvasReady"
+          @update:corners="(corners) => (canvasCorners = corners)"
+        />
       </LeafletMap>
     </div>
   </div>
