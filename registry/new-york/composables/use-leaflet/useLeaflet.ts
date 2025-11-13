@@ -193,21 +193,70 @@ export const useLeaflet = async () => {
     }
   };
 
+  /**
+   * Calcule le point médian entre deux LatLng
+   * @param point1 - Premier point
+   * @param point2 - Deuxième point
+   * @returns Point médian [lat, lng]
+   */
+  const calculateMidpoint = (point1: LatLng, point2: LatLng): [number, number] => {
+    const midLat = (point1.lat + point2.lat) / 2;
+    const midLng = (point1.lng + point2.lng) / 2;
+    return [midLat, midLng];
+  };
+
+  /**
+   * Calcule un LatLng à partir d'un centre et d'un rayon (vers l'est)
+   * Utile pour positionner des handles de rayon de cercle
+   * @param center - Centre du cercle
+   * @param radiusInMeters - Rayon en mètres
+   * @returns [lat, lng] du point à la distance du rayon vers l'est
+   */
+  const calculateRadiusPoint = (center: LatLng, radiusInMeters: number): [number, number] => {
+    const lat = center.lat;
+    const lng = center.lng + radiusToLngDegrees(radiusInMeters, center.lat);
+    return [lat, lng];
+  };
+
+  /**
+   * Calcule les bounds d'un cercle
+   * @param center - Centre du cercle
+   * @param radiusInMeters - Rayon en mètres
+   * @returns Objet avec southWest et northEast pour créer des bounds
+   */
+  const calculateCircleBounds = (
+    center: LatLng,
+    radiusInMeters: number
+  ): { southWest: [number, number]; northEast: [number, number] } => {
+    const radiusInLatDegrees = radiusToLatDegrees(radiusInMeters);
+    const radiusInLngDegrees = radiusToLngDegrees(radiusInMeters, center.lat);
+
+    return {
+      southWest: [center.lat - radiusInLatDegrees, center.lng - radiusInLngDegrees],
+      northEast: [center.lat + radiusInLatDegrees, center.lng + radiusInLngDegrees],
+    };
+  };
+
   return {
     L,
     LatDegreesMeters,
-    // Conversions degrés/mètres (existantes)
+    // Conversions degrés/mètres
     radiusToLatDegrees,
     latDegreesToRadius,
     radiusToLngDegrees,
     lngDegreesToRadius,
-    // Nouvelles fonctions Turf.js
+    // Fonctions Turf.js (géométrie)
     toGeoJSONCoords,
     calculateLineDistance,
     calculatePolygonArea,
     calculateCentroid,
     calculateDistance,
+    // Formatage
     formatDistance,
     formatArea,
+    // Calculs utilitaires
+    calculateMidpoint,
+    calculateRadiusPoint,
+    calculateCircleBounds,
   };
 };

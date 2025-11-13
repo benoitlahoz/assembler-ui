@@ -8,6 +8,7 @@ import {
   type Rect,
   type UseQuadtreeReturn,
 } from '~~/registry/new-york/composables/use-quadtree/useQuadtree';
+import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
 
 // Helper to convert lat/lng bounds to x/y bounds
 const convertLatLngBounds = (bounds: {
@@ -118,14 +119,15 @@ function generateMarkers(count: number): DemoMarker[] {
 /**
  * Generate all circles at once
  */
-function generateCircles(count: number): DemoCircle[] {
+async function generateCircles(count: number): Promise<DemoCircle[]> {
+  const { LatDegreesMeters } = await useLeaflet();
   const circles: DemoCircle[] = [];
   for (let i = 0; i < count; i++) {
     const lat = randomCoord(PARIS_LAT, RANGE);
     const lng = randomCoord(PARIS_LNG, RANGE);
     const radiusMeters = Math.random() * 500 + 100;
     // Convert radius in meters to degrees (approximate)
-    const radiusDeg = radiusMeters / 111320; // 1 degree ≈ 111.32km at equator
+    const radiusDeg = radiusMeters / LatDegreesMeters;
 
     circles.push({
       id: `circle-${i}`,
@@ -269,13 +271,13 @@ async function yieldToMain(): Promise<void> {
  * Generate items progressively in chunks to avoid blocking
  */
 async function* generateInChunks<T>(
-  generator: (count: number) => T[],
+  generator: (count: number) => T[] | Promise<T[]>,
   totalCount: number,
   chunkSize: number
 ): AsyncGenerator<T[], void, unknown> {
   for (let i = 0; i < totalCount; i += chunkSize) {
     const count = Math.min(chunkSize, totalCount - i);
-    yield generator(count);
+    yield await generator(count);
     await yieldToMain();
   }
 }

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { inject, watch, ref, type Ref, onBeforeUnmount, provide } from 'vue';
 import { LeafletBoundingBoxStylesKey, LeafletMapKey, LeafletModuleKey } from '.';
+import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
+
+const { LatDegreesMeters, radiusToLngDegrees, lngDegreesToRadius } = await useLeaflet();
 
 export interface LeafletHandleStyle {
   className: string;
@@ -128,18 +131,16 @@ const constrainToSquare = (
   const lngDiff = bounds.getEast() - bounds.getWest();
 
   // Convert to metric coordinates to get true visual dimensions
-  // 1 degree latitude ≈ 111320 meters
-  // 1 degree longitude ≈ 111320 * cos(latitude) meters
-  const latMeters = latDiff * 111320;
-  const lngMeters = lngDiff * 111320 * Math.cos((currentCenter.lat * Math.PI) / 180);
+  const latMeters = latDiff * LatDegreesMeters;
+  const lngMeters = lngDegreesToRadius(lngDiff, currentCenter.lat);
 
   // Determine which dimension changed more (to allow both growing and shrinking)
   let targetMeters = latMeters;
   if (originalBounds) {
     const origLatDiff = originalBounds.getNorth() - originalBounds.getSouth();
     const origLngDiff = originalBounds.getEast() - originalBounds.getWest();
-    const origLatMeters = origLatDiff * 111320;
-    const origLngMeters = origLngDiff * 111320 * Math.cos((currentCenter.lat * Math.PI) / 180);
+    const origLatMeters = origLatDiff * LatDegreesMeters;
+    const origLngMeters = lngDegreesToRadius(origLngDiff, currentCenter.lat);
 
     // Use the dimension that changed the most
     const latChange = Math.abs(latMeters - origLatMeters);
@@ -152,8 +153,8 @@ const constrainToSquare = (
   }
 
   // Convert back to degrees
-  const halfLatDiff = targetMeters / 2 / 111320;
-  const halfLngDiff = targetMeters / 2 / (111320 * Math.cos((currentCenter.lat * Math.PI) / 180));
+  const halfLatDiff = targetMeters / 2 / LatDegreesMeters;
+  const halfLngDiff = radiusToLngDegrees(targetMeters / 2, currentCenter.lat);
 
   return L.value.latLngBounds(
     [currentCenter.lat - halfLatDiff, currentCenter.lng - halfLngDiff],
