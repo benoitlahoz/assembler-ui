@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, type ComponentPublicInstance } from 'vue';
+import { ref, watch, type ComponentPublicInstance } from 'vue';
 import { ClientOnly } from '#components';
 import {
   LeafletMap,
@@ -142,6 +142,15 @@ const animateCanvas = () => {
 
   animate();
 };
+
+watch(
+  () => canvasOpacity.value,
+  () => {
+    if (canvasRef.value) {
+      canvasRef.value.redraw();
+    }
+  }
+);
 </script>
 
 <template>
@@ -194,7 +203,7 @@ const animateCanvas = () => {
             type="range"
             min="0"
             max="1"
-            step="0.1"
+            step="0.01"
             v-model.number="canvasOpacity"
             class="w-32"
           />
