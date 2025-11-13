@@ -1,12 +1,9 @@
 <script setup lang="ts">
 import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount, type HTMLAttributes } from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
-import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from '.';
 import type { FeatureReference } from './LeafletFeaturesSelector.vue';
 import './leaflet-editing.css';
-
-const { calculateMidpoint } = await useLeaflet();
 
 export interface LeafletCanvasProps {
   id?: string | number;
@@ -71,17 +68,6 @@ const createSourceCanvas = () => {
   sourceCanvas.value = document.createElement('canvas');
   sourceCanvas.value.width = props.width;
   sourceCanvas.value.height = props.height;
-  const sourceCtx = sourceCanvas.value.getContext('2d');
-
-  // Dessiner quelque chose par défaut
-  if (sourceCtx) {
-    sourceCtx.fillStyle = '#3388ff';
-    sourceCtx.fillRect(0, 0, props.width, props.height);
-    sourceCtx.fillStyle = 'white';
-    sourceCtx.font = '20px Arial';
-    sourceCtx.textAlign = 'center';
-    sourceCtx.fillText('Canvas déformable', props.width / 2, props.height / 2);
-  }
 
   emit('canvas-ready', sourceCanvas.value);
   return sourceCanvas.value;

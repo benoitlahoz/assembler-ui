@@ -1025,12 +1025,9 @@ import {
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
-
-const { calculateMidpoint } = await useLeaflet();
 
 export interface LeafletCanvasProps {
   id?: string | number;
@@ -1092,16 +1089,6 @@ const createSourceCanvas = () => {
   sourceCanvas.value = document.createElement("canvas");
   sourceCanvas.value.width = props.width;
   sourceCanvas.value.height = props.height;
-  const sourceCtx = sourceCanvas.value.getContext("2d");
-
-  if (sourceCtx) {
-    sourceCtx.fillStyle = "#3388ff";
-    sourceCtx.fillRect(0, 0, props.width, props.height);
-    sourceCtx.fillStyle = "white";
-    sourceCtx.font = "20px Arial";
-    sourceCtx.textAlign = "center";
-    sourceCtx.fillText("Canvas déformable", props.width / 2, props.height / 2);
-  }
 
   emit("canvas-ready", sourceCanvas.value);
   return sourceCanvas.value;
@@ -1604,12 +1591,9 @@ import {
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
-
-const { calculateMidpoint } = await useLeaflet();
 
 export interface LeafletCanvasProps {
   id?: string | number;
@@ -1676,16 +1660,6 @@ const createSourceCanvas = () => {
   sourceCanvas.value = document.createElement("canvas");
   sourceCanvas.value.width = props.width;
   sourceCanvas.value.height = props.height;
-  const sourceCtx = sourceCanvas.value.getContext("2d");
-
-  if (sourceCtx) {
-    sourceCtx.fillStyle = "#3388ff";
-    sourceCtx.fillRect(0, 0, props.width, props.height);
-    sourceCtx.fillStyle = "white";
-    sourceCtx.font = "20px Arial";
-    sourceCtx.textAlign = "center";
-    sourceCtx.fillText("Canvas déformable", props.width / 2, props.height / 2);
-  }
 
   emit("canvas-ready", sourceCanvas.value);
   return sourceCanvas.value;
@@ -8703,42 +8677,101 @@ const canvasCorners = ref([
 
 const isEditable = ref(false);
 const isDraggable = ref(false);
-const canvasOpacity = ref(1);
+const canvasOpacity = ref(0.7);
 
 const sourceCanvas = ref<HTMLCanvasElement | null>(null);
+const videoElement = ref<HTMLVideoElement | null>(null);
+const isVideoLoaded = ref(false);
+const isVideoPlaying = ref(false);
+let animationFrameId: number | null = null;
+
+const videoUrl =
+  "/api/proxy-video?url=" +
+  encodeURIComponent(
+    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+  );
 
 const onCanvasReady = (canvas: HTMLCanvasElement) => {
   sourceCanvas.value = canvas;
 
+  if (!videoElement.value) {
+    videoElement.value = document.createElement("video");
+
+    videoElement.value.loop = true;
+    videoElement.value.muted = true;
+    videoElement.value.playsInline = true;
+
+    videoElement.value.src = videoUrl;
+
+    videoElement.value.addEventListener("loadeddata", () => {
+      isVideoLoaded.value = true;
+
+      drawVideoFrame();
+    });
+
+    videoElement.value.addEventListener("error", () => {
+      drawDefaultContent(canvas);
+    });
+
+    videoElement.value.load();
+  }
+};
+
+const drawDefaultContent = (canvas: HTMLCanvasElement) => {
   const ctx = canvas.getContext("2d");
-  if (ctx) {
-    const gradient = ctx.createLinearGradient(
-      0,
-      0,
-      canvas.width,
-      canvas.height,
-    );
-    gradient.addColorStop(0, "#667eea");
-    gradient.addColorStop(1, "#764ba2");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (!ctx) return;
 
-    ctx.fillStyle = "white";
-    ctx.font = "bold 24px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("Canvas Déformable", canvas.width / 2, 50);
+  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  gradient.addColorStop(0, "#667eea");
+  gradient.addColorStop(1, "#764ba2");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.font = "16px Arial";
-    ctx.fillText("Activez l'édition pour", canvas.width / 2, 120);
-    ctx.fillText("déplacer les coins", canvas.width / 2, 145);
+  ctx.fillStyle = "white";
+  ctx.font = "bold 24px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("NASA Earth Clouds Overlay", canvas.width / 2, 50);
 
-    ctx.beginPath();
-    ctx.arc(canvas.width / 2, canvas.height / 2 + 30, 40, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
-    ctx.fill();
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 3;
-    ctx.stroke();
+  ctx.font = "16px Arial";
+  ctx.fillText("Cliquez sur 'Lancer Vidéo' pour", canvas.width / 2, 120);
+  ctx.fillText("afficher les nuages de la NASA", canvas.width / 2, 145);
+};
+
+const drawVideoFrame = () => {
+  if (!sourceCanvas.value || !videoElement.value || !canvasRef.value) return;
+
+  const ctx = sourceCanvas.value.getContext("2d");
+  if (!ctx) return;
+
+  ctx.drawImage(
+    videoElement.value,
+    0,
+    0,
+    sourceCanvas.value.width,
+    sourceCanvas.value.height,
+  );
+
+  canvasRef.value.redraw();
+
+  if (isVideoPlaying.value && !videoElement.value.paused) {
+    animationFrameId = requestAnimationFrame(drawVideoFrame);
+  }
+};
+
+const toggleVideo = () => {
+  if (!videoElement.value || !isVideoLoaded.value) return;
+
+  if (isVideoPlaying.value) {
+    videoElement.value.pause();
+    isVideoPlaying.value = false;
+    if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
+    }
+  } else {
+    videoElement.value.play();
+    isVideoPlaying.value = true;
+    drawVideoFrame();
   }
 };
 
@@ -8858,6 +8891,27 @@ watch(
           class="px-4 py-2 rounded-md bg-purple-500 text-white hover:bg-purple-600 text-sm font-medium transition-colors"
         >
           Animer
+        </button>
+
+        <button
+          @click="toggleVideo"
+          :disabled="!isVideoLoaded"
+          class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
+          :class="
+            isVideoPlaying
+              ? 'bg-red-500 text-white hover:bg-red-600'
+              : isVideoLoaded
+                ? 'bg-orange-500 text-white hover:bg-orange-600'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          "
+        >
+          {{
+            !isVideoLoaded
+              ? "Chargement..."
+              : isVideoPlaying
+                ? "Pause Vidéo"
+                : "Lancer Vidéo"
+          }}
         </button>
 
         <div class="flex items-center gap-2">
