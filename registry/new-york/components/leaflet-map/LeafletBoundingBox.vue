@@ -1,28 +1,22 @@
 <script setup lang="ts">
 import { inject, watch, ref, type Ref, onBeforeUnmount, provide } from 'vue';
-import { LeafletBoundingBoxStylesKey, LeafletMapKey, LeafletModuleKey } from '.';
+import {
+  LeafletStylesKey,
+  LeafletMapKey,
+  LeafletModuleKey,
+  type LeafletFeatureRectangleStyle,
+  type LeafletFeatureHandleStyle,
+} from '.';
+import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
 
-export interface LeafletHandleStyle {
-  className: string;
-  html: string;
-  iconSize: [number, number];
-}
-
-export interface LeafletBoxStyle {
-  color: string;
-  weight: number;
-  fill: boolean;
-  fillColor?: string;
-  dashArray?: string;
-  interactive: boolean;
-}
+const { LatDegreesMeters, radiusToLngDegrees, lngDegreesToRadius } = await useLeaflet();
 
 export interface LeafletBoundingBoxStyles {
-  box: LeafletBoxStyle;
-  corner: LeafletHandleStyle;
-  edge: LeafletHandleStyle;
-  rotate: LeafletHandleStyle;
-  center: LeafletHandleStyle;
+  rectangle: LeafletFeatureRectangleStyle;
+  corner: LeafletFeatureHandleStyle;
+  edge: LeafletFeatureHandleStyle;
+  rotate: LeafletFeatureHandleStyle;
+  center: LeafletFeatureHandleStyle;
 }
 
 export interface LeafletBoundingBoxProps {
@@ -50,7 +44,7 @@ const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 
 const stylesOptions = ref<LeafletBoundingBoxStyles>({
-  box: {
+  rectangle: {
     color: '#3388ff',
     weight: 2,
     fill: false,
@@ -59,28 +53,28 @@ const stylesOptions = ref<LeafletBoundingBoxStyles>({
     interactive: false,
   },
   corner: {
-    className: 'leaflet-bounding-box-handle leaflet-bounding-box-corner',
+    className: 'leaflet-feature-handle leaflet-handle-corner',
     html: '<div style="width:8px;height:8px;background:#fff;border:2px solid #3388ff;border-radius:2px;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
     iconSize: [8, 8],
   },
   edge: {
-    className: 'leaflet-bounding-box-handle leaflet-bounding-box-edge',
+    className: 'leaflet-feature-handle leaflet-handle-edge',
     html: '<div style="width:8px;height:8px;background:#fff;border:2px solid #3388ff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
     iconSize: [8, 8],
   },
   rotate: {
-    className: 'leaflet-bounding-box-handle leaflet-bounding-box-rotate',
+    className: 'leaflet-feature-handle leaflet-handle-rotate',
     html: '<div style="width:12px;height:12px;background:#fff;border:2px solid #3388ff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
     iconSize: [12, 12],
   },
   center: {
-    className: 'leaflet-bounding-box-handle leaflet-bounding-box-center',
+    className: 'leaflet-feature-handle leaflet-handle-center',
     html: '<div style="width:12px;height:12px;background:#ff8800;border:2px solid #fff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
     iconSize: [12, 12],
   },
 });
 
-provide(LeafletBoundingBoxStylesKey, stylesOptions);
+provide(LeafletStylesKey, stylesOptions);
 
 const boundingBox = ref<L.Rectangle | null>(null);
 const cornerHandles = ref<L.Marker[]>([]);
@@ -128,18 +122,16 @@ const constrainToSquare = (
   const lngDiff = bounds.getEast() - bounds.getWest();
 
   // Convert to metric coordinates to get true visual dimensions
-  // 1 degree latitude ≈ 111320 meters
-  // 1 degree longitude ≈ 111320 * cos(latitude) meters
-  const latMeters = latDiff * 111320;
-  const lngMeters = lngDiff * 111320 * Math.cos((currentCenter.lat * Math.PI) / 180);
+  const latMeters = latDiff * LatDegreesMeters;
+  const lngMeters = lngDegreesToRadius(lngDiff, currentCenter.lat);
 
   // Determine which dimension changed more (to allow both growing and shrinking)
   let targetMeters = latMeters;
   if (originalBounds) {
     const origLatDiff = originalBounds.getNorth() - originalBounds.getSouth();
     const origLngDiff = originalBounds.getEast() - originalBounds.getWest();
-    const origLatMeters = origLatDiff * 111320;
-    const origLngMeters = origLngDiff * 111320 * Math.cos((currentCenter.lat * Math.PI) / 180);
+    const origLatMeters = origLatDiff * LatDegreesMeters;
+    const origLngMeters = lngDegreesToRadius(origLngDiff, currentCenter.lat);
 
     // Use the dimension that changed the most
     const latChange = Math.abs(latMeters - origLatMeters);
@@ -152,8 +144,8 @@ const constrainToSquare = (
   }
 
   // Convert back to degrees
-  const halfLatDiff = targetMeters / 2 / 111320;
-  const halfLngDiff = targetMeters / 2 / (111320 * Math.cos((currentCenter.lat * Math.PI) / 180));
+  const halfLatDiff = targetMeters / 2 / LatDegreesMeters;
+  const halfLngDiff = radiusToLngDegrees(targetMeters / 2, currentCenter.lat);
 
   return L.value.latLngBounds(
     [currentCenter.lat - halfLatDiff, currentCenter.lng - halfLngDiff],
@@ -170,7 +162,9 @@ const createBoundingBox = () => {
   clearHandles();
 
   // Créer le rectangle de bounding box
-  boundingBox.value = L.value.rectangle(props.bounds, stylesOptions.value.box).addTo(map.value);
+  boundingBox.value = L.value
+    .rectangle(props.bounds, stylesOptions.value.rectangle)
+    .addTo(map.value);
 
   // Créer les handles aux coins (pour scale)
   const corners = [

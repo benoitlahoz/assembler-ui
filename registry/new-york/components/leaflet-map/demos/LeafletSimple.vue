@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { Button } from '@/components/ui/button';
 import { ref, type ComponentPublicInstance } from 'vue';
 import { ClientOnly } from '#components';
 import {
   LeafletMap,
   LeafletTileLayer,
   LeafletZoomControl,
-  LeafletDrawControl,
+  LeafletControls,
+  LeafletControlItem,
   LeafletCircle,
   type LeafletMapExposed,
 } from '~~/registry/new-york/components/leaflet-map';
+import { Icon } from '@iconify/vue';
 
 type LeafletMapInstance = ComponentPublicInstance & LeafletMapExposed;
 
@@ -20,13 +21,9 @@ const locationCoords = ref<{ lat: number; lng: number; accuracy: number }>({
   lng: 5.3691,
   accuracy: 500,
 });
+
 const onLocate = () => {
-  // Ugly way to call the locate method on the LeafletMap component.
-  // https://www.answeroverflow.com/m/1398747077265064026
-  const locate = mapRef.value?.locate || mapRef.value?.$.exposed?.locate;
-  if (locate) {
-    locate();
-  }
+  mapRef.value?.locate();
 };
 
 const onLocationFound = (event: any) => {
@@ -40,7 +37,6 @@ const onLocationFound = (event: any) => {
 
 <template>
   <ClientOnly>
-    <div class="mb-4"><Button @click="onLocate">Locate</Button></div>
     <div class="h-128 min-h-128 mb-4">
       <LeafletMap
         ref="mapRef"
@@ -58,9 +54,13 @@ const onLocationFound = (event: any) => {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
 
-        <LeafletZoomControl position="topleft" />
+        <LeafletControls position="topleft" :enabled="true" @item-clicked="onLocate">
+          <LeafletControlItem name="locate" type="push" title="Locate me">
+            <Icon icon="gis:location-arrow" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+        </LeafletControls>
 
-        <LeafletDrawControl position="topright" />
+        <LeafletZoomControl position="topleft" />
 
         <!-- Adds a circle at location -->
         <LeafletCircle

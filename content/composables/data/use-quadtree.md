@@ -9,7 +9,7 @@ description: Generic Quadtree composable for efficient spatial queries
 ::hr-underline
 ::
 
-This will install the component in the path defined by your `components.json` file, thanks to shadcn-vue.
+This will install the composable in the path defined by your `components.json` file, thanks to shadcn-vue.
 
 :::code-group{.w-full}
 ```bash [yarn]
@@ -35,9 +35,9 @@ This will install the component in the path defined by your `components.json` fi
 
 Copy and paste these files into your project.
 
-:::code-tree{default-value="src/components/ui/use-quadtree/useQuadtree.ts"}
+:::code-tree{default-value="src/composables/use-quadtree/useQuadtree.ts"}
 
-```ts [src/components/ui/use-quadtree/useQuadtree.ts]
+```ts [src/composables/use-quadtree/useQuadtree.ts]
 import { ref, readonly, type Ref } from "vue";
 
 export interface Rect {
@@ -276,6 +276,37 @@ export type UseQuadtreeReturn<T extends Rect = Rect> = ReturnType<
 ```
 :::
 
+## API
+::hr-underline
+::
+
+  ### Parameters
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `config`{.primary .text-primary} | `QuadtreeConfig` | — | — |
+
+  ### Returns
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `tree`{.primary .text-primary} | `any` | — |
+| `insert`{.primary .text-primary} | `any` | — |
+| `retrieve`{.primary .text-primary} | `any` | — |
+| `clear`{.primary .text-primary} | `any` | — |
+| `size`{.primary .text-primary} | `any` | — |
+| `getBounds`{.primary .text-primary} | `any` | — |
+| `recreate`{.primary .text-primary} | `any` | — |
+
+  ### Types
+| Name | Type | Description |
+|------|------|-------------|
+| `Rect`{.primary .text-primary} | `interface` | — |
+| `QuadtreeBounds`{.primary .text-primary} | `interface` | — |
+| `QuadtreeConfig`{.primary .text-primary} | `interface` | — |
+| `UseQuadtreeReturn`{.primary .text-primary} | `type` | — |
+
+---
+
 ::tip
-You can copy and adapt this template for any component documentation.
+You can copy and adapt this template for any composable documentation.
 ::

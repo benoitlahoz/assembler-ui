@@ -2,6 +2,9 @@
  * Generic Quadtree composable for efficient spatial queries
  * Inspired by timohausmann/quadtree-js
  *
+ * @type registry:hook
+ * @category data
+ *
  * @example
  * ```ts
  * const { tree, insert, retrieve, clear, size } = useQuadtree({

@@ -197,7 +197,12 @@ watch(
 watch(
   controlsRegistry,
   () => {
-    // Try to create if we have the map
+    // Si le contrôle existe déjà, le retirer et le recréer avec les nouveaux items
+    if (control.value && control.value._map) {
+      control.value.remove();
+      control.value = null;
+    }
+    // Créer ou recréer le contrôle
     if (!control.value) {
       tryCreateControl();
     }

@@ -8,7 +8,7 @@ description: ControlGrid - Composant de grille drag-and-drop
     <simple-demo />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";
@@ -2895,7 +2895,7 @@ Catégorie de contrôles à afficher (si non spécifié, affiche tous les contr�
     <interactive-demo />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";

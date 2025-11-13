@@ -8,7 +8,7 @@ description: A 1:1 aspect ratio button component for grid-based layouts.
     <control-button-demo />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref, onMounted, shallowRef, h } from "vue";

@@ -193,21 +193,95 @@ export const useLeaflet = async () => {
     }
   };
 
+  /**
+   * Calcule le point médian entre deux LatLng
+   * @param point1 - Premier point
+   * @param point2 - Deuxième point
+   * @returns Point médian [lat, lng]
+   */
+  const calculateMidpoint = (point1: LatLng, point2: LatLng): [number, number] => {
+    const midLat = (point1.lat + point2.lat) / 2;
+    const midLng = (point1.lng + point2.lng) / 2;
+    return [midLat, midLng];
+  };
+
+  /**
+   * Calcule un LatLng à partir d'un centre et d'un rayon (vers l'est)
+   * Utile pour positionner des handles de rayon de cercle
+   * @param center - Centre du cercle
+   * @param radiusInMeters - Rayon en mètres
+   * @returns [lat, lng] du point à la distance du rayon vers l'est
+   */
+  const calculateRadiusPoint = (center: LatLng, radiusInMeters: number): [number, number] => {
+    const lat = center.lat;
+    const lng = center.lng + radiusToLngDegrees(radiusInMeters, center.lat);
+    return [lat, lng];
+  };
+
+  /**
+   * Calcule les bounds d'un cercle
+   * @param center - Centre du cercle
+   * @param radiusInMeters - Rayon en mètres
+   * @returns Objet avec southWest et northEast pour créer des bounds
+   */
+  const calculateCircleBounds = (
+    center: LatLng,
+    radiusInMeters: number
+  ): { southWest: [number, number]; northEast: [number, number] } => {
+    const radiusInLatDegrees = radiusToLatDegrees(radiusInMeters);
+    const radiusInLngDegrees = radiusToLngDegrees(radiusInMeters, center.lat);
+
+    return {
+      southWest: [center.lat - radiusInLatDegrees, center.lng - radiusInLngDegrees],
+      northEast: [center.lat + radiusInLatDegrees, center.lng + radiusInLngDegrees],
+    };
+  };
+
+  /**
+   * Calcule combien de mètres représente un pixel à un niveau de zoom donné
+   * Utilise la circonférence de la Terre (40075016.686m) et le cosinus de la latitude
+   * pour tenir compte de la projection Mercator
+   *
+   * Formule : (circonférence × cos(latitude)) / (2^(zoom + 8))
+   * Le +8 vient de : 256 pixels par tuile = 2^8
+   *
+   * @param zoom - Niveau de zoom de la carte
+   * @param latitude - Latitude du point (pour la correction Mercator)
+   * @returns Nombre de mètres par pixel
+   *
+   * @example
+   * // À zoom 15 à Paris (lat ~48.86)
+   * const meters = pixelsToMeters(15, 48.86);
+   * const snapThreshold = 20 * meters; // 20 pixels en mètres
+   */
+  const pixelsToMeters = (zoom: number, latitude: number): number => {
+    const earthCircumference = 40075016.686; // Circonférence de la Terre en mètres
+    return (
+      (earthCircumference * Math.abs(Math.cos((latitude * Math.PI) / 180))) / Math.pow(2, zoom + 8)
+    );
+  };
+
   return {
     L,
     LatDegreesMeters,
-    // Conversions degrés/mètres (existantes)
+    // Conversions degrés/mètres
     radiusToLatDegrees,
     latDegreesToRadius,
     radiusToLngDegrees,
     lngDegreesToRadius,
-    // Nouvelles fonctions Turf.js
+    pixelsToMeters,
+    // Fonctions Turf.js (géométrie)
     toGeoJSONCoords,
     calculateLineDistance,
     calculatePolygonArea,
     calculateCentroid,
     calculateDistance,
+    // Formatage
     formatDistance,
     formatArea,
+    // Calculs utilitaires
+    calculateMidpoint,
+    calculateRadiusPoint,
+    calculateCircleBounds,
   };
 };

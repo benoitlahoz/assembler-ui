@@ -5,13 +5,12 @@ import {
   LeafletMap,
   LeafletTileLayer,
   LeafletZoomControl,
-  LeafletDrawControl,
   LeafletControls,
   LeafletControlItem,
   LeafletFeaturesEditor,
   LeafletFeaturesSelector,
   LeafletFeatureHandle,
-  LeafletBoundingBoxRectangle,
+  LeafletFeatureRectangle,
   LeafletMarker,
   LeafletCircle,
   LeafletPolyline,
@@ -34,7 +33,7 @@ const editMode = ref(true); // Start with edit mode enabled
 const currentMode = ref<FeatureShapeType | FeatureSelectMode | null>('select'); // Start in select mode
 
 // Mode mesure
-const measureMode = ref(false);
+const measureMode = ref<'line' | 'polygon' | false>(false);
 const lastMeasurement = ref<{ distance: number; area?: number } | null>(null);
 
 // Computed selection mode for LeafletFeaturesSelector (only 'select' or 'direct-select')
@@ -45,7 +44,7 @@ const selectionMode = computed<FeatureSelectMode | null>(() => {
 });
 
 // Check if we're in selection mode
-const isSelectMode = computed(() => selectionMode.value !== null);
+const isSelectMode = computed(() => selectionMode.value !== null); //
 
 // Données pour les différentes shapes
 const markers = ref([
@@ -104,17 +103,23 @@ const rectangles = ref([
 
 // Handle mode selection from DrawControl and LeafletControls
 const handleModeSelected = (mode: string | null) => {
-  // Si on active le mode measure, désactiver les autres modes
-  if (mode === 'measure') {
-    measureMode.value = !measureMode.value;
-    if (measureMode.value) {
-      currentMode.value = null;
+  // Si on active un mode measure, désactiver les autres modes
+  if (mode === 'measure-line' || mode === 'measure-polygon') {
+    const newMode = mode === 'measure-line' ? 'line' : 'polygon';
+    // Toggle: si on clique sur le même mode, le désactiver
+    if (measureMode.value === newMode) {
+      measureMode.value = false;
+    } else {
+      measureMode.value = newMode;
+      currentMode.value = null; // Désactiver les autres modes
     }
     return;
   }
 
   // Si on sélectionne un autre mode, désactiver measure
-  measureMode.value = false;
+  if (measureMode.value) {
+    measureMode.value = false;
+  }
 
   // Toggle behavior: if clicking the same mode, deactivate it
   if (currentMode.value === mode) {
@@ -299,23 +304,43 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
         <LeafletControls
           position="topright"
           :enabled="editMode"
-          :active-item="measureMode ? 'measure' : null"
+          :active-item="
+            measureMode === 'line'
+              ? 'measure-line'
+              : measureMode === 'polygon'
+                ? 'measure-polygon'
+                : null
+          "
           @item-clicked="handleModeSelected"
         >
-          <LeafletControlItem name="measure" type="toggle" title="Measure Distance & Area">
+          <LeafletControlItem name="measure-line" type="toggle" title="Measure Distance (Line)">
+            <Icon icon="ri:ruler-line" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem
+            name="measure-polygon"
+            type="toggle"
+            title="Measure Distance & Area (Polygon)"
+          >
             <Icon icon="raphael:ruler" class="w-4 h-4 text-black" />
           </LeafletControlItem>
         </LeafletControls>
 
         <!-- Outil de mesure -->
         <LeafletMeasureTool
-          :enabled="measureMode"
+          :enabled="!!measureMode"
+          :mode="measureMode || 'polygon'"
           unit="metric"
           :show-area="true"
-          color="#ff6600"
+          class="border border-blue-500 bg-blue-500/20"
           @measurement-complete="handleMeasurementComplete"
           @measurement-update="(data) => (lastMeasurement = data)"
-        />
+        >
+          <LeafletFeatureHandle
+            role="corner"
+            class="bg-blue-500/20 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+            :size="12"
+          />
+        </LeafletMeasureTool>
 
         <!-- Features Editor - Drawing logic -->
         <LeafletFeaturesEditor
@@ -388,7 +413,7 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
 
             <!-- Custom bounding box styling. Note that a default bounding box component is inserted in the `#bounding-box` slot -->
             <template #bounding-box-styles>
-              <LeafletBoundingBoxRectangle class="border-2 border-orange-400" :dashed="[5, 5]" />
+              <LeafletFeatureRectangle class="border-2 border-orange-400" :dashed="[5, 5]" />
 
               <LeafletFeatureHandle
                 role="corner"

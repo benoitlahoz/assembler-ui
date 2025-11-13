@@ -10,9 +10,18 @@ import {
   onMounted,
 } from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
+import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from '.';
 import type { FeatureReference } from './LeafletFeaturesSelector.vue';
 import './leaflet-editing.css';
+
+const {
+  calculateRadiusPoint,
+  calculateCircleBounds,
+  radiusToLngDegrees,
+  lngDegreesToRadius,
+  LatDegreesMeters,
+} = await useLeaflet();
 
 export interface LeafletCircleProps {
   id?: string | number;
@@ -122,11 +131,8 @@ const setupMapDragHandlers = () => {
     // Update radius marker if in edit mode
     if (radiusMarker.value && props.editable) {
       const radius = circle.value.getRadius();
-      const radiusLatLng = L.value!.latLng(
-        newLatLng.lat,
-        newLatLng.lng + radius / 111320 / Math.cos((newLatLng.lat * Math.PI) / 180)
-      );
-      radiusMarker.value.setLatLng(radiusLatLng);
+      const [lat, lng] = calculateRadiusPoint(newLatLng, radius);
+      radiusMarker.value.setLatLng(L.value!.latLng(lat, lng));
     }
   };
 
@@ -159,10 +165,8 @@ const enableEditing = () => {
 
   // Only create radius marker in edit mode
   if (props.editable) {
-    const radiusLatLng = L.value.latLng(
-      center.lat,
-      center.lng + radius / 111320 / Math.cos((center.lat * Math.PI) / 180)
-    );
+    const [lat, lng] = calculateRadiusPoint(center, radius);
+    const radiusLatLng = L.value.latLng(lat, lng);
     radiusMarker.value = L.value
       .marker(radiusLatLng, {
         draggable: true,
@@ -202,18 +206,8 @@ const registerWithSelection = () => {
       const center = circle.value.getLatLng();
       const radius = circle.value.getRadius(); // in meters
 
-      // Convert radius from meters to degrees
-      // 1 degree latitude ≈ 111320 meters (constant)
-      // 1 degree longitude ≈ 111320 * cos(latitude) meters (varies by latitude)
-      const radiusInLatDegrees = radius / 111320;
-      const radiusInLngDegrees = radius / (111320 * Math.cos((center.lat * Math.PI) / 180));
-
-      // Create square bounds: use radius in lat degrees for both dimensions
-      // This ensures the box is visually square on the map
-      return L.value.latLngBounds(
-        [center.lat - radiusInLatDegrees, center.lng - radiusInLngDegrees],
-        [center.lat + radiusInLatDegrees, center.lng + radiusInLngDegrees]
-      );
+      const { southWest, northEast } = calculateCircleBounds(center, radius);
+      return L.value.latLngBounds(southWest, northEast);
     },
     applyTransform: (bounds: L.LatLngBounds) => {
       if (!circle.value) return;
@@ -224,9 +218,9 @@ const registerWithSelection = () => {
       const latDiff = bounds.getNorth() - bounds.getSouth();
       const lngDiff = bounds.getEast() - bounds.getWest();
 
-      // Convert back to meters (use average to handle both lat/lng)
-      const radiusLat = (latDiff / 2) * 111320;
-      const radiusLng = (lngDiff / 2) * 111320 * Math.cos((center.lat * Math.PI) / 180);
+      // Convert back to meters using composable functions
+      const radiusLat = (latDiff / 2) * LatDegreesMeters;
+      const radiusLng = lngDegreesToRadius(lngDiff / 2, center.lat);
       const radius = (radiusLat + radiusLng) / 2;
 
       circle.value.setLatLng(center);
@@ -277,11 +271,8 @@ watch(
             if (radiusMarker.value && props.editable) {
               const center = circle.value.getLatLng();
               const radius = circle.value.getRadius();
-              const radiusLatLng = L.value.latLng(
-                center.lat,
-                center.lng + radius / 111320 / Math.cos((center.lat * Math.PI) / 180)
-              );
-              radiusMarker.value.setLatLng(radiusLatLng);
+              const [lat, lng] = calculateRadiusPoint(center, radius);
+              radiusMarker.value.setLatLng(L.value.latLng(lat, lng));
             }
           }
         } else {

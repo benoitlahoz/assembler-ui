@@ -8,7 +8,7 @@ description: DragDropProvider - Wrapper component pour fournir la configuration 
     <basic-demo />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";
@@ -748,7 +748,7 @@ Mode d&#39;interaction (peut être étendu pour supporter d&#39;autres modes)
     <grid-layout-demo />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref, computed, type Ref } from "vue";
@@ -1161,7 +1161,7 @@ const getPositionByIntersectionDebug = (
     <simple-test />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount, type HTMLAttributes } from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
+import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from '.';
 import type { FeatureReference } from './LeafletFeaturesSelector.vue';
 import './leaflet-editing.css';
+
+const { calculateMidpoint, LatDegreesMeters, lngDegreesToRadius } = await useLeaflet();
 
 export interface LeafletPolygonProps {
   id?: string | number;
@@ -139,8 +142,7 @@ const createMidpoints = () => {
 
     if (!current || !next) continue;
 
-    const midLat = (current.lat + next.lat) / 2;
-    const midLng = (current.lng + next.lng) / 2;
+    const [midLat, midLng] = calculateMidpoint(current, next);
 
     const midMarker = L.value
       .marker([midLat, midLng], {
@@ -206,8 +208,7 @@ const updateMidpoints = (latlngs: L.LatLng[]) => {
   midpointMarkers.value.forEach((midMarker, i) => {
     const nextIndex = (i + 1) % latlngs.length;
     if (latlngs[i] && latlngs[nextIndex]) {
-      const midLat = (latlngs[i].lat + latlngs[nextIndex].lat) / 2;
-      const midLng = (latlngs[i].lng + latlngs[nextIndex].lng) / 2;
+      const [midLat, midLng] = calculateMidpoint(latlngs[i], latlngs[nextIndex]);
       midMarker.setLatLng(L.value!.latLng(midLat, midLng));
     }
   });
@@ -356,8 +357,8 @@ const registerWithSelection = () => {
       const angleRad = (-angle * Math.PI) / 180; // Inverser l'angle pour corriger le sens
 
       // Conversion en coordonnées métriques pour une rotation correcte
-      const metersPerDegreeLat = 111320; // 1 degré de latitude ≈ 111320 mètres
-      const metersPerDegreeLng = 111320 * Math.cos((center.lat * Math.PI) / 180);
+      const metersPerDegreeLat = LatDegreesMeters;
+      const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
 
       const newLatLngs = initialLatLngs.map((latlng) => {
         const lat = latlng[0];
