@@ -10,6 +10,7 @@ import {
   provide,
 } from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
+import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
 import {
   LeafletMapKey,
   LeafletModuleKey,
@@ -19,6 +20,8 @@ import {
 } from '.';
 import type { FeatureReference } from './LeafletFeaturesSelector.vue';
 import './leaflet-editing.css';
+
+const { LatDegreesMeters, lngDegreesToRadius } = await useLeaflet();
 
 export interface LeafletCanvasStyles {
   corner: LeafletFeatureHandleStyle;
@@ -149,6 +152,12 @@ const enableDragging = () => {
     if (!map.value || !L.value) return;
 
     L.value.DomEvent.stopPropagation(e as any);
+
+    // Sélectionner la feature avant de commencer le drag pour afficher la bounding box
+    if (props.selectable && selectionContext) {
+      selectionContext.selectFeature('polygon', canvasId.value);
+    }
+
     isDragging.value = true;
 
     emit('dragstart');
@@ -417,8 +426,64 @@ const registerWithSelection = () => {
       const latlngs = props.corners.map((c) => L.value!.latLng(c.lat, c.lng));
       return L.value!.latLngBounds(latlngs);
     },
-    applyTransform: () => {
-      // Transformation non supportée pour canvas
+    getInitialData: () => {
+      return props.corners.map((c) => [c.lat, c.lng] as [number, number]);
+    },
+    applyTransform: (bounds: L.LatLngBounds) => {
+      if (!L.value) return;
+
+      const currentBounds = L.value.latLngBounds(
+        props.corners.map((c) => L.value!.latLng(c.lat, c.lng))
+      );
+      const currentCenter = currentBounds.getCenter();
+      const newCenter = bounds.getCenter();
+
+      const scaleX =
+        (bounds.getEast() - bounds.getWest()) / (currentBounds.getEast() - currentBounds.getWest());
+      const scaleY =
+        (bounds.getNorth() - bounds.getSouth()) /
+        (currentBounds.getNorth() - currentBounds.getSouth());
+
+      const newCorners = props.corners.map((corner) => {
+        const relativeX = (corner.lng - currentCenter.lng) * scaleX;
+        const relativeY = (corner.lat - currentCenter.lat) * scaleY;
+        return {
+          lat: newCenter.lat + relativeY,
+          lng: newCenter.lng + relativeX,
+        };
+      });
+
+      emit('update:corners', newCorners);
+    },
+    applyRotation: (
+      angle: number,
+      center: { lat: number; lng: number },
+      initialCorners: Array<[number, number]>
+    ) => {
+      if (!L.value || !initialCorners) return;
+
+      const angleRad = (-angle * Math.PI) / 180;
+
+      const metersPerDegreeLat = LatDegreesMeters;
+      const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
+
+      const newCorners = initialCorners.map((corner) => {
+        const lat = corner[0];
+        const lng = corner[1];
+
+        const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+        const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+
+        const newRelMetersY = relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+        const newRelMetersX = relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+
+        return {
+          lat: center.lat + newRelMetersY / metersPerDegreeLat,
+          lng: center.lng + newRelMetersX / metersPerDegreeLng,
+        };
+      });
+
+      emit('update:corners', newCorners);
     },
   };
   selectionContext.registerFeature(feature);
@@ -480,6 +545,29 @@ watch(
 
           // Dessiner
           reset();
+        }
+
+        // Check if selectable changed and we need to register/unregister
+        if (canvasLayer.value) {
+          const selectableChanged = oldVal && Boolean(oldVal[5]) !== Boolean(newSelectable);
+          if (selectableChanged) {
+            // Remove old event listeners
+            const oldClickHandler = canvasLayer.value.onclick;
+            if (oldClickHandler) {
+              canvasLayer.value.removeEventListener('click', oldClickHandler);
+            }
+
+            // Add new event listeners based on selectable state
+            if (newSelectable && selectionContext) {
+              canvasLayer.value.addEventListener('click', () => {
+                selectionContext.selectFeature('polygon', canvasId.value);
+                emit('click');
+              });
+              registerWithSelection();
+            } else {
+              canvasLayer.value.addEventListener('click', handleClick);
+            }
+          }
         }
 
         // Gestion des modes : draggable OU editable, pas les deux

@@ -154,12 +154,12 @@ const enableDragging = () => {
     if (!map.value || !L.value) return;
 
     L.value.DomEvent.stopPropagation(e as any);
-    
+
     // Sélectionner la feature avant de commencer le drag pour afficher la bounding box
     if (props.selectable && selectionContext) {
       selectionContext.selectFeature('polygon', canvasId.value);
     }
-    
+
     isDragging.value = true;
 
     emit('dragstart');
