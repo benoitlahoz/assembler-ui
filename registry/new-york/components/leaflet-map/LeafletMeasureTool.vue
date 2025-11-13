@@ -79,14 +79,6 @@ const stylesOptions = ref<LeafletMeasureToolStyles>({
 
 provide(LeafletStylesKey, stylesOptions);
 
-watch(
-  () => stylesOptions.value,
-  (newStyles) => {
-    console.log(stylesOptions.value);
-  },
-  { deep: true }
-);
-
 // État
 const measurementPoints = ref<Array<[number, number]>>([]);
 const markers = ref<Marker[]>([]);

@@ -3521,11 +3521,14 @@ const {
   calculateLineDistance,
   calculatePolygonArea,
   formatDistance: formatDistanceUtil,
-  formatArea: formatAreaUtil,
   pixelsToMeters,
 } = await useLeaflet();
 
-const { getLeafletShapeColors, parseHTMLToElement } = useCssParser();
+const {
+  getLeafletShapeColors,
+  parseHTMLToElement,
+  fetchStylesFromElementClass,
+} = useCssParser();
 
 const stylesOptions = ref<LeafletMeasureToolStyles>({
   corner: {
@@ -3543,6 +3546,14 @@ const stylesOptions = ref<LeafletMeasureToolStyles>({
 });
 
 provide(LeafletStylesKey, stylesOptions);
+
+watch(
+  () => stylesOptions.value,
+  (newStyles) => {
+    console.log(stylesOptions.value);
+  },
+  { deep: true },
+);
 
 const measurementPoints = ref<Array<[number, number]>>([]);
 const markers = ref<Marker[]>([]);
@@ -3575,10 +3586,6 @@ const calculateArea = (): number | undefined => {
 
 const formatDistance = (distanceInMeters: number): string => {
   return formatDistanceUtil(distanceInMeters, props.unit);
-};
-
-const formatArea = (areaInM2: number): string => {
-  return formatAreaUtil(areaInM2, props.unit);
 };
 
 const colors = computed(() => getLeafletShapeColors(props.class));
@@ -3839,13 +3846,19 @@ const handleMouseMove = (e: L.LeafletMouseEvent) => {
 
   if (distance < snapThreshold) {
     if (!snapCircle.value) {
-      const colors = getLeafletShapeColors(props.class);
+      const colors = fetchStylesFromElementClass((el: HTMLElement) => {
+        return {
+          color: getComputedStyle(el).borderColor || "orange",
+          fillColor: getComputedStyle(el).backgroundColor || "orange",
+        };
+      }, props.class);
+
       snapCircle.value = L.value
         .circle(firstLatLng, {
           radius: snapThreshold,
           color: colors.color,
           fillColor: colors.fillColor,
-          fillOpacity: 0.3,
+          fillOpacity: 1,
           weight: 2,
         })
         .addTo(map.value);
@@ -6365,7 +6378,7 @@ export const useCssParser = () => {
 };
 ```
 
-```ts [src/components/ui/use-quadtree/useQuadtree.ts]
+```ts [src/composables/use-quadtree/useQuadtree.ts]
 import { ref, readonly, type Ref } from "vue";
 
 export interface Rect {
@@ -7564,15 +7577,16 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
           :mode="measureMode || 'polygon'"
           unit="metric"
           :show-area="true"
-          class="border border-orange-500 bg-orange-500/20"
+          class="border border-blue-500 bg-blue-500/20"
           @measurement-complete="handleMeasurementComplete"
           @measurement-update="(data) => (lastMeasurement = data)"
-        />
-        <LeafletFeatureHandle
-          role="edge"
-          class="bg-blue-500/20 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
-          :size="8"
-        />
+        >
+          <LeafletFeatureHandle
+            role="corner"
+            class="bg-blue-500/20 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+            :size="12"
+          />
+        </LeafletMeasureTool>
 
         <LeafletFeaturesEditor
           :enabled="editMode"
