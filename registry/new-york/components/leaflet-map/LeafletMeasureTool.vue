@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { ref, inject, watch, onBeforeUnmount, nextTick, type Ref, type HTMLAttributes } from 'vue';
+import {
+  ref,
+  inject,
+  watch,
+  onBeforeUnmount,
+  nextTick,
+  type Ref,
+  type HTMLAttributes,
+  computed,
+} from 'vue';
 import { cn } from '@/lib/utils';
 import { LeafletMapKey, LeafletModuleKey } from '.';
 import type { LatLng, Marker, Circle, DivIcon } from 'leaflet';
@@ -14,7 +23,7 @@ const {
   formatArea: formatAreaUtil,
 } = await useLeaflet();
 
-const { getLeafletShapeColors } = useCssParser();
+const { getLeafletShapeColors, parseHTMLToElement } = useCssParser();
 
 export interface LeafletMeasureToolProps {
   enabled?: boolean;
@@ -75,11 +84,11 @@ const formatArea = (areaInM2: number): string => {
   return formatAreaUtil(areaInM2, props.unit);
 };
 
+const colors = computed(() => getLeafletShapeColors(props.class));
+
 // Créer un marqueur de mesure
 const createMeasureMarker = (latlng: [number, number], index: number): Marker | null => {
   if (!L.value || !map.value) return null;
-
-  const colors = getLeafletShapeColors(props.class);
 
   return L.value
     .marker([latlng[0], latlng[1]], {
@@ -88,7 +97,7 @@ const createMeasureMarker = (latlng: [number, number], index: number): Marker | 
         html: `<div style="
         width: 10px;
         height: 10px;
-        background: ${colors.color};
+        background: ${colors.value.color};
         border: 2px solid white;
         border-radius: 50%;
         box-shadow: 0 0 4px rgba(0,0,0,0.3);
@@ -103,25 +112,34 @@ const createMeasureMarker = (latlng: [number, number], index: number): Marker | 
 const createDistanceLabel = (latlng: [number, number], text: string): Marker | null => {
   if (!L.value || !map.value) return null;
 
-  const colors = getLeafletShapeColors(props.class);
+  const html = `<div style="
+        color: black;
+        background: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        border: 2px solid ${colors.value.color};
+        font-size: 12px;
+        font-weight: bold;
+        white-space: nowrap;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      ">${text}</div>`;
+
+  const [width, height] = parseHTMLToElement((el: HTMLElement) => {
+    return [
+      el.firstChild ? (el.firstChild as HTMLElement).offsetWidth : 80,
+      el.firstChild ? (el.firstChild as HTMLElement).offsetHeight : 20,
+    ];
+  }, html);
+
+  console.log(width, height);
 
   return L.value
     .marker([latlng[0], latlng[1]], {
       icon: L.value.divIcon({
         className: 'leaflet-measure-label',
-        html: `<div style="
-        color: black;
-        background: white;
-        padding: 4px 8px;
-        border-radius: 4px;
-        border: 2px solid ${colors.color};
-        font-size: 12px;
-        font-weight: bold;
-        white-space: nowrap;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-      ">${text}</div>`,
-        iconSize: [0, 0],
-        iconAnchor: [0, -10],
+        html,
+        iconSize: [width, height],
+        iconAnchor: [width / 2, height / 2],
       }) as DivIcon,
     })
     .addTo(map.value);

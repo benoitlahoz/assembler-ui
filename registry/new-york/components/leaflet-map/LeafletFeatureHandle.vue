@@ -18,12 +18,12 @@ const props = withDefaults(defineProps<LeafletFeatureHandleProps>(), {
   size: 8,
 });
 
-const { withHiddenElement, getTailwindBaseCssValues } = useCssParser();
+const { fetchStylesFromElementClass, getTailwindBaseCssValues } = useCssParser();
 
 const stylesOptions = inject(LeafletBoundingBoxStylesKey, ref());
 
 const tailwindToMarkerHtml = (className: string, size: number | string) => {
-  const styles = withHiddenElement((el: HTMLElement) => {
+  const styles = fetchStylesFromElementClass((el: HTMLElement) => {
     const config = getTailwindBaseCssValues(el, [
       'background-color',
       'border',

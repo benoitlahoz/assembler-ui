@@ -1034,36 +1034,40 @@ const props = withDefaults(defineProps<LeafletBoundingBoxRectangleProps>(), {
 
 const stylesOptions = inject(LeafletBoundingBoxStylesKey, ref());
 
-const { withHiddenElement, getTailwindBaseCssValues } = useCssParser();
+const { fetchStylesFromElementClass, getTailwindBaseCssValues } =
+  useCssParser();
 
 const tailwindToBoxOptions = (className: string, dashed?: number[]) => {
-  const style = withHiddenElement((el: HTMLElement): LeafletBoxStyle => {
-    const config = getTailwindBaseCssValues(el, [
-      "background-color",
-      "border-color",
-      "border-width",
-      "opacity",
-    ]);
+  const style = fetchStylesFromElementClass(
+    (el: HTMLElement): LeafletBoxStyle => {
+      const config = getTailwindBaseCssValues(el, [
+        "background-color",
+        "border-color",
+        "border-width",
+        "opacity",
+      ]);
 
-    const color = config["border-color"] || "#3388ff";
-    const weight = config["border-width"]
-      ? parseInt(config["border-width"])
-      : 2;
-    const fill: boolean =
-      !!config["background-color"] &&
-      removeWhitespaces(config["background-color"]) !== "rgba(0,0,0,0)" &&
-      config["opacity"] !== "0";
-    const fillColor = fill ? config["background-color"] : undefined;
+      const color = config["border-color"] || "#3388ff";
+      const weight = config["border-width"]
+        ? parseInt(config["border-width"])
+        : 2;
+      const fill: boolean =
+        !!config["background-color"] &&
+        removeWhitespaces(config["background-color"]) !== "rgba(0,0,0,0)" &&
+        config["opacity"] !== "0";
+      const fillColor = fill ? config["background-color"] : undefined;
 
-    return {
-      color,
-      weight,
-      fill,
-      fillColor,
-      dashArray: dashed ? dashed.join(", ") : undefined,
-      interactive: false,
-    };
-  }, className);
+      return {
+        color,
+        weight,
+        fill,
+        fillColor,
+        dashArray: dashed ? dashed.join(", ") : undefined,
+        interactive: false,
+      };
+    },
+    className,
+  );
 
   return style;
 };
@@ -2154,12 +2158,13 @@ const props = withDefaults(defineProps<LeafletFeatureHandleProps>(), {
   size: 8,
 });
 
-const { withHiddenElement, getTailwindBaseCssValues } = useCssParser();
+const { fetchStylesFromElementClass, getTailwindBaseCssValues } =
+  useCssParser();
 
 const stylesOptions = inject(LeafletBoundingBoxStylesKey, ref());
 
 const tailwindToMarkerHtml = (className: string, size: number | string) => {
-  const styles = withHiddenElement((el: HTMLElement) => {
+  const styles = fetchStylesFromElementClass((el: HTMLElement) => {
     const config = getTailwindBaseCssValues(el, [
       "background-color",
       "border",
@@ -3453,6 +3458,7 @@ import {
   nextTick,
   type Ref,
   type HTMLAttributes,
+  computed,
 } from "vue";
 import { cn } from "@/lib/utils";
 import { LeafletMapKey, LeafletModuleKey } from ".";
@@ -3468,7 +3474,7 @@ const {
   formatArea: formatAreaUtil,
 } = await useLeaflet();
 
-const { getLeafletShapeColors } = useCssParser();
+const { getLeafletShapeColors, parseHTMLToElement } = useCssParser();
 
 export interface LeafletMeasureToolProps {
   enabled?: boolean;
@@ -3530,13 +3536,13 @@ const formatArea = (areaInM2: number): string => {
   return formatAreaUtil(areaInM2, props.unit);
 };
 
+const colors = computed(() => getLeafletShapeColors(props.class));
+
 const createMeasureMarker = (
   latlng: [number, number],
   index: number,
 ): Marker | null => {
   if (!L.value || !map.value) return null;
-
-  const colors = getLeafletShapeColors(props.class);
 
   return L.value
     .marker([latlng[0], latlng[1]], {
@@ -3545,7 +3551,7 @@ const createMeasureMarker = (
         html: `<div style="
         width: 10px;
         height: 10px;
-        background: ${colors.color};
+        background: ${colors.value.color};
         border: 2px solid white;
         border-radius: 50%;
         box-shadow: 0 0 4px rgba(0,0,0,0.3);
@@ -3562,24 +3568,33 @@ const createDistanceLabel = (
 ): Marker | null => {
   if (!L.value || !map.value) return null;
 
-  const colors = getLeafletShapeColors(props.class);
+  const html = `<div style="
+        color: black;
+        background: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        border: 2px solid ${colors.value.color};
+        font-size: 12px;
+        font-weight: bold;
+        white-space: nowrap;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      ">${text}</div>`;
+
+  const [width, height] = parseHTMLToElement((el: HTMLElement) => {
+    return [
+      el.firstChild ? (el.firstChild as HTMLElement).offsetWidth : 80,
+      el.firstChild ? (el.firstChild as HTMLElement).offsetHeight : 20,
+    ];
+  }, html);
+
+  console.log(width, height);
 
   return L.value
     .marker([latlng[0], latlng[1]], {
       icon: L.value.divIcon({
         className: "leaflet-measure-label",
-        html: `<div style="
-        color: black;
-        background: white;
-        padding: 4px 8px;
-        border-radius: 4px;
-        border: 2px solid ${colors.color};
-        font-size: 12px;
-        font-weight: bold;
-        white-space: nowrap;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-      ">${text}</div>`,
-        iconSize: [0, 0],
+        html,
+        iconSize: [width, height],
         iconAnchor: [0, -10],
       }) as DivIcon,
     })
@@ -5990,7 +6005,7 @@ const buildGradientRegExp = () => {
 const RegExpLib = buildGradientRegExp();
 
 export const useCssParser = () => {
-  const withHiddenElement = (
+  const fetchStylesFromElementClass = (
     fn: (el: HTMLElement) => any,
     className: string,
   ) => {
@@ -6001,6 +6016,20 @@ export const useCssParser = () => {
     el.style.visibility = "hidden";
     el.className = className;
     el.style.overflow = "hidden";
+    document.body.appendChild(el);
+    const result = fn(el);
+    document.body.removeChild(el);
+    return result;
+  };
+
+  const parseHTMLToElement = (fn: (el: HTMLElement) => any, html: string) => {
+    const el = document.createElement("div");
+    el.style.visibility = "hidden";
+    el.style.zIndex = "-1000";
+    el.style.position = "absolute";
+    el.style.top = "0";
+    el.style.left = "0";
+    el.innerHTML = html;
     document.body.appendChild(el);
     const result = fn(el);
     document.body.removeChild(el);
@@ -6054,7 +6083,7 @@ export const useCssParser = () => {
         classList = Object.keys(classNames).filter((key) => classNames[key]);
       }
 
-      const cssValues = withHiddenElement(
+      const cssValues = fetchStylesFromElementClass(
         (el) =>
           getTailwindBaseCssValues(el, [
             "border-color",
@@ -6102,7 +6131,7 @@ export const useCssParser = () => {
         classList = Object.keys(classNames).filter((key) => classNames[key]);
       }
 
-      const cssValues = withHiddenElement(
+      const cssValues = fetchStylesFromElementClass(
         (el) =>
           getTailwindBaseCssValues(el, ["border-color", "color", "opacity"]),
         classList.join(" "),
@@ -6188,7 +6217,8 @@ export const useCssParser = () => {
   };
 
   return {
-    withHiddenElement,
+    fetchStylesFromElementClass,
+    parseHTMLToElement,
     getTailwindBaseCssValues,
     getLeafletShapeColors,
     getLeafletLineColors,

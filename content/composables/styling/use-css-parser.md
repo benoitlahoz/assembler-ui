@@ -139,7 +139,7 @@ const buildGradientRegExp = () => {
 const RegExpLib = buildGradientRegExp();
 
 export const useCssParser = () => {
-  const withHiddenElement = (
+  const fetchStylesFromElementClass = (
     fn: (el: HTMLElement) => any,
     className: string,
   ) => {
@@ -150,6 +150,20 @@ export const useCssParser = () => {
     el.style.visibility = "hidden";
     el.className = className;
     el.style.overflow = "hidden";
+    document.body.appendChild(el);
+    const result = fn(el);
+    document.body.removeChild(el);
+    return result;
+  };
+
+  const parseHTMLToElement = (fn: (el: HTMLElement) => any, html: string) => {
+    const el = document.createElement("div");
+    el.style.visibility = "hidden";
+    el.style.zIndex = "-1000";
+    el.style.position = "absolute";
+    el.style.top = "0";
+    el.style.left = "0";
+    el.innerHTML = html;
     document.body.appendChild(el);
     const result = fn(el);
     document.body.removeChild(el);
@@ -203,7 +217,7 @@ export const useCssParser = () => {
         classList = Object.keys(classNames).filter((key) => classNames[key]);
       }
 
-      const cssValues = withHiddenElement(
+      const cssValues = fetchStylesFromElementClass(
         (el) =>
           getTailwindBaseCssValues(el, [
             "border-color",
@@ -251,7 +265,7 @@ export const useCssParser = () => {
         classList = Object.keys(classNames).filter((key) => classNames[key]);
       }
 
-      const cssValues = withHiddenElement(
+      const cssValues = fetchStylesFromElementClass(
         (el) =>
           getTailwindBaseCssValues(el, ["border-color", "color", "opacity"]),
         classList.join(" "),
@@ -337,7 +351,8 @@ export const useCssParser = () => {
   };
 
   return {
-    withHiddenElement,
+    fetchStylesFromElementClass,
+    parseHTMLToElement,
     getTailwindBaseCssValues,
     getLeafletShapeColors,
     getLeafletLineColors,
@@ -357,7 +372,8 @@ Can be undefined if match not found.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `withHiddenElement`{.primary .text-primary} | `any` | — |
+| `fetchStylesFromElementClass`{.primary .text-primary} | `any` | — |
+| `parseHTMLToElement`{.primary .text-primary} | `any` | — |
 | `getTailwindBaseCssValues`{.primary .text-primary} | `any` | — |
 | `getLeafletShapeColors`{.primary .text-primary} | `any` | — |
 | `getLeafletLineColors`{.primary .text-primary} | `any` | — |

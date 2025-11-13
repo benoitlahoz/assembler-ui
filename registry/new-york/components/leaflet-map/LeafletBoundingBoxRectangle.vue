@@ -16,10 +16,10 @@ const props = withDefaults(defineProps<LeafletBoundingBoxRectangleProps>(), {
 
 const stylesOptions = inject(LeafletBoundingBoxStylesKey, ref());
 
-const { withHiddenElement, getTailwindBaseCssValues } = useCssParser();
+const { fetchStylesFromElementClass, getTailwindBaseCssValues } = useCssParser();
 
 const tailwindToBoxOptions = (className: string, dashed?: number[]) => {
-  const style = withHiddenElement((el: HTMLElement): LeafletBoxStyle => {
+  const style = fetchStylesFromElementClass((el: HTMLElement): LeafletBoxStyle => {
     const config = getTailwindBaseCssValues(el, [
       'background-color',
       'border-color',

@@ -103,7 +103,7 @@ const buildGradientRegExp = () => {
 const RegExpLib = buildGradientRegExp();
 
 export const useCssParser = () => {
-  const withHiddenElement = (fn: (el: HTMLElement) => any, className: string) => {
+  const fetchStylesFromElementClass = (fn: (el: HTMLElement) => any, className: string) => {
     const el = document.createElement('div');
     el.style.position = 'absolute';
     el.style.width = '0px';
@@ -111,6 +111,20 @@ export const useCssParser = () => {
     el.style.visibility = 'hidden';
     el.className = className;
     el.style.overflow = 'hidden';
+    document.body.appendChild(el);
+    const result = fn(el);
+    document.body.removeChild(el);
+    return result;
+  };
+
+  const parseHTMLToElement = (fn: (el: HTMLElement) => any, html: string) => {
+    const el = document.createElement('div');
+    el.style.visibility = 'hidden';
+    el.style.zIndex = '-1000';
+    el.style.position = 'absolute';
+    el.style.top = '0';
+    el.style.left = '0';
+    el.innerHTML = html;
     document.body.appendChild(el);
     const result = fn(el);
     document.body.removeChild(el);
@@ -163,7 +177,7 @@ export const useCssParser = () => {
         classList = Object.keys(classNames).filter((key) => classNames[key]);
       }
 
-      const cssValues = withHiddenElement(
+      const cssValues = fetchStylesFromElementClass(
         (el) =>
           getTailwindBaseCssValues(el, ['border-color', 'color', 'background-color', 'opacity']),
         classList.join(' ')
@@ -202,7 +216,7 @@ export const useCssParser = () => {
         classList = Object.keys(classNames).filter((key) => classNames[key]);
       }
 
-      const cssValues = withHiddenElement(
+      const cssValues = fetchStylesFromElementClass(
         (el) => getTailwindBaseCssValues(el, ['border-color', 'color', 'opacity']),
         classList.join(' ')
       );
@@ -293,7 +307,8 @@ export const useCssParser = () => {
   };
 
   return {
-    withHiddenElement,
+    fetchStylesFromElementClass,
+    parseHTMLToElement,
     getTailwindBaseCssValues,
     getLeafletShapeColors,
     getLeafletLineColors,
