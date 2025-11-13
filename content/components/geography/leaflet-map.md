@@ -1040,6 +1040,7 @@ export interface LeafletCanvasProps {
   draggable?: boolean;
   selectable?: boolean;
   subdivisions?: number;
+  opacity?: number;
   class?: HTMLAttributes["class"];
 }
 
@@ -1056,6 +1057,7 @@ const props = withDefaults(defineProps<LeafletCanvasProps>(), {
   draggable: false,
   selectable: false,
   subdivisions: 20,
+  opacity: 1,
 });
 
 const emit = defineEmits<{
@@ -1337,6 +1339,8 @@ const drawWarpedGrid = (corners: Array<{ x: number; y: number }>) => {
 
   ctx.value.clearRect(0, 0, canvasLayer.value.width, canvasLayer.value.height);
 
+  ctx.value.globalAlpha = props.opacity;
+
   for (let i = 0; i < subs; i++) {
     for (let j = 0; j < subs; j++) {
       const u0 = i / subs,
@@ -1386,6 +1390,8 @@ const drawWarpedGrid = (corners: Array<{ x: number; y: number }>) => {
       }
     }
   }
+
+  ctx.value.globalAlpha = 1;
 };
 
 const drawOutline = (corners: Array<{ x: number; y: number }>) => {
@@ -7283,6 +7289,7 @@ export type UseQuadtreeReturn<T extends Rect = Rect> = ReturnType<
 | `draggable`{.primary .text-primary} | `boolean` | false |  |
 | `selectable`{.primary .text-primary} | `boolean` | false |  |
 | `subdivisions`{.primary .text-primary} | `number` | 20 |  |
+| `opacity`{.primary .text-primary} | `number` | 1 |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
   ### Slots
@@ -7859,6 +7866,7 @@ const canvasCorners = ref([
 
 const isEditable = ref(false);
 const isDraggable = ref(false);
+const canvasOpacity = ref(1);
 
 const sourceCanvas = ref<HTMLCanvasElement | null>(null);
 
@@ -8005,6 +8013,24 @@ const animateCanvas = () => {
         >
           Animer
         </button>
+
+        <div class="flex items-center gap-2">
+          <label for="opacity-slider" class="text-sm font-medium text-gray-700">
+            Opacité:
+          </label>
+          <input
+            id="opacity-slider"
+            type="range"
+            min="0"
+            max="1"
+            step="0.1"
+            v-model.number="canvasOpacity"
+            class="w-32"
+          />
+          <span class="text-sm text-gray-600 w-12"
+            >{{ (canvasOpacity * 100).toFixed(0) }}%</span
+          >
+        </div>
       </div>
 
       <div class="h-128 min-h-128">
@@ -8033,6 +8059,7 @@ const animateCanvas = () => {
             :editable="isEditable"
             :draggable="isDraggable"
             :subdivisions="20"
+            :opacity="canvasOpacity"
             class="border border-purple-500 bg-purple-500/30"
             @canvas-ready="onCanvasReady"
             @update:corners="(corners) => (canvasCorners = corners)"
@@ -8047,6 +8074,7 @@ const animateCanvas = () => {
         <ul class="list-disc list-inside space-y-1">
           <li>Activez l'édition pour déplacer les 4 coins du canvas</li>
           <li>Activez le déplacement pour déplacer tout le canvas</li>
+          <li>Ajustez l'opacité avec le slider</li>
           <li>Cliquez sur "Animer" pour voir une animation sur le canvas</li>
           <li>
             Le canvas est subdivisé en grille pour une meilleure déformation

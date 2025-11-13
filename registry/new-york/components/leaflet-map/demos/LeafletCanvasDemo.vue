@@ -32,6 +32,7 @@ const canvasCorners = ref([
 
 const isEditable = ref(false);
 const isDraggable = ref(false);
+const canvasOpacity = ref(1);
 
 // Référence au canvas source pour pouvoir le redessiner
 const sourceCanvas = ref<HTMLCanvasElement | null>(null);
@@ -185,6 +186,20 @@ const animateCanvas = () => {
         >
           Animer
         </button>
+
+        <div class="flex items-center gap-2">
+          <label for="opacity-slider" class="text-sm font-medium text-gray-700"> Opacité: </label>
+          <input
+            id="opacity-slider"
+            type="range"
+            min="0"
+            max="1"
+            step="0.1"
+            v-model.number="canvasOpacity"
+            class="w-32"
+          />
+          <span class="text-sm text-gray-600 w-12">{{ (canvasOpacity * 100).toFixed(0) }}%</span>
+        </div>
       </div>
 
       <!-- Carte -->
@@ -215,6 +230,7 @@ const animateCanvas = () => {
             :editable="isEditable"
             :draggable="isDraggable"
             :subdivisions="20"
+            :opacity="canvasOpacity"
             class="border border-purple-500 bg-purple-500/30"
             @canvas-ready="onCanvasReady"
             @update:corners="(corners) => (canvasCorners = corners)"
@@ -230,6 +246,7 @@ const animateCanvas = () => {
         <ul class="list-disc list-inside space-y-1">
           <li>Activez l'édition pour déplacer les 4 coins du canvas</li>
           <li>Activez le déplacement pour déplacer tout le canvas</li>
+          <li>Ajustez l'opacité avec le slider</li>
           <li>Cliquez sur "Animer" pour voir une animation sur le canvas</li>
           <li>Le canvas est subdivisé en grille pour une meilleure déformation</li>
         </ul>

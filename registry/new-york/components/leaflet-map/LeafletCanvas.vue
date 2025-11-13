@@ -17,6 +17,7 @@ export interface LeafletCanvasProps {
   draggable?: boolean;
   selectable?: boolean;
   subdivisions?: number;
+  opacity?: number;
   class?: HTMLAttributes['class'];
 }
 
@@ -33,6 +34,7 @@ const props = withDefaults(defineProps<LeafletCanvasProps>(), {
   draggable: false,
   selectable: false,
   subdivisions: 20,
+  opacity: 1,
 });
 
 const emit = defineEmits<{
@@ -296,6 +298,9 @@ const drawWarpedGrid = (corners: Array<{ x: number; y: number }>) => {
 
   ctx.value.clearRect(0, 0, canvasLayer.value.width, canvasLayer.value.height);
 
+  // Appliquer l'opacité globale
+  ctx.value.globalAlpha = props.opacity;
+
   for (let i = 0; i < subs; i++) {
     for (let j = 0; j < subs; j++) {
       const u0 = i / subs,
@@ -328,6 +333,9 @@ const drawWarpedGrid = (corners: Array<{ x: number; y: number }>) => {
       }
     }
   }
+
+  // Réinitialiser l'opacité pour le contour
+  ctx.value.globalAlpha = 1;
 };
 
 const drawOutline = (corners: Array<{ x: number; y: number }>) => {
@@ -337,7 +345,7 @@ const drawOutline = (corners: Array<{ x: number; y: number }>) => {
   const colors = getLeafletShapeColors(props.class);
 
   ctx.value.beginPath();
-  
+
   if (corners[0]) {
     ctx.value.moveTo(corners[0].x, corners[0].y);
   }
@@ -350,7 +358,7 @@ const drawOutline = (corners: Array<{ x: number; y: number }>) => {
   if (corners[3]) {
     ctx.value.lineTo(corners[3].x, corners[3].y);
   }
-  
+
   ctx.value.closePath();
 
   // Appliquer le stroke avec la couleur extraite
@@ -378,7 +386,7 @@ const draw = () => {
   });
 
   drawWarpedGrid(corners);
-  
+
   // Dessiner le contour si en mode édition ou draggable
   if (props.editable || props.draggable) {
     drawOutline(corners);
