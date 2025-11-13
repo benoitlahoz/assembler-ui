@@ -50,7 +50,6 @@ const selectionContext = inject(LeafletSelectionKey, undefined);
 const canvasLayer = ref<HTMLCanvasElement | null>(null);
 const sourceCanvas = ref<HTMLCanvasElement | null>(null);
 const gl = ref<WebGLRenderingContext | null>(null);
-const overlayCtx = ref<CanvasRenderingContext2D | null>(null); // Pour le contour
 const editMarkers = ref<L.Marker[]>([]);
 const canvasId = ref<string | number>(props.id ?? `canvas-${Date.now()}-${Math.random()}`);
 const isDragging = ref(false);
