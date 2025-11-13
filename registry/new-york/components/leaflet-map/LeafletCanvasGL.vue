@@ -11,6 +11,7 @@ import {
 } from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
 import { useColors } from '~~/registry/new-york/composables/use-colors/useColors';
+import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
 import {
   LeafletMapKey,
   LeafletModuleKey,
@@ -20,6 +21,8 @@ import {
 } from '.';
 import type { FeatureReference } from './LeafletFeaturesSelector.vue';
 import './leaflet-editing.css';
+
+const { LatDegreesMeters, lngDegreesToRadius } = await useLeaflet();
 
 export interface LeafletCanvasGLProps {
   id?: string | number;
@@ -531,8 +534,8 @@ const draw = () => {
 
   drawWarpedGrid(corners);
 
-  // Dessiner le contour si en mode édition ou draggable
-  if (props.editable || props.draggable) {
+  // Dessiner le contour seulement en mode édition (pour déformer)
+  if (props.editable) {
     drawOutline(corners);
   }
 };
@@ -554,8 +557,64 @@ const registerWithSelection = () => {
       const latlngs = props.corners.map((c) => L.value!.latLng(c.lat, c.lng));
       return L.value!.latLngBounds(latlngs);
     },
-    applyTransform: () => {
-      // Transformation non supportée pour canvas
+    getInitialData: () => {
+      return props.corners.map((c) => [c.lat, c.lng] as [number, number]);
+    },
+    applyTransform: (bounds: L.LatLngBounds) => {
+      if (!L.value) return;
+
+      const currentBounds = L.value.latLngBounds(
+        props.corners.map((c) => L.value!.latLng(c.lat, c.lng))
+      );
+      const currentCenter = currentBounds.getCenter();
+      const newCenter = bounds.getCenter();
+
+      const scaleX =
+        (bounds.getEast() - bounds.getWest()) / (currentBounds.getEast() - currentBounds.getWest());
+      const scaleY =
+        (bounds.getNorth() - bounds.getSouth()) /
+        (currentBounds.getNorth() - currentBounds.getSouth());
+
+      const newCorners = props.corners.map((corner) => {
+        const relativeX = (corner.lng - currentCenter.lng) * scaleX;
+        const relativeY = (corner.lat - currentCenter.lat) * scaleY;
+        return {
+          lat: newCenter.lat + relativeY,
+          lng: newCenter.lng + relativeX,
+        };
+      });
+
+      emit('update:corners', newCorners);
+    },
+    applyRotation: (
+      angle: number,
+      center: { lat: number; lng: number },
+      initialCorners: Array<[number, number]>
+    ) => {
+      if (!L.value || !initialCorners) return;
+
+      const angleRad = (-angle * Math.PI) / 180;
+
+      const metersPerDegreeLat = LatDegreesMeters;
+      const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
+
+      const newCorners = initialCorners.map((corner) => {
+        const lat = corner[0];
+        const lng = corner[1];
+
+        const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+        const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+
+        const newRelMetersY = relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+        const newRelMetersX = relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+
+        return {
+          lat: center.lat + newRelMetersY / metersPerDegreeLat,
+          lng: center.lng + newRelMetersX / metersPerDegreeLng,
+        };
+      });
+
+      emit('update:corners', newCorners);
     },
   };
   selectionContext.registerFeature(feature);

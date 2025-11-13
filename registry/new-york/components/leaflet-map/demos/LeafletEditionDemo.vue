@@ -459,6 +459,7 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
               :corners="canvasCorners"
               :width="400"
               :height="300"
+              :selectable="currentMode === 'select'"
               :editable="currentMode === 'direct-select'"
               :draggable="currentMode === 'select'"
               :subdivisions="20"
