@@ -20,7 +20,7 @@ type LeafletCanvasInstance = ComponentPublicInstance & {
 
 const mapRef = ref<LeafletMapInstance | null>(null);
 const canvasRef = ref<LeafletCanvasInstance | null>(null);
-const zoom = ref(13);
+const zoom = ref(15);
 
 // Coins du canvas (ordre: top-left, top-right, bottom-right, bottom-left)
 const canvasCorners = ref([
@@ -32,7 +32,7 @@ const canvasCorners = ref([
 
 const isEditable = ref(false);
 const isDraggable = ref(false);
-const canvasOpacity = ref(0.7);
+const canvasOpacity = ref(0.85);
 
 // Référence au canvas source pour pouvoir le redessiner
 const sourceCanvas = ref<HTMLCanvasElement | null>(null);
