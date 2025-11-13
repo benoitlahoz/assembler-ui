@@ -8,7 +8,7 @@ description: Index file for input components
     <simple-input-demo />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { SimpleInput } from "@/components/ui/simple-input";
@@ -356,7 +356,7 @@ A very simple example of SimpleInput usage.
     <simple-input-demo-bis />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { SimpleInput } from "@/components/ui/simple-input";

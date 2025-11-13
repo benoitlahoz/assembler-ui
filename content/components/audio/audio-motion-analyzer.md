@@ -8,7 +8,7 @@ description:
     <audio-motion-simple />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";
@@ -4382,7 +4382,7 @@ export function drawWaveforms({
     <audio-visualizer-simple />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";

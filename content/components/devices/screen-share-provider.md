@@ -10,7 +10,7 @@ description: A renderless provider component that manages screen sharing functio
     <screen-share-provider-demo-simple />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { Badge } from "@/components/ui/badge";
@@ -669,7 +669,7 @@ If true, will call startShare() on mount if not already sharing. |
     <screen-share-provider-demo-advanced />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref, computed } from "vue";

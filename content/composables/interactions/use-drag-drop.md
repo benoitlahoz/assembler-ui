@@ -8,7 +8,7 @@ description: useDragDrop - Composable pour gérer le drag and drop avec intersec
     <file-list-demo />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref, computed } from "vue";
@@ -677,7 +677,7 @@ export class DragDropUtils {
     <timeline-demo />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref, computed } from "vue";
@@ -1038,7 +1038,7 @@ const removeEvent = (id: string) => {
     <kanban-demo />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";
@@ -1199,7 +1199,7 @@ const columnConfig = {
     <palette-canvas-demo />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";
@@ -1508,7 +1508,7 @@ const selectedItem = ref<string | null>(null);
     <free-layout-demo />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";
@@ -1763,7 +1763,7 @@ const addWidget = (type: Widget["type"]) => {
     <adaptive-mode-demo />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 
 <script setup lang="ts">

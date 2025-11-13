@@ -10,7 +10,7 @@ description: A renderless provider component that supplies media devices informa
     <media-devices-simple />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { nextTick, ref } from "vue";
@@ -1607,7 +1607,7 @@ to select the appropriate camera automatically.
     <media-devices-provider-demo-simple />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";
@@ -1694,7 +1694,7 @@ Select a camera from the list. The provider caches streams to avoid reopening th
     <media-device-demo-simple />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref, watch } from "vue";
@@ -1890,7 +1890,7 @@ Select a camera and quality preset. The provider caches streams efficiently when
     <media-device-demo-presets />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref, computed } from "vue";
@@ -2184,7 +2184,7 @@ Open two devices simultaneously. If you select the same device for both, the pro
     <media-device-demo-multiple />
   :::
 
-  :::tabs-item{icon="i-lucide-code" label="Code"}
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";

@@ -194,6 +194,43 @@ export const useLeaflet = async () => {
     }
   };
 
+  const calculateMidpoint = (
+    point1: LatLng,
+    point2: LatLng,
+  ): [number, number] => {
+    const midLat = (point1.lat + point2.lat) / 2;
+    const midLng = (point1.lng + point2.lng) / 2;
+    return [midLat, midLng];
+  };
+
+  const calculateRadiusPoint = (
+    center: LatLng,
+    radiusInMeters: number,
+  ): [number, number] => {
+    const lat = center.lat;
+    const lng = center.lng + radiusToLngDegrees(radiusInMeters, center.lat);
+    return [lat, lng];
+  };
+
+  const calculateCircleBounds = (
+    center: LatLng,
+    radiusInMeters: number,
+  ): { southWest: [number, number]; northEast: [number, number] } => {
+    const radiusInLatDegrees = radiusToLatDegrees(radiusInMeters);
+    const radiusInLngDegrees = radiusToLngDegrees(radiusInMeters, center.lat);
+
+    return {
+      southWest: [
+        center.lat - radiusInLatDegrees,
+        center.lng - radiusInLngDegrees,
+      ],
+      northEast: [
+        center.lat + radiusInLatDegrees,
+        center.lng + radiusInLngDegrees,
+      ],
+    };
+  };
+
   return {
     L,
     LatDegreesMeters,
@@ -208,8 +245,13 @@ export const useLeaflet = async () => {
     calculatePolygonArea,
     calculateCentroid,
     calculateDistance,
+
     formatDistance,
     formatArea,
+
+    calculateMidpoint,
+    calculateRadiusPoint,
+    calculateCircleBounds,
   };
 };
 ```
@@ -225,17 +267,20 @@ export const useLeaflet = async () => {
 |----------|------|-------------|
 | `L`{.primary .text-primary} | `any` | — |
 | `LatDegreesMeters`{.primary .text-primary} | `any` | — |
-| `radiusToLatDegrees`{.primary .text-primary} | `any` | Conversions degrés/mètres (existantes) |
+| `radiusToLatDegrees`{.primary .text-primary} | `any` | Conversions degrés/mètres |
 | `latDegreesToRadius`{.primary .text-primary} | `any` | — |
 | `radiusToLngDegrees`{.primary .text-primary} | `any` | — |
 | `lngDegreesToRadius`{.primary .text-primary} | `any` | — |
-| `toGeoJSONCoords`{.primary .text-primary} | `any` | Nouvelles fonctions Turf.js |
+| `toGeoJSONCoords`{.primary .text-primary} | `any` | Fonctions Turf.js (géométrie) |
 | `calculateLineDistance`{.primary .text-primary} | `any` | — |
 | `calculatePolygonArea`{.primary .text-primary} | `any` | — |
 | `calculateCentroid`{.primary .text-primary} | `any` | — |
 | `calculateDistance`{.primary .text-primary} | `any` | — |
-| `formatDistance`{.primary .text-primary} | `any` | — |
+| `formatDistance`{.primary .text-primary} | `any` | Formatage |
 | `formatArea`{.primary .text-primary} | `any` | — |
+| `calculateMidpoint`{.primary .text-primary} | `any` | Calculs utilitaires |
+| `calculateRadiusPoint`{.primary .text-primary} | `any` | — |
+| `calculateCircleBounds`{.primary .text-primary} | `any` | — |
 
   ### Types
 | Name | Type | Description |
