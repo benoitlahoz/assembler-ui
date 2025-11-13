@@ -81,6 +81,7 @@ export type { LeafletCircleProps } from './LeafletCircle.vue';
 export type { LeafletPolylineProps } from './LeafletPolyline.vue';
 export type { LeafletPolygonProps } from './LeafletPolygon.vue';
 export type { LeafletRectangleProps } from './LeafletRectangle.vue';
-export type { LeafletCanvasProps } from './LeafletCanvasGL.vue';
+export type { LeafletCanvasProps, LeafletCanvasStyles } from './LeafletCanvas.vue';
+export type { LeafletCanvasGLProps } from './LeafletCanvasGL.vue';
 export type { LeafletVirtualizeProps } from './LeafletVirtualize.vue';
 export type { LeafletMeasureToolProps } from './LeafletMeasureTool.vue';

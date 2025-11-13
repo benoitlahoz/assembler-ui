@@ -209,7 +209,11 @@ export type { LeafletCircleProps } from "./LeafletCircle.vue";
 export type { LeafletPolylineProps } from "./LeafletPolyline.vue";
 export type { LeafletPolygonProps } from "./LeafletPolygon.vue";
 export type { LeafletRectangleProps } from "./LeafletRectangle.vue";
-export type { LeafletCanvasProps } from "./LeafletCanvasGL.vue";
+export type {
+  LeafletCanvasProps,
+  LeafletCanvasStyles,
+} from "./LeafletCanvas.vue";
+export type { LeafletCanvasGLProps } from "./LeafletCanvasGL.vue";
 export type { LeafletVirtualizeProps } from "./LeafletVirtualize.vue";
 export type { LeafletMeasureToolProps } from "./LeafletMeasureTool.vue";
 ```
@@ -1023,11 +1027,22 @@ import {
   nextTick,
   onBeforeUnmount,
   type HTMLAttributes,
+  provide,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
+import {
+  LeafletMapKey,
+  LeafletModuleKey,
+  LeafletSelectionKey,
+  LeafletStylesKey,
+  type LeafletFeatureHandleStyle,
+} from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
+
+export interface LeafletCanvasStyles {
+  corner: LeafletFeatureHandleStyle;
+}
 
 export interface LeafletCanvasProps {
   id?: string | number;
@@ -1071,6 +1086,16 @@ const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const selectionContext = inject(LeafletSelectionKey, undefined);
 
+const stylesOptions = ref<LeafletCanvasStyles>({
+  corner: {
+    className: "leaflet-feature-handle leaflet-handle-corner-canvas",
+    html: '<div style="background:#3388ff;border:2px solid #fff;"></div>',
+    iconSize: [10, 10],
+  },
+});
+
+provide(LeafletStylesKey, stylesOptions);
+
 const canvasLayer = ref<HTMLCanvasElement | null>(null);
 const sourceCanvas = ref<HTMLCanvasElement | null>(null);
 const ctx = ref<CanvasRenderingContext2D | null>(null);
@@ -1107,11 +1132,7 @@ const enableEditing = () => {
   props.corners.forEach((corner, index) => {
     const marker = L.value!.marker([corner.lat, corner.lng], {
       draggable: true,
-      icon: L.value!.divIcon({
-        className: "leaflet-editing-icon",
-        html: '<div style="background:#fff;border:2px solid #ff3388;"></div>',
-        iconSize: [10, 10],
-      }),
+      icon: L.value!.divIcon(stylesOptions.value.corner),
     }).addTo(map.value!);
 
     marker.on("drag", () => {
@@ -1134,10 +1155,6 @@ const enableEditing = () => {
 
     editMarkers.value.push(marker);
   });
-};
-
-const disableEditing = () => {
-  clearEditMarkers();
 };
 
 let mouseDownHandler: ((e: MouseEvent) => void) | null = null;
@@ -1405,7 +1422,7 @@ const drawOutline = (corners: Array<{ x: number; y: number }>) => {
   ctx.value.closePath();
 
   ctx.value.strokeStyle = colors.color || "#3388ff";
-  ctx.value.lineWidth = 2;
+  ctx.value.lineWidth = colors.weight || 2;
   ctx.value.stroke();
 };
 
@@ -1589,13 +1606,21 @@ import {
   nextTick,
   onBeforeUnmount,
   type HTMLAttributes,
+  provide,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
+import { useColors } from "~~/registry/new-york/composables/use-colors/useColors";
+import {
+  LeafletMapKey,
+  LeafletModuleKey,
+  LeafletSelectionKey,
+  LeafletStylesKey,
+  type LeafletCanvasStyles,
+} from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
 
-export interface LeafletCanvasProps {
+export interface LeafletCanvasGLProps {
   id?: string | number;
   corners?: Array<{ lat: number; lng: number }>;
   width?: number;
@@ -1608,7 +1633,7 @@ export interface LeafletCanvasProps {
   class?: HTMLAttributes["class"];
 }
 
-const props = withDefaults(defineProps<LeafletCanvasProps>(), {
+const props = withDefaults(defineProps<LeafletCanvasGLProps>(), {
   corners: () => [
     { lat: 48.86, lng: 2.35 },
     { lat: 48.86, lng: 2.36 },
@@ -1632,15 +1657,25 @@ const emit = defineEmits<{
 }>();
 
 const { getLeafletShapeColors } = useCssParser();
+const { parseColor: parseColorUtil } = useColors();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const selectionContext = inject(LeafletSelectionKey, undefined);
 
+const stylesOptions = ref<LeafletCanvasStyles>({
+  corner: {
+    className: "leaflet-feature-handle leaflet-handle-corner-canvas",
+    html: '<div style="background:#3388ff;border:2px solid #fff;"></div>',
+    iconSize: [10, 10],
+  },
+});
+
+provide(LeafletStylesKey, stylesOptions);
+
 const canvasLayer = ref<HTMLCanvasElement | null>(null);
 const sourceCanvas = ref<HTMLCanvasElement | null>(null);
 const gl = ref<WebGLRenderingContext | null>(null);
-const overlayCtx = ref<CanvasRenderingContext2D | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
 const canvasId = ref<string | number>(
   props.id ?? `canvas-${Date.now()}-${Math.random()}`,
@@ -1678,11 +1713,7 @@ const enableEditing = () => {
   props.corners.forEach((corner, index) => {
     const marker = L.value!.marker([corner.lat, corner.lng], {
       draggable: true,
-      icon: L.value!.divIcon({
-        className: "leaflet-editing-icon",
-        html: '<div style="background:#fff;border:2px solid #ff3388;"></div>',
-        iconSize: [10, 10],
-      }),
+      icon: L.value!.divIcon(stylesOptions.value.corner),
     }).addTo(map.value!);
 
     marker.on("drag", () => {
@@ -1705,10 +1736,6 @@ const enableEditing = () => {
 
     editMarkers.value.push(marker);
   });
-};
-
-const disableEditing = () => {
-  clearEditMarkers();
 };
 
 let mouseDownHandler: ((e: MouseEvent) => void) | null = null;
@@ -2013,41 +2040,7 @@ const drawOutline = (corners: Array<{ x: number; y: number }>) => {
 
   const colors = getLeafletShapeColors(props.class);
 
-  const parseColor = (color: string) => {
-    const defaultColor = { r: 0.2, g: 0.53, b: 1.0 };
-
-    if (!color) return defaultColor;
-
-    if (color.startsWith("#")) {
-      const hex = color.replace("#", "");
-      if (hex.length === 3 && hex[0] && hex[1] && hex[2]) {
-        return {
-          r: parseInt(hex[0] + hex[0], 16) / 255,
-          g: parseInt(hex[1] + hex[1], 16) / 255,
-          b: parseInt(hex[2] + hex[2], 16) / 255,
-        };
-      } else if (hex.length === 6) {
-        return {
-          r: parseInt(hex.substring(0, 2), 16) / 255,
-          g: parseInt(hex.substring(2, 4), 16) / 255,
-          b: parseInt(hex.substring(4, 6), 16) / 255,
-        };
-      }
-    }
-
-    const rgbMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-    if (rgbMatch && rgbMatch[1] && rgbMatch[2] && rgbMatch[3]) {
-      return {
-        r: parseInt(rgbMatch[1]) / 255,
-        g: parseInt(rgbMatch[2]) / 255,
-        b: parseInt(rgbMatch[3]) / 255,
-      };
-    }
-
-    return defaultColor;
-  };
-
-  const rgb = parseColor(colors.color || "#3388ff");
+  const rgb = parseColorUtil(colors.color || "#3388ff");
 
   const lineVertexShaderSource = `
     attribute vec2 a_position;
@@ -2082,7 +2075,7 @@ const drawOutline = (corners: Array<{ x: number; y: number }>) => {
   gl.value.linkProgram(lineProgram);
   gl.value.useProgram(lineProgram);
 
-  const lineWidth = 2;
+  const lineWidth = colors.weight || 2;
   const linePositions: number[] = [];
 
   const addThickLine = (
@@ -7569,6 +7562,7 @@ export const useCssParser = () => {
         color: "#3388ff",
         fillColor: "#3388ff",
         fillOpacity: 0.2,
+        weight: 2,
       };
     }
 
@@ -7589,6 +7583,7 @@ export const useCssParser = () => {
             "color",
             "background-color",
             "opacity",
+            "border-width",
           ]),
         classList.join(" "),
       );
@@ -7599,6 +7594,9 @@ export const useCssParser = () => {
         fillOpacity: cssValues["opacity"]
           ? parseFloat(cssValues["opacity"])
           : 0.2,
+        weight: cssValues["border-width"]
+          ? parseFloat(cssValues["border-width"])
+          : 2,
       };
     } catch (err) {
       console.error("Error in getLeafletShapeColors:", err);
@@ -7606,6 +7604,7 @@ export const useCssParser = () => {
         color: "#3388ff",
         fillColor: "#3388ff",
         fillOpacity: 0.2,
+        weight: 2,
       };
     }
   };
@@ -7722,6 +7721,170 @@ export const useCssParser = () => {
     getLeafletShapeColors,
     getLeafletLineColors,
     parseGradient,
+  };
+};
+```
+
+```ts [src/composables/use-colors/useColors.ts]
+export const useColors = () => {
+  const oklchToRgb = (
+    l: number,
+    c: number,
+    h: number,
+  ): { r: number; g: number; b: number } => {
+    const hRad = (h * Math.PI) / 180;
+
+    const a = c * Math.cos(hRad);
+    const b = c * Math.sin(hRad);
+
+    const l_ = l + 0.3963377774 * a + 0.2158037573 * b;
+    const m_ = l - 0.1055613458 * a - 0.0638541728 * b;
+    const s_ = l - 0.0894841775 * a - 1.291485548 * b;
+
+    const l3 = l_ * l_ * l_;
+    const m3 = m_ * m_ * m_;
+    const s3 = s_ * s_ * s_;
+
+    let r = +4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3;
+    let g = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3;
+    let bl = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3;
+
+    const gammaCorrect = (val: number): number => {
+      if (val <= 0.0031308) {
+        return 12.92 * val;
+      }
+      return 1.055 * Math.pow(val, 1 / 2.4) - 0.055;
+    };
+
+    r = gammaCorrect(r);
+    g = gammaCorrect(g);
+    bl = gammaCorrect(bl);
+
+    r = Math.max(0, Math.min(1, r));
+    g = Math.max(0, Math.min(1, g));
+    bl = Math.max(0, Math.min(1, bl));
+
+    return { r, g, b: bl };
+  };
+
+  const oklabToRgb = (
+    l: number,
+    a: number,
+    b: number,
+  ): { r: number; g: number; b: number } => {
+    const l_ = l + 0.3963377774 * a + 0.2158037573 * b;
+    const m_ = l - 0.1055613458 * a - 0.0638541728 * b;
+    const s_ = l - 0.0894841775 * a - 1.291485548 * b;
+
+    const l3 = l_ * l_ * l_;
+    const m3 = m_ * m_ * m_;
+    const s3 = s_ * s_ * s_;
+
+    let r = +4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3;
+    let g = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3;
+    let bl = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3;
+
+    const gammaCorrect = (val: number): number => {
+      if (val <= 0.0031308) {
+        return 12.92 * val;
+      }
+      return 1.055 * Math.pow(val, 1 / 2.4) - 0.055;
+    };
+
+    r = gammaCorrect(r);
+    g = gammaCorrect(g);
+    bl = gammaCorrect(bl);
+
+    r = Math.max(0, Math.min(1, r));
+    g = Math.max(0, Math.min(1, g));
+    bl = Math.max(0, Math.min(1, bl));
+
+    return { r, g, b: bl };
+  };
+
+  const parseOklchOrOklab = (
+    colorString: string,
+  ): { r: number; g: number; b: number } | null => {
+    const defaultColor = { r: 0.2, g: 0.53, b: 1.0 };
+
+    const oklchMatch = colorString.match(
+      /oklch\(\s*([\d.]+)%?\s+([\d.]+)\s+([\d.]+)(?:deg)?\s*(?:\/\s*([\d.]+%?))?\s*\)/i,
+    );
+    if (oklchMatch) {
+      let l = parseFloat(oklchMatch[1]!);
+      const c = parseFloat(oklchMatch[2]!);
+      const h = parseFloat(oklchMatch[3]!);
+
+      if (oklchMatch[1]!.includes("%") || l > 1) {
+        l = l / 100;
+      }
+
+      return oklchToRgb(l, c, h);
+    }
+
+    const oklabMatch = colorString.match(
+      /oklab\(\s*([\d.]+)%?\s+([-\d.]+)\s+([-\d.]+)\s*(?:\/\s*([\d.]+%?))?\s*\)/i,
+    );
+    if (oklabMatch) {
+      let l = parseFloat(oklabMatch[1]!);
+      const a = parseFloat(oklabMatch[2]!);
+      const b = parseFloat(oklabMatch[3]!);
+
+      if (oklabMatch[1]!.includes("%") || l > 1) {
+        l = l / 100;
+      }
+
+      return oklabToRgb(l, a, b);
+    }
+
+    return null;
+  };
+
+  const parseColor = (color: string): { r: number; g: number; b: number } => {
+    const defaultColor = { r: 0.2, g: 0.53, b: 1.0 };
+
+    if (!color) return defaultColor;
+
+    if (color.startsWith("oklch") || color.startsWith("oklab")) {
+      const result = parseOklchOrOklab(color);
+      if (result) return result;
+      return defaultColor;
+    }
+
+    if (color.startsWith("#")) {
+      const hex = color.replace("#", "");
+      if (hex.length === 3 && hex[0] && hex[1] && hex[2]) {
+        return {
+          r: parseInt(hex[0] + hex[0], 16) / 255,
+          g: parseInt(hex[1] + hex[1], 16) / 255,
+          b: parseInt(hex[2] + hex[2], 16) / 255,
+        };
+      } else if (hex.length === 6) {
+        return {
+          r: parseInt(hex.substring(0, 2), 16) / 255,
+          g: parseInt(hex.substring(2, 4), 16) / 255,
+          b: parseInt(hex.substring(4, 6), 16) / 255,
+        };
+      }
+    }
+
+    const rgbMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (rgbMatch && rgbMatch[1] && rgbMatch[2] && rgbMatch[3]) {
+      return {
+        r: parseInt(rgbMatch[1]) / 255,
+        g: parseInt(rgbMatch[2]) / 255,
+        b: parseInt(rgbMatch[3]) / 255,
+      };
+    }
+
+    return defaultColor;
+  };
+
+  return {
+    oklchToRgb,
+    oklabToRgb,
+    parseOklchOrOklab,
+    parseColor,
   };
 };
 ```
@@ -8068,6 +8231,11 @@ export type UseQuadtreeReturn<T extends Rect = Rect> = ReturnType<
 |------|-------------|
 | `default`{.primary .text-primary} | — |
 
+  ### Provide
+| Key | Value | Type | Description |
+|-----|-------|------|-------------|
+| `LeafletStylesKey`{.primary .text-primary} | `stylesOptions` | `any` | — |
+
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
@@ -8107,6 +8275,11 @@ export type UseQuadtreeReturn<T extends Rect = Rect> = ReturnType<
 | Name | Description |
 |------|-------------|
 | `default`{.primary .text-primary} | — |
+
+  ### Provide
+| Key | Value | Type | Description |
+|-----|-------|------|-------------|
+| `LeafletStylesKey`{.primary .text-primary} | `stylesOptions` | `any` | — |
 
   ### Inject
 | Key | Default | Type | Description |
@@ -9543,10 +9716,16 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
           :draggable="currentMode === 'select'"
           :subdivisions="20"
           :opacity="canvasOpacity"
-          class="border border-purple-500"
+          class="border border-red-500"
           @canvas-ready="onCanvasReady"
           @update:corners="(corners) => (canvasCorners = corners)"
-        />
+        >
+          <LeafletFeatureHandle
+            role="corner"
+            class="border border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+            :size="10"
+          />
+        </LeafletCanvasGL>
       </LeafletMap>
     </div>
   </div>

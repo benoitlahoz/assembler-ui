@@ -164,6 +164,7 @@ export const useCssParser = () => {
         color: '#3388ff',
         fillColor: '#3388ff',
         fillOpacity: 0.2,
+        weight: 2,
       };
     }
 
@@ -179,7 +180,13 @@ export const useCssParser = () => {
 
       const cssValues = fetchStylesFromElementClass(
         (el) =>
-          getTailwindBaseCssValues(el, ['border-color', 'color', 'background-color', 'opacity']),
+          getTailwindBaseCssValues(el, [
+            'border-color',
+            'color',
+            'background-color',
+            'opacity',
+            'border-width',
+          ]),
         classList.join(' ')
       );
 
@@ -187,6 +194,7 @@ export const useCssParser = () => {
         color: cssValues['border-color'] || cssValues['color'] || '#3388ff',
         fillColor: cssValues['background-color'] || '#3388ff',
         fillOpacity: cssValues['opacity'] ? parseFloat(cssValues['opacity']) : 0.2,
+        weight: cssValues['border-width'] ? parseFloat(cssValues['border-width']) : 2,
       };
     } catch (err) {
       console.error('Error in getLeafletShapeColors:', err);
@@ -194,6 +202,7 @@ export const useCssParser = () => {
         color: '#3388ff',
         fillColor: '#3388ff',
         fillOpacity: 0.2,
+        weight: 2,
       };
     }
   };

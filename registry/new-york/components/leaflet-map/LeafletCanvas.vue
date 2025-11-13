@@ -1,9 +1,28 @@
 <script setup lang="ts">
-import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount, type HTMLAttributes } from 'vue';
+import {
+  inject,
+  watch,
+  ref,
+  type Ref,
+  nextTick,
+  onBeforeUnmount,
+  type HTMLAttributes,
+  provide,
+} from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
-import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from '.';
+import {
+  LeafletMapKey,
+  LeafletModuleKey,
+  LeafletSelectionKey,
+  LeafletStylesKey,
+  type LeafletFeatureHandleStyle,
+} from '.';
 import type { FeatureReference } from './LeafletFeaturesSelector.vue';
 import './leaflet-editing.css';
+
+export interface LeafletCanvasStyles {
+  corner: LeafletFeatureHandleStyle;
+}
 
 export interface LeafletCanvasProps {
   id?: string | number;
@@ -47,6 +66,16 @@ const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const selectionContext = inject(LeafletSelectionKey, undefined);
 
+const stylesOptions = ref<LeafletCanvasStyles>({
+  corner: {
+    className: 'leaflet-feature-handle leaflet-handle-corner-canvas',
+    html: '<div style="background:#3388ff;border:2px solid #fff;"></div>',
+    iconSize: [10, 10],
+  },
+});
+
+provide(LeafletStylesKey, stylesOptions);
+
 const canvasLayer = ref<HTMLCanvasElement | null>(null);
 const sourceCanvas = ref<HTMLCanvasElement | null>(null);
 const ctx = ref<CanvasRenderingContext2D | null>(null);
@@ -81,11 +110,7 @@ const enableEditing = () => {
   props.corners.forEach((corner, index) => {
     const marker = L.value!.marker([corner.lat, corner.lng], {
       draggable: true,
-      icon: L.value!.divIcon({
-        className: 'leaflet-editing-icon',
-        html: '<div style="background:#fff;border:2px solid #ff3388;"></div>',
-        iconSize: [10, 10],
-      }),
+      icon: L.value!.divIcon(stylesOptions.value.corner),
     }).addTo(map.value!);
 
     marker.on('drag', () => {
@@ -108,10 +133,6 @@ const enableEditing = () => {
 
     editMarkers.value.push(marker);
   });
-};
-
-const disableEditing = () => {
-  clearEditMarkers();
 };
 
 let mouseDownHandler: ((e: MouseEvent) => void) | null = null;
@@ -347,9 +368,9 @@ const drawOutline = (corners: Array<{ x: number; y: number }>) => {
 
   ctx.value.closePath();
 
-  // Appliquer le stroke avec la couleur extraite
+  // Appliquer le stroke avec la couleur et l'épaisseur extraites
   ctx.value.strokeStyle = colors.color || '#3388ff';
-  ctx.value.lineWidth = 2;
+  ctx.value.lineWidth = colors.weight || 2;
   ctx.value.stroke();
 };
 

@@ -1,11 +1,27 @@
 <script setup lang="ts">
-import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount, type HTMLAttributes } from 'vue';
+import {
+  inject,
+  watch,
+  ref,
+  type Ref,
+  nextTick,
+  onBeforeUnmount,
+  type HTMLAttributes,
+  provide,
+} from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
-import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from '.';
+import { useColors } from '~~/registry/new-york/composables/use-colors/useColors';
+import {
+  LeafletMapKey,
+  LeafletModuleKey,
+  LeafletSelectionKey,
+  LeafletStylesKey,
+  type LeafletCanvasStyles,
+} from '.';
 import type { FeatureReference } from './LeafletFeaturesSelector.vue';
 import './leaflet-editing.css';
 
-export interface LeafletCanvasProps {
+export interface LeafletCanvasGLProps {
   id?: string | number;
   corners?: Array<{ lat: number; lng: number }>;
   width?: number;
@@ -18,7 +34,7 @@ export interface LeafletCanvasProps {
   class?: HTMLAttributes['class'];
 }
 
-const props = withDefaults(defineProps<LeafletCanvasProps>(), {
+const props = withDefaults(defineProps<LeafletCanvasGLProps>(), {
   corners: () => [
     { lat: 48.86, lng: 2.35 },
     { lat: 48.86, lng: 2.36 },
@@ -42,10 +58,21 @@ const emit = defineEmits<{
 }>();
 
 const { getLeafletShapeColors } = useCssParser();
+const { parseColor: parseColorUtil } = useColors();
 
 const L = inject(LeafletModuleKey, ref());
 const map = inject<Ref<L.Map | null>>(LeafletMapKey, ref(null));
 const selectionContext = inject(LeafletSelectionKey, undefined);
+
+const stylesOptions = ref<LeafletCanvasStyles>({
+  corner: {
+    className: 'leaflet-feature-handle leaflet-handle-corner-canvas',
+    html: '<div style="background:#3388ff;border:2px solid #fff;"></div>',
+    iconSize: [10, 10],
+  },
+});
+
+provide(LeafletStylesKey, stylesOptions);
 
 const canvasLayer = ref<HTMLCanvasElement | null>(null);
 const sourceCanvas = ref<HTMLCanvasElement | null>(null);
@@ -85,11 +112,7 @@ const enableEditing = () => {
   props.corners.forEach((corner, index) => {
     const marker = L.value!.marker([corner.lat, corner.lng], {
       draggable: true,
-      icon: L.value!.divIcon({
-        className: 'leaflet-editing-icon',
-        html: '<div style="background:#fff;border:2px solid #ff3388;"></div>',
-        iconSize: [10, 10],
-      }),
+      icon: L.value!.divIcon(stylesOptions.value.corner),
     }).addTo(map.value!);
 
     marker.on('drag', () => {
@@ -112,10 +135,6 @@ const enableEditing = () => {
 
     editMarkers.value.push(marker);
   });
-};
-
-const disableEditing = () => {
-  clearEditMarkers();
 };
 
 let mouseDownHandler: ((e: MouseEvent) => void) | null = null;
@@ -383,47 +402,8 @@ const drawOutline = (corners: Array<{ x: number; y: number }>) => {
   // Extraire les couleurs des classes CSS
   const colors = getLeafletShapeColors(props.class);
 
-  // Convertir la couleur en RGB (supporte hex, rgb, rgba)
-  const parseColor = (color: string) => {
-    // Valeur par défaut
-    const defaultColor = { r: 0.2, g: 0.53, b: 1.0 }; // #3388ff
-
-    if (!color) return defaultColor;
-
-    // Si c'est une couleur hex
-    if (color.startsWith('#')) {
-      const hex = color.replace('#', '');
-      if (hex.length === 3 && hex[0] && hex[1] && hex[2]) {
-        // Format court #RGB
-        return {
-          r: parseInt(hex[0] + hex[0], 16) / 255,
-          g: parseInt(hex[1] + hex[1], 16) / 255,
-          b: parseInt(hex[2] + hex[2], 16) / 255,
-        };
-      } else if (hex.length === 6) {
-        // Format long #RRGGBB
-        return {
-          r: parseInt(hex.substring(0, 2), 16) / 255,
-          g: parseInt(hex.substring(2, 4), 16) / 255,
-          b: parseInt(hex.substring(4, 6), 16) / 255,
-        };
-      }
-    }
-
-    // Si c'est rgb() ou rgba()
-    const rgbMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-    if (rgbMatch && rgbMatch[1] && rgbMatch[2] && rgbMatch[3]) {
-      return {
-        r: parseInt(rgbMatch[1]) / 255,
-        g: parseInt(rgbMatch[2]) / 255,
-        b: parseInt(rgbMatch[3]) / 255,
-      };
-    }
-
-    return defaultColor;
-  };
-
-  const rgb = parseColor(colors.color || '#3388ff');
+  // Utiliser le parseur de couleur du composable
+  const rgb = parseColorUtil(colors.color || '#3388ff');
 
   // Créer un programme simple pour dessiner des lignes épaisses (via rectangles)
   const lineVertexShaderSource = `
@@ -460,8 +440,8 @@ const drawOutline = (corners: Array<{ x: number; y: number }>) => {
   gl.value.linkProgram(lineProgram);
   gl.value.useProgram(lineProgram);
 
-  // Créer des rectangles épais pour chaque segment (workaround pour lineWidth)
-  const lineWidth = 2;
+  // Utiliser le weight depuis les classes CSS
+  const lineWidth = colors.weight || 2;
   const linePositions: number[] = [];
 
   // Fonction pour créer un rectangle épais entre deux points

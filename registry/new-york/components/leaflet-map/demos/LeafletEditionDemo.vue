@@ -495,10 +495,16 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
           :draggable="currentMode === 'select'"
           :subdivisions="20"
           :opacity="canvasOpacity"
-          class="border border-purple-500"
+          class="border-2 border-red-500"
           @canvas-ready="onCanvasReady"
           @update:corners="(corners) => (canvasCorners = corners)"
-        />
+        >
+          <LeafletFeatureHandle
+            role="corner"
+            class="bg-white border-2 border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+            :size="10"
+          />
+        </LeafletCanvasGL>
       </LeafletMap>
     </div>
   </div>
