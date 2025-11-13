@@ -2,6 +2,10 @@
 import { ref, inject, watch, onBeforeUnmount, nextTick, type Ref } from 'vue';
 import { LeafletMapKey, LeafletModuleKey } from '.';
 import type { LatLng, Polyline, Marker, Circle, DivIcon } from 'leaflet';
+import area from '@turf/area';
+import length from '@turf/length';
+import centroid from '@turf/centroid';
+import type { Position } from 'geojson';
 
 export interface LeafletMeasureToolProps {
   enabled?: boolean;
@@ -43,52 +47,53 @@ const snapCircle = ref<Circle | null>(null);
 
 let isActive = false;
 
-// Calcul de distance
+// Convertir LatLng[] en coordonnées GeoJSON [lng, lat]
+const toGeoJSONCoords = (latlngs: LatLng[]): Position[] => {
+  return latlngs.map((ll) => [ll.lng, ll.lat]);
+};
+
+// Calcul de distance avec Turf.js
 const calculateDistance = (latlngs: LatLng[]): number => {
   if (latlngs.length < 2) return 0;
 
-  let totalDistance = 0;
-  for (let i = 0; i < latlngs.length - 1; i++) {
-    const current = latlngs[i];
-    const next = latlngs[i + 1];
-    if (current && next) {
-      totalDistance += current.distanceTo(next);
-    }
-  }
+  const coords = toGeoJSONCoords(latlngs);
+  const line = {
+    type: 'Feature' as const,
+    properties: {},
+    geometry: {
+      type: 'LineString' as const,
+      coordinates: coords,
+    },
+  };
 
-  return props.unit === 'metric' ? totalDistance : totalDistance * 3.28084;
+  // Turf.js calcule en kilomètres par défaut
+  const distanceKm = length(line, { units: 'kilometers' });
+  const distanceMeters = distanceKm * 1000;
+
+  return props.unit === 'metric' ? distanceMeters : distanceMeters * 3.28084;
 };
 
-// Calcul d'aire (pour polygones fermés)
+// Calcul d'aire avec Turf.js (géodésique précis)
 const calculateArea = (latlngs: LatLng[]): number | undefined => {
   if (!props.showArea || latlngs.length < 3) return undefined;
 
-  // Utiliser la formule de Shoelace pour calculer l'aire
-  let area = 0;
-  const n = latlngs.length;
+  const coords = toGeoJSONCoords(latlngs);
+  // Fermer le polygone (premier point = dernier point)
+  const closedCoords = [...coords, coords[0]].filter((c): c is Position => c !== undefined);
 
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    const current = latlngs[i];
-    const next = latlngs[j];
-    if (!current || !next) continue;
-    const xi = current.lat;
-    const yi = current.lng;
-    const xj = next.lat;
-    const yj = next.lng;
-    area += xi * yj - xj * yi;
-  }
+  const polygon = {
+    type: 'Feature' as const,
+    properties: {},
+    geometry: {
+      type: 'Polygon' as const,
+      coordinates: [closedCoords],
+    },
+  };
 
-  area = Math.abs(area / 2);
+  // Turf.js retourne l'aire en m² (géodésique précis)
+  const areaM2 = area(polygon);
 
-  // Conversion approximative en m² (très approximatif, pour une vraie app utiliser turf.js)
-  // 1 degré lat ≈ 111 km, 1 degré lng varie selon la latitude
-  const avgLat = latlngs.reduce((sum, ll) => sum + ll.lat, 0) / n;
-  const latToMeters = 111320;
-  const lngToMeters = 111320 * Math.cos((avgLat * Math.PI) / 180);
-  area = area * latToMeters * lngToMeters;
-
-  return props.unit === 'metric' ? area : area * 10.7639;
+  return props.unit === 'metric' ? areaM2 : areaM2 * 10.7639;
 };
 
 // Formatage des distances
@@ -284,19 +289,22 @@ const finishMeasurement = () => {
 
   // Afficher le total si aire disponible
   if (area !== undefined && measurementPoints.value.length >= 3) {
-    const center = measurementPoints.value.reduce(
-      (acc, ll) => {
-        acc.lat += ll.lat;
-        acc.lng += ll.lng;
-        return acc;
+    // Utiliser Turf.js pour calculer le centroïde précis
+    const coords = toGeoJSONCoords(measurementPoints.value);
+    const closedCoords = [...coords, coords[0]].filter((c): c is Position => c !== undefined);
+    const polygon = {
+      type: 'Feature' as const,
+      properties: {},
+      geometry: {
+        type: 'Polygon' as const,
+        coordinates: [closedCoords],
       },
-      { lat: 0, lng: 0 }
-    );
-    center.lat /= measurementPoints.value.length;
-    center.lng /= measurementPoints.value.length;
+    };
+    const center = centroid(polygon);
+    const [lng, lat] = center.geometry.coordinates;
 
     const totalLabel = createDistanceLabel(
-      L.value!.latLng(center.lat, center.lng),
+      L.value!.latLng(lat!, lng!),
       `${formatDistance(distance)} | ${formatArea(area)}`
     );
     if (totalLabel) measurementLabels.value.push(totalLabel);
