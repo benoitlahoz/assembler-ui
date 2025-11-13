@@ -9674,6 +9674,26 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
               :draggable="currentMode === 'select'"
             />
 
+            <LeafletCanvasGL
+              ref="canvasRef"
+              :corners="canvasCorners"
+              :width="400"
+              :height="300"
+              :editable="currentMode === 'direct-select'"
+              :draggable="currentMode === 'select'"
+              :subdivisions="20"
+              :opacity="canvasOpacity"
+              class="border-2 border-red-500"
+              @canvas-ready="onCanvasReady"
+              @update:corners="(corners) => (canvasCorners = corners)"
+            >
+              <LeafletFeatureHandle
+                role="corner"
+                class="bg-white border-2 border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+                :size="10"
+              />
+            </LeafletCanvasGL>
+
             <template #bounding-box-styles>
               <LeafletFeatureRectangle
                 class="border-2 border-orange-400"
@@ -9706,26 +9726,6 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
             </template>
           </LeafletFeaturesSelector>
         </LeafletFeaturesEditor>
-
-        <LeafletCanvasGL
-          ref="canvasRef"
-          :corners="canvasCorners"
-          :width="400"
-          :height="300"
-          :editable="currentMode === 'direct-select'"
-          :draggable="currentMode === 'select'"
-          :subdivisions="20"
-          :opacity="canvasOpacity"
-          class="border border-red-500"
-          @canvas-ready="onCanvasReady"
-          @update:corners="(corners) => (canvasCorners = corners)"
-        >
-          <LeafletFeatureHandle
-            role="corner"
-            class="border border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
-            :size="10"
-          />
-        </LeafletCanvasGL>
       </LeafletMap>
     </div>
   </div>
