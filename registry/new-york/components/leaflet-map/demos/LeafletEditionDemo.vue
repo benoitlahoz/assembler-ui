@@ -34,7 +34,7 @@ const editMode = ref(true); // Start with edit mode enabled
 const currentMode = ref<FeatureShapeType | FeatureSelectMode | null>('select'); // Start in select mode
 
 // Mode mesure
-const measureMode = ref(false);
+const measureMode = ref<'line' | 'polygon' | false>(false);
 const lastMeasurement = ref<{ distance: number; area?: number } | null>(null);
 
 // Computed selection mode for LeafletFeaturesSelector (only 'select' or 'direct-select')
@@ -104,17 +104,23 @@ const rectangles = ref([
 
 // Handle mode selection from DrawControl and LeafletControls
 const handleModeSelected = (mode: string | null) => {
-  // Si on active le mode measure, désactiver les autres modes
-  if (mode === 'measure') {
-    measureMode.value = !measureMode.value;
-    if (measureMode.value) {
-      currentMode.value = null;
+  // Si on active un mode measure, désactiver les autres modes
+  if (mode === 'measure-line' || mode === 'measure-polygon') {
+    const newMode = mode === 'measure-line' ? 'line' : 'polygon';
+    // Toggle: si on clique sur le même mode, le désactiver
+    if (measureMode.value === newMode) {
+      measureMode.value = false;
+    } else {
+      measureMode.value = newMode;
+      currentMode.value = null; // Désactiver les autres modes
     }
     return;
   }
 
   // Si on sélectionne un autre mode, désactiver measure
-  measureMode.value = false;
+  if (measureMode.value) {
+    measureMode.value = false;
+  }
 
   // Toggle behavior: if clicking the same mode, deactivate it
   if (currentMode.value === mode) {
@@ -297,19 +303,33 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
 
         <!-- Barre d'outils spécifique pour les outils (mesure, etc.) -->
         <LeafletControls
-          position="topright"
+          position="bottomright"
           :enabled="editMode"
-          :active-item="measureMode ? 'measure' : null"
+          :active-item="
+            measureMode === 'line'
+              ? 'measure-line'
+              : measureMode === 'polygon'
+                ? 'measure-polygon'
+                : null
+          "
           @item-clicked="handleModeSelected"
         >
-          <LeafletControlItem name="measure" type="toggle" title="Measure Distance & Area">
+          <LeafletControlItem name="measure-line" type="toggle" title="Measure Distance (Line)">
+            <Icon icon="ri:ruler-line" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem
+            name="measure-polygon"
+            type="toggle"
+            title="Measure Distance & Area (Polygon)"
+          >
             <Icon icon="raphael:ruler" class="w-4 h-4 text-black" />
           </LeafletControlItem>
         </LeafletControls>
 
         <!-- Outil de mesure -->
         <LeafletMeasureTool
-          :enabled="measureMode"
+          :enabled="!!measureMode"
+          :mode="measureMode || 'polygon'"
           unit="metric"
           :show-area="true"
           class="border border-orange-500 bg-orange-500/20"

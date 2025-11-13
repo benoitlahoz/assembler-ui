@@ -3479,6 +3479,7 @@ const { getLeafletShapeColors, parseHTMLToElement } = useCssParser();
 
 export interface LeafletMeasureToolProps {
   enabled?: boolean;
+  mode?: "line" | "polygon";
   unit?: "metric" | "imperial";
   showArea?: boolean;
   showPerimeter?: boolean;
@@ -3488,6 +3489,7 @@ export interface LeafletMeasureToolProps {
 
 const props = withDefaults(defineProps<LeafletMeasureToolProps>(), {
   enabled: false,
+  mode: "polygon",
   unit: "metric",
   showArea: true,
   showPerimeter: true,
@@ -3511,6 +3513,7 @@ const markers = ref<Marker[]>([]);
 const measurementLabels = ref<Marker[]>([]);
 const snapCircle = ref<Circle | null>(null);
 const tempPolygon = ref<L.Polygon | null>(null);
+const tempPolyline = ref<L.Polyline | null>(null);
 const isClosed = ref(false);
 
 let isActive = false;
@@ -3619,7 +3622,7 @@ const handleMapClick = (e: L.LeafletMouseEvent) => {
 
   const latlng = e.latlng;
 
-  if (measurementPoints.value.length >= 3) {
+  if (props.mode === "polygon" && measurementPoints.value.length >= 3) {
     const firstPoint = measurementPoints.value[0];
     if (!firstPoint) return;
     const firstLatLng = L.value.latLng(firstPoint[0], firstPoint[1]);
@@ -3630,6 +3633,8 @@ const handleMapClick = (e: L.LeafletMouseEvent) => {
     const snapThreshold = Number(props.snap) * metersPerPixel;
 
     if (distance < snapThreshold) {
+      isClosed.value = true;
+
       const firstPt = measurementPoints.value[0];
       const lastPt =
         measurementPoints.value[measurementPoints.value.length - 1];
@@ -3639,18 +3644,19 @@ const handleMapClick = (e: L.LeafletMouseEvent) => {
         const firstLatLng = L.value.latLng(firstPt[0], firstPt[1]);
         const closingDistance = lastLatLng.distanceTo(firstLatLng);
 
-        const midpoint: [number, number] = [
-          (firstPt[0] + lastPt[0]) / 2,
-          (firstPt[1] + lastPt[1]) / 2,
-        ];
-        const label = createDistanceLabel(
-          midpoint,
-          formatDistance(closingDistance),
-        );
-        if (label) measurementLabels.value.push(label);
+        if (closingDistance > 0) {
+          const midpoint: [number, number] = [
+            (firstPt[0] + lastPt[0]) / 2,
+            (firstPt[1] + lastPt[1]) / 2,
+          ];
+          const label = createDistanceLabel(
+            midpoint,
+            formatDistance(closingDistance),
+          );
+          if (label) measurementLabels.value.push(label);
+        }
       }
 
-      isClosed.value = true;
       finishMeasurement();
       return;
     }
@@ -3664,24 +3670,44 @@ const handleMapClick = (e: L.LeafletMouseEvent) => {
   );
   if (marker) markers.value.push(marker);
 
-  if (!tempPolygon.value && L.value && map.value) {
-    const colors = getLeafletShapeColors(props.class);
-    tempPolygon.value = L.value.polygon(
-      measurementPoints.value as L.LatLngExpression[],
-      {
-        color: colors.color,
-        fillColor: colors.fillColor,
-        fillOpacity: colors.fillOpacity,
-        weight: 3,
-        dashArray: "10, 5",
-        interactive: false,
-      },
-    );
-    tempPolygon.value.addTo(map.value);
-  } else if (tempPolygon.value) {
-    tempPolygon.value.setLatLngs(
-      measurementPoints.value as L.LatLngExpression[],
-    );
+  if (props.mode === "polygon") {
+    if (!tempPolygon.value && L.value && map.value) {
+      const colors = getLeafletShapeColors(props.class);
+      tempPolygon.value = L.value.polygon(
+        measurementPoints.value as L.LatLngExpression[],
+        {
+          color: colors.color,
+          fillColor: colors.fillColor,
+          fillOpacity: colors.fillOpacity,
+          weight: 3,
+          dashArray: "10, 5",
+          interactive: false,
+        },
+      );
+      tempPolygon.value.addTo(map.value);
+    } else if (tempPolygon.value) {
+      tempPolygon.value.setLatLngs(
+        measurementPoints.value as L.LatLngExpression[],
+      );
+    }
+  } else {
+    if (!tempPolyline.value && L.value && map.value) {
+      const colors = getLeafletShapeColors(props.class);
+      tempPolyline.value = L.value.polyline(
+        measurementPoints.value as L.LatLngExpression[],
+        {
+          color: colors.color,
+          weight: 3,
+          dashArray: "10, 5",
+          interactive: false,
+        },
+      );
+      tempPolyline.value.addTo(map.value);
+    } else if (tempPolyline.value) {
+      tempPolyline.value.setLatLngs(
+        measurementPoints.value as L.LatLngExpression[],
+      );
+    }
   }
 
   if (measurementPoints.value.length >= 2) {
@@ -3729,15 +3755,21 @@ const handleMouseMove = (e: L.LeafletMouseEvent) => {
 
   const latlng = e.latlng;
 
-  if (tempPolygon.value) {
+  if (props.mode === "polygon" && tempPolygon.value) {
     const previewPoints: Array<[number, number]> = [
       ...measurementPoints.value,
       [latlng.lat, latlng.lng],
     ];
     tempPolygon.value.setLatLngs(previewPoints as L.LatLngExpression[]);
+  } else if (props.mode === "line" && tempPolyline.value) {
+    const previewPoints: Array<[number, number]> = [
+      ...measurementPoints.value,
+      [latlng.lat, latlng.lng],
+    ];
+    tempPolyline.value.setLatLngs(previewPoints as L.LatLngExpression[]);
   }
 
-  if (measurementPoints.value.length < 3) {
+  if (props.mode !== "polygon" || measurementPoints.value.length < 3) {
     if (snapCircle.value) {
       snapCircle.value.remove();
       snapCircle.value = null;
@@ -3800,6 +3832,33 @@ const handleKeyDown = (e: KeyboardEvent) => {
 };
 
 const finishMeasurement = () => {
+  if (
+    props.mode === "polygon" &&
+    measurementPoints.value.length >= 3 &&
+    !isClosed.value
+  ) {
+    const firstPt = measurementPoints.value[0];
+    const lastPt = measurementPoints.value[measurementPoints.value.length - 1];
+
+    if (firstPt && lastPt && L.value) {
+      const lastLatLng = L.value.latLng(lastPt[0], lastPt[1]);
+      const firstLatLng = L.value.latLng(firstPt[0], firstPt[1]);
+      const closingDistance = lastLatLng.distanceTo(firstLatLng);
+
+      const midpoint: [number, number] = [
+        (firstPt[0] + lastPt[0]) / 2,
+        (firstPt[1] + lastPt[1]) / 2,
+      ];
+      const label = createDistanceLabel(
+        midpoint,
+        formatDistance(closingDistance),
+      );
+      if (label) measurementLabels.value.push(label);
+
+      isClosed.value = true;
+    }
+  }
+
   const distance = calculateDistance();
   const area = calculateArea();
 
@@ -3819,6 +3878,9 @@ const finishMeasurement = () => {
 const cleanup = () => {
   tempPolygon.value?.remove();
   tempPolygon.value = null;
+
+  tempPolyline.value?.remove();
+  tempPolyline.value = null;
 
   snapCircle.value?.remove();
   snapCircle.value = null;
@@ -6855,6 +6917,7 @@ export type UseQuadtreeReturn<T extends Rect = Rect> = ReturnType<
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `enabled`{.primary .text-primary} | `boolean` | false |  |
+| `mode`{.primary .text-primary} | `'line' \| 'polygon'` | polygon |  |
 | `unit`{.primary .text-primary} | `'metric' \| 'imperial'` | metric |  |
 | `showArea`{.primary .text-primary} | `boolean` | true |  |
 | `showPerimeter`{.primary .text-primary} | `boolean` | true |  |
@@ -7118,7 +7181,7 @@ const editMode = ref(true);
 
 const currentMode = ref<FeatureShapeType | FeatureSelectMode | null>("select");
 
-const measureMode = ref(false);
+const measureMode = ref<"line" | "polygon" | false>(false);
 const lastMeasurement = ref<{ distance: number; area?: number } | null>(null);
 
 const selectionMode = computed<FeatureSelectMode | null>(() => {
@@ -7190,15 +7253,21 @@ const rectangles = ref([
 ]);
 
 const handleModeSelected = (mode: string | null) => {
-  if (mode === "measure") {
-    measureMode.value = !measureMode.value;
-    if (measureMode.value) {
+  if (mode === "measure-line" || mode === "measure-polygon") {
+    const newMode = mode === "measure-line" ? "line" : "polygon";
+
+    if (measureMode.value === newMode) {
+      measureMode.value = false;
+    } else {
+      measureMode.value = newMode;
       currentMode.value = null;
     }
     return;
   }
 
-  measureMode.value = false;
+  if (measureMode.value) {
+    measureMode.value = false;
+  }
 
   if (currentMode.value === mode) {
     currentMode.value = null;
@@ -7409,22 +7478,36 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
         </LeafletControls>
 
         <LeafletControls
-          position="topright"
+          position="bottomright"
           :enabled="editMode"
-          :active-item="measureMode ? 'measure' : null"
+          :active-item="
+            measureMode === 'line'
+              ? 'measure-line'
+              : measureMode === 'polygon'
+                ? 'measure-polygon'
+                : null
+          "
           @item-clicked="handleModeSelected"
         >
           <LeafletControlItem
-            name="measure"
+            name="measure-line"
             type="toggle"
-            title="Measure Distance & Area"
+            title="Measure Distance (Line)"
+          >
+            <Icon icon="ri:ruler-line" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem
+            name="measure-polygon"
+            type="toggle"
+            title="Measure Distance & Area (Polygon)"
           >
             <Icon icon="raphael:ruler" class="w-4 h-4 text-black" />
           </LeafletControlItem>
         </LeafletControls>
 
         <LeafletMeasureTool
-          :enabled="measureMode"
+          :enabled="!!measureMode"
+          :mode="measureMode || 'polygon'"
           unit="metric"
           :show-area="true"
           class="border border-orange-500 bg-orange-500/20"

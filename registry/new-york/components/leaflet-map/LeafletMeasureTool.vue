@@ -28,6 +28,7 @@ const { getLeafletShapeColors, parseHTMLToElement } = useCssParser();
 
 export interface LeafletMeasureToolProps {
   enabled?: boolean;
+  mode?: 'line' | 'polygon';
   unit?: 'metric' | 'imperial';
   showArea?: boolean;
   showPerimeter?: boolean;
@@ -37,6 +38,7 @@ export interface LeafletMeasureToolProps {
 
 const props = withDefaults(defineProps<LeafletMeasureToolProps>(), {
   enabled: false,
+  mode: 'polygon',
   unit: 'metric',
   showArea: true,
   showPerimeter: true,
@@ -59,10 +61,13 @@ const markers = ref<Marker[]>([]);
 const measurementLabels = ref<Marker[]>([]);
 const snapCircle = ref<Circle | null>(null);
 const tempPolygon = ref<L.Polygon | null>(null);
+const tempPolyline = ref<L.Polyline | null>(null);
 const isClosed = ref(false);
 
 let isActive = false;
 let isFinished = false;
+let lastClickTime = 0;
+const DOUBLE_CLICK_DELAY = 300; // ms
 
 // Calcul de distance (utilise le composable)
 const calculateDistance = (): number => {
@@ -160,9 +165,17 @@ const handleMapClick = (e: L.LeafletMouseEvent) => {
 
   if (!isActive) return;
 
+  // Ignorer le clic si c'est trop proche du dernier (éviter double-clic)
+  const now = Date.now();
+  if (now - lastClickTime < DOUBLE_CLICK_DELAY) {
+    return;
+  }
+  lastClickTime = now;
+
   const latlng = e.latlng;
 
-  if (measurementPoints.value.length >= 3) {
+  // Snap uniquement en mode polygon
+  if (props.mode === 'polygon' && measurementPoints.value.length >= 3) {
     const firstPoint = measurementPoints.value[0];
     if (!firstPoint) return;
     const firstLatLng = L.value.latLng(firstPoint[0], firstPoint[1]);
@@ -175,6 +188,9 @@ const handleMapClick = (e: L.LeafletMouseEvent) => {
     const snapThreshold = Number(props.snap) * metersPerPixel;
 
     if (distance < snapThreshold) {
+      // Marquer comme fermé AVANT d'ajouter le label
+      isClosed.value = true;
+
       // Ajouter le dernier segment (retour au premier point) avant de fermer
       const firstPt = measurementPoints.value[0];
       const lastPt = measurementPoints.value[measurementPoints.value.length - 1];
@@ -184,17 +200,18 @@ const handleMapClick = (e: L.LeafletMouseEvent) => {
         const firstLatLng = L.value.latLng(firstPt[0], firstPt[1]);
         const closingDistance = lastLatLng.distanceTo(firstLatLng);
 
-        // Ajouter le label pour le segment de fermeture
-        const midpoint: [number, number] = [
-          (firstPt[0] + lastPt[0]) / 2,
-          (firstPt[1] + lastPt[1]) / 2,
-        ];
-        const label = createDistanceLabel(midpoint, formatDistance(closingDistance));
-        if (label) measurementLabels.value.push(label);
+        // Ajouter le label pour le segment de fermeture seulement si distance > 0
+        if (closingDistance > 0) {
+          const midpoint: [number, number] = [
+            (firstPt[0] + lastPt[0]) / 2,
+            (firstPt[1] + lastPt[1]) / 2,
+          ];
+          const label = createDistanceLabel(midpoint, formatDistance(closingDistance));
+          if (label) measurementLabels.value.push(label);
+        }
       }
 
       // Fermer le polygone
-      isClosed.value = true;
       finishMeasurement();
       return;
     }
@@ -206,20 +223,36 @@ const handleMapClick = (e: L.LeafletMouseEvent) => {
   const marker = createMeasureMarker([latlng.lat, latlng.lng], measurementPoints.value.length - 1);
   if (marker) markers.value.push(marker);
 
-  // Créer ou mettre à jour le polygone temporaire
-  if (!tempPolygon.value && L.value && map.value) {
-    const colors = getLeafletShapeColors(props.class);
-    tempPolygon.value = L.value.polygon(measurementPoints.value as L.LatLngExpression[], {
-      color: colors.color,
-      fillColor: colors.fillColor,
-      fillOpacity: colors.fillOpacity,
-      weight: 3,
-      dashArray: '10, 5',
-      interactive: false,
-    });
-    tempPolygon.value.addTo(map.value);
-  } else if (tempPolygon.value) {
-    tempPolygon.value.setLatLngs(measurementPoints.value as L.LatLngExpression[]);
+  // Créer ou mettre à jour le polygone/polyligne temporaire
+  if (props.mode === 'polygon') {
+    if (!tempPolygon.value && L.value && map.value) {
+      const colors = getLeafletShapeColors(props.class);
+      tempPolygon.value = L.value.polygon(measurementPoints.value as L.LatLngExpression[], {
+        color: colors.color,
+        fillColor: colors.fillColor,
+        fillOpacity: colors.fillOpacity,
+        weight: 3,
+        dashArray: '10, 5',
+        interactive: false,
+      });
+      tempPolygon.value.addTo(map.value);
+    } else if (tempPolygon.value) {
+      tempPolygon.value.setLatLngs(measurementPoints.value as L.LatLngExpression[]);
+    }
+  } else {
+    // Mode ligne
+    if (!tempPolyline.value && L.value && map.value) {
+      const colors = getLeafletShapeColors(props.class);
+      tempPolyline.value = L.value.polyline(measurementPoints.value as L.LatLngExpression[], {
+        color: colors.color,
+        weight: 3,
+        dashArray: '10, 5',
+        interactive: false,
+      });
+      tempPolyline.value.addTo(map.value);
+    } else if (tempPolyline.value) {
+      tempPolyline.value.setLatLngs(measurementPoints.value as L.LatLngExpression[]);
+    }
   }
 
   // Calculer et afficher la distance du segment
@@ -263,17 +296,23 @@ const handleMouseMove = (e: L.LeafletMouseEvent) => {
 
   const latlng = e.latlng;
 
-  // Mettre à jour le polygone temporaire avec la position de la souris
-  if (tempPolygon.value) {
+  // Mettre à jour le polygone/polyligne temporaire avec la position de la souris
+  if (props.mode === 'polygon' && tempPolygon.value) {
     const previewPoints: Array<[number, number]> = [
       ...measurementPoints.value,
       [latlng.lat, latlng.lng],
     ];
     tempPolygon.value.setLatLngs(previewPoints as L.LatLngExpression[]);
+  } else if (props.mode === 'line' && tempPolyline.value) {
+    const previewPoints: Array<[number, number]> = [
+      ...measurementPoints.value,
+      [latlng.lat, latlng.lng],
+    ];
+    tempPolyline.value.setLatLngs(previewPoints as L.LatLngExpression[]);
   }
 
-  // Cercle de snap uniquement s'il y a au moins 3 points
-  if (measurementPoints.value.length < 3) {
+  // Cercle de snap uniquement en mode polygon et s'il y a au moins 3 points
+  if (props.mode !== 'polygon' || measurementPoints.value.length < 3) {
     if (snapCircle.value) {
       snapCircle.value.remove();
       snapCircle.value = null;
@@ -342,6 +381,28 @@ const handleKeyDown = (e: KeyboardEvent) => {
 
 // Terminer la mesure
 const finishMeasurement = () => {
+  // En mode polygon avec au moins 3 points, ajouter le segment de fermeture
+  if (props.mode === 'polygon' && measurementPoints.value.length >= 3 && !isClosed.value) {
+    const firstPt = measurementPoints.value[0];
+    const lastPt = measurementPoints.value[measurementPoints.value.length - 1];
+
+    if (firstPt && lastPt && L.value) {
+      const lastLatLng = L.value.latLng(lastPt[0], lastPt[1]);
+      const firstLatLng = L.value.latLng(firstPt[0], firstPt[1]);
+      const closingDistance = lastLatLng.distanceTo(firstLatLng);
+
+      // Ajouter le label pour le segment de fermeture
+      const midpoint: [number, number] = [
+        (firstPt[0] + lastPt[0]) / 2,
+        (firstPt[1] + lastPt[1]) / 2,
+      ];
+      const label = createDistanceLabel(midpoint, formatDistance(closingDistance));
+      if (label) measurementLabels.value.push(label);
+
+      isClosed.value = true;
+    }
+  }
+
   const distance = calculateDistance();
   const area = calculateArea();
 
@@ -360,6 +421,9 @@ const finishMeasurement = () => {
 const cleanup = () => {
   tempPolygon.value?.remove();
   tempPolygon.value = null;
+
+  tempPolyline.value?.remove();
+  tempPolyline.value = null;
 
   snapCircle.value?.remove();
   snapCircle.value = null;
