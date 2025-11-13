@@ -154,6 +154,12 @@ const enableDragging = () => {
     if (!map.value || !L.value) return;
 
     L.value.DomEvent.stopPropagation(e as any);
+    
+    // Sélectionner la feature avant de commencer le drag pour afficher la bounding box
+    if (props.selectable && selectionContext) {
+      selectionContext.selectFeature('polygon', canvasId.value);
+    }
+    
     isDragging.value = true;
 
     emit('dragstart');
@@ -680,6 +686,29 @@ watch(
 
           // Dessiner
           reset();
+        }
+
+        // Check if selectable changed and we need to register/unregister
+        if (canvasLayer.value) {
+          const selectableChanged = oldVal && Boolean(oldVal[5]) !== Boolean(newSelectable);
+          if (selectableChanged) {
+            // Remove old event listeners
+            const oldClickHandler = canvasLayer.value.onclick;
+            if (oldClickHandler) {
+              canvasLayer.value.removeEventListener('click', oldClickHandler);
+            }
+
+            // Add new event listeners based on selectable state
+            if (newSelectable && selectionContext) {
+              canvasLayer.value.addEventListener('click', () => {
+                selectionContext.selectFeature('polygon', canvasId.value);
+                emit('click');
+              });
+              registerWithSelection();
+            } else {
+              canvasLayer.value.addEventListener('click', handleClick);
+            }
+          }
         }
 
         // Gestion des modes : draggable OU editable, pas les deux
