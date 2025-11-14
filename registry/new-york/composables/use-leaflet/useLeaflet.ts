@@ -261,6 +261,50 @@ export const useLeaflet = async () => {
     );
   };
 
+  // Helper function to constrain bounds to a square
+  const constrainToSquare = (
+    bounds: L.LatLngBounds,
+    center?: L.LatLng,
+    originalBounds?: L.LatLngBounds
+  ): L.LatLngBounds => {
+    if (!L.value) return bounds;
+
+    const currentCenter = center || bounds.getCenter();
+    const latDiff = bounds.getNorth() - bounds.getSouth();
+    const lngDiff = bounds.getEast() - bounds.getWest();
+
+    // Convert to metric coordinates to get true visual dimensions
+    const latMeters = latDiff * LatDegreesMeters;
+    const lngMeters = lngDegreesToRadius(lngDiff, currentCenter.lat);
+
+    // Determine which dimension changed more (to allow both growing and shrinking)
+    let targetMeters = latMeters;
+    if (originalBounds) {
+      const origLatDiff = originalBounds.getNorth() - originalBounds.getSouth();
+      const origLngDiff = originalBounds.getEast() - originalBounds.getWest();
+      const origLatMeters = origLatDiff * LatDegreesMeters;
+      const origLngMeters = lngDegreesToRadius(origLngDiff, currentCenter.lat);
+
+      // Use the dimension that changed the most
+      const latChange = Math.abs(latMeters - origLatMeters);
+      const lngChange = Math.abs(lngMeters - origLngMeters);
+
+      targetMeters = lngChange > latChange ? lngMeters : latMeters;
+    } else {
+      // Fallback to average if no original bounds
+      targetMeters = (latMeters + lngMeters) / 2;
+    }
+
+    // Convert back to degrees
+    const halfLatDiff = targetMeters / 2 / LatDegreesMeters;
+    const halfLngDiff = radiusToLngDegrees(targetMeters / 2, currentCenter.lat);
+
+    return L.value.latLngBounds(
+      [currentCenter.lat - halfLatDiff, currentCenter.lng - halfLngDiff],
+      [currentCenter.lat + halfLatDiff, currentCenter.lng + halfLngDiff]
+    );
+  };
+
   return {
     L,
     LatDegreesMeters,
@@ -283,5 +327,7 @@ export const useLeaflet = async () => {
     calculateMidpoint,
     calculateRadiusPoint,
     calculateCircleBounds,
+    // Contraintes
+    constrainToSquare,
   };
 };

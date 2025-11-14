@@ -86,10 +86,12 @@ const createButton = (
   button.setAttribute('tabindex', '0');
   button.dataset.toolType = type;
 
-  L.value!.DomEvent.on(button, 'click', (e: Event) => {
+  const onButtonClick = (e: Event) => {
     L.value!.DomEvent.preventDefault(e);
     toggleDrawMode(type);
-  });
+  };
+
+  L.value!.DomEvent.on(button, 'click', onButtonClick);
 
   return button;
 };

@@ -7,89 +7,551 @@ description: Quadtree composable return value for spatial indexing (required)
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <leaflet-simple />
+    <leaflet-edition-demo />
   :::
 
   :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
-import { ref, type ComponentPublicInstance } from "vue";
-import { ClientOnly } from "#components";
+import { ref, computed, type ComponentPublicInstance } from "vue";
+import { Button } from "@/components/ui/button";
 import {
   LeafletMap,
   LeafletTileLayer,
   LeafletZoomControl,
   LeafletControls,
   LeafletControlItem,
+  LeafletFeaturesEditor,
+  LeafletFeaturesSelector,
+  LeafletFeatureHandle,
+  LeafletFeatureRectangle,
+  LeafletMarker,
   LeafletCircle,
+  LeafletPolyline,
+  LeafletPolygon,
+  LeafletRectangle,
+  LeafletMeasureTool,
+  LeafletCanvasGL,
   type LeafletMapExposed,
+  type FeatureDrawEvent,
+  type FeatureShapeType,
+  type FeatureSelectMode,
 } from "@/components/ui/leaflet-map";
 import { Icon } from "@iconify/vue";
 
-type LeafletMapInstance = ComponentPublicInstance & LeafletMapExposed;
-
-const mapRef = ref<LeafletMapInstance | null>(null);
-const zoom = ref(13);
-const locationCoords = ref<{ lat: number; lng: number; accuracy: number }>({
-  lat: 43.3026,
-  lng: 5.3691,
-  accuracy: 500,
-});
-
-const onLocate = () => {
-  mapRef.value?.locate();
+type LeafletCanvasInstance = ComponentPublicInstance & {
+  sourceCanvas: HTMLCanvasElement | null;
+  redraw: () => void;
 };
 
-const onLocationFound = (event: any) => {
-  locationCoords.value = {
-    lat: event.latitude,
-    lng: event.longitude,
-    accuracy: event.accuracy,
-  };
+const mapRef = ref<LeafletMapExposed | null>(null);
+
+const editMode = ref(true);
+
+const currentMode = ref<FeatureShapeType | FeatureSelectMode | null>("select");
+
+const measureMode = ref<"line" | "polygon" | false>(false);
+const lastMeasurement = ref<{ distance: number; area?: number } | null>(null);
+
+const selectionMode = computed<FeatureSelectMode | null>(() => {
+  if (currentMode.value === "select") return "select";
+  if (currentMode.value === "direct-select") return "direct-select";
+  return null;
+});
+
+const isSelectMode = computed(() => selectionMode.value !== null);
+
+const markers = ref([
+  { id: 1, lat: 48.8566, lng: 2.3522, label: "Paris" },
+  { id: 2, lat: 48.8738, lng: 2.295, label: "Arc de Triomphe" },
+  { id: 3, lat: 48.8584, lng: 2.2945, label: "Tour Eiffel" },
+]);
+
+const circles = ref([
+  {
+    id: 1,
+    lat: 48.8566,
+    lng: 2.3522,
+    radius: 500,
+    class: "border border-blue-500 bg-blue-500/20",
+  },
+  {
+    id: 2,
+    lat: 48.8738,
+    lng: 2.295,
+    radius: 300,
+    class: "border border-green-500 bg-green-500/30",
+  },
+]);
+
+const polylines = ref([
+  {
+    id: 1,
+    latlngs: [
+      [48.8566, 2.3522],
+      [48.8738, 2.295],
+      [48.8584, 2.2945],
+    ] as Array<[number, number]>,
+    class: "border border-red-500",
+    weight: 4,
+  },
+]);
+
+const polygons = ref([
+  {
+    id: 1,
+    latlngs: [
+      [48.86, 2.34],
+      [48.86, 2.36],
+      [48.85, 2.36],
+      [48.85, 2.34],
+    ] as Array<[number, number]>,
+    class: "border border-purple-500 bg-purple-500/30",
+  },
+]);
+
+const rectangles = ref([
+  {
+    id: 1,
+    bounds: [
+      [48.84, 2.28],
+      [48.845, 2.29],
+    ] as [[number, number], [number, number]],
+    class: "border border-orange-500 bg-orange-500/20",
+  },
+]);
+
+const canvasRef = ref<LeafletCanvasInstance | null>(null);
+const canvasCorners = ref([
+  { lat: 48.865, lng: 2.34 },
+  { lat: 48.865, lng: 2.365 },
+  { lat: 48.85, lng: 2.365 },
+  { lat: 48.85, lng: 2.34 },
+]);
+const canvasOpacity = ref(0.7);
+const sourceCanvas = ref<HTMLCanvasElement | null>(null);
+
+const onCanvasReady = (canvas: HTMLCanvasElement) => {
+  sourceCanvas.value = canvas;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  gradient.addColorStop(0, "#667eea");
+  gradient.addColorStop(1, "#764ba2");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "white";
+  ctx.font = "bold 24px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Canvas Overlay", canvas.width / 2, canvas.height / 2 - 10);
+
+  ctx.font = "16px Arial";
+  ctx.fillText(
+    "Editable & Draggable",
+    canvas.width / 2,
+    canvas.height / 2 + 20,
+  );
+};
+
+const handleModeSelected = (mode: string | null) => {
+  if (mode === "measure-line" || mode === "measure-polygon") {
+    const newMode = mode === "measure-line" ? "line" : "polygon";
+
+    if (measureMode.value === newMode) {
+      measureMode.value = false;
+    } else {
+      measureMode.value = newMode;
+      currentMode.value = null;
+    }
+    return;
+  }
+
+  if (measureMode.value) {
+    measureMode.value = false;
+  }
+
+  if (currentMode.value === mode) {
+    currentMode.value = null;
+  } else {
+    currentMode.value = mode as FeatureShapeType | FeatureSelectMode | null;
+  }
+};
+
+const handleMeasurementComplete = (data: {
+  distance: number;
+  area?: number;
+}) => {
+  lastMeasurement.value = data;
+};
+
+const handleShapeCreated = (event: FeatureDrawEvent) => {
+  const { layer, layerType } = event;
+
+  switch (layerType) {
+    case "marker": {
+      const latlng = (layer as any).getLatLng();
+      const newId =
+        markers.value.length > 0
+          ? Math.max(...markers.value.map((m) => m.id)) + 1
+          : 1;
+      markers.value.push({
+        id: newId,
+        lat: latlng.lat,
+        lng: latlng.lng,
+        label: `Marker ${newId}`,
+      });
+      break;
+    }
+    case "circle": {
+      const latlng = (layer as any).getLatLng();
+      const radius = (layer as any).getRadius();
+      const newId =
+        circles.value.length > 0
+          ? Math.max(...circles.value.map((c) => c.id)) + 1
+          : 1;
+      circles.value.push({
+        id: newId,
+        lat: latlng.lat,
+        lng: latlng.lng,
+        radius: radius,
+        class: "border border-blue-500 bg-blue-500/20",
+      });
+      break;
+    }
+    case "polyline": {
+      const latlngs = (layer as any)
+        .getLatLngs()
+        .map((ll: any) => [ll.lat, ll.lng] as [number, number]);
+      const newId =
+        polylines.value.length > 0
+          ? Math.max(...polylines.value.map((p) => p.id)) + 1
+          : 1;
+      polylines.value.push({
+        id: newId,
+        latlngs: latlngs,
+        class: "border border-red-500",
+        weight: 4,
+      });
+      break;
+    }
+    case "polygon": {
+      const latlngs = (layer as any)
+        .getLatLngs()[0]
+        .map((ll: any) => [ll.lat, ll.lng] as [number, number]);
+      const newId =
+        polygons.value.length > 0
+          ? Math.max(...polygons.value.map((p) => p.id)) + 1
+          : 1;
+      polygons.value.push({
+        id: newId,
+        latlngs: latlngs,
+        class: "border border-purple-500 bg-purple-500/30",
+      });
+      break;
+    }
+    case "rectangle": {
+      const bounds = (layer as any).getBounds();
+      const newId =
+        rectangles.value.length > 0
+          ? Math.max(...rectangles.value.map((r) => r.id)) + 1
+          : 1;
+      rectangles.value.push({
+        id: newId,
+        bounds: [
+          [bounds.getSouth(), bounds.getWest()],
+          [bounds.getNorth(), bounds.getEast()],
+        ] as [[number, number], [number, number]],
+        class: "border border-orange-500 bg-orange-500/20",
+      });
+      break;
+    }
+  }
+
+  currentMode.value = "select";
 };
 </script>
 
 <template>
-  <ClientOnly>
-    <div class="h-128 min-h-128 mb-4">
+  <div class="w-full h-full flex flex-col gap-4">
+    <div class="rounded flex items-center justify-between gap-4 flex-wrap">
+      <div class="flex gap-2 items-center">
+        <Button
+          @click="editMode = !editMode"
+          class="px-4 py-2 rounded transition-colors"
+          :class="
+            editMode
+              ? 'bg-blue-500 text-white hover:bg-blue-600'
+              : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+          "
+        >
+          {{ editMode ? "Disable edition" : "Enable edition" }}
+        </Button>
+      </div>
+
+      <div
+        v-if="measureMode && lastMeasurement"
+        class="px-4 py-2 bg-orange-50 border border-orange-200 rounded-lg shadow-sm"
+      >
+        <div class="text-sm font-medium text-orange-900">
+          Measurement Result:
+        </div>
+        <div class="text-xs text-orange-700 mt-1">
+          <span class="font-semibold">Distance:</span>
+          {{
+            lastMeasurement.distance > 1000
+              ? `${(lastMeasurement.distance / 1000).toFixed(2)} km`
+              : `${lastMeasurement.distance.toFixed(2)} m`
+          }}
+        </div>
+        <div
+          v-if="lastMeasurement.area !== undefined"
+          class="text-xs text-orange-700"
+        >
+          <span class="font-semibold">Area:</span>
+          {{
+            lastMeasurement.area > 10000
+              ? `${(lastMeasurement.area / 1000000).toFixed(2)} km²`
+              : `${lastMeasurement.area.toFixed(2)} m²`
+          }}
+        </div>
+      </div>
+    </div>
+
+    <div class="flex-1 relative">
       <LeafletMap
         ref="mapRef"
-        name="marseille"
-        tile-layer="openstreetmap"
-        :center-lat="locationCoords.lat"
-        :center-lng="locationCoords.lng"
-        :zoom="zoom"
-        class="rounded-lg"
-        @location:found="onLocationFound"
+        name="shapes-demo"
+        class="w-full h-[600px] rounded-lg shadow-lg"
+        tile-layer="osm"
+        :center-lat="48.8566"
+        :center-lng="2.3522"
+        :zoom="13"
       >
         <LeafletTileLayer
-          name="openstreetmap"
+          name="osm"
           url-template="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         />
-
-        <LeafletControls
-          position="topleft"
-          :enabled="true"
-          @item-clicked="onLocate"
-        >
-          <LeafletControlItem name="locate" type="push" title="Locate me">
-            <Icon icon="gis:location-arrow" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-        </LeafletControls>
 
         <LeafletZoomControl position="topleft" />
 
-        <LeafletCircle
-          :key="`circle-${locationCoords.lat}-${locationCoords.lng}`"
-          :lat="locationCoords.lat"
-          :lng="locationCoords.lng"
-          :radius="locationCoords.accuracy"
-          class="bg-red-500/20 border border-red-500"
-        />
+        <LeafletControls
+          position="topleft"
+          :enabled="editMode"
+          :active-item="currentMode"
+          @item-clicked="handleModeSelected"
+        >
+          <LeafletControlItem
+            name="select"
+            type="toggle"
+            title="Selection Tool (V)"
+          >
+            <Icon icon="gis:arrow" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem
+            name="direct-select"
+            type="toggle"
+            title="Direct Selection Tool (A)"
+          >
+            <Icon icon="gis:arrow-o" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem name="marker" type="toggle" title="Draw Marker">
+            <Icon icon="gis:poi" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem
+            name="rectangle"
+            type="toggle"
+            title="Draw Rectangle"
+          >
+            <Icon icon="gis:rectangle" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem name="circle" type="toggle" title="Draw Circle">
+            <Icon icon="gis:circle" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem
+            name="polyline"
+            type="toggle"
+            title="Draw Polyline"
+          >
+            <Icon icon="gis:polyline" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem name="polygon" type="toggle" title="Draw Polygon">
+            <Icon icon="gis:polygon" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+        </LeafletControls>
+
+        <LeafletControls
+          position="topright"
+          :enabled="editMode"
+          :active-item="
+            measureMode === 'line'
+              ? 'measure-line'
+              : measureMode === 'polygon'
+                ? 'measure-polygon'
+                : null
+          "
+          @item-clicked="handleModeSelected"
+        >
+          <LeafletControlItem
+            name="measure-line"
+            type="toggle"
+            title="Measure Distance (Line)"
+          >
+            <Icon icon="ri:ruler-line" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem
+            name="measure-polygon"
+            type="toggle"
+            title="Measure Distance & Area (Polygon)"
+          >
+            <Icon icon="raphael:ruler" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+        </LeafletControls>
+
+        <LeafletMeasureTool
+          :enabled="!!measureMode"
+          :mode="measureMode || 'polygon'"
+          unit="metric"
+          :show-area="true"
+          class="border border-blue-500 bg-blue-500/20"
+          @measurement-complete="handleMeasurementComplete"
+          @measurement-update="(data) => (lastMeasurement = data)"
+        >
+          <LeafletFeatureHandle
+            role="corner"
+            class="bg-blue-500/20 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+            :size="12"
+          />
+        </LeafletMeasureTool>
+
+        <LeafletFeaturesEditor
+          :enabled="editMode"
+          :mode="currentMode"
+          :shape-options="{ color: '#3388ff', fillOpacity: 0.2 }"
+          @draw:created="handleShapeCreated"
+        >
+          <LeafletFeaturesSelector
+            :enabled="isSelectMode"
+            :mode="selectionMode"
+          >
+            <LeafletMarker
+              v-for="marker in markers"
+              :key="`marker-${marker.id}`"
+              :id="`marker-${marker.id}`"
+              v-model:lat="marker.lat"
+              v-model:lng="marker.lng"
+              :selectable="currentMode === 'select'"
+              :editable="currentMode === 'direct-select'"
+              :draggable="currentMode === 'select'"
+            />
+
+            <LeafletCircle
+              v-for="circle in circles"
+              :key="`circle-${circle.id}`"
+              :id="`circle-${circle.id}`"
+              v-model:lat="circle.lat"
+              v-model:lng="circle.lng"
+              v-model:radius="circle.radius"
+              :class="circle.class"
+              :selectable="currentMode === 'select'"
+              :editable="currentMode === 'direct-select'"
+              :draggable="currentMode === 'select'"
+            />
+
+            <LeafletPolyline
+              v-for="polyline in polylines"
+              :key="`polyline-${polyline.id}`"
+              :id="`polyline-${polyline.id}`"
+              v-model:latlngs="polyline.latlngs"
+              :weight="polyline.weight"
+              :class="polyline.class"
+              :selectable="currentMode === 'select'"
+              :editable="currentMode === 'direct-select'"
+              :draggable="currentMode === 'select'"
+            />
+
+            <LeafletPolygon
+              v-for="polygon in polygons"
+              :key="`polygon-${polygon.id}`"
+              :id="`polygon-${polygon.id}`"
+              v-model:latlngs="polygon.latlngs"
+              :class="polygon.class"
+              :selectable="currentMode === 'select'"
+              :editable="currentMode === 'direct-select'"
+              :draggable="currentMode === 'select'"
+              :auto-close="true"
+            />
+
+            <LeafletRectangle
+              v-for="rectangle in rectangles"
+              :key="`rectangle-${rectangle.id}`"
+              :id="`rectangle-${rectangle.id}`"
+              v-model:bounds="rectangle.bounds"
+              :class="rectangle.class"
+              :selectable="currentMode === 'select'"
+              :editable="currentMode === 'direct-select'"
+              :draggable="currentMode === 'select'"
+            />
+
+            <LeafletCanvasGL
+              ref="canvasRef"
+              :corners="canvasCorners"
+              :width="400"
+              :height="300"
+              :selectable="currentMode === 'select'"
+              :editable="currentMode === 'direct-select'"
+              :draggable="currentMode === 'select'"
+              :subdivisions="20"
+              :opacity="canvasOpacity"
+              class="border-2 border-red-500"
+              @canvas-ready="onCanvasReady"
+              @update:corners="(corners) => (canvasCorners = corners)"
+            >
+              <LeafletFeatureHandle
+                role="corner"
+                class="bg-white border-2 border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+                :size="10"
+              />
+            </LeafletCanvasGL>
+
+            <template #bounding-box-styles>
+              <LeafletFeatureRectangle
+                class="border-2 border-orange-400"
+                :dashed="[5, 5]"
+              />
+
+              <LeafletFeatureHandle
+                role="corner"
+                class="bg-red-500/30 border border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+                :size="10"
+              />
+
+              <LeafletFeatureHandle
+                role="edge"
+                class="bg-blue-500/20 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+                :size="8"
+              />
+
+              <LeafletFeatureHandle
+                role="rotate"
+                class="bg-blue-500/40 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+                :size="12"
+              />
+
+              <LeafletFeatureHandle
+                role="center"
+                class="bg-orange-500/40 border border-orange-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+                :size="12"
+              />
+            </template>
+          </LeafletFeaturesSelector>
+        </LeafletFeaturesEditor>
       </LeafletMap>
     </div>
-  </ClientOnly>
+  </div>
 </template>
 ```
   :::
@@ -378,9 +840,11 @@ onMounted(() => {
           .map(mapContainer.value, { zoomControl: false })
           .setView([centerLat.value, centerLng.value], zoom.value);
 
-        map.value.on("click", (event: LeafletMouseEvent) => {
+        const onMapClick = (event: LeafletMouseEvent) => {
           emit("click", event);
-        });
+        };
+
+        map.value.on("click", onMapClick);
         map.value.on("locationfound", onLocationFound);
         map.value.on("locationerror", onLocationError);
 
@@ -442,8 +906,12 @@ import {
 } from ".";
 import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
 
-const { LatDegreesMeters, radiusToLngDegrees, lngDegreesToRadius } =
-  await useLeaflet();
+const {
+  LatDegreesMeters,
+  radiusToLngDegrees,
+  lngDegreesToRadius,
+  constrainToSquare,
+} = await useLeaflet();
 
 export interface LeafletBoundingBoxStyles {
   rectangle: LeafletFeatureRectangleStyle;
@@ -543,44 +1011,6 @@ const clearHandles = () => {
   }
 };
 
-const constrainToSquare = (
-  bounds: L.LatLngBounds,
-  center?: L.LatLng,
-  originalBounds?: L.LatLngBounds,
-): L.LatLngBounds => {
-  if (!L.value) return bounds;
-
-  const currentCenter = center || bounds.getCenter();
-  const latDiff = bounds.getNorth() - bounds.getSouth();
-  const lngDiff = bounds.getEast() - bounds.getWest();
-
-  const latMeters = latDiff * LatDegreesMeters;
-  const lngMeters = lngDegreesToRadius(lngDiff, currentCenter.lat);
-
-  let targetMeters = latMeters;
-  if (originalBounds) {
-    const origLatDiff = originalBounds.getNorth() - originalBounds.getSouth();
-    const origLngDiff = originalBounds.getEast() - originalBounds.getWest();
-    const origLatMeters = origLatDiff * LatDegreesMeters;
-    const origLngMeters = lngDegreesToRadius(origLngDiff, currentCenter.lat);
-
-    const latChange = Math.abs(latMeters - origLatMeters);
-    const lngChange = Math.abs(lngMeters - origLngMeters);
-
-    targetMeters = lngChange > latChange ? lngMeters : latMeters;
-  } else {
-    targetMeters = (latMeters + lngMeters) / 2;
-  }
-
-  const halfLatDiff = targetMeters / 2 / LatDegreesMeters;
-  const halfLngDiff = radiusToLngDegrees(targetMeters / 2, currentCenter.lat);
-
-  return L.value.latLngBounds(
-    [currentCenter.lat - halfLatDiff, currentCenter.lng - halfLngDiff],
-    [currentCenter.lat + halfLatDiff, currentCenter.lng + halfLngDiff],
-  );
-};
-
 const createBoundingBox = () => {
   if (!props.bounds || !L.value || !map.value || !props.visible) {
     clearHandles();
@@ -601,11 +1031,13 @@ const createBoundingBox = () => {
   ];
 
   const cornerCursors = [
-    "nwse-resize",
     "nesw-resize",
     "nwse-resize",
     "nesw-resize",
+    "nwse-resize",
   ];
+  const edgeCursors = ["ew-resize", "ns-resize", "ew-resize", "ns-resize"];
+  const rotateCursor = "ew-resize";
 
   corners.forEach((corner, index) => {
     const handle = L.value!.marker(corner, {
@@ -613,22 +1045,27 @@ const createBoundingBox = () => {
       icon: L.value!.divIcon(stylesOptions.value.corner),
     }).addTo(map.value!);
 
-    handle.on("mousedown", () => {
+    const handleElement = handle.getElement();
+    if (handleElement && cornerCursors[index]) {
+      handleElement.style.cursor = cornerCursors[index];
+    }
+
+    const onCornerMouseDown = () => {
       if (map.value && cornerCursors[index]) {
         map.value.getContainer().style.cursor = cornerCursors[index];
       }
-    });
+    };
 
-    handle.on("dragstart", () => {
+    const onCornerDragStart = () => {
       isScaling.value = true;
       scaleStartBounds = props.bounds;
       scaleCornerIndex = index;
       if (map.value) {
         map.value.dragging.disable();
       }
-    });
+    };
 
-    handle.on("drag", () => {
+    const onCornerDrag = () => {
       if (!isScaling.value || !scaleStartBounds) return;
 
       const newCorner = handle.getLatLng();
@@ -678,9 +1115,9 @@ const createBoundingBox = () => {
       updateHandlePositions(newBounds);
 
       emit("update:bounds", newBounds);
-    });
+    };
 
-    handle.on("dragend", () => {
+    const onCornerDragEnd = () => {
       isScaling.value = false;
       if (map.value) {
         map.value.getContainer().style.cursor = "";
@@ -689,7 +1126,12 @@ const createBoundingBox = () => {
       if (boundingBox.value) {
         emit("update:bounds", boundingBox.value.getBounds());
       }
-    });
+    };
+
+    handle.on("mousedown", onCornerMouseDown);
+    handle.on("dragstart", onCornerDragStart);
+    handle.on("drag", onCornerDrag);
+    handle.on("dragend", onCornerDragEnd);
 
     cornerHandles.value.push(handle);
   });
@@ -713,29 +1155,32 @@ const createBoundingBox = () => {
     ),
   ];
 
-  const edgeCursors = ["ew-resize", "ns-resize", "ew-resize", "ns-resize"];
-
   edges.forEach((edge, index) => {
     const handle = L.value!.marker(edge, {
       draggable: true,
       icon: L.value!.divIcon(stylesOptions.value.edge),
     }).addTo(map.value!);
 
-    handle.on("mousedown", () => {
+    const handleElement = handle.getElement();
+    if (handleElement && edgeCursors[index]) {
+      handleElement.style.cursor = edgeCursors[index];
+    }
+
+    const onEdgeMouseDown = () => {
       if (map.value && edgeCursors[index]) {
         map.value.getContainer().style.cursor = edgeCursors[index];
       }
-    });
+    };
 
-    handle.on("dragstart", () => {
+    const onEdgeDragStart = () => {
       isScaling.value = true;
       scaleStartBounds = props.bounds;
       if (map.value) {
         map.value.dragging.disable();
       }
-    });
+    };
 
-    handle.on("drag", () => {
+    const onEdgeDrag = () => {
       if (!isScaling.value || !scaleStartBounds) return;
 
       const newPos = handle.getLatLng();
@@ -783,9 +1228,9 @@ const createBoundingBox = () => {
       updateHandlePositions(newBounds);
 
       emit("update:bounds", newBounds);
-    });
+    };
 
-    handle.on("dragend", () => {
+    const onEdgeDragEnd = () => {
       isScaling.value = false;
       if (map.value) {
         map.value.getContainer().style.cursor = "";
@@ -794,7 +1239,12 @@ const createBoundingBox = () => {
       if (boundingBox.value) {
         emit("update:bounds", boundingBox.value.getBounds());
       }
-    });
+    };
+
+    handle.on("mousedown", onEdgeMouseDown);
+    handle.on("dragstart", onEdgeDragStart);
+    handle.on("drag", onEdgeDrag);
+    handle.on("dragend", onEdgeDragEnd);
 
     edgeHandles.value.push(handle);
   });
@@ -819,13 +1269,23 @@ const createBoundingBox = () => {
       })
       .addTo(map.value);
 
-    rotateHandle.value.on("mousedown", () => {
-      if (map.value) {
-        map.value.getContainer().style.cursor = "grabbing";
-      }
-    });
+    const handleElement = rotateHandle.value.getElement();
+    if (handleElement) {
+      handleElement.style.cursor = rotateCursor;
+    }
 
-    rotateHandle.value.on("dragstart", () => {
+    const onRotateMouseDown = () => {
+      if (map.value) {
+        map.value.getContainer().style.cursor = rotateCursor;
+      }
+
+      const handleElement = rotateHandle.value?.getElement();
+      if (handleElement) {
+        handleElement.style.cursor = rotateCursor;
+      }
+    };
+
+    const onRotateDragStart = () => {
       isRotating.value = true;
       if (map.value && props.bounds) {
         map.value.dragging.disable();
@@ -840,9 +1300,9 @@ const createBoundingBox = () => {
         const dy = handlePos.lat - center.lat;
         rotationStartAngle = Math.atan2(dy, dx) * (180 / Math.PI);
       }
-    });
+    };
 
-    rotateHandle.value.on("drag", () => {
+    const onRotateDrag = () => {
       if (!isRotating.value || !props.bounds) return;
 
       const center = props.bounds.getCenter();
@@ -855,13 +1315,18 @@ const createBoundingBox = () => {
       const rotationAngle = currentAngle - rotationStartAngle;
 
       emit("rotate", rotationAngle);
-    });
+    };
 
-    rotateHandle.value.on("dragend", () => {
+    const onRotateDragEnd = () => {
       isRotating.value = false;
       if (map.value) {
         map.value.getContainer().style.cursor = "";
         map.value.dragging.enable();
+      }
+
+      const handleElement = rotateHandle.value?.getElement();
+      if (handleElement) {
+        handleElement.style.cursor = "grab";
       }
 
       if (boundingBox.value) boundingBox.value.setStyle({ opacity: 1 });
@@ -875,13 +1340,19 @@ const createBoundingBox = () => {
           createBoundingBox();
         }
       }, 0);
-    });
+    };
 
-    rotateHandle.value.on("mouseup", () => {
+    const onRotateMouseUp = () => {
       if (map.value) {
         map.value.getContainer().style.cursor = "";
       }
-    });
+    };
+
+    rotateHandle.value.on("mousedown", onRotateMouseDown);
+    rotateHandle.value.on("dragstart", onRotateDragStart);
+    rotateHandle.value.on("drag", onRotateDrag);
+    rotateHandle.value.on("dragend", onRotateDragEnd);
+    rotateHandle.value.on("mouseup", onRotateMouseUp);
   }
 
   const center = props.bounds.getCenter();
@@ -1163,7 +1634,7 @@ const enableEditing = () => {
       icon: L.value!.divIcon(stylesOptions.value.corner),
     }).addTo(map.value!);
 
-    marker.on("drag", () => {
+    const onMarkerDrag = () => {
       const newCorners = [...props.corners];
       const newPos = marker.getLatLng();
       newCorners[index] = { lat: newPos.lat, lng: newPos.lng };
@@ -1172,20 +1643,24 @@ const enableEditing = () => {
       if (selectionContext) {
         selectionContext.notifyFeatureUpdate(canvasId.value);
       }
-    });
+    };
 
-    marker.on("dragend", () => {
+    const onMarkerDragEnd = () => {
       const newCorners = [...props.corners];
       const newPos = marker.getLatLng();
       newCorners[index] = { lat: newPos.lat, lng: newPos.lng };
       emit("update:corners", newCorners);
-    });
+    };
+
+    marker.on("drag", onMarkerDrag);
+    marker.on("dragend", onMarkerDragEnd);
 
     editMarkers.value.push(marker);
   });
 };
 
 let mouseDownHandler: ((e: MouseEvent) => void) | null = null;
+let mouseMoveHandler: ((e: MouseEvent) => void) | null = null;
 
 const enableDragging = () => {
   if (!canvasLayer.value || !map.value || !L.value) return;
@@ -1193,6 +1668,27 @@ const enableDragging = () => {
   if (mouseDownHandler) {
     canvasLayer.value.removeEventListener("mousedown", mouseDownHandler);
   }
+  if (mouseMoveHandler) {
+    canvasLayer.value.removeEventListener("mousemove", mouseMoveHandler);
+  }
+
+  mouseMoveHandler = (e: MouseEvent) => {
+    if (!map.value || !L.value || isDragging.value) return;
+
+    const containerPoint = map.value.mouseEventToContainerPoint(e as any);
+    const corners = props.corners.map((corner) => {
+      const point = map.value!.latLngToContainerPoint([corner.lat, corner.lng]);
+      return { x: point.x, y: point.y };
+    });
+
+    if (
+      isPointInPolygon({ x: containerPoint.x, y: containerPoint.y }, corners)
+    ) {
+      map.value.getContainer().style.cursor = "pointer";
+    } else {
+      map.value.getContainer().style.cursor = "";
+    }
+  };
 
   mouseDownHandler = (e: MouseEvent) => {
     if (!map.value || !L.value) return;
@@ -1231,12 +1727,21 @@ const enableDragging = () => {
   };
 
   canvasLayer.value.addEventListener("mousedown", mouseDownHandler);
+  canvasLayer.value.addEventListener("mousemove", mouseMoveHandler);
 };
 
 const disableDragging = () => {
-  if (!canvasLayer.value || !mouseDownHandler) return;
-  canvasLayer.value.removeEventListener("mousedown", mouseDownHandler);
-  mouseDownHandler = null;
+  if (!canvasLayer.value) return;
+
+  if (mouseDownHandler) {
+    canvasLayer.value.removeEventListener("mousedown", mouseDownHandler);
+    mouseDownHandler = null;
+  }
+
+  if (mouseMoveHandler) {
+    canvasLayer.value.removeEventListener("mousemove", mouseMoveHandler);
+    mouseMoveHandler = null;
+  }
 };
 
 const setupMapDragHandlers = () => {
@@ -1615,6 +2120,7 @@ watch(
           const leafletPane = newMap.getPanes().overlayPane;
           leafletPane.appendChild(canvasLayer.value);
 
+          newMap.on("move", reset);
           newMap.on("moveend", reset);
           newMap.on("zoom", reset);
           newMap.on("viewreset", reset);
@@ -1675,6 +2181,7 @@ onBeforeUnmount(() => {
   }
 
   if (map.value) {
+    map.value.off("move", reset);
     map.value.off("moveend", reset);
     map.value.off("zoom", reset);
     map.value.off("viewreset", reset);
@@ -1848,7 +2355,7 @@ const enableEditing = () => {
       icon: L.value!.divIcon(stylesOptions.value.corner),
     }).addTo(map.value!);
 
-    marker.on("drag", () => {
+    const onMarkerDrag = () => {
       const newCorners = [...props.corners];
       const newPos = marker.getLatLng();
       newCorners[index] = { lat: newPos.lat, lng: newPos.lng };
@@ -1857,20 +2364,24 @@ const enableEditing = () => {
       if (selectionContext) {
         selectionContext.notifyFeatureUpdate(canvasId.value);
       }
-    });
+    };
 
-    marker.on("dragend", () => {
+    const onMarkerDragEnd = () => {
       const newCorners = [...props.corners];
       const newPos = marker.getLatLng();
       newCorners[index] = { lat: newPos.lat, lng: newPos.lng };
       emit("update:corners", newCorners);
-    });
+    };
+
+    marker.on("drag", onMarkerDrag);
+    marker.on("dragend", onMarkerDragEnd);
 
     editMarkers.value.push(marker);
   });
 };
 
 let mouseDownHandler: ((e: MouseEvent) => void) | null = null;
+let mouseMoveHandler: ((e: MouseEvent) => void) | null = null;
 
 const enableDragging = () => {
   if (!canvasLayer.value || !map.value || !L.value) return;
@@ -1878,6 +2389,27 @@ const enableDragging = () => {
   if (mouseDownHandler) {
     canvasLayer.value.removeEventListener("mousedown", mouseDownHandler);
   }
+  if (mouseMoveHandler) {
+    canvasLayer.value.removeEventListener("mousemove", mouseMoveHandler);
+  }
+
+  mouseMoveHandler = (e: MouseEvent) => {
+    if (!map.value || !L.value || isDragging.value) return;
+
+    const containerPoint = map.value.mouseEventToContainerPoint(e as any);
+    const corners = props.corners.map((corner) => {
+      const point = map.value!.latLngToContainerPoint([corner.lat, corner.lng]);
+      return { x: point.x, y: point.y };
+    });
+
+    if (
+      isPointInPolygon({ x: containerPoint.x, y: containerPoint.y }, corners)
+    ) {
+      map.value.getContainer().style.cursor = "pointer";
+    } else {
+      map.value.getContainer().style.cursor = "";
+    }
+  };
 
   mouseDownHandler = (e: MouseEvent) => {
     if (!map.value || !L.value) return;
@@ -1910,18 +2442,27 @@ const enableDragging = () => {
     setupMapDragHandlers();
 
     if (map.value) {
-      map.value.getContainer().style.cursor = "move";
+      map.value.getContainer().style.cursor = "pointer";
       map.value.dragging.disable();
     }
   };
 
   canvasLayer.value.addEventListener("mousedown", mouseDownHandler);
+  canvasLayer.value.addEventListener("mousemove", mouseMoveHandler);
 };
 
 const disableDragging = () => {
-  if (!canvasLayer.value || !mouseDownHandler) return;
-  canvasLayer.value.removeEventListener("mousedown", mouseDownHandler);
-  mouseDownHandler = null;
+  if (!canvasLayer.value) return;
+
+  if (mouseDownHandler) {
+    canvasLayer.value.removeEventListener("mousedown", mouseDownHandler);
+    mouseDownHandler = null;
+  }
+
+  if (mouseMoveHandler) {
+    canvasLayer.value.removeEventListener("mousemove", mouseMoveHandler);
+    mouseMoveHandler = null;
+  }
 };
 
 const setupMapDragHandlers = () => {
@@ -1964,7 +2505,7 @@ const setupMapDragHandlers = () => {
     isDragging.value = false;
 
     if (map.value) {
-      map.value.getContainer().style.cursor = "";
+      map.value.getContainer().style.cursor = "pointer";
       map.value.dragging.enable();
       map.value.off("mousemove", onMouseMove as any);
       map.value.off("mouseup", onMouseUp);
@@ -2459,6 +3000,7 @@ watch(
           const leafletPane = newMap.getPanes().overlayPane;
           leafletPane.appendChild(canvasLayer.value);
 
+          newMap.on("move", reset);
           newMap.on("moveend", reset);
           newMap.on("zoom", reset);
           newMap.on("viewreset", reset);
@@ -2538,6 +3080,7 @@ onBeforeUnmount(() => {
   }
 
   if (map.value) {
+    map.value.off("move", reset);
     map.value.off("moveend", reset);
     map.value.off("zoom", reset);
     map.value.off("viewreset", reset);
@@ -2650,6 +3193,7 @@ const enableDragging = () => {
 
   const onMouseDown = (e: any) => {
     if (!map.value || !circle.value) return;
+
     isDragging.value = true;
     dragStartLatLng = circle.value.getLatLng();
     dragStartMousePoint = e.containerPoint;
@@ -2739,17 +3283,20 @@ const enableEditing = () => {
       })
       .addTo(map.value);
 
-    radiusMarker.value.on("drag", () => {
+    const onRadiusMarkerDrag = () => {
       const center = circle.value!.getLatLng();
       const radiusPoint = radiusMarker.value!.getLatLng();
       const newRadius = center.distanceTo(radiusPoint);
       circle.value!.setRadius(newRadius);
-    });
+    };
 
-    radiusMarker.value.on("dragend", () => {
+    const onRadiusMarkerDragEnd = () => {
       const newRadius = circle.value!.getRadius();
       emit("update:radius", newRadius);
-    });
+    };
+
+    radiusMarker.value.on("drag", onRadiusMarkerDrag);
+    radiusMarker.value.on("dragend", onRadiusMarkerDragEnd);
   }
 };
 
@@ -2838,20 +3385,22 @@ watch(
           );
           circle.value.addTo(map.value);
 
-          if (props.selectable && selectionContext) {
-            circle.value.on("click", () => {
+          const onCircleClick = () => {
+            if (props.selectable && selectionContext) {
               selectionContext.selectFeature("circle", circleId.value);
-              emit("click");
-            });
-            circle.value.on("mousedown", (e: any) => {
-              if (props.draggable) {
-                selectionContext.selectFeature("circle", circleId.value);
-              }
-            });
-          } else {
-            circle.value.on("click", () => {
-              emit("click");
-            });
+            }
+            emit("click");
+          };
+
+          const onCircleMouseDown = (e: any) => {
+            if (props.draggable && props.selectable && selectionContext) {
+              selectionContext.selectFeature("circle", circleId.value);
+            }
+          };
+
+          circle.value.on("click", onCircleClick);
+          if (props.selectable && selectionContext) {
+            circle.value.on("mousedown", onCircleMouseDown);
           }
 
           setupMapDragHandlers();
@@ -2868,24 +3417,25 @@ watch(
             circle.value.off("click");
             circle.value.off("mousedown");
 
-            if (props.selectable && selectionContext) {
-              circle.value.on("click", () => {
+            const onCircleClick = () => {
+              if (props.selectable && selectionContext) {
                 selectionContext.selectFeature("circle", circleId.value);
-                emit("click");
-              });
-              circle.value.on("mousedown", (e: any) => {
-                if (props.draggable) {
-                  selectionContext.selectFeature("circle", circleId.value);
-                }
-              });
-              registerWithSelection();
-            } else {
-              circle.value.on("click", () => {
-                emit("click");
-              });
-              if (selectionContext) {
-                selectionContext.unregisterFeature(circleId.value);
               }
+              emit("click");
+            };
+
+            const onCircleMouseDown = (e: any) => {
+              if (props.draggable && props.selectable && selectionContext) {
+                selectionContext.selectFeature("circle", circleId.value);
+              }
+            };
+
+            circle.value.on("click", onCircleClick);
+            if (props.selectable && selectionContext) {
+              circle.value.on("mousedown", onCircleMouseDown);
+              registerWithSelection();
+            } else if (selectionContext) {
+              selectionContext.unregisterFeature(circleId.value);
             }
           }
         }
@@ -3440,10 +3990,12 @@ const createButton = (
   button.setAttribute("tabindex", "0");
   button.dataset.toolType = type;
 
-  L.value!.DomEvent.on(button, "click", (e: Event) => {
+  const onButtonClick = (e: Event) => {
     L.value!.DomEvent.preventDefault(e);
     toggleDrawMode(type);
-  });
+  };
+
+  L.value!.DomEvent.on(button, "click", onButtonClick);
 
   return button;
 };
@@ -4874,24 +5426,33 @@ const setupMarker = () => {
       icon: new Icon(),
     });
 
+    const onDragStart = () => {
+      if (props.selectable && selectionContext) {
+        selectionContext.selectFeature("marker", markerId.value);
+      }
+      emit("dragstart");
+    };
+
     if (isDraggable) {
       marker.value.on("drag", onDrag);
-      marker.value.on("dragstart", () => emit("dragstart"));
+      marker.value.on("dragstart", onDragStart);
       marker.value.on("dragend", onDragEnd);
     }
 
-    if (props.selectable && selectionContext) {
-      marker.value.on("click", () => {
+    const onMarkerClick = () => {
+      if (props.selectable && selectionContext) {
         selectionContext.selectFeature("marker", markerId.value);
-        emit("click");
-      });
+      }
+      emit("click");
+    };
 
-      marker.value.on("dragstart", () => {
-        selectionContext.selectFeature("marker", markerId.value);
-        emit("dragstart");
-      });
+    if (props.selectable && selectionContext) {
+      marker.value.on("click", onMarkerClick);
+      if (!isDraggable) {
+        marker.value.on("dragstart", onDragStart);
+      }
     } else {
-      marker.value.on("click", () => emit("click"));
+      marker.value.on("click", onMarkerClick);
     }
 
     marker.value.addTo(map.value);
@@ -4963,18 +5524,26 @@ watch(
             marker.value.off("click");
             marker.value.off("dragstart");
 
+            const onMarkerClick = () => {
+              if (props.selectable && selectionContext) {
+                selectionContext.selectFeature("marker", markerId.value);
+              }
+              emit("click");
+            };
+
+            const onDragStart = () => {
+              if (props.selectable && selectionContext) {
+                selectionContext.selectFeature("marker", markerId.value);
+              }
+              emit("dragstart");
+            };
+
             if (props.selectable && selectionContext) {
-              marker.value.on("click", () => {
-                selectionContext.selectFeature("marker", markerId.value);
-                emit("click");
-              });
-              marker.value.on("dragstart", () => {
-                selectionContext.selectFeature("marker", markerId.value);
-                emit("dragstart");
-              });
+              marker.value.on("click", onMarkerClick);
+              marker.value.on("dragstart", onDragStart);
               registerWithSelection();
             } else {
-              marker.value.on("click", () => emit("click"));
+              marker.value.on("click", onMarkerClick);
               if (selectionContext) {
                 selectionContext.unregisterFeature(markerId.value);
               }
@@ -5691,12 +6260,14 @@ const enableEditing = () => {
     if (isFirstPoint && props.autoClose) {
       firstPointMarker.value = marker;
 
-      marker.on("click", () => {
+      const onFirstPointClick = () => {
         emit("closed");
-      });
+      };
+
+      marker.on("click", onFirstPointClick);
     }
 
-    marker.on("drag", () => {
+    const onVertexDrag = () => {
       const newLatLngs = [...latlngs];
       let currentPos = marker.getLatLng();
 
@@ -5704,14 +6275,17 @@ const enableEditing = () => {
       polygon.value!.setLatLngs([newLatLngs]);
 
       updateMidpoints(newLatLngs);
-    });
+    };
 
-    marker.on("dragend", () => {
+    const onVertexDragEnd = () => {
       const updatedLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map(
         (ll) => [ll.lat, ll.lng],
       ) as Array<[number, number]>;
       emit("update:latlngs", updatedLatLngs);
-    });
+    };
+
+    marker.on("drag", onVertexDrag);
+    marker.on("dragend", onVertexDragEnd);
 
     editMarkers.value.push(marker);
   });
@@ -5746,11 +6320,11 @@ const createMidpoints = () => {
 
     let pointAdded = false;
 
-    midMarker.on("dragstart", () => {
+    const onMidpointDragStart = () => {
       if (map.value) map.value.getContainer().style.cursor = "copy";
-    });
+    };
 
-    midMarker.on("drag", () => {
+    const onMidpointDrag = () => {
       const newPos = midMarker.getLatLng();
       const currentLatlngs = polygon.value!.getLatLngs()[0] as L.LatLng[];
 
@@ -5764,26 +6338,32 @@ const createMidpoints = () => {
         newLatlngs[nextIndex] = newPos;
         polygon.value!.setLatLngs([newLatlngs]);
       }
-    });
+    };
 
-    midMarker.on("dragend", () => {
+    const onMidpointDragEnd = () => {
       if (map.value) map.value.getContainer().style.cursor = "";
       const updatedLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map(
         (ll) => [ll.lat, ll.lng],
       ) as Array<[number, number]>;
       emit("update:latlngs", updatedLatLngs);
       enableEditing();
-    });
+    };
 
-    midMarker.on("mouseover", () => {
+    const onMidpointMouseOver = () => {
       if (map.value) map.value.getContainer().style.cursor = "copy";
-    });
+    };
 
-    midMarker.on("mouseout", () => {
+    const onMidpointMouseOut = () => {
       if (map.value) {
         map.value.getContainer().style.cursor = "";
       }
-    });
+    };
+
+    midMarker.on("dragstart", onMidpointDragStart);
+    midMarker.on("drag", onMidpointDrag);
+    midMarker.on("dragend", onMidpointDragEnd);
+    midMarker.on("mouseover", onMidpointMouseOver);
+    midMarker.on("mouseout", onMidpointMouseOut);
 
     midpointMarkers.value.push(midMarker);
   }
@@ -5805,7 +6385,7 @@ const updateMidpoints = (latlngs: L.LatLng[]) => {
 const enableDragging = () => {
   if (!polygon.value || !map.value) return;
 
-  polygon.value.on("mousedown", (e: L.LeafletMouseEvent) => {
+  const onPolygonMouseDown = (e: L.LeafletMouseEvent) => {
     L.value!.DomEvent.stopPropagation(e);
     isDragging.value = true;
 
@@ -5822,7 +6402,9 @@ const enableDragging = () => {
       map.value.getContainer().style.cursor = "move";
       map.value.dragging.disable();
     }
-  });
+  };
+
+  polygon.value.on("mousedown", onPolygonMouseDown);
 };
 
 const disableDragging = () => {
@@ -6015,20 +6597,24 @@ watch(
           });
           polygon.value.addTo(map.value);
 
-          if (props.selectable && selectionContext) {
-            polygon.value.on("click", () => {
+          const onPolygonClick = () => {
+            if (props.selectable && selectionContext) {
               selectionContext.selectFeature("polygon", polygonId.value);
-              emit("click");
-            });
-            polygon.value.on("mousedown", (e: any) => {
-              if (props.draggable) {
-                selectionContext.selectFeature("polygon", polygonId.value);
-              }
-            });
+            }
+            emit("click");
+          };
+
+          const onPolygonMouseDown = (e: any) => {
+            if (props.draggable && props.selectable && selectionContext) {
+              selectionContext.selectFeature("polygon", polygonId.value);
+            }
+          };
+
+          if (props.selectable && selectionContext) {
+            polygon.value.on("click", onPolygonClick);
+            polygon.value.on("mousedown", onPolygonMouseDown);
           } else {
-            polygon.value.on("click", () => {
-              emit("click");
-            });
+            polygon.value.on("click", onPolygonClick);
           }
 
           if (props.selectable && selectionContext) {
@@ -6043,21 +6629,25 @@ watch(
             polygon.value.off("click");
             polygon.value.off("mousedown");
 
-            if (props.selectable && selectionContext) {
-              polygon.value.on("click", () => {
+            const onPolygonClick = () => {
+              if (props.selectable && selectionContext) {
                 selectionContext.selectFeature("polygon", polygonId.value);
-                emit("click");
-              });
-              polygon.value.on("mousedown", (e: any) => {
-                if (props.draggable) {
-                  selectionContext.selectFeature("polygon", polygonId.value);
-                }
-              });
+              }
+              emit("click");
+            };
+
+            const onPolygonMouseDown = (e: any) => {
+              if (props.draggable && props.selectable && selectionContext) {
+                selectionContext.selectFeature("polygon", polygonId.value);
+              }
+            };
+
+            if (props.selectable && selectionContext) {
+              polygon.value.on("click", onPolygonClick);
+              polygon.value.on("mousedown", onPolygonMouseDown);
               registerWithSelection();
             } else {
-              polygon.value.on("click", () => {
-                emit("click");
-              });
+              polygon.value.on("click", onPolygonClick);
               if (selectionContext) {
                 selectionContext.unregisterFeature(polygonId.value);
               }
@@ -6193,21 +6783,24 @@ const enableEditing = () => {
       }),
     }).addTo(map.value!);
 
-    marker.on("drag", () => {
+    const onVertexDrag = () => {
       const newLatLngs = [...latlngs];
       newLatLngs[index] = marker.getLatLng();
       polyline.value!.setLatLngs(newLatLngs);
 
       updateMidpoints(newLatLngs);
-    });
+    };
 
-    marker.on("dragend", () => {
+    const onVertexDragEnd = () => {
       const updatedLatLngs = polyline.value!.getLatLngs() as L.LatLng[];
       emit(
         "update:latlngs",
         updatedLatLngs.map((ll) => [ll.lat, ll.lng]),
       );
-    });
+    };
+
+    marker.on("drag", onVertexDrag);
+    marker.on("dragend", onVertexDragEnd);
 
     editMarkers.value.push(marker);
   });
@@ -6241,11 +6834,11 @@ const createMidpoints = () => {
 
     let pointAdded = false;
 
-    midMarker.on("dragstart", () => {
+    const onMidpointDragStart = () => {
       if (map.value) map.value.getContainer().style.cursor = "copy";
-    });
+    };
 
-    midMarker.on("drag", () => {
+    const onMidpointDrag = () => {
       const newPos = midMarker.getLatLng();
       const currentLatlngs = polyline.value!.getLatLngs() as L.LatLng[];
 
@@ -6259,26 +6852,32 @@ const createMidpoints = () => {
         newLatlngs[i + 1] = newPos;
         polyline.value!.setLatLngs(newLatlngs);
       }
-    });
+    };
 
-    midMarker.on("dragend", () => {
+    const onMidpointDragEnd = () => {
       if (map.value) map.value.getContainer().style.cursor = "";
       const updatedLatLngs = (polyline.value!.getLatLngs() as L.LatLng[]).map(
         (ll) => [ll.lat, ll.lng],
       ) as Array<[number, number]>;
       emit("update:latlngs", updatedLatLngs);
       enableEditing();
-    });
+    };
 
-    midMarker.on("mouseover", () => {
+    const onMidpointMouseOver = () => {
       if (map.value) map.value.getContainer().style.cursor = "copy";
-    });
+    };
 
-    midMarker.on("mouseout", () => {
+    const onMidpointMouseOut = () => {
       if (map.value) {
         map.value.getContainer().style.cursor = "";
       }
-    });
+    };
+
+    midMarker.on("dragstart", onMidpointDragStart);
+    midMarker.on("drag", onMidpointDrag);
+    midMarker.on("dragend", onMidpointDragEnd);
+    midMarker.on("mouseover", onMidpointMouseOver);
+    midMarker.on("mouseout", onMidpointMouseOut);
 
     midpointMarkers.value.push(midMarker);
   }
@@ -6298,7 +6897,7 @@ const updateMidpoints = (latlngs: L.LatLng[]) => {
 const enableDragging = () => {
   if (!polyline.value || !map.value) return;
 
-  polyline.value.on("mousedown", (e: L.LeafletMouseEvent) => {
+  const onPolylineMouseDown = (e: L.LeafletMouseEvent) => {
     L.value!.DomEvent.stopPropagation(e);
     isDragging.value = true;
 
@@ -6315,7 +6914,9 @@ const enableDragging = () => {
       map.value.getContainer().style.cursor = "move";
       map.value.dragging.disable();
     }
-  });
+  };
+
+  polyline.value.on("mousedown", onPolylineMouseDown);
 };
 
 const disableDragging = () => {
@@ -6507,20 +7108,24 @@ watch(
           });
           polyline.value.addTo(map.value);
 
-          if (props.selectable && selectionContext) {
-            polyline.value.on("click", () => {
+          const onPolylineClick = () => {
+            if (props.selectable && selectionContext) {
               selectionContext.selectFeature("polyline", polylineId.value);
-              emit("click");
-            });
-            polyline.value.on("mousedown", (e: any) => {
-              if (props.draggable) {
-                selectionContext.selectFeature("polyline", polylineId.value);
-              }
-            });
+            }
+            emit("click");
+          };
+
+          const onPolylineMouseDown = (e: any) => {
+            if (props.draggable && props.selectable && selectionContext) {
+              selectionContext.selectFeature("polyline", polylineId.value);
+            }
+          };
+
+          if (props.selectable && selectionContext) {
+            polyline.value.on("click", onPolylineClick);
+            polyline.value.on("mousedown", onPolylineMouseDown);
           } else {
-            polyline.value.on("click", () => {
-              emit("click");
-            });
+            polyline.value.on("click", onPolylineClick);
           }
 
           if (props.selectable && selectionContext) {
@@ -6535,21 +7140,25 @@ watch(
             polyline.value.off("click");
             polyline.value.off("mousedown");
 
-            if (props.selectable && selectionContext) {
-              polyline.value.on("click", () => {
+            const onPolylineClick = () => {
+              if (props.selectable && selectionContext) {
                 selectionContext.selectFeature("polyline", polylineId.value);
-                emit("click");
-              });
-              polyline.value.on("mousedown", (e: any) => {
-                if (props.draggable) {
-                  selectionContext.selectFeature("polyline", polylineId.value);
-                }
-              });
+              }
+              emit("click");
+            };
+
+            const onPolylineMouseDown = (e: any) => {
+              if (props.draggable && props.selectable && selectionContext) {
+                selectionContext.selectFeature("polyline", polylineId.value);
+              }
+            };
+
+            if (props.selectable && selectionContext) {
+              polyline.value.on("click", onPolylineClick);
+              polyline.value.on("mousedown", onPolylineMouseDown);
               registerWithSelection();
             } else {
-              polyline.value.on("click", () => {
-                emit("click");
-              });
+              polyline.value.on("click", onPolylineClick);
               if (selectionContext) {
                 selectionContext.unregisterFeature(polylineId.value);
               }
@@ -6679,7 +7288,7 @@ const enableEditing = () => {
       }),
     }).addTo(map.value!);
 
-    marker.on("drag", () => {
+    const onCornerDrag = () => {
       const currentBounds = rectangle.value!.getBounds();
       const newCorner = marker.getLatLng();
 
@@ -6726,15 +7335,18 @@ const enableEditing = () => {
           m.setLatLng(updatedCorners[i]!);
         }
       });
-    });
+    };
 
-    marker.on("dragend", () => {
+    const onCornerDragEnd = () => {
       const updatedBounds = rectangle.value!.getBounds();
       emit("update:bounds", [
         [updatedBounds.getSouth(), updatedBounds.getWest()],
         [updatedBounds.getNorth(), updatedBounds.getEast()],
       ]);
-    });
+    };
+
+    marker.on("drag", onCornerDrag);
+    marker.on("dragend", onCornerDragEnd);
 
     editMarkers.value.push(marker);
   });
@@ -6743,7 +7355,7 @@ const enableEditing = () => {
 const enableDragging = () => {
   if (!rectangle.value || !map.value) return;
 
-  rectangle.value.on("mousedown", (e: L.LeafletMouseEvent) => {
+  const onRectangleMouseDown = (e: L.LeafletMouseEvent) => {
     L.value!.DomEvent.stopPropagation(e);
     isDragging.value = true;
 
@@ -6758,7 +7370,9 @@ const enableDragging = () => {
       map.value.getContainer().style.cursor = "move";
       map.value.dragging.disable();
     }
-  });
+  };
+
+  rectangle.value.on("mousedown", onRectangleMouseDown);
 };
 
 const disableDragging = () => {
@@ -6906,20 +7520,24 @@ watch(
           });
           rectangle.value.addTo(map.value);
 
-          if (props.selectable && selectionContext) {
-            rectangle.value.on("click", () => {
+          const onRectangleClick = () => {
+            if (props.selectable && selectionContext) {
               selectionContext.selectFeature("rectangle", rectangleId.value);
-              emit("click");
-            });
-            rectangle.value.on("mousedown", (e: any) => {
-              if (props.draggable) {
-                selectionContext.selectFeature("rectangle", rectangleId.value);
-              }
-            });
+            }
+            emit("click");
+          };
+
+          const onRectangleMouseDown = (e: any) => {
+            if (props.draggable && props.selectable && selectionContext) {
+              selectionContext.selectFeature("rectangle", rectangleId.value);
+            }
+          };
+
+          if (props.selectable && selectionContext) {
+            rectangle.value.on("click", onRectangleClick);
+            rectangle.value.on("mousedown", onRectangleMouseDown);
           } else {
-            rectangle.value.on("click", () => {
-              emit("click");
-            });
+            rectangle.value.on("click", onRectangleClick);
           }
 
           if (props.selectable && selectionContext) {
@@ -6934,24 +7552,25 @@ watch(
             rectangle.value.off("click");
             rectangle.value.off("mousedown");
 
-            if (props.selectable && selectionContext) {
-              rectangle.value.on("click", () => {
+            const onRectangleClick = () => {
+              if (props.selectable && selectionContext) {
                 selectionContext.selectFeature("rectangle", rectangleId.value);
-                emit("click");
-              });
-              rectangle.value.on("mousedown", (e: any) => {
-                if (props.draggable) {
-                  selectionContext.selectFeature(
-                    "rectangle",
-                    rectangleId.value,
-                  );
-                }
-              });
+              }
+              emit("click");
+            };
+
+            const onRectangleMouseDown = (e: any) => {
+              if (props.draggable && props.selectable && selectionContext) {
+                selectionContext.selectFeature("rectangle", rectangleId.value);
+              }
+            };
+
+            if (props.selectable && selectionContext) {
+              rectangle.value.on("click", onRectangleClick);
+              rectangle.value.on("mousedown", onRectangleMouseDown);
               registerWithSelection();
             } else {
-              rectangle.value.on("click", () => {
-                emit("click");
-              });
+              rectangle.value.on("click", onRectangleClick);
               if (selectionContext) {
                 selectionContext.unregisterFeature(rectangleId.value);
               }
@@ -7115,7 +7734,7 @@ const map = inject<Ref<Leaflet.Map | null>>(LeafletMapKey, ref(null));
 const visibleBounds = ref<Leaflet.LatLngBounds | null>(null);
 const visibleFeatureIds = ref<Set<string | number>>(new Set());
 const isTransitioning = ref(false);
-let updateScheduled = false;
+let rafId: number | null = null;
 
 const calculateDynamicMargin = (zoom: number): number => {
   const clampedZoom = Math.max(1, Math.min(20, zoom));
@@ -7128,11 +7747,12 @@ const calculateDynamicMargin = (zoom: number): number => {
 const updateVisibleBounds = () => {
   if (!map.value || !L.value) return;
 
-  if (updateScheduled) return;
-  updateScheduled = true;
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+  }
 
-  requestAnimationFrame(() => {
-    updateScheduled = false;
+  rafId = requestAnimationFrame(() => {
+    rafId = null;
 
     if (!map.value || !L.value) return;
 
@@ -7233,11 +7853,15 @@ const updateVisibleFeaturesQuadtree = () => {
   visibleFeatureIds.value = newVisibleIds;
   emit("update:visible-count", newVisibleIds.size);
 };
+const handleMapUpdate = () => {
+  updateVisibleBounds();
+};
+
 onMounted(() => {
   if (map.value) {
     updateVisibleBounds();
-    map.value.on("moveend", updateVisibleBounds);
-    map.value.on("zoomend", updateVisibleBounds);
+    map.value.on("moveend", handleMapUpdate);
+    map.value.on("zoomend", handleMapUpdate);
   }
 });
 
@@ -7246,70 +7870,53 @@ watch(
   (newMap) => {
     if (newMap) {
       updateVisibleBounds();
-      newMap.on("moveend", updateVisibleBounds);
-      newMap.on("zoomend", updateVisibleBounds);
+      newMap.on("moveend", handleMapUpdate);
+      newMap.on("zoomend", handleMapUpdate);
     }
   },
   { immediate: true },
 );
+
 onBeforeUnmount(() => {
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+
   if (map.value) {
-    map.value.off("moveend", updateVisibleBounds);
-    map.value.off("zoomend", updateVisibleBounds);
+    map.value.off("moveend", handleMapUpdate);
+    map.value.off("zoomend", handleMapUpdate);
   }
 });
 
 watch(
-  () => props.enabled,
-  async () => {
-    isTransitioning.value = true;
-    emit("transition-start");
+  () =>
+    [
+      props.enabled,
+      props.marginMeters,
+      props.marginZoomRatio,
+      props.minZoom,
+      props.maxZoom,
+      props.quadtree,
+    ] as const,
+  async ([enabled], [oldEnabled]) => {
+    if (enabled !== oldEnabled) {
+      isTransitioning.value = true;
+      emit("transition-start");
 
-    await new Promise((resolve) => setTimeout(resolve, props.transitionDelay));
-    updateVisibleFeaturesQuadtree();
+      await new Promise((resolve) =>
+        setTimeout(resolve, props.transitionDelay),
+      );
+    }
 
-    await new Promise((resolve) => setTimeout(resolve, 200));
-
-    isTransitioning.value = false;
-    emit("transition-end");
-  },
-);
-
-watch(
-  () => props.marginMeters,
-  () => {
-    updateVisibleBounds();
-  },
-);
-
-watch(
-  () => props.marginZoomRatio,
-  () => {
-    updateVisibleBounds();
-  },
-);
-
-watch(
-  () => props.minZoom,
-  () => {
-    updateVisibleFeaturesQuadtree();
-  },
-);
-
-watch(
-  () => props.maxZoom,
-  () => {
-    updateVisibleFeaturesQuadtree();
-  },
-);
-
-watch(
-  () => props.quadtree,
-  () => {
     if (map.value) {
-      nextTick(() => {
-        updateVisibleBounds();
-      });
+      updateVisibleBounds();
+    }
+
+    if (enabled !== oldEnabled) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      isTransitioning.value = false;
+      emit("transition-end");
     }
   },
 );
@@ -7575,6 +8182,44 @@ export const useLeaflet = async () => {
     );
   };
 
+  const constrainToSquare = (
+    bounds: L.LatLngBounds,
+    center?: L.LatLng,
+    originalBounds?: L.LatLngBounds,
+  ): L.LatLngBounds => {
+    if (!L.value) return bounds;
+
+    const currentCenter = center || bounds.getCenter();
+    const latDiff = bounds.getNorth() - bounds.getSouth();
+    const lngDiff = bounds.getEast() - bounds.getWest();
+
+    const latMeters = latDiff * LatDegreesMeters;
+    const lngMeters = lngDegreesToRadius(lngDiff, currentCenter.lat);
+
+    let targetMeters = latMeters;
+    if (originalBounds) {
+      const origLatDiff = originalBounds.getNorth() - originalBounds.getSouth();
+      const origLngDiff = originalBounds.getEast() - originalBounds.getWest();
+      const origLatMeters = origLatDiff * LatDegreesMeters;
+      const origLngMeters = lngDegreesToRadius(origLngDiff, currentCenter.lat);
+
+      const latChange = Math.abs(latMeters - origLatMeters);
+      const lngChange = Math.abs(lngMeters - origLngMeters);
+
+      targetMeters = lngChange > latChange ? lngMeters : latMeters;
+    } else {
+      targetMeters = (latMeters + lngMeters) / 2;
+    }
+
+    const halfLatDiff = targetMeters / 2 / LatDegreesMeters;
+    const halfLngDiff = radiusToLngDegrees(targetMeters / 2, currentCenter.lat);
+
+    return L.value.latLngBounds(
+      [currentCenter.lat - halfLatDiff, currentCenter.lng - halfLngDiff],
+      [currentCenter.lat + halfLatDiff, currentCenter.lng + halfLngDiff],
+    );
+  };
+
   return {
     L,
     LatDegreesMeters,
@@ -7597,6 +8242,8 @@ export const useLeaflet = async () => {
     calculateMidpoint,
     calculateRadiusPoint,
     calculateCircleBounds,
+
+    constrainToSquare,
   };
 };
 ```
@@ -9020,6 +9667,96 @@ Helps smooth transitions when toggling virtualization on/off
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <leaflet-simple />
+  :::
+
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
+```vue
+<script setup lang="ts">
+import { ref, type ComponentPublicInstance } from "vue";
+import { ClientOnly } from "#components";
+import {
+  LeafletMap,
+  LeafletTileLayer,
+  LeafletZoomControl,
+  LeafletControls,
+  LeafletControlItem,
+  LeafletCircle,
+  type LeafletMapExposed,
+} from "@/components/ui/leaflet-map";
+import { Icon } from "@iconify/vue";
+
+type LeafletMapInstance = ComponentPublicInstance & LeafletMapExposed;
+
+const mapRef = ref<LeafletMapInstance | null>(null);
+const zoom = ref(13);
+const locationCoords = ref<{ lat: number; lng: number; accuracy: number }>({
+  lat: 43.3026,
+  lng: 5.3691,
+  accuracy: 500,
+});
+
+const onLocate = () => {
+  mapRef.value?.locate();
+};
+
+const onLocationFound = (event: any) => {
+  locationCoords.value = {
+    lat: event.latitude,
+    lng: event.longitude,
+    accuracy: event.accuracy,
+  };
+};
+</script>
+
+<template>
+  <ClientOnly>
+    <div class="h-128 min-h-128 mb-4">
+      <LeafletMap
+        ref="mapRef"
+        name="marseille"
+        tile-layer="openstreetmap"
+        :center-lat="locationCoords.lat"
+        :center-lng="locationCoords.lng"
+        :zoom="zoom"
+        class="rounded-lg"
+        @location:found="onLocationFound"
+      >
+        <LeafletTileLayer
+          name="openstreetmap"
+          url-template="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        />
+
+        <LeafletControls
+          position="topleft"
+          :enabled="true"
+          @item-clicked="onLocate"
+        >
+          <LeafletControlItem name="locate" type="push" title="Locate me">
+            <Icon icon="gis:location-arrow" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+        </LeafletControls>
+
+        <LeafletZoomControl position="topleft" />
+
+        <LeafletCircle
+          :key="`circle-${locationCoords.lat}-${locationCoords.lng}`"
+          :lat="locationCoords.lat"
+          :lng="locationCoords.lng"
+          :radius="locationCoords.accuracy"
+          class="bg-red-500/20 border border-red-500"
+        />
+      </LeafletMap>
+    </div>
+  </ClientOnly>
+</template>
+```
+  :::
+::
+
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
     <leaflet-canvas-demo />
   :::
 
@@ -9386,558 +10123,6 @@ watch(
       </div>
     </div>
   </ClientOnly>
-</template>
-```
-  :::
-::
-
-::tabs
-  :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <leaflet-edition-demo />
-  :::
-
-  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
-```vue
-<script setup lang="ts">
-import { ref, computed, type ComponentPublicInstance } from "vue";
-import { Button } from "@/components/ui/button";
-import {
-  LeafletMap,
-  LeafletTileLayer,
-  LeafletZoomControl,
-  LeafletControls,
-  LeafletControlItem,
-  LeafletFeaturesEditor,
-  LeafletFeaturesSelector,
-  LeafletFeatureHandle,
-  LeafletFeatureRectangle,
-  LeafletMarker,
-  LeafletCircle,
-  LeafletPolyline,
-  LeafletPolygon,
-  LeafletRectangle,
-  LeafletMeasureTool,
-  LeafletCanvasGL,
-  type LeafletMapExposed,
-  type FeatureDrawEvent,
-  type FeatureShapeType,
-  type FeatureSelectMode,
-} from "@/components/ui/leaflet-map";
-import { Icon } from "@iconify/vue";
-
-type LeafletCanvasInstance = ComponentPublicInstance & {
-  sourceCanvas: HTMLCanvasElement | null;
-  redraw: () => void;
-};
-
-const mapRef = ref<LeafletMapExposed | null>(null);
-
-const editMode = ref(true);
-
-const currentMode = ref<FeatureShapeType | FeatureSelectMode | null>("select");
-
-const measureMode = ref<"line" | "polygon" | false>(false);
-const lastMeasurement = ref<{ distance: number; area?: number } | null>(null);
-
-const selectionMode = computed<FeatureSelectMode | null>(() => {
-  if (currentMode.value === "select") return "select";
-  if (currentMode.value === "direct-select") return "direct-select";
-  return null;
-});
-
-const isSelectMode = computed(() => selectionMode.value !== null);
-
-const markers = ref([
-  { id: 1, lat: 48.8566, lng: 2.3522, label: "Paris" },
-  { id: 2, lat: 48.8738, lng: 2.295, label: "Arc de Triomphe" },
-  { id: 3, lat: 48.8584, lng: 2.2945, label: "Tour Eiffel" },
-]);
-
-const circles = ref([
-  {
-    id: 1,
-    lat: 48.8566,
-    lng: 2.3522,
-    radius: 500,
-    class: "border border-blue-500 bg-blue-500/20",
-  },
-  {
-    id: 2,
-    lat: 48.8738,
-    lng: 2.295,
-    radius: 300,
-    class: "border border-green-500 bg-green-500/30",
-  },
-]);
-
-const polylines = ref([
-  {
-    id: 1,
-    latlngs: [
-      [48.8566, 2.3522],
-      [48.8738, 2.295],
-      [48.8584, 2.2945],
-    ] as Array<[number, number]>,
-    class: "border border-red-500",
-    weight: 4,
-  },
-]);
-
-const polygons = ref([
-  {
-    id: 1,
-    latlngs: [
-      [48.86, 2.34],
-      [48.86, 2.36],
-      [48.85, 2.36],
-      [48.85, 2.34],
-    ] as Array<[number, number]>,
-    class: "border border-purple-500 bg-purple-500/30",
-  },
-]);
-
-const rectangles = ref([
-  {
-    id: 1,
-    bounds: [
-      [48.84, 2.28],
-      [48.845, 2.29],
-    ] as [[number, number], [number, number]],
-    class: "border border-orange-500 bg-orange-500/20",
-  },
-]);
-
-const canvasRef = ref<LeafletCanvasInstance | null>(null);
-const canvasCorners = ref([
-  { lat: 48.865, lng: 2.34 },
-  { lat: 48.865, lng: 2.365 },
-  { lat: 48.85, lng: 2.365 },
-  { lat: 48.85, lng: 2.34 },
-]);
-const canvasOpacity = ref(0.7);
-const sourceCanvas = ref<HTMLCanvasElement | null>(null);
-
-const onCanvasReady = (canvas: HTMLCanvasElement) => {
-  sourceCanvas.value = canvas;
-
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  gradient.addColorStop(0, "#667eea");
-  gradient.addColorStop(1, "#764ba2");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.fillStyle = "white";
-  ctx.font = "bold 24px Arial";
-  ctx.textAlign = "center";
-  ctx.fillText("Canvas Overlay", canvas.width / 2, canvas.height / 2 - 10);
-
-  ctx.font = "16px Arial";
-  ctx.fillText(
-    "Editable & Draggable",
-    canvas.width / 2,
-    canvas.height / 2 + 20,
-  );
-};
-
-const handleModeSelected = (mode: string | null) => {
-  if (mode === "measure-line" || mode === "measure-polygon") {
-    const newMode = mode === "measure-line" ? "line" : "polygon";
-
-    if (measureMode.value === newMode) {
-      measureMode.value = false;
-    } else {
-      measureMode.value = newMode;
-      currentMode.value = null;
-    }
-    return;
-  }
-
-  if (measureMode.value) {
-    measureMode.value = false;
-  }
-
-  if (currentMode.value === mode) {
-    currentMode.value = null;
-  } else {
-    currentMode.value = mode as FeatureShapeType | FeatureSelectMode | null;
-  }
-};
-
-const handleMeasurementComplete = (data: {
-  distance: number;
-  area?: number;
-}) => {
-  lastMeasurement.value = data;
-};
-
-const handleShapeCreated = (event: FeatureDrawEvent) => {
-  const { layer, layerType } = event;
-
-  switch (layerType) {
-    case "marker": {
-      const latlng = (layer as any).getLatLng();
-      const newId =
-        markers.value.length > 0
-          ? Math.max(...markers.value.map((m) => m.id)) + 1
-          : 1;
-      markers.value.push({
-        id: newId,
-        lat: latlng.lat,
-        lng: latlng.lng,
-        label: `Marker ${newId}`,
-      });
-      break;
-    }
-    case "circle": {
-      const latlng = (layer as any).getLatLng();
-      const radius = (layer as any).getRadius();
-      const newId =
-        circles.value.length > 0
-          ? Math.max(...circles.value.map((c) => c.id)) + 1
-          : 1;
-      circles.value.push({
-        id: newId,
-        lat: latlng.lat,
-        lng: latlng.lng,
-        radius: radius,
-        class: "border border-blue-500 bg-blue-500/20",
-      });
-      break;
-    }
-    case "polyline": {
-      const latlngs = (layer as any)
-        .getLatLngs()
-        .map((ll: any) => [ll.lat, ll.lng] as [number, number]);
-      const newId =
-        polylines.value.length > 0
-          ? Math.max(...polylines.value.map((p) => p.id)) + 1
-          : 1;
-      polylines.value.push({
-        id: newId,
-        latlngs: latlngs,
-        class: "border border-red-500",
-        weight: 4,
-      });
-      break;
-    }
-    case "polygon": {
-      const latlngs = (layer as any)
-        .getLatLngs()[0]
-        .map((ll: any) => [ll.lat, ll.lng] as [number, number]);
-      const newId =
-        polygons.value.length > 0
-          ? Math.max(...polygons.value.map((p) => p.id)) + 1
-          : 1;
-      polygons.value.push({
-        id: newId,
-        latlngs: latlngs,
-        class: "border border-purple-500 bg-purple-500/30",
-      });
-      break;
-    }
-    case "rectangle": {
-      const bounds = (layer as any).getBounds();
-      const newId =
-        rectangles.value.length > 0
-          ? Math.max(...rectangles.value.map((r) => r.id)) + 1
-          : 1;
-      rectangles.value.push({
-        id: newId,
-        bounds: [
-          [bounds.getSouth(), bounds.getWest()],
-          [bounds.getNorth(), bounds.getEast()],
-        ] as [[number, number], [number, number]],
-        class: "border border-orange-500 bg-orange-500/20",
-      });
-      break;
-    }
-  }
-
-  currentMode.value = "select";
-};
-</script>
-
-<template>
-  <div class="w-full h-full flex flex-col gap-4">
-    <div class="rounded flex items-center justify-between gap-4 flex-wrap">
-      <div class="flex gap-2 items-center">
-        <Button
-          @click="editMode = !editMode"
-          class="px-4 py-2 rounded transition-colors"
-          :class="
-            editMode
-              ? 'bg-blue-500 text-white hover:bg-blue-600'
-              : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-          "
-        >
-          {{ editMode ? "Disable edition" : "Enable edition" }}
-        </Button>
-      </div>
-
-      <div
-        v-if="measureMode && lastMeasurement"
-        class="px-4 py-2 bg-orange-50 border border-orange-200 rounded-lg shadow-sm"
-      >
-        <div class="text-sm font-medium text-orange-900">
-          Measurement Result:
-        </div>
-        <div class="text-xs text-orange-700 mt-1">
-          <span class="font-semibold">Distance:</span>
-          {{
-            lastMeasurement.distance > 1000
-              ? `${(lastMeasurement.distance / 1000).toFixed(2)} km`
-              : `${lastMeasurement.distance.toFixed(2)} m`
-          }}
-        </div>
-        <div
-          v-if="lastMeasurement.area !== undefined"
-          class="text-xs text-orange-700"
-        >
-          <span class="font-semibold">Area:</span>
-          {{
-            lastMeasurement.area > 10000
-              ? `${(lastMeasurement.area / 1000000).toFixed(2)} km²`
-              : `${lastMeasurement.area.toFixed(2)} m²`
-          }}
-        </div>
-      </div>
-    </div>
-
-    <div class="flex-1 relative">
-      <LeafletMap
-        ref="mapRef"
-        name="shapes-demo"
-        class="w-full h-[600px] rounded-lg shadow-lg"
-        tile-layer="osm"
-        :center-lat="48.8566"
-        :center-lng="2.3522"
-        :zoom="13"
-      >
-        <LeafletTileLayer
-          name="osm"
-          url-template="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        />
-
-        <LeafletZoomControl position="topleft" />
-
-        <LeafletControls
-          position="topleft"
-          :enabled="editMode"
-          :active-item="currentMode"
-          @item-clicked="handleModeSelected"
-        >
-          <LeafletControlItem
-            name="select"
-            type="toggle"
-            title="Selection Tool (V)"
-          >
-            <Icon icon="gis:arrow" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-          <LeafletControlItem
-            name="direct-select"
-            type="toggle"
-            title="Direct Selection Tool (A)"
-          >
-            <Icon icon="gis:arrow-o" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-          <LeafletControlItem name="marker" type="toggle" title="Draw Marker">
-            <Icon icon="gis:poi" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-          <LeafletControlItem
-            name="rectangle"
-            type="toggle"
-            title="Draw Rectangle"
-          >
-            <Icon icon="gis:rectangle" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-          <LeafletControlItem name="circle" type="toggle" title="Draw Circle">
-            <Icon icon="gis:circle" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-          <LeafletControlItem
-            name="polyline"
-            type="toggle"
-            title="Draw Polyline"
-          >
-            <Icon icon="gis:polyline" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-          <LeafletControlItem name="polygon" type="toggle" title="Draw Polygon">
-            <Icon icon="gis:polygon" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-        </LeafletControls>
-
-        <LeafletControls
-          position="topright"
-          :enabled="editMode"
-          :active-item="
-            measureMode === 'line'
-              ? 'measure-line'
-              : measureMode === 'polygon'
-                ? 'measure-polygon'
-                : null
-          "
-          @item-clicked="handleModeSelected"
-        >
-          <LeafletControlItem
-            name="measure-line"
-            type="toggle"
-            title="Measure Distance (Line)"
-          >
-            <Icon icon="ri:ruler-line" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-          <LeafletControlItem
-            name="measure-polygon"
-            type="toggle"
-            title="Measure Distance & Area (Polygon)"
-          >
-            <Icon icon="raphael:ruler" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-        </LeafletControls>
-
-        <LeafletMeasureTool
-          :enabled="!!measureMode"
-          :mode="measureMode || 'polygon'"
-          unit="metric"
-          :show-area="true"
-          class="border border-blue-500 bg-blue-500/20"
-          @measurement-complete="handleMeasurementComplete"
-          @measurement-update="(data) => (lastMeasurement = data)"
-        >
-          <LeafletFeatureHandle
-            role="corner"
-            class="bg-blue-500/20 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
-            :size="12"
-          />
-        </LeafletMeasureTool>
-
-        <LeafletFeaturesEditor
-          :enabled="editMode"
-          :mode="currentMode"
-          :shape-options="{ color: '#3388ff', fillOpacity: 0.2 }"
-          @draw:created="handleShapeCreated"
-        >
-          <LeafletFeaturesSelector
-            :enabled="isSelectMode"
-            :mode="selectionMode"
-          >
-            <LeafletMarker
-              v-for="marker in markers"
-              :key="`marker-${marker.id}`"
-              :id="`marker-${marker.id}`"
-              v-model:lat="marker.lat"
-              v-model:lng="marker.lng"
-              :selectable="currentMode === 'select'"
-              :editable="currentMode === 'direct-select'"
-              :draggable="currentMode === 'select'"
-            />
-
-            <LeafletCircle
-              v-for="circle in circles"
-              :key="`circle-${circle.id}`"
-              :id="`circle-${circle.id}`"
-              v-model:lat="circle.lat"
-              v-model:lng="circle.lng"
-              v-model:radius="circle.radius"
-              :class="circle.class"
-              :selectable="currentMode === 'select'"
-              :editable="currentMode === 'direct-select'"
-              :draggable="currentMode === 'select'"
-            />
-
-            <LeafletPolyline
-              v-for="polyline in polylines"
-              :key="`polyline-${polyline.id}`"
-              :id="`polyline-${polyline.id}`"
-              v-model:latlngs="polyline.latlngs"
-              :weight="polyline.weight"
-              :class="polyline.class"
-              :selectable="currentMode === 'select'"
-              :editable="currentMode === 'direct-select'"
-              :draggable="currentMode === 'select'"
-            />
-
-            <LeafletPolygon
-              v-for="polygon in polygons"
-              :key="`polygon-${polygon.id}`"
-              :id="`polygon-${polygon.id}`"
-              v-model:latlngs="polygon.latlngs"
-              :class="polygon.class"
-              :selectable="currentMode === 'select'"
-              :editable="currentMode === 'direct-select'"
-              :draggable="currentMode === 'select'"
-              :auto-close="true"
-            />
-
-            <LeafletRectangle
-              v-for="rectangle in rectangles"
-              :key="`rectangle-${rectangle.id}`"
-              :id="`rectangle-${rectangle.id}`"
-              v-model:bounds="rectangle.bounds"
-              :class="rectangle.class"
-              :selectable="currentMode === 'select'"
-              :editable="currentMode === 'direct-select'"
-              :draggable="currentMode === 'select'"
-            />
-
-            <LeafletCanvasGL
-              ref="canvasRef"
-              :corners="canvasCorners"
-              :width="400"
-              :height="300"
-              :selectable="currentMode === 'select'"
-              :editable="currentMode === 'direct-select'"
-              :draggable="currentMode === 'select'"
-              :subdivisions="20"
-              :opacity="canvasOpacity"
-              class="border-2 border-red-500"
-              @canvas-ready="onCanvasReady"
-              @update:corners="(corners) => (canvasCorners = corners)"
-            >
-              <LeafletFeatureHandle
-                role="corner"
-                class="bg-white border-2 border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
-                :size="10"
-              />
-            </LeafletCanvasGL>
-
-            <template #bounding-box-styles>
-              <LeafletFeatureRectangle
-                class="border-2 border-orange-400"
-                :dashed="[5, 5]"
-              />
-
-              <LeafletFeatureHandle
-                role="corner"
-                class="bg-red-500/30 border border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
-                :size="10"
-              />
-
-              <LeafletFeatureHandle
-                role="edge"
-                class="bg-blue-500/20 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
-                :size="8"
-              />
-
-              <LeafletFeatureHandle
-                role="rotate"
-                class="bg-blue-500/40 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
-                :size="12"
-              />
-
-              <LeafletFeatureHandle
-                role="center"
-                class="bg-orange-500/40 border border-orange-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
-                :size="12"
-              />
-            </template>
-          </LeafletFeaturesSelector>
-        </LeafletFeaturesEditor>
-      </LeafletMap>
-    </div>
-  </div>
 </template>
 ```
   :::

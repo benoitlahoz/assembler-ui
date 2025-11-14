@@ -2,9 +2,9 @@
  * @type registry:ui
  * @category geography
  *
+ * @demo LeafletEditionDemo
  * @demo LeafletSimple
  * @demo LeafletCanvasDemo
- * @demo LeafletEditionDemo
  * @demo LeafletVirtualizationDemo
  */
 

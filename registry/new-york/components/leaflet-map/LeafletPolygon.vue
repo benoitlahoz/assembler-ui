@@ -98,13 +98,16 @@ const enableEditing = () => {
 
     if (isFirstPoint && props.autoClose) {
       firstPointMarker.value = marker;
-      // Clic sur le premier point pour fermer le polygone
-      marker.on('click', () => {
+
+      const onFirstPointClick = () => {
         emit('closed');
-      });
+      };
+
+      // Clic sur le premier point pour fermer le polygone
+      marker.on('click', onFirstPointClick);
     }
 
-    marker.on('drag', () => {
+    const onVertexDrag = () => {
       const newLatLngs = [...latlngs];
       let currentPos = marker.getLatLng();
 
@@ -113,15 +116,18 @@ const enableEditing = () => {
 
       // Mettre à jour les midpoints en temps réel
       updateMidpoints(newLatLngs);
-    });
+    };
 
-    marker.on('dragend', () => {
+    const onVertexDragEnd = () => {
       const updatedLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map((ll) => [
         ll.lat,
         ll.lng,
       ]) as Array<[number, number]>;
       emit('update:latlngs', updatedLatLngs);
-    });
+    };
+
+    marker.on('drag', onVertexDrag);
+    marker.on('dragend', onVertexDragEnd);
 
     editMarkers.value.push(marker);
   });
@@ -157,11 +163,11 @@ const createMidpoints = () => {
 
     let pointAdded = false;
 
-    midMarker.on('dragstart', () => {
+    const onMidpointDragStart = () => {
       if (map.value) map.value.getContainer().style.cursor = 'copy';
-    });
+    };
 
-    midMarker.on('drag', () => {
+    const onMidpointDrag = () => {
       const newPos = midMarker.getLatLng();
       const currentLatlngs = polygon.value!.getLatLngs()[0] as L.LatLng[];
 
@@ -177,9 +183,9 @@ const createMidpoints = () => {
         newLatlngs[nextIndex] = newPos;
         polygon.value!.setLatLngs([newLatlngs]);
       }
-    });
+    };
 
-    midMarker.on('dragend', () => {
+    const onMidpointDragEnd = () => {
       if (map.value) map.value.getContainer().style.cursor = '';
       const updatedLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map((ll) => [
         ll.lat,
@@ -187,17 +193,23 @@ const createMidpoints = () => {
       ]) as Array<[number, number]>;
       emit('update:latlngs', updatedLatLngs);
       enableEditing(); // Recréer tous les marqueurs
-    });
+    };
 
-    midMarker.on('mouseover', () => {
+    const onMidpointMouseOver = () => {
       if (map.value) map.value.getContainer().style.cursor = 'copy';
-    });
+    };
 
-    midMarker.on('mouseout', () => {
+    const onMidpointMouseOut = () => {
       if (map.value) {
         map.value.getContainer().style.cursor = '';
       }
-    });
+    };
+
+    midMarker.on('dragstart', onMidpointDragStart);
+    midMarker.on('drag', onMidpointDrag);
+    midMarker.on('dragend', onMidpointDragEnd);
+    midMarker.on('mouseover', onMidpointMouseOver);
+    midMarker.on('mouseout', onMidpointMouseOut);
 
     midpointMarkers.value.push(midMarker);
   }
@@ -217,7 +229,7 @@ const updateMidpoints = (latlngs: L.LatLng[]) => {
 const enableDragging = () => {
   if (!polygon.value || !map.value) return;
 
-  polygon.value.on('mousedown', (e: L.LeafletMouseEvent) => {
+  const onPolygonMouseDown = (e: L.LeafletMouseEvent) => {
     L.value!.DomEvent.stopPropagation(e);
     isDragging.value = true;
 
@@ -238,7 +250,9 @@ const enableDragging = () => {
       map.value.getContainer().style.cursor = 'move';
       map.value.dragging.disable();
     }
-  });
+  };
+
+  polygon.value.on('mousedown', onPolygonMouseDown);
 };
 
 const disableDragging = () => {
@@ -427,21 +441,25 @@ watch(
           });
           polygon.value.addTo(map.value);
 
+          const onPolygonClick = () => {
+            if (props.selectable && selectionContext) {
+              selectionContext.selectFeature('polygon', polygonId.value);
+            }
+            emit('click');
+          };
+
+          const onPolygonMouseDown = (e: any) => {
+            if (props.draggable && props.selectable && selectionContext) {
+              selectionContext.selectFeature('polygon', polygonId.value);
+            }
+          };
+
           // Add click event listener
           if (props.selectable && selectionContext) {
-            polygon.value.on('click', () => {
-              selectionContext.selectFeature('polygon', polygonId.value);
-              emit('click');
-            });
-            polygon.value.on('mousedown', (e: any) => {
-              if (props.draggable) {
-                selectionContext.selectFeature('polygon', polygonId.value);
-              }
-            });
+            polygon.value.on('click', onPolygonClick);
+            polygon.value.on('mousedown', onPolygonMouseDown);
           } else {
-            polygon.value.on('click', () => {
-              emit('click');
-            });
+            polygon.value.on('click', onPolygonClick);
           }
 
           // Register with selection context if selectable
@@ -458,22 +476,26 @@ watch(
             polygon.value.off('click');
             polygon.value.off('mousedown');
 
+            const onPolygonClick = () => {
+              if (props.selectable && selectionContext) {
+                selectionContext.selectFeature('polygon', polygonId.value);
+              }
+              emit('click');
+            };
+
+            const onPolygonMouseDown = (e: any) => {
+              if (props.draggable && props.selectable && selectionContext) {
+                selectionContext.selectFeature('polygon', polygonId.value);
+              }
+            };
+
             // Add new event listeners based on selectable state
             if (props.selectable && selectionContext) {
-              polygon.value.on('click', () => {
-                selectionContext.selectFeature('polygon', polygonId.value);
-                emit('click');
-              });
-              polygon.value.on('mousedown', (e: any) => {
-                if (props.draggable) {
-                  selectionContext.selectFeature('polygon', polygonId.value);
-                }
-              });
+              polygon.value.on('click', onPolygonClick);
+              polygon.value.on('mousedown', onPolygonMouseDown);
               registerWithSelection();
             } else {
-              polygon.value.on('click', () => {
-                emit('click');
-              });
+              polygon.value.on('click', onPolygonClick);
               if (selectionContext) {
                 selectionContext.unregisterFeature(polygonId.value);
               }

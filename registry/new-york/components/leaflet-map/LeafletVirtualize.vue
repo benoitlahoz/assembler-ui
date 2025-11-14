@@ -95,7 +95,7 @@ const map = inject<Ref<Leaflet.Map | null>>(LeafletMapKey, ref(null));
 const visibleBounds = ref<Leaflet.LatLngBounds | null>(null);
 const visibleFeatureIds = ref<Set<string | number>>(new Set());
 const isTransitioning = ref(false);
-let updateScheduled = false;
+let rafId: number | null = null;
 
 /**
  * Calculate dynamic margin based on zoom level
@@ -120,12 +120,14 @@ const calculateDynamicMargin = (zoom: number): number => {
 const updateVisibleBounds = () => {
   if (!map.value || !L.value) return;
 
-  // Debounce updates using requestAnimationFrame
-  if (updateScheduled) return;
-  updateScheduled = true;
+  // Cancel pending update
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+  }
 
-  requestAnimationFrame(() => {
-    updateScheduled = false;
+  // Schedule single RAF update
+  rafId = requestAnimationFrame(() => {
+    rafId = null;
 
     if (!map.value || !L.value) return;
 
@@ -231,12 +233,16 @@ const updateVisibleFeaturesQuadtree = () => {
   visibleFeatureIds.value = newVisibleIds;
   emit('update:visible-count', newVisibleIds.size);
 }; // Setup map event listeners for virtualization
+const handleMapUpdate = () => {
+  updateVisibleBounds();
+};
+
 onMounted(() => {
   // If map is already available, set it up immediately
   if (map.value) {
     updateVisibleBounds();
-    map.value.on('moveend', updateVisibleBounds);
-    map.value.on('zoomend', updateVisibleBounds);
+    map.value.on('moveend', handleMapUpdate);
+    map.value.on('zoomend', handleMapUpdate);
   }
 });
 
@@ -246,81 +252,56 @@ watch(
   (newMap) => {
     if (newMap) {
       updateVisibleBounds();
-      newMap.on('moveend', updateVisibleBounds);
-      newMap.on('zoomend', updateVisibleBounds);
+      newMap.on('moveend', handleMapUpdate);
+      newMap.on('zoomend', handleMapUpdate);
     }
   },
   { immediate: true }
 );
+
 onBeforeUnmount(() => {
+  // Cancel any pending RAF
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+
   if (map.value) {
-    map.value.off('moveend', updateVisibleBounds);
-    map.value.off('zoomend', updateVisibleBounds);
+    map.value.off('moveend', handleMapUpdate);
+    map.value.off('zoomend', handleMapUpdate);
   }
 });
 
-// Watch for props changes
+// Consolidate all prop watchers into one
 watch(
-  () => props.enabled,
-  async () => {
-    // Emit transition start
-    isTransitioning.value = true;
-    emit('transition-start');
+  () =>
+    [
+      props.enabled,
+      props.marginMeters,
+      props.marginZoomRatio,
+      props.minZoom,
+      props.maxZoom,
+      props.quadtree,
+    ] as const,
+  async ([enabled], [oldEnabled]) => {
+    // Handle enabled toggle with transition
+    if (enabled !== oldEnabled) {
+      isTransitioning.value = true;
+      emit('transition-start');
 
-    // Debounce the update to avoid freezing when toggling
-    await new Promise((resolve) => setTimeout(resolve, props.transitionDelay));
-    updateVisibleFeaturesQuadtree();
+      await new Promise((resolve) => setTimeout(resolve, props.transitionDelay));
+    }
 
-    // Wait a bit more for Vue to process
-    await new Promise((resolve) => setTimeout(resolve, 200));
-
-    // Emit transition end
-    isTransitioning.value = false;
-    emit('transition-end');
-  }
-);
-
-watch(
-  () => props.marginMeters,
-  () => {
-    updateVisibleBounds();
-  }
-);
-
-watch(
-  () => props.marginZoomRatio,
-  () => {
-    updateVisibleBounds();
-  }
-);
-
-watch(
-  () => props.minZoom,
-  () => {
-    // Directly update visible features when zoom constraints change
-    // since the bounds don't actually change, only the visibility logic
-    updateVisibleFeaturesQuadtree();
-  }
-);
-
-watch(
-  () => props.maxZoom,
-  () => {
-    // Directly update visible features when zoom constraints change
-    // since the bounds don't actually change, only the visibility logic
-    updateVisibleFeaturesQuadtree();
-  }
-);
-
-watch(
-  () => props.quadtree,
-  () => {
-    // When quadtree changes, update visible features
-    // But only if map is already mounted
+    // Single update for all prop changes
     if (map.value) {
-      nextTick(() => {
-        updateVisibleBounds();
-      });
+      updateVisibleBounds();
+    }
+
+    // End transition if it was started
+    if (enabled !== oldEnabled) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      isTransitioning.value = false;
+      emit('transition-end');
     }
   }
 );

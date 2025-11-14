@@ -152,9 +152,11 @@ onMounted(() => {
           .map(mapContainer.value, { zoomControl: false })
           .setView([centerLat.value, centerLng.value], zoom.value);
 
-        map.value.on('click', (event: LeafletMouseEvent) => {
+        const onMapClick = (event: LeafletMouseEvent) => {
           emit('click', event);
-        });
+        };
+
+        map.value.on('click', onMapClick);
         map.value.on('locationfound', onLocationFound);
         map.value.on('locationerror', onLocationError);
 
