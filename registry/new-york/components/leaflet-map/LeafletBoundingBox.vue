@@ -9,7 +9,8 @@ import {
 } from '.';
 import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
 
-const { LatDegreesMeters, radiusToLngDegrees, lngDegreesToRadius } = await useLeaflet();
+const { LatDegreesMeters, radiusToLngDegrees, lngDegreesToRadius, constrainToSquare } =
+  await useLeaflet();
 
 export interface LeafletBoundingBoxStyles {
   rectangle: LeafletFeatureRectangleStyle;
@@ -109,50 +110,6 @@ const clearHandles = () => {
   }
 };
 
-// Helper function to constrain bounds to a square
-const constrainToSquare = (
-  bounds: L.LatLngBounds,
-  center?: L.LatLng,
-  originalBounds?: L.LatLngBounds
-): L.LatLngBounds => {
-  if (!L.value) return bounds;
-
-  const currentCenter = center || bounds.getCenter();
-  const latDiff = bounds.getNorth() - bounds.getSouth();
-  const lngDiff = bounds.getEast() - bounds.getWest();
-
-  // Convert to metric coordinates to get true visual dimensions
-  const latMeters = latDiff * LatDegreesMeters;
-  const lngMeters = lngDegreesToRadius(lngDiff, currentCenter.lat);
-
-  // Determine which dimension changed more (to allow both growing and shrinking)
-  let targetMeters = latMeters;
-  if (originalBounds) {
-    const origLatDiff = originalBounds.getNorth() - originalBounds.getSouth();
-    const origLngDiff = originalBounds.getEast() - originalBounds.getWest();
-    const origLatMeters = origLatDiff * LatDegreesMeters;
-    const origLngMeters = lngDegreesToRadius(origLngDiff, currentCenter.lat);
-
-    // Use the dimension that changed the most
-    const latChange = Math.abs(latMeters - origLatMeters);
-    const lngChange = Math.abs(lngMeters - origLngMeters);
-
-    targetMeters = lngChange > latChange ? lngMeters : latMeters;
-  } else {
-    // Fallback to average if no original bounds
-    targetMeters = (latMeters + lngMeters) / 2;
-  }
-
-  // Convert back to degrees
-  const halfLatDiff = targetMeters / 2 / LatDegreesMeters;
-  const halfLngDiff = radiusToLngDegrees(targetMeters / 2, currentCenter.lat);
-
-  return L.value.latLngBounds(
-    [currentCenter.lat - halfLatDiff, currentCenter.lng - halfLngDiff],
-    [currentCenter.lat + halfLatDiff, currentCenter.lng + halfLngDiff]
-  );
-};
-
 const createBoundingBox = () => {
   if (!props.bounds || !L.value || !map.value || !props.visible) {
     clearHandles();
@@ -161,12 +118,10 @@ const createBoundingBox = () => {
 
   clearHandles();
 
-  // Créer le rectangle de bounding box
   boundingBox.value = L.value
     .rectangle(props.bounds, stylesOptions.value.rectangle)
     .addTo(map.value);
 
-  // Créer les handles aux coins (pour scale)
   const corners = [
     props.bounds.getSouthWest(), // 0: bas-gauche
     props.bounds.getNorthWest(), // 1: haut-gauche
@@ -174,14 +129,21 @@ const createBoundingBox = () => {
     props.bounds.getSouthEast(), // 3: bas-droit
   ];
 
-  // Curseurs pour chaque coin (pour resize diagonal)
-  const cornerCursors = ['nwse-resize', 'nesw-resize', 'nwse-resize', 'nesw-resize'];
+  const cornerCursors = ['nesw-resize', 'nwse-resize', 'nesw-resize', 'nwse-resize'];
+  const edgeCursors = ['ew-resize', 'ns-resize', 'ew-resize', 'ns-resize'];
+  const rotateCursor = 'ew-resize';
 
   corners.forEach((corner, index) => {
     const handle = L.value!.marker(corner, {
       draggable: true,
       icon: L.value!.divIcon(stylesOptions.value.corner),
     }).addTo(map.value!);
+
+    // Définir le curseur sur l'élément du marker
+    const handleElement = handle.getElement();
+    if (handleElement && cornerCursors[index]) {
+      handleElement.style.cursor = cornerCursors[index];
+    }
 
     const onCornerMouseDown = () => {
       if (map.value && cornerCursors[index]) {
@@ -279,13 +241,17 @@ const createBoundingBox = () => {
     L.value!.latLng(props.bounds.getSouth(), (props.bounds.getWest() + props.bounds.getEast()) / 2), // 3: bas
   ];
 
-  const edgeCursors = ['ew-resize', 'ns-resize', 'ew-resize', 'ns-resize'];
-
   edges.forEach((edge, index) => {
     const handle = L.value!.marker(edge, {
       draggable: true,
       icon: L.value!.divIcon(stylesOptions.value.edge),
     }).addTo(map.value!);
+
+    // Définir le curseur sur l'élément du marker
+    const handleElement = handle.getElement();
+    if (handleElement && edgeCursors[index]) {
+      handleElement.style.cursor = edgeCursors[index];
+    }
 
     const onEdgeMouseDown = () => {
       if (map.value && edgeCursors[index]) {
@@ -390,9 +356,20 @@ const createBoundingBox = () => {
       })
       .addTo(map.value);
 
+    // Définir le curseur sur l'élément du marker
+    const handleElement = rotateHandle.value.getElement();
+    if (handleElement) {
+      handleElement.style.cursor = rotateCursor;
+    }
+
     const onRotateMouseDown = () => {
       if (map.value) {
-        map.value.getContainer().style.cursor = 'grabbing';
+        map.value.getContainer().style.cursor = rotateCursor;
+      }
+      // Changer le curseur du handle aussi
+      const handleElement = rotateHandle.value?.getElement();
+      if (handleElement) {
+        handleElement.style.cursor = rotateCursor;
       }
     };
 
@@ -439,6 +416,12 @@ const createBoundingBox = () => {
       if (map.value) {
         map.value.getContainer().style.cursor = '';
         map.value.dragging.enable();
+      }
+
+      // Restaurer le curseur grab sur le handle
+      const handleElement = rotateHandle.value?.getElement();
+      if (handleElement) {
+        handleElement.style.cursor = 'grab';
       }
 
       // Réafficher la bounding box et les handles
