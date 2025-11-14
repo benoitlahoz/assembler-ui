@@ -10,7 +10,7 @@ import {
   provide,
 } from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
-import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
+import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
 import {
   LeafletMapKey,
   LeafletModuleKey,

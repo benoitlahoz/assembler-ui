@@ -229,8 +229,8 @@ import {
   useDragDrop,
   type UseDragDropOptions,
   type UseDragDropReturn,
-} from "../../composables/use-drag-drop/useDragDrop";
-import { DRAG_DROP_INJECTION_KEY } from "../../composables/use-drag-drop-context/useDragDropContext";
+} from "~~/registry/new-york/composables/use-drag-drop/useDragDrop";
+import { DRAG_DROP_INJECTION_KEY } from "~~/registry/new-york/composables/use-drag-drop-context/useDragDropContext";
 
 interface Props extends UseDragDropOptions {
   mode?: "drag" | "resize" | "both";
@@ -753,7 +753,7 @@ Mode d&#39;interaction (peut être étendu pour supporter d&#39;autres modes)
 <script setup lang="ts">
 import { ref, computed, type Ref } from "vue";
 import DragDropProvider from "../DragDropProvider.vue";
-import { DragDropUtils } from "../../../composables/use-drag-drop/useDragDrop";
+import { DragDropUtils } from "../~~/registry/new-york/composables/use-drag-drop/useDragDrop";
 
 const CELL_SIZE = 80;
 const GAP = 8;

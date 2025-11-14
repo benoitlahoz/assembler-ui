@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, type Ref } from 'vue';
 import DragDropProvider from '../DragDropProvider.vue';
-import { DragDropUtils } from '../../../composables/use-drag-drop/useDragDrop';
+import { DragDropUtils } from '../~~/registry/new-york/composables/use-drag-drop/useDragDrop';
 
 const CELL_SIZE = 80;
 const GAP = 8;

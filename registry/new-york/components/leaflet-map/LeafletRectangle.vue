@@ -1,9 +1,18 @@
 <script setup lang="ts">
 import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount, type HTMLAttributes } from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
+import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from '.';
 import type { FeatureReference } from './LeafletFeaturesSelector.vue';
 import './leaflet-editing.css';
+
+const {
+  calculateBoundsFromHandle,
+  setMapCursor,
+  resetMapCursor,
+  createStyledMarker,
+  translatePointByPixels,
+} = await useLeaflet();
 
 export interface LeafletRectangleProps {
   id?: string | number;
@@ -64,43 +73,25 @@ const enableEditing = () => {
   ];
 
   corners.forEach((corner, index) => {
-    const marker = L.value!.marker(corner, {
-      draggable: true,
-      icon: L.value!.divIcon({
+    const marker = createStyledMarker(
+      corner,
+      {
         className: 'leaflet-editing-icon',
-        iconSize: [8, 8],
         html: '<div style="width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #3388ff;"></div>',
-      }),
-    }).addTo(map.value!);
+        iconSize: [8, 8],
+      },
+      { draggable: true },
+      map.value!
+    );
+    if (!marker) return;
 
     const onCornerDrag = () => {
       const currentBounds = rectangle.value!.getBounds();
       const newCorner = marker.getLatLng();
 
-      // Calculer les nouvelles bornes en fonction du coin déplacé
-      let newBounds: L.LatLngBounds;
-      switch (index) {
-        case 0: // Sud-Ouest
-          newBounds = L.value!.latLngBounds(newCorner, currentBounds.getNorthEast());
-          break;
-        case 1: // Nord-Ouest
-          newBounds = L.value!.latLngBounds(
-            [currentBounds.getSouth(), newCorner.lng],
-            [newCorner.lat, currentBounds.getEast()]
-          );
-          break;
-        case 2: // Nord-Est
-          newBounds = L.value!.latLngBounds(currentBounds.getSouthWest(), newCorner);
-          break;
-        case 3: // Sud-Est
-          newBounds = L.value!.latLngBounds(
-            [newCorner.lat, currentBounds.getWest()],
-            [currentBounds.getNorth(), newCorner.lng]
-          );
-          break;
-        default:
-          return;
-      }
+      // Calculer les nouvelles bornes avec la fonction utilitaire
+      const newBounds = calculateBoundsFromHandle('corner', index, newCorner, currentBounds);
+      if (!newBounds) return;
 
       rectangle.value!.setBounds(newBounds);
       // Mettre à jour les positions des autres marqueurs
@@ -151,7 +142,7 @@ const enableDragging = () => {
 
     // Curseur et désactiver le drag de la carte
     if (map.value) {
-      map.value.getContainer().style.cursor = 'move';
+      setMapCursor(map.value, 'move');
       map.value.dragging.disable();
     }
   };
@@ -174,18 +165,13 @@ const setupMapDragHandlers = () => {
     const deltaX = currentPoint.x - dragStartMousePoint.x;
     const deltaY = currentPoint.y - dragStartMousePoint.y;
 
-    // Calculer les nouvelles positions des coins
-    const swPoint = map.value.latLngToContainerPoint(dragStartBounds.getSouthWest());
-    const nePoint = map.value.latLngToContainerPoint(dragStartBounds.getNorthEast());
+    // Utiliser translatePointByPixels pour calculer les nouvelles positions
+    const newSW = translatePointByPixels(dragStartBounds.getSouthWest(), deltaX, deltaY, map.value);
+    const newNE = translatePointByPixels(dragStartBounds.getNorthEast(), deltaX, deltaY, map.value);
 
-    const newSW = map.value.containerPointToLatLng(
-      L.value!.point(swPoint.x + deltaX, swPoint.y + deltaY)
-    );
-    const newNE = map.value.containerPointToLatLng(
-      L.value!.point(nePoint.x + deltaX, nePoint.y + deltaY)
-    );
+    if (!newSW || !newNE || !L.value) return;
 
-    const newBounds = L.value!.latLngBounds(newSW, newNE);
+    const newBounds = L.value.latLngBounds(newSW, newNE);
 
     // Mettre à jour le rectangle
     rectangle.value!.setBounds(newBounds);
@@ -209,7 +195,7 @@ const setupMapDragHandlers = () => {
 
     // Réactiver le drag de la carte
     if (map.value) {
-      map.value.getContainer().style.cursor = '';
+      resetMapCursor(map.value);
       map.value.dragging.enable();
       map.value.off('mousemove', onMouseMove);
       map.value.off('mouseup', onMouseUp);

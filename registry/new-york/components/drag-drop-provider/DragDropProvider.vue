@@ -4,8 +4,8 @@ import {
   useDragDrop,
   type UseDragDropOptions,
   type UseDragDropReturn,
-} from '../../composables/use-drag-drop/useDragDrop';
-import { DRAG_DROP_INJECTION_KEY } from '../../composables/use-drag-drop-context/useDragDropContext';
+} from '~~/registry/new-york/composables/use-drag-drop/useDragDrop';
+import { DRAG_DROP_INJECTION_KEY } from '~~/registry/new-york/composables/use-drag-drop-context/useDragDropContext';
 
 interface Props extends UseDragDropOptions {
   /**

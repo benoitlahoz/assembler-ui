@@ -694,6 +694,8 @@ import {
   onBeforeUnmount,
 } from "vue";
 import { cn } from "@/lib/utils";
+import type Leaflet from "leaflet";
+import type { LeafletMouseEvent } from "leaflet";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import {
   LeafletErrorsKey,
@@ -701,8 +703,7 @@ import {
   LeafletModuleKey,
   LeafletTileLayersKey,
 } from ".";
-import type Leaflet from "leaflet";
-import type { LeafletMouseEvent } from "leaflet";
+
 type Leaflet = typeof Leaflet;
 
 export interface LeafletMapExposed {
@@ -897,6 +898,7 @@ defineExpose<LeafletMapExposed>({
 ```vue [src/components/ui/leaflet-map/LeafletBoundingBox.vue]
 <script setup lang="ts">
 import { inject, watch, ref, type Ref, onBeforeUnmount, provide } from "vue";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import {
   LeafletStylesKey,
   LeafletMapKey,
@@ -904,13 +906,14 @@ import {
   type LeafletFeatureRectangleStyle,
   type LeafletFeatureHandleStyle,
 } from ".";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
 
 const {
-  LatDegreesMeters,
-  radiusToLngDegrees,
-  lngDegreesToRadius,
   constrainToSquare,
+  calculateHandlePositions,
+  calculateBoundsFromHandle,
+  setMapCursor,
+  resetMapCursor,
+  createStyledMarker,
 } = await useLeaflet();
 
 export interface LeafletBoundingBoxStyles {
@@ -1023,12 +1026,13 @@ const createBoundingBox = () => {
     .rectangle(props.bounds, stylesOptions.value.rectangle)
     .addTo(map.value);
 
-  const corners = [
-    props.bounds.getSouthWest(),
-    props.bounds.getNorthWest(),
-    props.bounds.getNorthEast(),
-    props.bounds.getSouthEast(),
-  ];
+  const handlePositions = calculateHandlePositions(props.bounds, map.value, {
+    corners: true,
+    edges: true,
+    rotate: props.showRotateHandle,
+    center: true,
+    rotateOffsetPx: 30,
+  });
 
   const cornerCursors = [
     "nesw-resize",
@@ -1039,11 +1043,14 @@ const createBoundingBox = () => {
   const edgeCursors = ["ew-resize", "ns-resize", "ew-resize", "ns-resize"];
   const rotateCursor = "ew-resize";
 
-  corners.forEach((corner, index) => {
-    const handle = L.value!.marker(corner, {
-      draggable: true,
-      icon: L.value!.divIcon(stylesOptions.value.corner),
-    }).addTo(map.value!);
+  handlePositions.corners?.forEach((corner, index) => {
+    const handle = createStyledMarker(
+      corner,
+      stylesOptions.value.corner,
+      { draggable: true },
+      map.value!,
+    );
+    if (!handle) return;
 
     const handleElement = handle.getElement();
     if (handleElement && cornerCursors[index]) {
@@ -1051,9 +1058,7 @@ const createBoundingBox = () => {
     }
 
     const onCornerMouseDown = () => {
-      if (map.value && cornerCursors[index]) {
-        map.value.getContainer().style.cursor = cornerCursors[index];
-      }
+      if (map.value) setMapCursor(map.value, cornerCursors[index] || "");
     };
 
     const onCornerDragStart = () => {
@@ -1069,36 +1074,13 @@ const createBoundingBox = () => {
       if (!isScaling.value || !scaleStartBounds) return;
 
       const newCorner = handle.getLatLng();
-      let newBounds: L.LatLngBounds;
-
-      switch (index) {
-        case 0:
-          newBounds = L.value!.latLngBounds(
-            newCorner,
-            scaleStartBounds.getNorthEast(),
-          );
-          break;
-        case 1:
-          newBounds = L.value!.latLngBounds(
-            [scaleStartBounds.getSouth(), newCorner.lng],
-            [newCorner.lat, scaleStartBounds.getEast()],
-          );
-          break;
-        case 2:
-          newBounds = L.value!.latLngBounds(
-            scaleStartBounds.getSouthWest(),
-            newCorner,
-          );
-          break;
-        case 3:
-          newBounds = L.value!.latLngBounds(
-            [newCorner.lat, scaleStartBounds.getWest()],
-            [scaleStartBounds.getNorth(), newCorner.lng],
-          );
-          break;
-        default:
-          return;
-      }
+      let newBounds = calculateBoundsFromHandle(
+        "corner",
+        index,
+        newCorner,
+        scaleStartBounds,
+      );
+      if (!newBounds) return;
 
       if (props.constrainSquare) {
         newBounds = constrainToSquare(
@@ -1120,7 +1102,7 @@ const createBoundingBox = () => {
     const onCornerDragEnd = () => {
       isScaling.value = false;
       if (map.value) {
-        map.value.getContainer().style.cursor = "";
+        resetMapCursor(map.value);
         map.value.dragging.enable();
       }
       if (boundingBox.value) {
@@ -1136,30 +1118,14 @@ const createBoundingBox = () => {
     cornerHandles.value.push(handle);
   });
 
-  const edges = [
-    L.value!.latLng(
-      (props.bounds.getSouth() + props.bounds.getNorth()) / 2,
-      props.bounds.getWest(),
-    ),
-    L.value!.latLng(
-      props.bounds.getNorth(),
-      (props.bounds.getWest() + props.bounds.getEast()) / 2,
-    ),
-    L.value!.latLng(
-      (props.bounds.getSouth() + props.bounds.getNorth()) / 2,
-      props.bounds.getEast(),
-    ),
-    L.value!.latLng(
-      props.bounds.getSouth(),
-      (props.bounds.getWest() + props.bounds.getEast()) / 2,
-    ),
-  ];
-
-  edges.forEach((edge, index) => {
-    const handle = L.value!.marker(edge, {
-      draggable: true,
-      icon: L.value!.divIcon(stylesOptions.value.edge),
-    }).addTo(map.value!);
+  handlePositions.edges?.forEach((edge, index) => {
+    const handle = createStyledMarker(
+      edge,
+      stylesOptions.value.edge,
+      { draggable: true },
+      map.value!,
+    );
+    if (!handle) return;
 
     const handleElement = handle.getElement();
     if (handleElement && edgeCursors[index]) {
@@ -1167,9 +1133,7 @@ const createBoundingBox = () => {
     }
 
     const onEdgeMouseDown = () => {
-      if (map.value && edgeCursors[index]) {
-        map.value.getContainer().style.cursor = edgeCursors[index];
-      }
+      if (map.value) setMapCursor(map.value, edgeCursors[index] || "");
     };
 
     const onEdgeDragStart = () => {
@@ -1184,34 +1148,13 @@ const createBoundingBox = () => {
       if (!isScaling.value || !scaleStartBounds) return;
 
       const newPos = handle.getLatLng();
-      let newBounds: L.LatLngBounds = scaleStartBounds;
-
-      switch (index) {
-        case 0:
-          newBounds = L.value!.latLngBounds(
-            [scaleStartBounds.getSouth(), newPos.lng],
-            [scaleStartBounds.getNorth(), scaleStartBounds.getEast()],
-          );
-          break;
-        case 1:
-          newBounds = L.value!.latLngBounds(
-            [scaleStartBounds.getSouth(), scaleStartBounds.getWest()],
-            [newPos.lat, scaleStartBounds.getEast()],
-          );
-          break;
-        case 2:
-          newBounds = L.value!.latLngBounds(
-            [scaleStartBounds.getSouth(), scaleStartBounds.getWest()],
-            [scaleStartBounds.getNorth(), newPos.lng],
-          );
-          break;
-        case 3:
-          newBounds = L.value!.latLngBounds(
-            [newPos.lat, scaleStartBounds.getWest()],
-            [scaleStartBounds.getNorth(), scaleStartBounds.getEast()],
-          );
-          break;
-      }
+      let newBounds = calculateBoundsFromHandle(
+        "edge",
+        index,
+        newPos,
+        scaleStartBounds,
+      );
+      if (!newBounds) return;
 
       if (props.constrainSquare) {
         newBounds = constrainToSquare(
@@ -1233,7 +1176,7 @@ const createBoundingBox = () => {
     const onEdgeDragEnd = () => {
       isScaling.value = false;
       if (map.value) {
-        map.value.getContainer().style.cursor = "";
+        resetMapCursor(map.value);
         map.value.dragging.enable();
       }
       if (boundingBox.value) {
@@ -1249,25 +1192,15 @@ const createBoundingBox = () => {
     edgeHandles.value.push(handle);
   });
 
-  if (props.showRotateHandle) {
-    const centerTop = L.value!.latLng(
-      props.bounds.getNorth(),
-      (props.bounds.getWest() + props.bounds.getEast()) / 2,
+  if (props.showRotateHandle && handlePositions.rotate) {
+    rotateHandle.value = createStyledMarker(
+      handlePositions.rotate,
+      stylesOptions.value.rotate,
+      { draggable: true },
+      map.value,
     );
 
-    const centerTopPoint = map.value.latLngToLayerPoint(centerTop);
-    const rotateHandlePoint = L.value!.point(
-      centerTopPoint.x,
-      centerTopPoint.y - 30,
-    );
-    const rotateHandleLatLng = map.value.layerPointToLatLng(rotateHandlePoint);
-
-    rotateHandle.value = L.value
-      .marker(rotateHandleLatLng, {
-        draggable: true,
-        icon: L.value.divIcon(stylesOptions.value.rotate),
-      })
-      .addTo(map.value);
+    if (!rotateHandle.value) return;
 
     const handleElement = rotateHandle.value.getElement();
     if (handleElement) {
@@ -1275,9 +1208,7 @@ const createBoundingBox = () => {
     }
 
     const onRotateMouseDown = () => {
-      if (map.value) {
-        map.value.getContainer().style.cursor = rotateCursor;
-      }
+      if (map.value) setMapCursor(map.value, rotateCursor);
 
       const handleElement = rotateHandle.value?.getElement();
       if (handleElement) {
@@ -1320,7 +1251,7 @@ const createBoundingBox = () => {
     const onRotateDragEnd = () => {
       isRotating.value = false;
       if (map.value) {
-        map.value.getContainer().style.cursor = "";
+        resetMapCursor(map.value);
         map.value.dragging.enable();
       }
 
@@ -1343,9 +1274,7 @@ const createBoundingBox = () => {
     };
 
     const onRotateMouseUp = () => {
-      if (map.value) {
-        map.value.getContainer().style.cursor = "";
-      }
+      resetMapCursor(map.value);
     };
 
     rotateHandle.value.on("mousedown", onRotateMouseDown);
@@ -1355,67 +1284,41 @@ const createBoundingBox = () => {
     rotateHandle.value.on("mouseup", onRotateMouseUp);
   }
 
-  const center = props.bounds.getCenter();
-  centerHandle.value = L.value
-    .marker(center, {
-      draggable: false,
-      icon: L.value.divIcon(stylesOptions.value.center),
-    })
-    .addTo(map.value);
+  if (handlePositions.center) {
+    centerHandle.value = createStyledMarker(
+      handlePositions.center,
+      stylesOptions.value.center,
+      { draggable: false },
+      map.value,
+    );
+  }
 };
 
 const updateHandlePositions = (bounds: L.LatLngBounds) => {
   if (!L.value || !map.value) return;
 
-  const corners = [
-    bounds.getSouthWest(),
-    bounds.getNorthWest(),
-    bounds.getNorthEast(),
-    bounds.getSouthEast(),
-  ];
-  cornerHandles.value.forEach((handle, i) => {
-    if (corners[i]) handle.setLatLng(corners[i]);
+  const handlePositions = calculateHandlePositions(bounds, map.value, {
+    corners: true,
+    edges: true,
+    rotate: props.showRotateHandle,
+    center: true,
+    rotateOffsetPx: 30,
   });
 
-  const edges = [
-    L.value.latLng(
-      (bounds.getSouth() + bounds.getNorth()) / 2,
-      bounds.getWest(),
-    ),
-    L.value.latLng(
-      bounds.getNorth(),
-      (bounds.getWest() + bounds.getEast()) / 2,
-    ),
-    L.value.latLng(
-      (bounds.getSouth() + bounds.getNorth()) / 2,
-      bounds.getEast(),
-    ),
-    L.value.latLng(
-      bounds.getSouth(),
-      (bounds.getWest() + bounds.getEast()) / 2,
-    ),
-  ];
-  edgeHandles.value.forEach((handle, i) => {
-    if (edges[i]) handle.setLatLng(edges[i]);
+  handlePositions.corners?.forEach((corner, i) => {
+    if (cornerHandles.value[i]) cornerHandles.value[i].setLatLng(corner);
   });
 
-  if (rotateHandle.value) {
-    const centerTop = L.value.latLng(
-      bounds.getNorth(),
-      (bounds.getWest() + bounds.getEast()) / 2,
-    );
-    const centerTopPoint = map.value.latLngToLayerPoint(centerTop);
-    const rotateHandlePoint = L.value.point(
-      centerTopPoint.x,
-      centerTopPoint.y - 30,
-    );
-    const rotateHandleLatLng = map.value.layerPointToLatLng(rotateHandlePoint);
-    rotateHandle.value.setLatLng(rotateHandleLatLng);
+  handlePositions.edges?.forEach((edge, i) => {
+    if (edgeHandles.value[i]) edgeHandles.value[i].setLatLng(edge);
+  });
+
+  if (rotateHandle.value && handlePositions.rotate) {
+    rotateHandle.value.setLatLng(handlePositions.rotate);
   }
 
-  if (centerHandle.value) {
-    const center = bounds.getCenter();
-    centerHandle.value.setLatLng(center);
+  if (centerHandle.value && handlePositions.center) {
+    centerHandle.value.setLatLng(handlePositions.center);
   }
 };
 
@@ -1501,7 +1404,7 @@ import {
   provide,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import {
   LeafletMapKey,
   LeafletModuleKey,
@@ -2221,7 +2124,7 @@ import {
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useColors } from "~~/registry/new-york/composables/use-colors/useColors";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import {
   LeafletMapKey,
   LeafletModuleKey,
@@ -3116,20 +3019,22 @@ import {
   nextTick,
   onBeforeUnmount,
   type HTMLAttributes,
-  onMounted,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
 
 const {
+  LatDegreesMeters,
   calculateRadiusPoint,
   calculateCircleBounds,
-  radiusToLngDegrees,
   lngDegreesToRadius,
-  LatDegreesMeters,
+  setMapCursor,
+  resetMapCursor,
+  translatePointByPixels,
+  createStyledMarker,
 } = await useLeaflet();
 
 export interface LeafletCircleProps {
@@ -3199,7 +3104,7 @@ const enableDragging = () => {
     dragStartMousePoint = e.containerPoint;
     L.value!.DomEvent.stopPropagation(e);
     map.value.dragging.disable();
-    map.value.getContainer().style.cursor = "move";
+    setMapCursor(map.value, "move");
 
     emit("dragstart");
   };
@@ -3223,9 +3128,13 @@ const setupMapDragHandlers = () => {
     const dx = currentPoint.x - dragStartMousePoint.x;
     const dy = currentPoint.y - dragStartMousePoint.y;
 
-    const startPoint = map.value.latLngToContainerPoint(dragStartLatLng);
-    const newPoint = L.value!.point(startPoint.x + dx, startPoint.y + dy);
-    const newLatLng = map.value.containerPointToLatLng(newPoint);
+    const newLatLng = translatePointByPixels(
+      dragStartLatLng,
+      dx,
+      dy,
+      map.value,
+    );
+    if (!newLatLng) return;
 
     circle.value.setLatLng(newLatLng);
 
@@ -3250,7 +3159,7 @@ const setupMapDragHandlers = () => {
     emit("update:lat", newLatLng.lat);
     emit("update:lng", newLatLng.lng);
     map.value.dragging.enable();
-    map.value.getContainer().style.cursor = "";
+    resetMapCursor(map.value);
   };
 
   map.value.on("mousemove", onMouseMove);
@@ -3272,16 +3181,17 @@ const enableEditing = () => {
   if (props.editable) {
     const [lat, lng] = calculateRadiusPoint(center, radius);
     const radiusLatLng = L.value.latLng(lat, lng);
-    radiusMarker.value = L.value
-      .marker(radiusLatLng, {
-        draggable: true,
-        icon: L.value.divIcon({
-          className: "leaflet-editing-icon",
-          html: '<div style="width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #3388ff;"></div>',
-          iconSize: [8, 8],
-        }),
-      })
-      .addTo(map.value);
+    radiusMarker.value = createStyledMarker(
+      radiusLatLng,
+      {
+        className: "leaflet-editing-icon",
+        html: '<div style="width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #3388ff;"></div>',
+        iconSize: [8, 8],
+      },
+      { draggable: true },
+      map.value,
+    );
+    if (!radiusMarker.value) return;
 
     const onRadiusMarkerDrag = () => {
       const center = circle.value!.getLatLng();
@@ -4247,11 +4157,11 @@ watch(
 
 ```vue [src/components/ui/leaflet-map/LeafletFeatureRectangle.vue]
 <script setup lang="ts">
+import { removeWhitespaces } from "@assemblerjs/core";
 import { watch, inject, type HTMLAttributes, ref } from "vue";
 import { cn } from "@/lib/utils";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { LeafletStylesKey } from ".";
-import { removeWhitespaces } from "@assemblerjs/core";
 
 export interface LeafletFeatureRectangleStyle {
   color: string;
@@ -5328,17 +5238,13 @@ provide(LeafletSelectionKey, context);
 
 ```vue [src/components/ui/leaflet-map/LeafletMarker.vue]
 <script setup lang="ts">
+import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount } from "vue";
 import {
-  inject,
-  watch,
-  ref,
-  type Ref,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-} from "vue";
-import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
-import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
+  LeafletMapKey,
+  LeafletModuleKey,
+  LeafletSelectionKey,
+  type FeatureReference,
+} from ".";
 
 export interface LeafletMarkerProps {
   id?: string | number;
@@ -5597,16 +5503,15 @@ import {
   computed,
   provide,
 } from "vue";
-import { cn } from "@/lib/utils";
+import type { LatLng, Marker, Circle, DivIcon } from "leaflet";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
+import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import {
   LeafletMapKey,
   LeafletModuleKey,
   LeafletStylesKey,
   type LeafletFeatureHandleStyle,
 } from ".";
-import type { LatLng, Marker, Circle, DivIcon } from "leaflet";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
-import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 
 export interface LeafletMeasureToolStyles {
   corner: LeafletFeatureHandleStyle;
@@ -5648,6 +5553,8 @@ const {
   calculatePolygonArea,
   formatDistance: formatDistanceUtil,
   pixelsToMeters,
+  setMapCursor,
+  resetMapCursor,
 } = await useLeaflet();
 
 const {
@@ -6081,7 +5988,7 @@ const enable = () => {
   if (!map.value) return;
 
   isActive = true;
-  map.value.getContainer().style.cursor = "crosshair";
+  setMapCursor(map.value, "crosshair");
 
   if (map.value.dragging) {
     map.value.dragging.disable();
@@ -6102,7 +6009,7 @@ const disable = () => {
   if (!map.value) return;
 
   isActive = false;
-  map.value.getContainer().style.cursor = "";
+  resetMapCursor(map.value);
 
   map.value.off("click", handleMapClick);
   map.value.off("mousemove", handleMouseMove);
@@ -6160,13 +6067,21 @@ import {
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
 
-const { calculateMidpoint, LatDegreesMeters, lngDegreesToRadius } =
-  await useLeaflet();
+const {
+  calculateMidpoint,
+  LatDegreesMeters,
+  lngDegreesToRadius,
+  normalizeLatLngs,
+  setMapCursor,
+  resetMapCursor,
+  translatePointByPixels,
+  createStyledMarker,
+} = await useLeaflet();
 
 export interface LeafletPolygonProps {
   id?: string | number;
@@ -6213,17 +6128,6 @@ const polygonId = ref<string | number>(
 let dragStartLatLngs: L.LatLng[] = [];
 let dragStartMousePoint: L.Point | null = null;
 
-const normalizeLatLngs = (
-  latlngs: Array<[number, number]> | Array<{ lat: number; lng: number }>,
-): Array<[number, number]> => {
-  return latlngs.map((point) => {
-    if (Array.isArray(point)) {
-      return point;
-    }
-    return [point.lat, point.lng] as [number, number];
-  });
-};
-
 const clearEditMarkers = () => {
   editMarkers.value.forEach((marker) => marker.remove());
   editMarkers.value = [];
@@ -6244,9 +6148,9 @@ const enableEditing = () => {
 
   latlngs.forEach((latlng, index) => {
     const isFirstPoint = index === 0;
-    const marker = L.value!.marker(latlng, {
-      draggable: true,
-      icon: L.value!.divIcon({
+    const marker = createStyledMarker(
+      latlng,
+      {
         className: isFirstPoint
           ? "leaflet-editing-icon leaflet-editing-icon-first"
           : "leaflet-editing-icon",
@@ -6254,8 +6158,11 @@ const enableEditing = () => {
           ? '<div style="width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid #3388ff;cursor:pointer;"></div>'
           : '<div style="width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #3388ff;"></div>',
         iconSize: isFirstPoint ? [12, 12] : [8, 8],
-      }),
-    }).addTo(map.value!);
+      },
+      { draggable: true },
+      map.value!,
+    );
+    if (!marker) return;
 
     if (isFirstPoint && props.autoClose) {
       firstPointMarker.value = marker;
@@ -6307,21 +6214,22 @@ const createMidpoints = () => {
 
     const [midLat, midLng] = calculateMidpoint(current, next);
 
-    const midMarker = L.value
-      .marker([midLat, midLng], {
-        draggable: true,
-        icon: L.value.divIcon({
-          className: "leaflet-editing-icon-midpoint",
-          html: "<div></div>",
-          iconSize: [14, 14],
-        }),
-      })
-      .addTo(map.value);
+    const midMarker = createStyledMarker(
+      [midLat, midLng],
+      {
+        className: "leaflet-editing-icon-midpoint",
+        html: "<div></div>",
+        iconSize: [14, 14],
+      },
+      { draggable: true },
+      map.value,
+    );
+    if (!midMarker) continue;
 
     let pointAdded = false;
 
     const onMidpointDragStart = () => {
-      if (map.value) map.value.getContainer().style.cursor = "copy";
+      if (map.value) setMapCursor(map.value, "copy");
     };
 
     const onMidpointDrag = () => {
@@ -6341,7 +6249,7 @@ const createMidpoints = () => {
     };
 
     const onMidpointDragEnd = () => {
-      if (map.value) map.value.getContainer().style.cursor = "";
+      resetMapCursor(map.value);
       const updatedLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map(
         (ll) => [ll.lat, ll.lng],
       ) as Array<[number, number]>;
@@ -6350,13 +6258,11 @@ const createMidpoints = () => {
     };
 
     const onMidpointMouseOver = () => {
-      if (map.value) map.value.getContainer().style.cursor = "copy";
+      if (map.value) setMapCursor(map.value, "copy");
     };
 
     const onMidpointMouseOut = () => {
-      if (map.value) {
-        map.value.getContainer().style.cursor = "";
-      }
+      resetMapCursor(map.value);
     };
 
     midMarker.on("dragstart", onMidpointDragStart);
@@ -6399,7 +6305,7 @@ const enableDragging = () => {
     setupMapDragHandlers();
 
     if (map.value) {
-      map.value.getContainer().style.cursor = "move";
+      setMapCursor(map.value, "move");
       map.value.dragging.disable();
     }
   };
@@ -6422,14 +6328,13 @@ const setupMapDragHandlers = () => {
     const deltaX = currentPoint.x - dragStartMousePoint.x;
     const deltaY = currentPoint.y - dragStartMousePoint.y;
 
-    const newLatLngs = dragStartLatLngs.map((startLatLng) => {
-      const startPoint = map.value!.latLngToContainerPoint(startLatLng);
-      const newPoint = L.value!.point(
-        startPoint.x + deltaX,
-        startPoint.y + deltaY,
-      );
-      return map.value!.containerPointToLatLng(newPoint);
-    });
+    const newLatLngs = dragStartLatLngs
+      .map((startLatLng) =>
+        translatePointByPixels(startLatLng, deltaX, deltaY, map.value!),
+      )
+      .filter((ll): ll is L.LatLng => ll !== null);
+
+    if (newLatLngs.length !== dragStartLatLngs.length) return;
 
     polygon.value!.setLatLngs([newLatLngs]);
 
@@ -6449,7 +6354,7 @@ const setupMapDragHandlers = () => {
     isDragging.value = false;
 
     if (map.value) {
-      map.value.getContainer().style.cursor = "";
+      resetMapCursor(map.value);
       map.value.dragging.enable();
       map.value.off("mousemove", onMouseMove);
       map.value.off("mouseup", onMouseUp);
@@ -6700,13 +6605,21 @@ import {
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
 
-const { calculateMidpoint, LatDegreesMeters, lngDegreesToRadius } =
-  await useLeaflet();
+const {
+  calculateMidpoint,
+  LatDegreesMeters,
+  lngDegreesToRadius,
+  normalizeLatLngs,
+  setMapCursor,
+  resetMapCursor,
+  translatePointByPixels,
+  createStyledMarker,
+} = await useLeaflet();
 
 export interface LeafletPolylineProps {
   id?: string | number;
@@ -6749,17 +6662,6 @@ const polylineId = ref<string | number>(
 let dragStartLatLngs: L.LatLng[] = [];
 let dragStartMousePoint: L.Point | null = null;
 
-const normalizeLatLngs = (
-  latlngs: Array<[number, number]> | Array<{ lat: number; lng: number }>,
-): Array<[number, number]> => {
-  return latlngs.map((point) => {
-    if (Array.isArray(point)) {
-      return point;
-    }
-    return [point.lat, point.lng] as [number, number];
-  });
-};
-
 const clearEditMarkers = () => {
   editMarkers.value.forEach((marker) => marker.remove());
   editMarkers.value = [];
@@ -6774,14 +6676,17 @@ const enableEditing = () => {
 
   const latlngs = polyline.value.getLatLngs() as L.LatLng[];
   latlngs.forEach((latlng, index) => {
-    const marker = L.value!.marker(latlng, {
-      draggable: true,
-      icon: L.value!.divIcon({
+    const marker = createStyledMarker(
+      latlng,
+      {
         className: "leaflet-editing-icon",
         html: '<div style="width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #3388ff;"></div>',
         iconSize: [8, 8],
-      }),
-    }).addTo(map.value!);
+      },
+      { draggable: true },
+      map.value!,
+    );
+    if (!marker) return;
 
     const onVertexDrag = () => {
       const newLatLngs = [...latlngs];
@@ -6821,21 +6726,22 @@ const createMidpoints = () => {
 
     const [midLat, midLng] = calculateMidpoint(current, next);
 
-    const midMarker = L.value
-      .marker([midLat, midLng], {
-        draggable: true,
-        icon: L.value.divIcon({
-          className: "leaflet-editing-icon-midpoint",
-          html: "<div></div>",
-          iconSize: [14, 14],
-        }),
-      })
-      .addTo(map.value);
+    const midMarker = createStyledMarker(
+      [midLat, midLng],
+      {
+        className: "leaflet-editing-icon-midpoint",
+        html: "<div></div>",
+        iconSize: [14, 14],
+      },
+      { draggable: true },
+      map.value,
+    );
+    if (!midMarker) continue;
 
     let pointAdded = false;
 
     const onMidpointDragStart = () => {
-      if (map.value) map.value.getContainer().style.cursor = "copy";
+      if (map.value) setMapCursor(map.value, "copy");
     };
 
     const onMidpointDrag = () => {
@@ -6855,7 +6761,7 @@ const createMidpoints = () => {
     };
 
     const onMidpointDragEnd = () => {
-      if (map.value) map.value.getContainer().style.cursor = "";
+      resetMapCursor(map.value);
       const updatedLatLngs = (polyline.value!.getLatLngs() as L.LatLng[]).map(
         (ll) => [ll.lat, ll.lng],
       ) as Array<[number, number]>;
@@ -6864,13 +6770,11 @@ const createMidpoints = () => {
     };
 
     const onMidpointMouseOver = () => {
-      if (map.value) map.value.getContainer().style.cursor = "copy";
+      if (map.value) setMapCursor(map.value, "copy");
     };
 
     const onMidpointMouseOut = () => {
-      if (map.value) {
-        map.value.getContainer().style.cursor = "";
-      }
+      resetMapCursor(map.value);
     };
 
     midMarker.on("dragstart", onMidpointDragStart);
@@ -6911,7 +6815,7 @@ const enableDragging = () => {
     setupMapDragHandlers();
 
     if (map.value) {
-      map.value.getContainer().style.cursor = "move";
+      setMapCursor(map.value, "move");
       map.value.dragging.disable();
     }
   };
@@ -6934,14 +6838,13 @@ const setupMapDragHandlers = () => {
     const deltaX = currentPoint.x - dragStartMousePoint.x;
     const deltaY = currentPoint.y - dragStartMousePoint.y;
 
-    const newLatLngs = dragStartLatLngs.map((startLatLng) => {
-      const startPoint = map.value!.latLngToContainerPoint(startLatLng);
-      const newPoint = L.value!.point(
-        startPoint.x + deltaX,
-        startPoint.y + deltaY,
-      );
-      return map.value!.containerPointToLatLng(newPoint);
-    });
+    const newLatLngs = dragStartLatLngs
+      .map((startLatLng) =>
+        translatePointByPixels(startLatLng, deltaX, deltaY, map.value!),
+      )
+      .filter((ll): ll is L.LatLng => ll !== null);
+
+    if (newLatLngs.length !== dragStartLatLngs.length) return;
 
     polyline.value!.setLatLngs(newLatLngs);
 
@@ -6961,7 +6864,7 @@ const setupMapDragHandlers = () => {
     isDragging.value = false;
 
     if (map.value) {
-      map.value.getContainer().style.cursor = "";
+      resetMapCursor(map.value);
       map.value.dragging.enable();
       map.value.off("mousemove", onMouseMove);
       map.value.off("mouseup", onMouseUp);
@@ -7215,9 +7118,18 @@ import {
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
+
+const {
+  calculateBoundsFromHandle,
+  setMapCursor,
+  resetMapCursor,
+  createStyledMarker,
+  translatePointByPixels,
+} = await useLeaflet();
 
 export interface LeafletRectangleProps {
   id?: string | number;
@@ -7279,48 +7191,29 @@ const enableEditing = () => {
   ];
 
   corners.forEach((corner, index) => {
-    const marker = L.value!.marker(corner, {
-      draggable: true,
-      icon: L.value!.divIcon({
+    const marker = createStyledMarker(
+      corner,
+      {
         className: "leaflet-editing-icon",
-        iconSize: [8, 8],
         html: '<div style="width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #3388ff;"></div>',
-      }),
-    }).addTo(map.value!);
+        iconSize: [8, 8],
+      },
+      { draggable: true },
+      map.value!,
+    );
+    if (!marker) return;
 
     const onCornerDrag = () => {
       const currentBounds = rectangle.value!.getBounds();
       const newCorner = marker.getLatLng();
 
-      let newBounds: L.LatLngBounds;
-      switch (index) {
-        case 0:
-          newBounds = L.value!.latLngBounds(
-            newCorner,
-            currentBounds.getNorthEast(),
-          );
-          break;
-        case 1:
-          newBounds = L.value!.latLngBounds(
-            [currentBounds.getSouth(), newCorner.lng],
-            [newCorner.lat, currentBounds.getEast()],
-          );
-          break;
-        case 2:
-          newBounds = L.value!.latLngBounds(
-            currentBounds.getSouthWest(),
-            newCorner,
-          );
-          break;
-        case 3:
-          newBounds = L.value!.latLngBounds(
-            [newCorner.lat, currentBounds.getWest()],
-            [currentBounds.getNorth(), newCorner.lng],
-          );
-          break;
-        default:
-          return;
-      }
+      const newBounds = calculateBoundsFromHandle(
+        "corner",
+        index,
+        newCorner,
+        currentBounds,
+      );
+      if (!newBounds) return;
 
       rectangle.value!.setBounds(newBounds);
 
@@ -7367,7 +7260,7 @@ const enableDragging = () => {
     setupMapDragHandlers();
 
     if (map.value) {
-      map.value.getContainer().style.cursor = "move";
+      setMapCursor(map.value, "move");
       map.value.dragging.disable();
     }
   };
@@ -7396,21 +7289,22 @@ const setupMapDragHandlers = () => {
     const deltaX = currentPoint.x - dragStartMousePoint.x;
     const deltaY = currentPoint.y - dragStartMousePoint.y;
 
-    const swPoint = map.value.latLngToContainerPoint(
+    const newSW = translatePointByPixels(
       dragStartBounds.getSouthWest(),
+      deltaX,
+      deltaY,
+      map.value,
     );
-    const nePoint = map.value.latLngToContainerPoint(
+    const newNE = translatePointByPixels(
       dragStartBounds.getNorthEast(),
+      deltaX,
+      deltaY,
+      map.value,
     );
 
-    const newSW = map.value.containerPointToLatLng(
-      L.value!.point(swPoint.x + deltaX, swPoint.y + deltaY),
-    );
-    const newNE = map.value.containerPointToLatLng(
-      L.value!.point(nePoint.x + deltaX, nePoint.y + deltaY),
-    );
+    if (!newSW || !newNE || !L.value) return;
 
-    const newBounds = L.value!.latLngBounds(newSW, newNE);
+    const newBounds = L.value.latLngBounds(newSW, newNE);
 
     rectangle.value!.setBounds(newBounds);
 
@@ -7430,7 +7324,7 @@ const setupMapDragHandlers = () => {
     isDragging.value = false;
 
     if (map.value) {
-      map.value.getContainer().style.cursor = "";
+      resetMapCursor(map.value);
       map.value.dragging.enable();
       map.value.off("mousemove", onMouseMove);
       map.value.off("mouseup", onMouseUp);
@@ -7689,7 +7583,7 @@ import type {
   UseQuadtreeReturn,
   Rect,
 } from "~~/registry/new-york/composables/use-quadtree/useQuadtree";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 
 const { radiusToLatDegrees, radiusToLngDegrees } = await useLeaflet();
 
@@ -8022,6 +7916,15 @@ export const useLeaflet = async () => {
     return latlngs.map((ll) => [ll.lng, ll.lat]);
   };
 
+  const fromGeoJSONCoords = (coords: Position[]): LatLng[] => {
+    return coords
+      .filter(
+        (c): c is [number, number] | [number, number, number] =>
+          c[0] !== undefined && c[1] !== undefined,
+      )
+      .map((c) => new L.value!.LatLng(c[1], c[0]));
+  };
+
   const calculateLineDistance = (
     latlngs: LatLng[],
     unit: "metric" | "imperial" = "metric",
@@ -8220,6 +8123,249 @@ export const useLeaflet = async () => {
     );
   };
 
+  const normalizeLatLngs = (
+    latlngs: Array<[number, number]> | Array<{ lat: number; lng: number }>,
+  ): Array<[number, number]> => {
+    return latlngs.map((point) => {
+      if (Array.isArray(point)) {
+        return point;
+      }
+      return [point.lat, point.lng] as [number, number];
+    });
+  };
+
+  const translatePointByPixels = (
+    latlng: L.LatLng,
+    deltaX: number,
+    deltaY: number,
+    map: L.Map,
+  ): L.LatLng | null => {
+    if (!L.value || !map) return null;
+    const point = map.latLngToContainerPoint(latlng);
+    const newPoint = L.value.point(point.x + deltaX, point.y + deltaY);
+    return map.containerPointToLatLng(newPoint);
+  };
+
+  const calculatePixelOffset = (
+    from: L.LatLng,
+    to: L.LatLng,
+    map: L.Map,
+  ): { x: number; y: number } | null => {
+    if (!L.value || !map) return null;
+    const fromPoint = map.latLngToContainerPoint(from);
+    const toPoint = map.latLngToContainerPoint(to);
+    return {
+      x: toPoint.x - fromPoint.x,
+      y: toPoint.y - fromPoint.y,
+    };
+  };
+
+  const calculateHandlePositions = (
+    bounds: L.LatLngBounds,
+    map: L.Map,
+    options: {
+      corners?: boolean;
+      edges?: boolean;
+      rotate?: boolean;
+      center?: boolean;
+      rotateOffsetPx?: number;
+    } = {},
+  ): {
+    corners?: L.LatLng[];
+    edges?: L.LatLng[];
+    rotate?: L.LatLng;
+    center?: L.LatLng;
+  } => {
+    if (!L.value) return {};
+
+    const {
+      corners = true,
+      edges = true,
+      rotate = true,
+      center = true,
+      rotateOffsetPx = 30,
+    } = options;
+
+    const result: {
+      corners?: L.LatLng[];
+      edges?: L.LatLng[];
+      rotate?: L.LatLng;
+      center?: L.LatLng;
+    } = {};
+
+    if (corners) {
+      result.corners = [
+        bounds.getSouthWest(),
+        bounds.getNorthWest(),
+        bounds.getNorthEast(),
+        bounds.getSouthEast(),
+      ];
+    }
+
+    if (edges) {
+      result.edges = [
+        L.value.latLng(
+          (bounds.getSouth() + bounds.getNorth()) / 2,
+          bounds.getWest(),
+        ),
+        L.value.latLng(
+          bounds.getNorth(),
+          (bounds.getWest() + bounds.getEast()) / 2,
+        ),
+        L.value.latLng(
+          (bounds.getSouth() + bounds.getNorth()) / 2,
+          bounds.getEast(),
+        ),
+        L.value.latLng(
+          bounds.getSouth(),
+          (bounds.getWest() + bounds.getEast()) / 2,
+        ),
+      ];
+    }
+
+    if (rotate && map) {
+      const centerTop = L.value.latLng(
+        bounds.getNorth(),
+        (bounds.getWest() + bounds.getEast()) / 2,
+      );
+      const centerTopPoint = map.latLngToLayerPoint(centerTop);
+      const rotateHandlePoint = L.value.point(
+        centerTopPoint.x,
+        centerTopPoint.y - rotateOffsetPx,
+      );
+      result.rotate = map.layerPointToLatLng(rotateHandlePoint);
+    }
+
+    if (center) {
+      result.center = bounds.getCenter();
+    }
+
+    return result;
+  };
+
+  const calculateBoundsFromHandle = (
+    handleType: "corner" | "edge",
+    handleIndex: number,
+    newPosition: L.LatLng,
+    originalBounds: L.LatLngBounds,
+  ): L.LatLngBounds | null => {
+    if (!L.value) return null;
+
+    let newBounds: L.LatLngBounds;
+
+    if (handleType === "corner") {
+      switch (handleIndex) {
+        case 0:
+          newBounds = L.value.latLngBounds(
+            newPosition,
+            originalBounds.getNorthEast(),
+          );
+          break;
+        case 1:
+          newBounds = L.value.latLngBounds(
+            [originalBounds.getSouth(), newPosition.lng],
+            [newPosition.lat, originalBounds.getEast()],
+          );
+          break;
+        case 2:
+          newBounds = L.value.latLngBounds(
+            originalBounds.getSouthWest(),
+            newPosition,
+          );
+          break;
+        case 3:
+          newBounds = L.value.latLngBounds(
+            [newPosition.lat, originalBounds.getWest()],
+            [originalBounds.getNorth(), newPosition.lng],
+          );
+          break;
+        default:
+          return null;
+      }
+    } else if (handleType === "edge") {
+      switch (handleIndex) {
+        case 0:
+          newBounds = L.value.latLngBounds(
+            [originalBounds.getSouth(), newPosition.lng],
+            [originalBounds.getNorth(), originalBounds.getEast()],
+          );
+          break;
+        case 1:
+          newBounds = L.value.latLngBounds(
+            [originalBounds.getSouth(), originalBounds.getWest()],
+            [newPosition.lat, originalBounds.getEast()],
+          );
+          break;
+        case 2:
+          newBounds = L.value.latLngBounds(
+            [originalBounds.getSouth(), originalBounds.getWest()],
+            [originalBounds.getNorth(), newPosition.lng],
+          );
+          break;
+        case 3:
+          newBounds = L.value.latLngBounds(
+            [newPosition.lat, originalBounds.getWest()],
+            [originalBounds.getNorth(), originalBounds.getEast()],
+          );
+          break;
+        default:
+          return null;
+      }
+    } else {
+      return null;
+    }
+
+    return newBounds;
+  };
+
+  const setMapCursor = (map: L.Map | null, cursor: string): void => {
+    if (!map) return;
+    map.getContainer().style.cursor = cursor;
+  };
+
+  const resetMapCursor = (map: L.Map | null): void => {
+    setMapCursor(map, "");
+  };
+
+  const createStyledMarker = (
+    latlng: L.LatLng | [number, number],
+    style: {
+      html: string;
+      className?: string;
+      iconSize?: [number, number];
+      iconAnchor?: [number, number];
+    },
+    options: L.MarkerOptions = {},
+    map?: L.Map,
+  ): L.Marker | null => {
+    if (!L.value) return null;
+
+    const {
+      html,
+      className = "leaflet-styled-marker",
+      iconSize = [12, 12],
+      iconAnchor,
+    } = style;
+
+    const icon = L.value.divIcon({
+      className,
+      html,
+      iconSize,
+      iconAnchor,
+    });
+
+    const marker = L.value.marker(latlng, {
+      ...options,
+      icon,
+    });
+
+    if (map) {
+      marker.addTo(map);
+    }
+
+    return marker;
+  };
+
   return {
     L,
     LatDegreesMeters,
@@ -8231,6 +8377,7 @@ export const useLeaflet = async () => {
     pixelsToMeters,
 
     toGeoJSONCoords,
+    fromGeoJSONCoords,
     calculateLineDistance,
     calculatePolygonArea,
     calculateCentroid,
@@ -8244,6 +8391,19 @@ export const useLeaflet = async () => {
     calculateCircleBounds,
 
     constrainToSquare,
+
+    normalizeLatLngs,
+
+    translatePointByPixels,
+    calculatePixelOffset,
+
+    calculateHandlePositions,
+    calculateBoundsFromHandle,
+
+    setMapCursor,
+    resetMapCursor,
+
+    createStyledMarker,
   };
 };
 ```

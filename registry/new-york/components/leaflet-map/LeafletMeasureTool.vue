@@ -9,16 +9,15 @@ import {
   computed,
   provide,
 } from 'vue';
-import { cn } from '@/lib/utils';
+import type { LatLng, Marker, Circle, DivIcon } from 'leaflet';
+import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
+import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
 import {
   LeafletMapKey,
   LeafletModuleKey,
   LeafletStylesKey,
   type LeafletFeatureHandleStyle,
 } from '.';
-import type { LatLng, Marker, Circle, DivIcon } from 'leaflet';
-import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
-import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
 
 export interface LeafletMeasureToolStyles {
   corner: LeafletFeatureHandleStyle;
@@ -58,6 +57,8 @@ const {
   calculatePolygonArea,
   formatDistance: formatDistanceUtil,
   pixelsToMeters,
+  setMapCursor,
+  resetMapCursor,
 } = await useLeaflet();
 
 const { getLeafletShapeColors, parseHTMLToElement, fetchStylesFromElementClass } = useCssParser();
@@ -476,7 +477,7 @@ const enable = () => {
   if (!map.value) return;
 
   isActive = true;
-  map.value.getContainer().style.cursor = 'crosshair';
+  setMapCursor(map.value, 'crosshair');
 
   // Désactiver le dragging de la carte pendant la mesure
   if (map.value.dragging) {
@@ -498,7 +499,7 @@ const disable = () => {
   if (!map.value) return;
 
   isActive = false;
-  map.value.getContainer().style.cursor = '';
+  resetMapCursor(map.value);
 
   map.value.off('click', handleMapClick);
   map.value.off('mousemove', handleMouseMove);

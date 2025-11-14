@@ -11,7 +11,7 @@ import {
   useDragDrop,
   DragDropUtils,
   type DragDropItem,
-} from '../../composables/use-drag-drop/useDragDrop';
+} from '~~/registry/new-york/composables/use-drag-drop/useDragDrop';
 import {
   ControlGridItemsKey,
   ControlGridConfigKey,

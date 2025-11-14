@@ -1,12 +1,21 @@
 <script setup lang="ts">
 import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount, type HTMLAttributes } from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
-import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
+import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from '.';
 import type { FeatureReference } from './LeafletFeaturesSelector.vue';
 import './leaflet-editing.css';
 
-const { calculateMidpoint, LatDegreesMeters, lngDegreesToRadius } = await useLeaflet();
+const {
+  calculateMidpoint,
+  LatDegreesMeters,
+  lngDegreesToRadius,
+  normalizeLatLngs,
+  setMapCursor,
+  resetMapCursor,
+  translatePointByPixels,
+  createStyledMarker,
+} = await useLeaflet();
 
 export interface LeafletPolygonProps {
   id?: string | number;
@@ -52,17 +61,6 @@ const polygonId = ref<string | number>(props.id ?? `polygon-${Date.now()}-${Math
 let dragStartLatLngs: L.LatLng[] = [];
 let dragStartMousePoint: L.Point | null = null;
 
-const normalizeLatLngs = (
-  latlngs: Array<[number, number]> | Array<{ lat: number; lng: number }>
-): Array<[number, number]> => {
-  return latlngs.map((point) => {
-    if (Array.isArray(point)) {
-      return point;
-    }
-    return [point.lat, point.lng] as [number, number];
-  });
-};
-
 const clearEditMarkers = () => {
   editMarkers.value.forEach((marker) => marker.remove());
   editMarkers.value = [];
@@ -83,9 +81,9 @@ const enableEditing = () => {
 
   latlngs.forEach((latlng, index) => {
     const isFirstPoint = index === 0;
-    const marker = L.value!.marker(latlng, {
-      draggable: true,
-      icon: L.value!.divIcon({
+    const marker = createStyledMarker(
+      latlng,
+      {
         className: isFirstPoint
           ? 'leaflet-editing-icon leaflet-editing-icon-first'
           : 'leaflet-editing-icon',
@@ -93,8 +91,11 @@ const enableEditing = () => {
           ? '<div style="width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid #3388ff;cursor:pointer;"></div>'
           : '<div style="width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #3388ff;"></div>',
         iconSize: isFirstPoint ? [12, 12] : [8, 8],
-      }),
-    }).addTo(map.value!);
+      },
+      { draggable: true },
+      map.value!
+    );
+    if (!marker) return;
 
     if (isFirstPoint && props.autoClose) {
       firstPointMarker.value = marker;
@@ -150,21 +151,22 @@ const createMidpoints = () => {
 
     const [midLat, midLng] = calculateMidpoint(current, next);
 
-    const midMarker = L.value
-      .marker([midLat, midLng], {
-        draggable: true,
-        icon: L.value.divIcon({
-          className: 'leaflet-editing-icon-midpoint',
-          html: '<div></div>',
-          iconSize: [14, 14],
-        }),
-      })
-      .addTo(map.value);
+    const midMarker = createStyledMarker(
+      [midLat, midLng],
+      {
+        className: 'leaflet-editing-icon-midpoint',
+        html: '<div></div>',
+        iconSize: [14, 14],
+      },
+      { draggable: true },
+      map.value
+    );
+    if (!midMarker) continue;
 
     let pointAdded = false;
 
     const onMidpointDragStart = () => {
-      if (map.value) map.value.getContainer().style.cursor = 'copy';
+      if (map.value) setMapCursor(map.value, 'copy');
     };
 
     const onMidpointDrag = () => {
@@ -186,7 +188,7 @@ const createMidpoints = () => {
     };
 
     const onMidpointDragEnd = () => {
-      if (map.value) map.value.getContainer().style.cursor = '';
+      resetMapCursor(map.value);
       const updatedLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map((ll) => [
         ll.lat,
         ll.lng,
@@ -196,13 +198,11 @@ const createMidpoints = () => {
     };
 
     const onMidpointMouseOver = () => {
-      if (map.value) map.value.getContainer().style.cursor = 'copy';
+      if (map.value) setMapCursor(map.value, 'copy');
     };
 
     const onMidpointMouseOut = () => {
-      if (map.value) {
-        map.value.getContainer().style.cursor = '';
-      }
+      resetMapCursor(map.value);
     };
 
     midMarker.on('dragstart', onMidpointDragStart);
@@ -247,7 +247,7 @@ const enableDragging = () => {
 
     // Curseur et désactiver le drag de la carte
     if (map.value) {
-      map.value.getContainer().style.cursor = 'move';
+      setMapCursor(map.value, 'move');
       map.value.dragging.disable();
     }
   };
@@ -270,12 +270,12 @@ const setupMapDragHandlers = () => {
     const deltaX = currentPoint.x - dragStartMousePoint.x;
     const deltaY = currentPoint.y - dragStartMousePoint.y;
 
-    // Calculer les nouvelles positions
-    const newLatLngs = dragStartLatLngs.map((startLatLng) => {
-      const startPoint = map.value!.latLngToContainerPoint(startLatLng);
-      const newPoint = L.value!.point(startPoint.x + deltaX, startPoint.y + deltaY);
-      return map.value!.containerPointToLatLng(newPoint);
-    });
+    // Calculer les nouvelles positions avec translatePointByPixels
+    const newLatLngs = dragStartLatLngs
+      .map((startLatLng) => translatePointByPixels(startLatLng, deltaX, deltaY, map.value!))
+      .filter((ll): ll is L.LatLng => ll !== null);
+
+    if (newLatLngs.length !== dragStartLatLngs.length) return;
 
     // Mettre à jour le polygone
     polygon.value!.setLatLngs([newLatLngs]);
@@ -297,7 +297,7 @@ const setupMapDragHandlers = () => {
 
     // Réactiver le drag de la carte
     if (map.value) {
-      map.value.getContainer().style.cursor = '';
+      resetMapCursor(map.value);
       map.value.dragging.enable();
       map.value.off('mousemove', onMouseMove);
       map.value.off('mouseup', onMouseUp);

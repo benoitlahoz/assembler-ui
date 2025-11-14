@@ -123,8 +123,8 @@ export { default as ControlGrid } from "./ControlGrid.vue";
 export { default as ControlGridToolbar } from "./ControlGridToolbar.vue";
 export { default as ControlGridItem } from "./ControlGridItem.vue";
 
-export { useControlsGrid } from "../../composables/use-controls-grid/useControlsGrid";
-export { useControlRegistry } from "../../composables/use-control-registry/useControlRegistry";
+export { useControlsGrid } from "~~/registry/new-york/composables/use-controls-grid/useControlsGrid";
+export { useControlRegistry } from "~~/registry/new-york/composables/use-control-registry/useControlRegistry";
 
 export interface ComponentToRegister {
   name: string;
@@ -406,7 +406,7 @@ import {
   useDragDrop,
   DragDropUtils,
   type DragDropItem,
-} from "../../composables/use-drag-drop/useDragDrop";
+} from "~~/registry/new-york/composables/use-drag-drop/useDragDrop";
 import {
   ControlGridItemsKey,
   ControlGridConfigKey,
@@ -1869,7 +1869,7 @@ import { ref, computed } from "vue";
 import {
   useControlRegistry,
   type ControlDefinition,
-} from "../../composables/use-control-registry/useControlRegistry";
+} from "~~/registry/new-york/composables/use-control-registry/useControlRegistry";
 
 interface Props {
   category?: string;

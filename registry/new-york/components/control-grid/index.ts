@@ -15,8 +15,8 @@ export { default as ControlGridToolbar } from './ControlGridToolbar.vue';
 export { default as ControlGridItem } from './ControlGridItem.vue';
 
 // Export des composables associés
-export { useControlsGrid } from '../../composables/use-controls-grid/useControlsGrid';
-export { useControlRegistry } from '../../composables/use-control-registry/useControlRegistry';
+export { useControlsGrid } from '~~/registry/new-york/composables/use-controls-grid/useControlsGrid';
+export { useControlRegistry } from '~~/registry/new-york/composables/use-control-registry/useControlRegistry';
 
 // ============================================================================
 // Types
