@@ -1615,6 +1615,7 @@ watch(
           const leafletPane = newMap.getPanes().overlayPane;
           leafletPane.appendChild(canvasLayer.value);
 
+          newMap.on("move", reset);
           newMap.on("moveend", reset);
           newMap.on("zoom", reset);
           newMap.on("viewreset", reset);
@@ -1675,6 +1676,7 @@ onBeforeUnmount(() => {
   }
 
   if (map.value) {
+    map.value.off("move", reset);
     map.value.off("moveend", reset);
     map.value.off("zoom", reset);
     map.value.off("viewreset", reset);
@@ -2459,6 +2461,7 @@ watch(
           const leafletPane = newMap.getPanes().overlayPane;
           leafletPane.appendChild(canvasLayer.value);
 
+          newMap.on("move", reset);
           newMap.on("moveend", reset);
           newMap.on("zoom", reset);
           newMap.on("viewreset", reset);
@@ -2538,6 +2541,7 @@ onBeforeUnmount(() => {
   }
 
   if (map.value) {
+    map.value.off("move", reset);
     map.value.off("moveend", reset);
     map.value.off("zoom", reset);
     map.value.off("viewreset", reset);
@@ -7115,7 +7119,7 @@ const map = inject<Ref<Leaflet.Map | null>>(LeafletMapKey, ref(null));
 const visibleBounds = ref<Leaflet.LatLngBounds | null>(null);
 const visibleFeatureIds = ref<Set<string | number>>(new Set());
 const isTransitioning = ref(false);
-let updateScheduled = false;
+let rafId: number | null = null;
 
 const calculateDynamicMargin = (zoom: number): number => {
   const clampedZoom = Math.max(1, Math.min(20, zoom));
@@ -7128,11 +7132,12 @@ const calculateDynamicMargin = (zoom: number): number => {
 const updateVisibleBounds = () => {
   if (!map.value || !L.value) return;
 
-  if (updateScheduled) return;
-  updateScheduled = true;
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+  }
 
-  requestAnimationFrame(() => {
-    updateScheduled = false;
+  rafId = requestAnimationFrame(() => {
+    rafId = null;
 
     if (!map.value || !L.value) return;
 
@@ -7253,6 +7258,11 @@ watch(
   { immediate: true },
 );
 onBeforeUnmount(() => {
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+
   if (map.value) {
     map.value.off("moveend", updateVisibleBounds);
     map.value.off("zoomend", updateVisibleBounds);
@@ -7260,56 +7270,33 @@ onBeforeUnmount(() => {
 });
 
 watch(
-  () => props.enabled,
-  async () => {
-    isTransitioning.value = true;
-    emit("transition-start");
+  () =>
+    [
+      props.enabled,
+      props.marginMeters,
+      props.marginZoomRatio,
+      props.minZoom,
+      props.maxZoom,
+      props.quadtree,
+    ] as const,
+  async ([enabled], [oldEnabled]) => {
+    if (enabled !== oldEnabled) {
+      isTransitioning.value = true;
+      emit("transition-start");
 
-    await new Promise((resolve) => setTimeout(resolve, props.transitionDelay));
-    updateVisibleFeaturesQuadtree();
+      await new Promise((resolve) =>
+        setTimeout(resolve, props.transitionDelay),
+      );
+    }
 
-    await new Promise((resolve) => setTimeout(resolve, 200));
-
-    isTransitioning.value = false;
-    emit("transition-end");
-  },
-);
-
-watch(
-  () => props.marginMeters,
-  () => {
-    updateVisibleBounds();
-  },
-);
-
-watch(
-  () => props.marginZoomRatio,
-  () => {
-    updateVisibleBounds();
-  },
-);
-
-watch(
-  () => props.minZoom,
-  () => {
-    updateVisibleFeaturesQuadtree();
-  },
-);
-
-watch(
-  () => props.maxZoom,
-  () => {
-    updateVisibleFeaturesQuadtree();
-  },
-);
-
-watch(
-  () => props.quadtree,
-  () => {
     if (map.value) {
-      nextTick(() => {
-        updateVisibleBounds();
-      });
+      updateVisibleBounds();
+    }
+
+    if (enabled !== oldEnabled) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      isTransitioning.value = false;
+      emit("transition-end");
     }
   },
 );
