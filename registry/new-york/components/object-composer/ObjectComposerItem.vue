@@ -152,9 +152,13 @@ function handleChildAdd(path: string[], key: string, value: any) {
 </script>
 
 <template>
-  <div v-if="!isExpandable" data-slot="object-composer-item" :class="cn(props.class)">
+  <div
+    v-if="!isExpandable"
+    data-slot="object-composer-item"
+    :class="cn('select-none hover:bg-accent', props.class)"
+  >
     <div class="flex items-center">
-      <div class="expand-spacer" />
+      <div class="w-8" />
 
       <!-- Slot pour contenu personnalisé -->
       <div class="item-content">
@@ -281,10 +285,10 @@ function handleChildAdd(path: string[], key: string, value: any) {
   <!-- Accordion pour les éléments expandables -->
   <Accordion v-else v-model="accordionValue" type="single" collapsible>
     <AccordionItem value="item-1" class="border-b-0">
-      <div class="flex items-center">
-        <AccordionTrigger class="flex-none hover:no-underline py-1! px-2">
+      <div class="flex items-center hover:bg-accent select-none">
+        <AccordionTrigger class="flex-none hover:no-underline select-none py-1! px-2">
           <template #icon>
-            <ChevronRight class="transition-transform duration-200 w-4 h-4" />
+            <ChevronRight class="transition-transform duration-200 w-4 h-4 text-muted-foreground" />
           </template>
         </AccordionTrigger>
 
@@ -303,7 +307,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
             <!-- Rendu par défaut si aucun slot n'est fourni -->
             <div v-if="!isEditing" class="default-item-content">
               <span class="item-key">{{ itemKey }}</span>
-              <span class="item-separator">:</span>
+              <span class="text-muted-foreground">:</span>
               <span class="item-value" :class="`type-${valueType}`">
                 {{ displayValue }}
               </span>
@@ -499,10 +503,6 @@ function handleChildAdd(path: string[], key: string, value: any) {
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-.item-separator {
-  color: #666;
 }
 
 .item-value {
