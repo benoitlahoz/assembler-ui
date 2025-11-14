@@ -244,7 +244,8 @@ function handleChildAdd(path: string[], key: string, value: any) {
         @keyup.enter="saveEdit"
         @keyup.esc="cancelEdit"
       />
-      <Button variant="ghost" size="icon" title="Sauvegarder" @click="saveEdit">
+      <div class="flex ml-auto">
+        <Button variant="ghost" size="icon" title="Sauvegarder" @click="saveEdit">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="14"
@@ -275,6 +276,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
       </Button>
+      </div>
     </div>
   </div>
 
@@ -398,7 +400,8 @@ function handleChildAdd(path: string[], key: string, value: any) {
           @keyup.enter="saveEdit"
           @keyup.esc="cancelEdit"
         />
-        <Button variant="ghost" size="icon" title="Sauvegarder" @click="saveEdit">
+        <div class="flex ml-auto">
+          <Button variant="ghost" size="icon" title="Sauvegarder" @click="saveEdit">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="14"
@@ -429,6 +432,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         </Button>
+        </div>
       </div>
 
       <AccordionContent class="pb-0!">
