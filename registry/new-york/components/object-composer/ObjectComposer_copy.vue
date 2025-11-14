@@ -115,8 +115,85 @@ const downloadJSON = () => {
 </script>
 
 <template>
-  <div data-slot="object-composer">
-    <slot />
+  <div class="object-composer">
+    <div class="composer-header">
+      <h3 class="composer-title">{{ title }}</h3>
+      <div class="composer-actions">
+        <Button
+          v-if="!readonly"
+          class="header-Button"
+          title="Ajouter un élément racine"
+          @click="addRootItem"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Ajouter
+        </Button>
+
+        <Button class="header-Button" title="Copier dans le presse-papier" @click="copyToClipboard">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+          Copier
+        </Button>
+
+        <Button class="header-Button" title="Télécharger en JSON" @click="downloadJSON">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Télécharger
+        </Button>
+      </div>
+    </div>
+
+    <div class="text-sm p-4 bg-card mb-2">
+      <ObjectComposerItem
+        v-for="[key, value] in rootEntries"
+        :key="key"
+        :item-key="key"
+        :value="value"
+        :depth="0"
+        :path="[]"
+        @update="handleUpdate"
+        @delete="handleDelete"
+        @add="handleAdd"
+      />
+    </div>
   </div>
 </template>
 

@@ -161,47 +161,32 @@ function handleChildAdd(path: string[], key: string, value: any) {
       </Button>
       <div v-else class="expand-spacer" />
 
-      <!-- Slot pour contenu personnalisé -->
-      <div class="item-content">
-        <slot
-          :item-key="itemKey"
-          :value="value"
-          :value-type="valueType"
-          :display-value="displayValue"
-          :is-expandable="isExpandable"
-          :is-expanded="isExpanded"
-          :is-editing="isEditing"
-          :edit-key="editKey"
-          :edit-value="editValue"
-        >
-          <!-- Rendu par défaut si aucun slot n'est fourni -->
-          <div v-if="!isEditing" class="default-item-content">
-            <span class="item-key">{{ itemKey }}</span>
-            <span class="item-separator">:</span>
-            <span class="item-value" :class="`type-${valueType}`">
-              {{ displayValue }}
-            </span>
-          </div>
+      <!-- Key/Value Display -->
+      <div v-if="!isEditing" class="item-content">
+        <span class="item-key">{{ itemKey }}</span>
+        <span class="item-separator">:</span>
+        <span class="item-value" :class="`type-${valueType}`">
+          {{ displayValue }}
+        </span>
+      </div>
 
-          <!-- Edit Mode par défaut -->
-          <div v-else class="item-edit">
-            <Input
-              v-model="editKey"
-              class="edit-key"
-              type="text"
-              @keyup.enter="saveEdit"
-              @keyup.esc="cancelEdit"
-            />
-            <span class="item-separator">:</span>
-            <Input
-              v-model="editValue"
-              class="edit-value"
-              type="text"
-              @keyup.enter="saveEdit"
-              @keyup.esc="cancelEdit"
-            />
-          </div>
-        </slot>
+      <!-- Edit Mode -->
+      <div v-else class="item-edit">
+        <Input
+          v-model="editKey"
+          class="edit-key"
+          type="text"
+          @keyup.enter="saveEdit"
+          @keyup.esc="cancelEdit"
+        />
+        <span class="item-separator">:</span>
+        <Input
+          v-model="editValue"
+          class="edit-value"
+          type="text"
+          @keyup.enter="saveEdit"
+          @keyup.esc="cancelEdit"
+        />
       </div>
 
       <!-- Actions -->
@@ -305,7 +290,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
       </div>
     </div>
 
-    <!-- Children - Arborescence récursive -->
+    <!-- Children -->
     <div v-if="isExpandable && isExpanded" class="border-l border-white ml-5">
       <ObjectComposerItem
         v-for="[key, val] in childEntries"
@@ -317,12 +302,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
         @update="handleChildUpdate"
         @delete="handleChildDelete"
         @add="handleChildAdd"
-      >
-        <!-- Propagation du slot personnalisé aux enfants -->
-        <template #default="slotProps: any">
-          <slot v-bind="slotProps" />
-        </template>
-      </ObjectComposerItem>
+      />
     </div>
   </div>
 </template>
@@ -369,12 +349,6 @@ function handleChildAdd(path: string[], key: string, value: any) {
   align-items: center;
   gap: 6px;
   flex: 1;
-}
-
-.default-item-content {
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .item-separator {
