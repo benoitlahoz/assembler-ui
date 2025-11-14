@@ -1,19 +1,24 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, type HTMLAttributes } from 'vue';
+import { cn } from '@/lib/utils';
 import { ObjectComposerItem } from '.';
 import { Button } from '@/components/ui/button';
 
 interface ObjectComposerProps {
   title?: string;
   readonly?: boolean;
+  class?: HTMLAttributes['class'];
 }
 
-withDefaults(defineProps<ObjectComposerProps>(), {
+const props = withDefaults(defineProps<ObjectComposerProps>(), {
   title: 'JSON Editor',
   readonly: false,
 });
 
 const model = defineModel<Record<string, any> | any[]>({ required: true });
+
+// Chemin de l'élément en cours d'édition (null si aucun)
+const editingPath = ref<string[] | null>(null);
 
 const rootEntries = computed(() => {
   if (Array.isArray(model.value)) {
@@ -21,6 +26,14 @@ const rootEntries = computed(() => {
   }
   return Object.entries(model.value);
 });
+
+const startEdit = (path: string[]) => {
+  editingPath.value = path;
+};
+
+const cancelEdit = () => {
+  editingPath.value = null;
+};
 
 const handleUpdate = (path: string[], value: any) => {
   const newData = JSON.parse(JSON.stringify(model.value));
@@ -37,6 +50,7 @@ const handleUpdate = (path: string[], value: any) => {
   current[lastKey as keyof typeof current] = value;
 
   model.value = newData;
+  editingPath.value = null; // Fermer l'édition après la mise à jour
 };
 
 const handleDelete = (path: string[]) => {
@@ -115,58 +129,21 @@ const downloadJSON = () => {
 </script>
 
 <template>
-  <div data-slot="object-composer">
-    <slot />
+  <div data-slot="object-composer" :class="cn('flex flex-col text-sm', props.class)">
+    <ObjectComposerItem
+      v-for="[key, val] in rootEntries"
+      :key="key"
+      :item-key="key"
+      :value="val"
+      :depth="0"
+      :path="[]"
+      :is-in-array="Array.isArray(model)"
+      :editing-path="editingPath"
+      @update="handleUpdate"
+      @delete="handleDelete"
+      @add="handleAdd"
+      @start-edit="startEdit"
+      @cancel-edit="cancelEdit"
+    />
   </div>
 </template>
-
-<style scoped>
-.object-composer {
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.composer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.composer-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #1a1a1a;
-}
-
-.composer-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.header-Button {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border: 1px solid #d0d0d0;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #333;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.header-Button:hover {
-  border-color: #b0b0b0;
-}
-
-.header-Button:active {
-  transform: translateY(1px);
-}
-</style>

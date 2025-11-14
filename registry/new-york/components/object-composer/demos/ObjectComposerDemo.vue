@@ -52,10 +52,6 @@ const readonlyData = ref({
 <template>
   <div class="demo-container">
     <div class="demo-section">
-      <h2 class="demo-title">Rendu Par Défaut</h2>
-      <p class="demo-description">
-        L'ObjectComposer affiche automatiquement l'arborescence avec le rendu par défaut.
-      </p>
       <ObjectComposer v-model="userData" title="Données Utilisateur">
         <ObjectComposerHeader>
           <ObjectComposerTitle>User Data (Default)</ObjectComposerTitle>

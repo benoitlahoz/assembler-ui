@@ -64,11 +64,6 @@ const readonlyData = ref({
 <template>
   <div class="demo-container">
     <div class="demo-section">
-      <h2 class="demo-title">Rendu Par Défaut</h2>
-      <p class="demo-description">
-        L'ObjectComposer affiche automatiquement l'arborescence avec le rendu
-        par défaut.
-      </p>
       <ObjectComposer v-model="userData" title="Données Utilisateur">
         <ObjectComposerHeader>
           <ObjectComposerTitle>User Data (Default)</ObjectComposerTitle>
@@ -325,21 +320,25 @@ export { default as ObjectComposerItem } from "./ObjectComposerItem.vue";
 
 ```vue [src/components/ui/object-composer/ObjectComposer.vue]
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, type HTMLAttributes } from "vue";
+import { cn } from "@/lib/utils";
 import { ObjectComposerItem } from ".";
 import { Button } from "@/components/ui/button";
 
 interface ObjectComposerProps {
   title?: string;
   readonly?: boolean;
+  class?: HTMLAttributes["class"];
 }
 
-withDefaults(defineProps<ObjectComposerProps>(), {
+const props = withDefaults(defineProps<ObjectComposerProps>(), {
   title: "JSON Editor",
   readonly: false,
 });
 
 const model = defineModel<Record<string, any> | any[]>({ required: true });
+
+const editingPath = ref<string[] | null>(null);
 
 const rootEntries = computed(() => {
   if (Array.isArray(model.value)) {
@@ -347,6 +346,14 @@ const rootEntries = computed(() => {
   }
   return Object.entries(model.value);
 });
+
+const startEdit = (path: string[]) => {
+  editingPath.value = path;
+};
+
+const cancelEdit = () => {
+  editingPath.value = null;
+};
 
 const handleUpdate = (path: string[], value: any) => {
   const newData = JSON.parse(JSON.stringify(model.value));
@@ -361,6 +368,7 @@ const handleUpdate = (path: string[], value: any) => {
   current[lastKey as keyof typeof current] = value;
 
   model.value = newData;
+  editingPath.value = null;
 };
 
 const handleDelete = (path: string[]) => {
@@ -435,61 +443,27 @@ const downloadJSON = () => {
 </script>
 
 <template>
-  <div data-slot="object-composer">
-    <slot />
+  <div
+    data-slot="object-composer"
+    :class="cn('flex flex-col text-sm', props.class)"
+  >
+    <ObjectComposerItem
+      v-for="[key, val] in rootEntries"
+      :key="key"
+      :item-key="key"
+      :value="val"
+      :depth="0"
+      :path="[]"
+      :is-in-array="Array.isArray(model)"
+      :editing-path="editingPath"
+      @update="handleUpdate"
+      @delete="handleDelete"
+      @add="handleAdd"
+      @start-edit="startEdit"
+      @cancel-edit="cancelEdit"
+    />
   </div>
 </template>
-
-<style scoped>
-.object-composer {
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.composer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.composer-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #1a1a1a;
-}
-
-.composer-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.header-Button {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border: 1px solid #d0d0d0;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #333;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.header-Button:hover {
-  border-color: #b0b0b0;
-}
-
-.header-Button:active {
-  transform: translateY(1px);
-}
-</style>
 ```
 
 ```vue [src/components/ui/object-composer/ObjectComposerDescription.vue]
@@ -524,35 +498,69 @@ const props = defineProps<ObjectComposerDescriptionProps>();
 
 ```vue [src/components/ui/object-composer/ObjectComposerItem.vue]
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, type HTMLAttributes } from "vue";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/Input";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { ChevronRight, Trash } from "lucide-vue-next";
 
 interface ObjectComposerItemProps {
   itemKey: string;
   value: any;
   depth?: number;
   path?: string[];
+  isInArray?: boolean;
+  editingPath?: string[] | null;
+  class?: HTMLAttributes["class"];
+}
+
+interface SlotProps {
+  itemKey: string;
+  value: any;
+  valueType: string;
+  displayValue: string;
+  isExpandable: boolean;
+  isEditing: boolean;
+  editKey: string;
+  editValue: string;
 }
 
 const props = withDefaults(defineProps<ObjectComposerItemProps>(), {
   depth: 0,
   path: () => [],
+  isInArray: false,
+  editingPath: null,
 });
 
 const emit = defineEmits<{
   update: [path: string[], value: any];
   delete: [path: string[]];
   add: [path: string[], key: string, value: any];
+  startEdit: [path: string[]];
+  cancelEdit: [];
 }>();
 
-const isExpanded = ref(true);
-const isEditing = ref(false);
+defineSlots<{
+  default(props: SlotProps): any;
+}>();
+
+const accordionValue = ref<string>("item-1");
 const editKey = ref(props.itemKey);
 const editValue = ref<string>("");
 
 const currentPath = computed(() => [...props.path, props.itemKey]);
+
+const isEditing = computed(() => {
+  if (!props.editingPath) return false;
+  if (props.editingPath.length !== currentPath.value.length) return false;
+  return props.editingPath.every((key, i) => key === currentPath.value[i]);
+});
 
 const valueType = computed(() => {
   if (props.value === null) return "null";
@@ -584,30 +592,26 @@ const displayValue = computed(() => {
     case "null":
       return "null";
     case "object":
-      return `{ ${Object.keys(props.value).length} }`;
+      return "";
     case "array":
-      return `[ ${props.value.length} ]`;
+      return "";
     default:
       return String(props.value);
   }
 });
 
-function toggleExpand() {
-  if (isExpandable.value) {
-    isExpanded.value = !isExpanded.value;
-  }
-}
+function toggleExpand() {}
 
 function startEdit() {
-  isEditing.value = true;
   editKey.value = props.itemKey;
   editValue.value =
     valueType.value === "string" ? props.value : JSON.stringify(props.value);
+  emit("startEdit", currentPath.value);
 }
 
 function cancelEdit() {
-  isEditing.value = false;
   editKey.value = props.itemKey;
+  emit("cancelEdit");
 }
 
 function saveEdit() {
@@ -627,7 +631,6 @@ function saveEdit() {
     }
 
     emit("update", currentPath.value, newValue);
-    isEditing.value = false;
   } catch (e) {
     console.error("Invalid value", e);
   }
@@ -654,87 +657,68 @@ function handleChildDelete(path: string[]) {
 function handleChildAdd(path: string[], key: string, value: any) {
   emit("add", path, key, value);
 }
+
+function handleChildStartEdit(path: string[]) {
+  emit("startEdit", path);
+}
+
+function handleChildCancelEdit() {
+  emit("cancelEdit");
+}
 </script>
 
 <template>
   <div
+    v-if="!isExpandable"
     data-slot="object-composer-item"
     :class="
-      cn('rounded-md mb-1', { border: depth === 0, 'border-border': depth > 0 })
+      cn(
+        'group select-none',
+        !isEditing && 'hover:bg-accent border-l border-border relative',
+        props.class,
+      )
     "
   >
-    <div class="flex items-center py-1 item-header">
-      <Button
-        v-if="isExpandable"
-        variant="ghost"
-        size="icon"
-        class="expand-button"
-        @click="toggleExpand"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          :class="{ 'rotate-90': isExpanded }"
-        >
-          <polyline points="9 18 15 12 9 6" />
-        </svg>
-      </Button>
-      <div v-else class="expand-spacer" />
+    <div v-if="!isEditing" class="flex items-center w-full">
+      <div class="w-8" />
 
-      <div class="item-content">
+      <div class="flex-1">
         <slot
           :item-key="itemKey"
           :value="value"
           :value-type="valueType"
           :display-value="displayValue"
           :is-expandable="isExpandable"
-          :is-expanded="isExpanded"
           :is-editing="isEditing"
           :edit-key="editKey"
           :edit-value="editValue"
         >
-          <div v-if="!isEditing" class="default-item-content">
-            <span class="item-key">{{ itemKey }}</span>
-            <span class="item-separator">:</span>
-            <span class="item-value" :class="`type-${valueType}`">
+          <div class="flex items-center gap-1.5">
+            <span class="font-medium text-foreground">{{ itemKey }}</span>
+            <span class="text-muted-foreground">:</span>
+            <span
+              :class="
+                cn({
+                  'text-red-600 dark:text-red-400': valueType === 'string',
+                  'text-blue-600 dark:text-blue-400': valueType === 'number',
+                  'text-purple-600 dark:text-purple-400':
+                    valueType === 'boolean',
+                  'text-muted-foreground italic': valueType === 'null',
+                  'text-muted-foreground italic text-sm':
+                    valueType === 'object' || valueType === 'array',
+                })
+              "
+            >
               {{ displayValue }}
             </span>
-          </div>
-
-          <div v-else class="item-edit">
-            <Input
-              v-model="editKey"
-              class="edit-key"
-              type="text"
-              @keyup.enter="saveEdit"
-              @keyup.esc="cancelEdit"
-            />
-            <span class="item-separator">:</span>
-            <Input
-              v-model="editValue"
-              class="edit-value"
-              type="text"
-              @keyup.enter="saveEdit"
-              @keyup.esc="cancelEdit"
-            />
           </div>
         </slot>
       </div>
 
-      <div class="item-actions">
-        <Button
-          v-if="!isEditing"
-          class="action-button"
-          title="Éditer"
-          @click="startEdit"
-        >
+      <div
+        class="flex ml-auto opacity-0 group-hover:opacity-100 transition-opacity"
+      >
+        <Button variant="ghost" size="icon" title="Éditer" @click="startEdit">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="14"
@@ -752,10 +736,232 @@ function handleChildAdd(path: string[], key: string, value: any) {
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
           </svg>
         </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          title="Supprimer"
+          @click="deleteItem"
+        >
+          <Trash class="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
 
-        <template v-else>
+    <div
+      v-else
+      class="flex items-center gap-2 p-3 rounded-md border bg-background w-full ml-0"
+    >
+      <template v-if="!isInArray">
+        <Input
+          v-model="editKey"
+          class="flex-none w-32"
+          placeholder="Clé"
+          type="text"
+          @keyup.enter="saveEdit"
+          @keyup.esc="cancelEdit"
+        />
+        <span class="text-muted-foreground">:</span>
+      </template>
+      <Input
+        v-model="editValue"
+        class="flex-1"
+        placeholder="Valeur"
+        type="text"
+        @keyup.enter="saveEdit"
+        @keyup.esc="cancelEdit"
+      />
+      <div class="flex ml-auto">
+        <Button
+          variant="ghost"
+          size="icon"
+          title="Sauvegarder"
+          @click="saveEdit"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </Button>
+        <Button variant="ghost" size="icon" title="Annuler" @click="cancelEdit">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </Button>
+      </div>
+    </div>
+  </div>
+
+  <Accordion
+    v-else
+    v-model="accordionValue"
+    type="single"
+    collapsible
+    :class="cn(!isEditing && 'border-l border-border relative')"
+  >
+    <AccordionItem value="item-1" class="border-b-0">
+      <div
+        v-if="!isEditing"
+        class="group flex items-center w-full hover:bg-accent select-none"
+      >
+        <AccordionTrigger
+          class="flex-none hover:no-underline select-none py-1! px-2"
+        >
+          <template #icon>
+            <ChevronRight
+              class="transition-transform duration-200 w-4 h-4 text-muted-foreground"
+            />
+          </template>
+        </AccordionTrigger>
+
+        <div class="flex-1">
+          <slot
+            :item-key="itemKey"
+            :value="value"
+            :value-type="valueType"
+            :display-value="displayValue"
+            :is-expandable="isExpandable"
+            :is-editing="isEditing"
+            :edit-key="editKey"
+            :edit-value="editValue"
+          >
+            <div class="flex items-center gap-1.5">
+              <span class="font-medium text-foreground">{{ itemKey }}</span>
+              <span class="text-muted-foreground">:</span>
+              <span
+                :class="
+                  cn({
+                    'text-red-600 dark:text-red-400': valueType === 'string',
+                    'text-blue-600 dark:text-blue-400': valueType === 'number',
+                    'text-purple-600 dark:text-purple-400':
+                      valueType === 'boolean',
+                    'text-muted-foreground italic': valueType === 'null',
+                    'text-muted-foreground italic text-sm':
+                      valueType === 'object' || valueType === 'array',
+                  })
+                "
+              >
+                {{ displayValue }}
+              </span>
+            </div>
+          </slot>
+        </div>
+
+        <div
+          class="flex ml-auto opacity-0 group-hover:opacity-100 transition-opacity"
+        >
           <Button
-            class="action-button save"
+            v-if="!isInArray"
+            variant="ghost"
+            size="icon"
+            title="Éditer"
+            @click="startEdit"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+              />
+              <path
+                d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
+              />
+            </svg>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Ajouter un enfant"
+            @click="addChild"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </Button>
+
+          <Button
+            v-if="!isEditing"
+            variant="ghost"
+            size="icon"
+            title="Supprimer"
+            @click="deleteItem"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="3 6 5 6 21 6" />
+              <path
+                d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+              />
+            </svg>
+          </Button>
+        </div>
+      </div>
+
+      <div
+        v-if="!isInArray && isEditing"
+        class="flex items-center gap-2 p-3 rounded-md border bg-background w-full"
+        :style="{ marginLeft: `-${2 + depth * 1}rem` }"
+      >
+        <Input
+          v-model="editKey"
+          class="flex-1"
+          placeholder="Clé"
+          type="text"
+          @keyup.enter="saveEdit"
+          @keyup.esc="cancelEdit"
+        />
+        <div class="flex ml-auto">
+          <Button
+            variant="ghost"
+            size="icon"
             title="Sauvegarder"
             @click="saveEdit"
           >
@@ -774,7 +980,8 @@ function handleChildAdd(path: string[], key: string, value: any) {
             </svg>
           </Button>
           <Button
-            class="action-button cancel"
+            variant="ghost"
+            size="icon"
             title="Annuler"
             @click="cancelEdit"
           >
@@ -793,237 +1000,39 @@ function handleChildAdd(path: string[], key: string, value: any) {
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </Button>
-        </template>
-
-        <Button
-          v-if="isExpandable && !isEditing"
-          class="action-button"
-          title="Ajouter un enfant"
-          @click="addChild"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </Button>
-
-        <Button
-          v-if="!isEditing"
-          class="action-button delete"
-          title="Supprimer"
-          @click="deleteItem"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <polyline points="3 6 5 6 21 6" />
-            <path
-              d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-            />
-          </svg>
-        </Button>
+        </div>
       </div>
-    </div>
 
-    <div v-if="isExpandable && isExpanded" class="border-l border-white ml-5">
-      <ObjectComposerItem
-        v-for="[key, val] in childEntries"
-        :key="key"
-        :item-key="key"
-        :value="val"
-        :depth="depth + 1"
-        :path="currentPath"
-        @update="handleChildUpdate"
-        @delete="handleChildDelete"
-        @add="handleChildAdd"
-      >
-        <template #default="slotProps: any">
-          <slot v-bind="slotProps" />
-        </template>
-      </ObjectComposerItem>
-    </div>
-  </div>
+      <AccordionContent class="pb-0!">
+        <div class="border-l border-border ml-4">
+          <ObjectComposerItem
+            v-for="[key, val] in childEntries"
+            :key="key"
+            :item-key="key"
+            :value="val"
+            :depth="depth + 1"
+            :path="currentPath"
+            :is-in-array="valueType === 'array'"
+            :editing-path="editingPath"
+            @update="handleChildUpdate"
+            @delete="handleChildDelete"
+            @add="handleChildAdd"
+            @start-edit="handleChildStartEdit"
+            @cancel-edit="handleChildCancelEdit"
+          >
+            <template v-if="$slots.default" #default="childSlotProps">
+              <slot v-bind="childSlotProps" />
+            </template>
+          </ObjectComposerItem>
+        </div>
+      </AccordionContent>
+    </AccordionItem>
+  </Accordion>
 </template>
 
 <style scoped>
-.item-header {
-  transition: background-color 0.15s ease;
-}
-
-.item-header:hover {
-  background-color: rgba(0, 0, 0, 0.03);
-}
-
-.expand-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #666;
-  transition: transform 0.2s ease;
-}
-
-.expand-button:hover {
-  color: #000;
-}
-
-.expand-button svg {
-  transition: transform 0.2s ease;
-}
-
-.expand-button svg.rotate-90 {
-  transform: rotate(90deg);
-}
-
 .expand-spacer {
   width: 20px;
-}
-
-.item-content {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-}
-
-.default-item-content {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.item-separator {
-  color: #666;
-}
-
-.item-value {
-  color: #1c01ce;
-}
-
-.item-value.type-string {
-  color: #c41a16;
-}
-
-.item-value.type-number {
-  color: #1c00cf;
-}
-
-.item-value.type-boolean {
-  color: #0f68a0;
-}
-
-.item-value.type-null {
-  color: #808080;
-}
-
-.item-value.type-object,
-.item-value.type-array {
-  color: #666;
-  font-style: italic;
-}
-
-.item-edit {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-}
-
-.edit-key,
-.edit-value {
-  padding: 2px 6px;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-  font-family: inherit;
-  font-size: inherit;
-}
-
-.edit-key {
-  flex: 0 0 auto;
-  min-width: 100px;
-}
-
-.edit-value {
-  flex: 1;
-  min-width: 150px;
-}
-
-.edit-key:focus,
-.edit-value:focus {
-  outline: none;
-  border-color: #007acc;
-  box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.1);
-}
-
-.item-actions {
-  display: flex;
-  gap: 4px;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.item-header:hover .item-actions {
-  opacity: 1;
-}
-
-.action-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #666;
-  border-radius: 3px;
-  transition: all 0.15s ease;
-}
-
-.action-button:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-  color: #000;
-}
-
-.action-button.save:hover {
-  background-color: rgba(0, 128, 0, 0.1);
-  color: #008000;
-}
-
-.action-button.cancel:hover {
-  background-color: rgba(128, 128, 128, 0.1);
-  color: #666;
-}
-
-.action-button.delete:hover {
-  background-color: rgba(255, 0, 0, 0.1);
-  color: #ff0000;
-}
-
-.children-container {
-  margin-left: 8px;
-  padding-left: 16px;
-  border-left: 1px solid white;
 }
 </style>
 ```
@@ -1801,11 +1810,11 @@ const downloadJSON = () => {
 |------|------|---------|-------------|
 | `title`{.primary .text-primary} | `string` | JSON Editor |  |
 | `readonly`{.primary .text-primary} | `boolean` | false |  |
+| `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
-  ### Slots
-| Name | Description |
-|------|-------------|
-| `default`{.primary .text-primary} | — |
+  ### Child Components
+
+  `ObjectComposerItem`{.primary .text-primary}
 
 ---
 
@@ -1857,6 +1866,9 @@ const downloadJSON = () => {
 | `value`{.primary .text-primary} | `any` | - |  |
 | `depth`{.primary .text-primary} | `number` | 0 |  |
 | `path`{.primary .text-primary} | `string[]` |  |  |
+| `isInArray`{.primary .text-primary} | `boolean` | false |  |
+| `editingPath`{.primary .text-primary} | `string[] \| null` |  |  |
+| `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
   ### Slots
 | Name | Description |
@@ -1867,7 +1879,19 @@ const downloadJSON = () => {
 
   `Button`{.primary .text-primary}
 
+  `Trash`{.primary .text-primary}
+
   `Input`{.primary .text-primary}
+
+  `Accordion`{.primary .text-primary}
+
+  `AccordionItem`{.primary .text-primary}
+
+  `AccordionTrigger`{.primary .text-primary}
+
+  `ChevronRight`{.primary .text-primary}
+
+  `AccordionContent`{.primary .text-primary}
 
   `ObjectComposerItem`{.primary .text-primary}
 

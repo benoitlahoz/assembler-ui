@@ -2,7 +2,3 @@
 @import '@nuxt/ui';
 @iport 'tw-animate-css';
 @import './globals.css';
-
-.primary {
-  @apply bg-primary/10;
-}
