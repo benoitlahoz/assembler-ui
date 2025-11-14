@@ -1,22 +1,22 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { useRegistry } from '../useRegistry';
+import { useCheckIn } from '../useCheckIn';
 import AccordionItem from './AccordionItem.vue';
-import { AccordionRegistryKey } from './registry-keys';
+import { AccordionDesk } from './desk-keys';
 
 // ==========================================
-// Accordion Registry Setup
+// Accordion Check-In Setup
 // ==========================================
 
 // ==========================================
 // Parent: Accordion Container
 // ==========================================
-const { provider } = useRegistry();
+const { openDesk } = useCheckIn();
 
 const openItems = ref<Set<string | number>>(new Set());
 const allowMultiple = ref(false);
 
-const context = provider(AccordionRegistryKey, {
+const desk = openDesk(AccordionDesk, {
   extraContext: {
     openItems,
     toggle: (id: string | number) => {
@@ -33,7 +33,7 @@ const context = provider(AccordionRegistryKey, {
     },
     isOpen: (id: string | number) => openItems.value.has(id),
   },
-  onRegister: (id, data) => {
+  onCheckIn: (id, data) => {
     if (data.open) {
       if (!allowMultiple.value) {
         openItems.value.clear();
@@ -44,14 +44,14 @@ const context = provider(AccordionRegistryKey, {
   },
 });
 
-const itemCount = computed(() => context.getAll().length);
+const itemCount = computed(() => desk.getAll().length);
 </script>
 
 <template>
   <div class="w-full max-w-2xl mx-auto space-y-6 p-6">
     <div class="space-y-2">
-      <h2 class="text-2xl font-bold">useRegistry - Accordion Demo</h2>
-      <p class="text-muted-foreground">Collapsible sections with registry-based state management</p>
+      <h2 class="text-2xl font-bold">useCheckIn - Accordion Demo</h2>
+      <p class="text-muted-foreground">Collapsible sections with check-in desk state management</p>
     </div>
 
     <!-- Controls -->
@@ -65,19 +65,19 @@ const itemCount = computed(() => context.getAll().length);
 
     <!-- Accordion Items -->
     <div class="border border-border rounded-lg divide-y divide-border">
-      <AccordionItem id="item1" title="What is useRegistry?" :open="true">
+      <AccordionItem id="item1" title="What is useCheckIn?" :open="true">
         <p class="text-muted-foreground">
-          <strong>useRegistry</strong> is a generic composable for managing parent-child component
-          relationships using Vue's provide/inject pattern. It creates a centralized registry where
-          child components can auto-register themselves.
+          <strong>useCheckIn</strong> is a generic composable for managing parent-child component
+          relationships using Vue's provide/inject pattern. Parent components open a "check-in desk"
+          where children check in with their data, like passengers at an airport.
         </p>
       </AccordionItem>
 
       <AccordionItem id="item2" title="How does it work?">
         <ul class="space-y-2 text-muted-foreground list-disc list-inside">
-          <li>Parent component creates a registry context using <code>provider()</code></li>
-          <li>Child components subscribe using <code>consumer()</code> with auto-registration</li>
-          <li>Registry maintains a reactive Map of all registered items</li>
+          <li>Parent component opens a check-in desk using <code>openDesk()</code></li>
+          <li>Child components check in using <code>checkIn()</code> with auto-registration</li>
+          <li>Desk maintains a reactive Map of all checked-in items</li>
           <li>Changes propagate automatically through Vue's reactivity system</li>
         </ul>
       </AccordionItem>
@@ -119,7 +119,7 @@ const itemCount = computed(() => context.getAll().length);
         <p>
           <strong>All Items:</strong>
           {{
-            context
+            desk
               .getAll()
               .map((i) => `${i.id}: "${i.data.title}"`)
               .join(', ')

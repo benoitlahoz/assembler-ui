@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useRegistry } from '../useRegistry';
-import { AccordionRegistryKey } from './registry-keys';
+import { useCheckIn } from '../useCheckIn';
+import { AccordionDesk } from './desk-keys';
 
 const props = withDefaults(
   defineProps<{
@@ -14,11 +14,11 @@ const props = withDefaults(
   }
 );
 
-const { consumer } = useRegistry();
+const { checkIn } = useCheckIn();
 
-const { context: accordionContext } = consumer(AccordionRegistryKey, {
+const { desk: accordionDesk } = checkIn(AccordionDesk, {
   required: true,
-  autoRegister: true,
+  autoCheckIn: true,
   id: props.id,
   data: () => ({
     title: props.title,
@@ -27,10 +27,10 @@ const { context: accordionContext } = consumer(AccordionRegistryKey, {
   watchData: true,
 });
 
-const isOpen = computed(() => (accordionContext as any)?.isOpen(props.id) || false);
+const isOpen = computed(() => (accordionDesk as any)?.isOpen(props.id) || false);
 
 const toggle = () => {
-  (accordionContext as any)?.toggle(props.id);
+  (accordionDesk as any)?.toggle(props.id);
 };
 </script>
 

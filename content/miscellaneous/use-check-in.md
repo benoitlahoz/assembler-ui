@@ -1,9 +1,9 @@
 ---
-title: useRegistry
-description: Generic registry system for provider/consumer pattern in Vue components.
+title: useCheckIn
+description: Generic check-in system for parent/child component registration pattern.
 ---
 
-  <p class="text-pretty mt-4">Allows parent components to provide a registry context that child components<br>can subscribe to for centralized state management.</p>
+  <p class="text-pretty mt-4">Like an airport check-in desk: parent components provide a check-in counter<br>where child components register themselves with their data.</p>
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
@@ -14,16 +14,16 @@ description: Generic registry system for provider/consumer pattern in Vue compon
 ```vue
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { useRegistry } from "../useRegistry";
+import { useCheckIn } from "../useCheckIn";
 import AccordionItem from "./AccordionItem.vue";
-import { AccordionRegistryKey } from "./registry-keys";
+import { AccordionDesk } from "./desk-keys";
 
-const { provider } = useRegistry();
+const { openDesk } = useCheckIn();
 
 const openItems = ref<Set<string | number>>(new Set());
 const allowMultiple = ref(false);
 
-const context = provider(AccordionRegistryKey, {
+const desk = openDesk(AccordionDesk, {
   extraContext: {
     openItems,
     toggle: (id: string | number) => {
@@ -40,7 +40,7 @@ const context = provider(AccordionRegistryKey, {
     },
     isOpen: (id: string | number) => openItems.value.has(id),
   },
-  onRegister: (id, data) => {
+  onCheckIn: (id, data) => {
     if (data.open) {
       if (!allowMultiple.value) {
         openItems.value.clear();
@@ -51,15 +51,15 @@ const context = provider(AccordionRegistryKey, {
   },
 });
 
-const itemCount = computed(() => context.getAll().length);
+const itemCount = computed(() => desk.getAll().length);
 </script>
 
 <template>
   <div class="w-full max-w-2xl mx-auto space-y-6 p-6">
     <div class="space-y-2">
-      <h2 class="text-2xl font-bold">useRegistry - Accordion Demo</h2>
+      <h2 class="text-2xl font-bold">useCheckIn - Accordion Demo</h2>
       <p class="text-muted-foreground">
-        Collapsible sections with registry-based state management
+        Collapsible sections with check-in desk state management
       </p>
     </div>
 
@@ -74,26 +74,25 @@ const itemCount = computed(() => context.getAll().length);
     </div>
 
     <div class="border border-border rounded-lg divide-y divide-border">
-      <AccordionItem id="item1" title="What is useRegistry?" :open="true">
+      <AccordionItem id="item1" title="What is useCheckIn?" :open="true">
         <p class="text-muted-foreground">
-          <strong>useRegistry</strong> is a generic composable for managing
+          <strong>useCheckIn</strong> is a generic composable for managing
           parent-child component relationships using Vue's provide/inject
-          pattern. It creates a centralized registry where child components can
-          auto-register themselves.
+          pattern. Parent components open a "check-in desk" where children check
+          in with their data, like passengers at an airport.
         </p>
       </AccordionItem>
 
       <AccordionItem id="item2" title="How does it work?">
         <ul class="space-y-2 text-muted-foreground list-disc list-inside">
           <li>
-            Parent component creates a registry context using
-            <code>provider()</code>
+            Parent component opens a check-in desk using <code>openDesk()</code>
           </li>
           <li>
-            Child components subscribe using <code>consumer()</code> with
+            Child components check in using <code>checkIn()</code> with
             auto-registration
           </li>
-          <li>Registry maintains a reactive Map of all registered items</li>
+          <li>Desk maintains a reactive Map of all checked-in items</li>
           <li>
             Changes propagate automatically through Vue's reactivity system
           </li>
@@ -139,7 +138,7 @@ const itemCount = computed(() => context.getAll().length);
         <p>
           <strong>All Items:</strong>
           {{
-            context
+            desk
               .getAll()
               .map((i) => `${i.id}: "${i.data.title}"`)
               .join(", ")
@@ -157,23 +156,23 @@ const itemCount = computed(() => context.getAll().length);
 ::hr-underline
 ::
 
-This will install the composable in the path defined by your `components.json` file, thanks to shadcn-vue.
+This will install the component in the path defined by your `components.json` file, thanks to shadcn-vue.
 
 :::code-group{.w-full}
 ```bash [yarn]
-  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-registry.json"
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-check-in.json"
   ```
 
 ```bash [npm]
-  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-registry.json"
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-check-in.json"
   ```
 
 ```bash [pnpm]
-  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-registry.json"
+  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-check-in.json"
   ```
 
 ```bash [bun]
-  bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-registry.json"
+  bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-check-in.json"
   ```
 :::
 
@@ -183,9 +182,9 @@ This will install the composable in the path defined by your `components.json` f
 
 Copy and paste these files into your project.
 
-:::code-tree{default-value="src/composables/use-registry/useRegistry.ts"}
+:::code-tree{default-value="src/components/ui/use-check-in/useCheckIn.ts"}
 
-```ts [src/composables/use-registry/useRegistry.ts]
+```ts [src/components/ui/use-check-in/useCheckIn.ts]
 import {
   ref,
   provide,
@@ -197,34 +196,34 @@ import {
   type Ref,
 } from "vue";
 
-export interface RegistryItem<T = any> {
+export interface CheckInItem<T = any> {
   id: string | number;
   data: T;
 }
 
-export interface RegistryContext<T = any> {
-  registry: Ref<Map<string | number, RegistryItem<T>>>;
-  register: (id: string | number, data: T) => void;
-  unregister: (id: string | number) => void;
-  get: (id: string | number) => RegistryItem<T> | undefined;
-  getAll: () => RegistryItem<T>[];
+export interface CheckInDesk<T = any> {
+  registry: Ref<Map<string | number, CheckInItem<T>>>;
+  checkIn: (id: string | number, data: T) => void;
+  checkOut: (id: string | number) => void;
+  get: (id: string | number) => CheckInItem<T> | undefined;
+  getAll: () => CheckInItem<T>[];
   update: (id: string | number, data: Partial<T>) => void;
   has: (id: string | number) => boolean;
   clear: () => void;
 }
 
-export interface RegistryProviderOptions<T = any> {
+export interface CheckInDeskOptions<T = any> {
   extraContext?: Record<string, any>;
 
-  onRegister?: (id: string | number, data: T) => void;
+  onCheckIn?: (id: string | number, data: T) => void;
 
-  onUnregister?: (id: string | number) => void;
+  onCheckOut?: (id: string | number) => void;
 }
 
-export interface RegistryConsumerOptions<T = any> {
+export interface CheckInOptions<T = any> {
   required?: boolean;
 
-  autoRegister?: boolean;
+  autoCheckIn?: boolean;
 
   id?: string | number;
 
@@ -235,32 +234,32 @@ export interface RegistryConsumerOptions<T = any> {
   watchData?: boolean;
 }
 
-export const useRegistry = () => {
-  const createKey = <T = any,>(
+export const useCheckIn = () => {
+  const createDesk = <T = any,>(
     namespace: string,
-  ): InjectionKey<RegistryContext<T>> => {
-    return Symbol(`Registry:${namespace}`) as InjectionKey<RegistryContext<T>>;
+  ): InjectionKey<CheckInDesk<T>> => {
+    return Symbol(`CheckInDesk:${namespace}`) as InjectionKey<CheckInDesk<T>>;
   };
 
-  const createRegistryContext = <T = any,>(
-    options?: RegistryProviderOptions<T>,
-  ): RegistryContext<T> => {
-    const registry = ref<Map<string | number, RegistryItem<T>>>(
+  const createDeskContext = <T = any,>(
+    options?: CheckInDeskOptions<T>,
+  ): CheckInDesk<T> => {
+    const registry = ref<Map<string | number, CheckInItem<T>>>(
       new Map(),
-    ) as Ref<Map<string | number, RegistryItem<T>>>;
+    ) as Ref<Map<string | number, CheckInItem<T>>>;
 
-    const register = (id: string | number, data: T) => {
+    const checkIn = (id: string | number, data: T) => {
       registry.value.set(id, { id, data: data as any });
       registry.value = new Map(registry.value);
-      options?.onRegister?.(id, data);
+      options?.onCheckIn?.(id, data);
     };
 
-    const unregister = (id: string | number) => {
+    const checkOut = (id: string | number) => {
       const existed = registry.value.has(id);
       registry.value.delete(id);
       registry.value = new Map(registry.value);
       if (existed) {
-        options?.onUnregister?.(id);
+        options?.onCheckOut?.(id);
       }
     };
 
@@ -275,7 +274,7 @@ export const useRegistry = () => {
         typeof existing.data === "object" &&
         typeof data === "object"
       ) {
-        register(id, { ...existing.data, ...data } as T);
+        checkIn(id, { ...existing.data, ...data } as T);
       }
     };
 
@@ -286,40 +285,40 @@ export const useRegistry = () => {
       registry.value = new Map();
     };
 
-    return { registry, register, unregister, get, getAll, update, has, clear };
+    return { registry, checkIn, checkOut, get, getAll, update, has, clear };
   };
 
-  const provider = <T = any,>(
-    key: InjectionKey<RegistryContext<T>>,
-    options?: RegistryProviderOptions<T>,
+  const openDesk = <T = any,>(
+    key: InjectionKey<CheckInDesk<T>>,
+    options?: CheckInDeskOptions<T>,
   ) => {
-    const registryContext = createRegistryContext<T>(options);
+    const deskContext = createDeskContext<T>(options);
 
     const fullContext = {
-      ...registryContext,
+      ...deskContext,
       ...(options?.extraContext || {}),
     } as any;
 
     provide(key, fullContext);
 
-    return fullContext as RegistryContext<T> & Record<string, any>;
+    return fullContext as CheckInDesk<T> & Record<string, any>;
   };
 
-  const consumer = <T = any,>(
-    key: InjectionKey<RegistryContext<T>>,
-    options?: RegistryConsumerOptions<T>,
+  const checkIn = <T = any,>(
+    key: InjectionKey<CheckInDesk<T>>,
+    options?: CheckInOptions<T>,
   ) => {
-    const context = inject(key, options?.required ? undefined : null);
+    const desk = inject(key, options?.required ? undefined : null);
 
-    if (options?.required && !context) {
+    if (options?.required && !desk) {
       const keyName = key.description || String(key);
       throw new Error(
-        `[useRegistry] Context not found for key: ${keyName}. ` +
-          `Make sure a provider is wrapping this component.`,
+        `[useCheckIn] Check-in desk not found for key: ${keyName}. ` +
+          `Make sure a desk is open (parent provides context).`,
       );
     }
 
-    if (options?.autoRegister && context) {
+    if (options?.autoCheckIn && desk) {
       const itemId = ref<string | number | undefined>(options.id);
 
       if (!itemId.value && options.generateId) {
@@ -328,7 +327,7 @@ export const useRegistry = () => {
 
       if (!itemId.value) {
         throw new Error(
-          '[useRegistry] Auto-registration requires an "id" or "generateId" option',
+          '[useCheckIn] Auto check-in requires an "id" or "generateId" option',
         );
       }
 
@@ -340,7 +339,7 @@ export const useRegistry = () => {
 
       onMounted(() => {
         if (itemId.value) {
-          context.register(itemId.value, getData());
+          desk.checkIn(itemId.value, getData());
         }
       });
 
@@ -349,7 +348,7 @@ export const useRegistry = () => {
           () => getData(),
           (newData) => {
             if (itemId.value && newData) {
-              context.update(itemId.value, newData);
+              desk.update(itemId.value, newData);
             }
           },
           { deep: true },
@@ -358,64 +357,50 @@ export const useRegistry = () => {
 
       onBeforeUnmount(() => {
         if (itemId.value) {
-          context.unregister(itemId.value);
+          desk.checkOut(itemId.value);
         }
       });
 
       return {
-        context,
+        desk,
         itemId,
         updateSelf: (data: Partial<T>) => {
           if (itemId.value) {
-            context.update(itemId.value, data);
+            desk.update(itemId.value, data);
           }
         },
       };
     }
 
-    return { context, itemId: ref(undefined), updateSelf: () => {} };
+    return { desk, itemId: ref(undefined), updateSelf: () => {} };
   };
 
-  const generateId = (prefix = "item"): string => {
+  const generateId = (prefix = "passenger"): string => {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   };
 
-  const local = <T = any,>(options?: RegistryProviderOptions<T>) => {
-    return createRegistryContext<T>(options);
+  const standaloneDesk = <T = any,>(options?: CheckInDeskOptions<T>) => {
+    return createDeskContext<T>(options);
   };
 
   return {
-    createKey,
-    provider,
-    consumer,
+    createDesk,
+    openDesk,
+    checkIn,
     generateId,
-    local,
+    standaloneDesk,
   };
 };
 ```
 :::
 
-## API
+## useCheckIn
 ::hr-underline
 ::
 
-  ### Returns
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `createKey`{.primary .text-primary} | `any` | — |
-| `provider`{.primary .text-primary} | `any` | — |
-| `consumer`{.primary .text-primary} | `any` | — |
-| `generateId`{.primary .text-primary} | `any` | — |
-| `local`{.primary .text-primary} | `any` | — |
-
-  ### Types
-| Name | Type | Description |
-|------|------|-------------|
-| `RegistryItem`{.primary .text-primary} | `interface` | — |
-| `RegistryContext`{.primary .text-primary} | `interface` | — |
-| `RegistryProviderOptions`{.primary .text-primary} | `interface` | — |
-| `RegistryConsumerOptions`{.primary .text-primary} | `interface` | — |
+Generic check-in system for parent/child component registration pattern.
+Like an airport check-in desk: parent components provide a check-in counter
+where child components register themselves with their data.
 
 ---
 
@@ -432,49 +417,49 @@ export const useRegistry = () => {
 ```vue
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { useRegistry } from "../useRegistry";
+import { useCheckIn } from "../useCheckIn";
 import TabPanel from "./TabPanel.vue";
-import { TabsRegistryKey } from "./registry-keys";
+import { TabsDesk } from "./desk-keys";
 
-const { provider } = useRegistry();
+const { openDesk } = useCheckIn();
 
 const activeTab = ref<string>("tab1");
 const tabCount = ref(0);
 
-const context = provider(TabsRegistryKey, {
+const desk = openDesk(TabsDesk, {
   extraContext: {
     activeTab,
     setActive: (id: string) => {
-      const tab = context.get(id as string);
+      const tab = desk.get(id as string);
       if (tab && !tab.data.disabled) {
         activeTab.value = id as string;
       }
     },
   },
-  onRegister: (id, data) => {
-    console.log("Tab registered:", id, data);
+  onCheckIn: (id, data) => {
+    console.log("Tab checked in:", id, data);
     tabCount.value++;
 
     if (tabCount.value === 1) {
       activeTab.value = id as string;
     }
   },
-  onUnregister: (id) => {
-    console.log("Tab unregistered:", id);
+  onCheckOut: (id) => {
+    console.log("Tab checked out:", id);
     tabCount.value--;
   },
 });
 
-const allTabs = computed(() => context.getAll());
-const activeTabData = computed(() => context.get(activeTab.value));
+const allTabs = computed(() => desk.getAll());
+const activeTabData = computed(() => desk.get(activeTab.value));
 </script>
 
 <template>
   <div class="w-full max-w-2xl mx-auto space-y-6 p-6">
     <div class="space-y-2">
-      <h2 class="text-2xl font-bold">useRegistry - Tabs Demo</h2>
+      <h2 class="text-2xl font-bold">useCheckIn - Tabs Demo</h2>
       <p class="text-muted-foreground">
-        Example of a tabs system using the generic registry pattern
+        Example of a tabs system using the generic check-in pattern
       </p>
     </div>
 
@@ -491,7 +476,7 @@ const activeTabData = computed(() => context.get(activeTab.value));
             tab.data.disabled && 'opacity-50 cursor-not-allowed',
           ]"
           :disabled="tab.data.disabled"
-          @click="context.setActive(tab.id as string)"
+          @click="desk.setActive(tab.id as string)"
         >
           <span v-if="tab.data.icon" class="mr-2">{{ tab.data.icon }}</span>
           {{ tab.data.label }}
@@ -594,17 +579,17 @@ const activeTabData = computed(() => context.get(activeTab.value));
 ```vue
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { useRegistry } from "../useRegistry";
+import { useCheckIn } from "../useCheckIn";
 import ToolbarButton from "./ToolbarButton.vue";
 import ToolbarSeparator from "./ToolbarSeparator.vue";
-import { ToolbarRegistryKey } from "./registry-keys";
+import { ToolbarDesk } from "./desk-keys";
 
-const { provider } = useRegistry();
+const { openDesk } = useCheckIn();
 
 const activeTool = ref<string | number | null>(null);
 const clickHistory = ref<Array<{ id: string | number; time: number }>>([]);
 
-const context = provider(ToolbarRegistryKey, {
+const desk = openDesk(ToolbarDesk, {
   extraContext: {
     activeTool,
     handleClick: (id: string | number, type: "button" | "toggle") => {
@@ -618,19 +603,19 @@ const context = provider(ToolbarRegistryKey, {
     },
     isActive: (id: string | number) => activeTool.value === id,
   },
-  onRegister: (id, data) => {
-    console.log("Tool registered:", id, data);
+  onCheckIn: (id, data) => {
+    console.log("Tool checked in:", id, data);
   },
 });
 
 const allTools = computed(() =>
-  context.getAll().sort((a, b) => String(a.id).localeCompare(String(b.id))),
+  desk.getAll().sort((a, b) => String(a.id).localeCompare(String(b.id))),
 );
 
 const lastAction = computed(() => {
   const last = clickHistory.value[clickHistory.value.length - 1];
   if (!last) return "None";
-  const tool = context.get(last.id);
+  const tool = desk.get(last.id);
   return `${tool?.data.label || last.id} at ${new Date(last.time).toLocaleTimeString()}`;
 });
 </script>
@@ -638,10 +623,10 @@ const lastAction = computed(() => {
 <template>
   <div class="w-full max-w-4xl mx-auto space-y-6 p-6">
     <div class="space-y-2">
-      <h2 class="text-2xl font-bold">useRegistry - Toolbar Demo</h2>
+      <h2 class="text-2xl font-bold">useCheckIn - Toolbar Demo</h2>
       <p class="text-muted-foreground">
         Dynamic toolbar with buttons, toggles, and separators managed by
-        registry
+        check-in desk
       </p>
     </div>
 
@@ -729,5 +714,5 @@ const lastAction = computed(() => {
 ::
 
 ::tip
-You can copy and adapt this template for any composable documentation.
+You can copy and adapt this template for any component documentation.
 ::

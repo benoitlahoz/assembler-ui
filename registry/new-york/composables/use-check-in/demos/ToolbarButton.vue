@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useRegistry } from '../useRegistry';
-import { ToolbarRegistryKey } from './registry-keys';
+import { useCheckIn } from '../useCheckIn';
+import { ToolbarDesk } from './desk-keys';
 
 const props = withDefaults(
   defineProps<{
@@ -16,11 +16,11 @@ const props = withDefaults(
   }
 );
 
-const { consumer } = useRegistry();
+const { checkIn } = useCheckIn();
 
-const { context: toolbarContext } = consumer(ToolbarRegistryKey, {
+const { desk: toolbarDesk } = checkIn(ToolbarDesk, {
   required: true,
-  autoRegister: true,
+  autoCheckIn: true,
   id: props.id,
   data: () => ({
     label: props.label,
@@ -33,12 +33,12 @@ const { context: toolbarContext } = consumer(ToolbarRegistryKey, {
 
 const isActive = computed(() => {
   if (props.type !== 'toggle') return false;
-  return (toolbarContext as any)?.isActive(props.id) || false;
+  return (toolbarDesk as any)?.isActive(props.id) || false;
 });
 
 const handleClick = () => {
-  if (!props.disabled && toolbarContext) {
-    (toolbarContext as any).handleClick(props.id, props.type);
+  if (!props.disabled && toolbarDesk) {
+    (toolbarDesk as any).handleClick(props.id, props.type);
   }
 };
 </script>

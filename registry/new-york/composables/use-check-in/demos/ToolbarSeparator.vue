@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { useRegistry } from '../useRegistry';
-import { ToolbarRegistryKey } from './registry-keys';
+import { useCheckIn } from '../useCheckIn';
+import { ToolbarDesk } from './desk-keys';
 
 const props = defineProps<{
   id: string;
 }>();
 
-const { consumer } = useRegistry();
+const { checkIn } = useCheckIn();
 
-consumer(ToolbarRegistryKey, {
+checkIn(ToolbarDesk, {
   required: true,
-  autoRegister: true,
+  autoCheckIn: true,
   id: props.id,
   data: () => ({
     label: 'Separator',

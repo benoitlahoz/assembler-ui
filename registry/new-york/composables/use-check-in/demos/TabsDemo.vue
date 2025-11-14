@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { useRegistry } from '../useRegistry';
+import { useCheckIn } from '../useCheckIn';
 import TabPanel from './TabPanel.vue';
-import { TabsRegistryKey } from './registry-keys';
+import { TabsDesk } from './desk-keys';
 
 // ==========================================
 // Tabs Demo Setup
@@ -11,45 +11,45 @@ import { TabsRegistryKey } from './registry-keys';
 // ==========================================
 // 3. Parent Component Logic
 // ==========================================
-const { provider } = useRegistry();
+const { openDesk } = useCheckIn();
 
 const activeTab = ref<string>('tab1');
 const tabCount = ref(0);
 
-const context = provider(TabsRegistryKey, {
+const desk = openDesk(TabsDesk, {
   extraContext: {
     activeTab,
     setActive: (id: string) => {
-      const tab = context.get(id as string);
+      const tab = desk.get(id as string);
       if (tab && !tab.data.disabled) {
         activeTab.value = id as string;
       }
     },
   },
-  onRegister: (id, data) => {
-    console.log('Tab registered:', id, data);
+  onCheckIn: (id, data) => {
+    console.log('Tab checked in:', id, data);
     tabCount.value++;
     // Set first tab as active
     if (tabCount.value === 1) {
       activeTab.value = id as string;
     }
   },
-  onUnregister: (id) => {
-    console.log('Tab unregistered:', id);
+  onCheckOut: (id) => {
+    console.log('Tab checked out:', id);
     tabCount.value--;
   },
 });
 
-const allTabs = computed(() => context.getAll());
-const activeTabData = computed(() => context.get(activeTab.value));
+const allTabs = computed(() => desk.getAll());
+const activeTabData = computed(() => desk.get(activeTab.value));
 </script>
 
 <template>
   <div class="w-full max-w-2xl mx-auto space-y-6 p-6">
     <div class="space-y-2">
-      <h2 class="text-2xl font-bold">useRegistry - Tabs Demo</h2>
+      <h2 class="text-2xl font-bold">useCheckIn - Tabs Demo</h2>
       <p class="text-muted-foreground">
-        Example of a tabs system using the generic registry pattern
+        Example of a tabs system using the generic check-in pattern
       </p>
     </div>
 
@@ -67,7 +67,7 @@ const activeTabData = computed(() => context.get(activeTab.value));
             tab.data.disabled && 'opacity-50 cursor-not-allowed',
           ]"
           :disabled="tab.data.disabled"
-          @click="context.setActive(tab.id as string)"
+          @click="desk.setActive(tab.id as string)"
         >
           <span v-if="tab.data.icon" class="mr-2">{{ tab.data.icon }}</span>
           {{ tab.data.label }}

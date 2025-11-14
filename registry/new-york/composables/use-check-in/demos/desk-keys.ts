@@ -1,9 +1,9 @@
 /**
- * Shared registry keys for demos
+ * Shared check-in desk keys for demos
  */
-import { useRegistry, type InjectionKey, type RegistryContext } from '../useRegistry';
+import { useCheckIn } from '../useCheckIn';
 
-const registry = useRegistry();
+const checkIn = useCheckIn();
 
 // ==========================================
 // Accordion Demo
@@ -13,7 +13,7 @@ export interface AccordionItemData {
   open?: boolean;
 }
 
-export const AccordionRegistryKey = registry.createKey<AccordionItemData>('AccordionDemo');
+export const AccordionDesk = checkIn.createDesk<AccordionItemData>('AccordionDemo');
 
 // ==========================================
 // Tabs Demo
@@ -24,7 +24,7 @@ export interface TabItemData {
   icon?: string;
 }
 
-export const TabsRegistryKey = registry.createKey<TabItemData>('TabsDemo');
+export const TabsDesk = checkIn.createDesk<TabItemData>('TabsDemo');
 
 // ==========================================
 // Toolbar Demo
@@ -37,4 +37,4 @@ export interface ToolItemData {
   disabled?: boolean;
 }
 
-export const ToolbarRegistryKey = registry.createKey<ToolItemData>('ToolbarDemo');
+export const ToolbarDesk = checkIn.createDesk<ToolItemData>('ToolbarDemo');

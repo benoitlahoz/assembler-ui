@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useRegistry } from '../useRegistry';
-import { TabsRegistryKey } from './registry-keys';
+import { useCheckIn } from '../useCheckIn';
+import { TabsDesk } from './desk-keys';
 
 const props = withDefaults(
   defineProps<{
@@ -15,11 +15,11 @@ const props = withDefaults(
   }
 );
 
-const { consumer } = useRegistry();
+const { checkIn } = useCheckIn();
 
-const { context: tabContext } = consumer(TabsRegistryKey, {
+const { desk: tabDesk } = checkIn(TabsDesk, {
   required: true,
-  autoRegister: true,
+  autoCheckIn: true,
   id: props.id,
   data: () => ({
     label: props.label,
@@ -29,7 +29,7 @@ const { context: tabContext } = consumer(TabsRegistryKey, {
   watchData: true,
 });
 
-const isActive = computed(() => (tabContext as any)?.activeTab.value === props.id);
+const isActive = computed(() => (tabDesk as any)?.activeTab.value === props.id);
 </script>
 
 <template>
