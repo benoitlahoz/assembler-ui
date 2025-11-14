@@ -72,62 +72,6 @@ const readonlyData = ref({
           </ObjectComposerDescription>
         </ObjectComposerHeader>
         <Separator class="my-4" />
-        <ObjectComposerItem
-          v-for="(value, key) in userData"
-          :key="key"
-          :itemKey="key"
-          :value="value"
-        />
-      </ObjectComposer>
-    </div>
-
-    <div class="demo-section">
-      <h2 class="demo-title">Rendu Personnalisé</h2>
-      <p class="demo-description">
-        Utilisez un slot pour personnaliser l'affichage de chaque élément.
-        L'arborescence fonctionne automatiquement.
-      </p>
-      <ObjectComposer v-model="userData" title="Données Utilisateur">
-        <ObjectComposerHeader>
-          <ObjectComposerTitle>User Data (Custom)</ObjectComposerTitle>
-          <ObjectComposerDescription>
-            Custom rendering with slot - tree navigation still works!
-          </ObjectComposerDescription>
-        </ObjectComposerHeader>
-        <Separator class="my-4" />
-        <ObjectComposerItem
-          v-for="(value, key) in userData"
-          :key="key"
-          :itemKey="key"
-          :value="value"
-        >
-          <template
-            #default="{ itemKey, value, valueType, displayValue, isExpandable }"
-          >
-            <div class="custom-item">
-              <span class="custom-key">{{ itemKey }}</span>
-              <span class="custom-separator">→</span>
-              <span class="custom-value" :class="`custom-type-${valueType}`">
-                {{ isExpandable ? `${displayValue} items` : displayValue }}
-              </span>
-              <span v-if="valueType === 'string'" class="custom-badge"
-                >text</span
-              >
-              <span v-else-if="valueType === 'number'" class="custom-badge"
-                >num</span
-              >
-              <span v-else-if="valueType === 'boolean'" class="custom-badge"
-                >bool</span
-              >
-              <span v-else-if="valueType === 'array'" class="custom-badge"
-                >array</span
-              >
-              <span v-else-if="valueType === 'object'" class="custom-badge"
-                >object</span
-              >
-            </div>
-          </template>
-        </ObjectComposerItem>
       </ObjectComposer>
     </div>
 
@@ -141,14 +85,7 @@ const readonlyData = ref({
         v-model="readonlyData"
         title="Configuration Système"
         :readonly="true"
-      >
-        <ObjectComposerItem
-          v-for="(value, key) in readonlyData"
-          :key="key"
-          :itemKey="key"
-          :value="value"
-        />
-      </ObjectComposer>
+      />
     </div>
 
     <div class="demo-section">
@@ -447,6 +384,7 @@ const downloadJSON = () => {
     data-slot="object-composer"
     :class="cn('flex flex-col text-sm', props.class)"
   >
+    <slot />
     <ObjectComposerItem
       v-for="[key, val] in rootEntries"
       :key="key"
@@ -816,7 +754,7 @@ function handleChildCancelEdit() {
     v-model="accordionValue"
     type="single"
     collapsible
-    :class="cn(!isEditing && 'border-l border-border relative')"
+    :class="cn(!isEditing)"
   >
     <AccordionItem value="item-1" class="border-b-0">
       <div
@@ -948,7 +886,6 @@ function handleChildCancelEdit() {
       <div
         v-if="!isInArray && isEditing"
         class="flex items-center gap-2 p-3 rounded-md border bg-background w-full"
-        :style="{ marginLeft: `-${2 + depth * 1}rem` }"
       >
         <Input
           v-model="editKey"
@@ -1811,6 +1748,11 @@ const downloadJSON = () => {
 | `title`{.primary .text-primary} | `string` | JSON Editor |  |
 | `readonly`{.primary .text-primary} | `boolean` | false |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
+
+  ### Slots
+| Name | Description |
+|------|-------------|
+| `default`{.primary .text-primary} | — |
 
   ### Child Components
 

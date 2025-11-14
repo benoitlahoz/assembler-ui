@@ -130,6 +130,7 @@ const downloadJSON = () => {
 
 <template>
   <div data-slot="object-composer" :class="cn('flex flex-col text-sm', props.class)">
+    <slot />
     <ObjectComposerItem
       v-for="[key, val] in rootEntries"
       :key="key"
