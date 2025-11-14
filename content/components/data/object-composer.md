@@ -490,6 +490,7 @@ interface ObjectComposerItemProps {
   value: any;
   depth?: number;
   path?: string[];
+  isInArray?: boolean;
   class?: HTMLAttributes["class"];
 }
 
@@ -507,6 +508,7 @@ interface SlotProps {
 const props = withDefaults(defineProps<ObjectComposerItemProps>(), {
   depth: 0,
   path: () => [],
+  isInArray: false,
 });
 
 const emit = defineEmits<{
@@ -711,64 +713,56 @@ function handleChildAdd(path: string[], key: string, value: any) {
       </div>
     </div>
 
-    <div v-else class="flex flex-col gap-2 w-full px-2 py-2">
-      <div class="flex items-center gap-2 w-full">
-        <Input
-          v-model="editKey"
-          class="flex-none w-32"
-          placeholder="Clé"
-          type="text"
-          @keyup.enter="saveEdit"
-          @keyup.esc="cancelEdit"
-        />
-        <span class="text-muted-foreground">:</span>
-        <Input
-          v-model="editValue"
-          class="flex-1"
-          placeholder="Valeur"
-          type="text"
-          @keyup.enter="saveEdit"
-          @keyup.esc="cancelEdit"
-        />
-      </div>
-      <div class="flex items-center justify-end gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          title="Sauvegarder"
-          @click="saveEdit"
+    <div v-else class="flex items-center gap-2 w-full px-2 py-2">
+      <Input
+        v-model="editKey"
+        :readonly="isInArray"
+        class="flex-none w-32"
+        placeholder="Clé"
+        type="text"
+        @keyup.enter="saveEdit"
+        @keyup.esc="cancelEdit"
+      />
+      <span class="text-muted-foreground">:</span>
+      <Input
+        v-model="editValue"
+        class="flex-1"
+        placeholder="Valeur"
+        type="text"
+        @keyup.enter="saveEdit"
+        @keyup.esc="cancelEdit"
+      />
+      <Button variant="ghost" size="icon" title="Sauvegarder" @click="saveEdit">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </Button>
-        <Button variant="ghost" size="icon" title="Annuler" @click="cancelEdit">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </Button>
-      </div>
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      </Button>
+      <Button variant="ghost" size="icon" title="Annuler" @click="cancelEdit">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </Button>
     </div>
   </div>
 
@@ -892,70 +886,56 @@ function handleChildAdd(path: string[], key: string, value: any) {
         </div>
       </div>
 
-      <div v-else class="flex flex-col gap-2 w-full px-2 py-2 hover:bg-accent">
-        <div class="flex items-center gap-2 w-full">
-          <div class="w-8" />
-          <Input
-            v-model="editKey"
-            class="flex-none w-32"
-            placeholder="Clé"
-            type="text"
-            @keyup.enter="saveEdit"
-            @keyup.esc="cancelEdit"
-          />
-          <span class="text-muted-foreground">:</span>
-          <Input
-            v-model="editValue"
-            class="flex-1"
-            placeholder="Valeur"
-            type="text"
-            @keyup.enter="saveEdit"
-            @keyup.esc="cancelEdit"
-          />
-        </div>
-        <div class="flex items-center justify-end gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            title="Sauvegarder"
-            @click="saveEdit"
+      <div
+        v-else
+        class="flex items-center gap-2 w-full px-2 py-2 hover:bg-accent"
+      >
+        <div class="w-8" />
+        <Input
+          v-model="editKey"
+          :readonly="isInArray"
+          class="flex-1"
+          placeholder="Clé"
+          type="text"
+          @keyup.enter="saveEdit"
+          @keyup.esc="cancelEdit"
+        />
+        <Button
+          variant="ghost"
+          size="icon"
+          title="Sauvegarder"
+          @click="saveEdit"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            title="Annuler"
-            @click="cancelEdit"
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </Button>
+        <Button variant="ghost" size="icon" title="Annuler" @click="cancelEdit">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </Button>
-        </div>
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </Button>
       </div>
 
       <AccordionContent class="pb-0!">
@@ -967,6 +947,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
             :value="val"
             :depth="depth + 1"
             :path="currentPath"
+            :is-in-array="valueType === 'array'"
             @update="handleChildUpdate"
             @delete="handleChildDelete"
             @add="handleChildAdd"
@@ -1830,6 +1811,7 @@ const downloadJSON = () => {
 | `value`{.primary .text-primary} | `any` | - |  |
 | `depth`{.primary .text-primary} | `number` | 0 |  |
 | `path`{.primary .text-primary} | `string[]` |  |  |
+| `isInArray`{.primary .text-primary} | `boolean` | false |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
   ### Slots
