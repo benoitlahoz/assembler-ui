@@ -88,7 +88,7 @@ const lastAction = computed(() => {
       <div class="p-4 border border-border rounded-lg">
         <h3 class="font-semibold mb-2">Active Toggles</h3>
         <div class="text-sm text-muted-foreground">
-          {{ activeTool ? context.get(activeTool)?.data.label : 'None' }}
+          {{ activeTool ? desk.get(activeTool)?.data.label : 'None' }}
         </div>
       </div>
 
