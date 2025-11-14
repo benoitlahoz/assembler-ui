@@ -5,13 +5,12 @@ import { ObjectComposerItem } from '.';
 import { Button } from '@/components/ui/button';
 
 interface ObjectComposerProps {
-  title?: string;
+  data: Record<string, any> | any[];
   readonly?: boolean;
   class?: HTMLAttributes['class'];
 }
 
 const props = withDefaults(defineProps<ObjectComposerProps>(), {
-  title: 'JSON Editor',
   readonly: false,
 });
 
@@ -26,91 +25,10 @@ const rootEntries = computed(() => {
   }
   return Object.entries(model.value);
 });
-
-const startEdit = (path: string[]) => {
-  editingPath.value = path;
-};
-
-const cancelEdit = () => {
-  editingPath.value = null;
-};
-
-const handleUpdate = (path: string[], value: any) => {
-  const newData = JSON.parse(JSON.stringify(model.value));
-
-  // Navigate to the parent of the target
-  let current: any = newData;
-  for (let i = 0; i < path.length - 1; i++) {
-    const key = path[i];
-    current = current[key as keyof typeof current];
-  }
-
-  // Update the value
-  const lastKey = path[path.length - 1];
-  current[lastKey as keyof typeof current] = value;
-
-  model.value = newData;
-  editingPath.value = null; // Fermer l'édition après la mise à jour
-};
-
-const handleDelete = (path: string[]) => {
-  const newData = JSON.parse(JSON.stringify(model.value));
-
-  // Navigate to the parent of the target
-  let current: any = newData;
-  for (let i = 0; i < path.length - 1; i++) {
-    const key = path[i];
-    current = current[key as keyof typeof current];
-  }
-
-  // Delete the item
-  const lastKey = path[path.length - 1];
-  if (Array.isArray(current)) {
-    current.splice(Number(lastKey), 1);
-  } else {
-    delete current[lastKey as keyof typeof current];
-  }
-
-  model.value = newData;
-};
-
-const handleAdd = (path: string[], key: string, value: any) => {
-  const newData = JSON.parse(JSON.stringify(model.value));
-
-  // Navigate to the target
-  let current: any = newData;
-  for (const k of path) {
-    current = current[k];
-  }
-
-  // Add the new item
-  if (Array.isArray(current)) {
-    current.push(value);
-  } else {
-    current[key] = value;
-  }
-
-  model.value = newData;
-};
 </script>
 
 <template>
   <div data-slot="object-composer" :class="cn('flex flex-col text-sm', props.class)">
     <slot />
-    <ObjectComposerItem
-      v-for="[key, val] in rootEntries"
-      :key="key"
-      :item-key="key"
-      :value="val"
-      :depth="0"
-      :path="[]"
-      :is-in-array="Array.isArray(model)"
-      :editing-path="editingPath"
-      @update="handleUpdate"
-      @delete="handleDelete"
-      @add="handleAdd"
-      @start-edit="startEdit"
-      @cancel-edit="cancelEdit"
-    />
   </div>
 </template>
