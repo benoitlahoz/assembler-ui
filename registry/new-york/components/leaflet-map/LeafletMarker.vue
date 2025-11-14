@@ -87,25 +87,34 @@ const setupMarker = () => {
       icon: new Icon(),
     });
 
+    const onDragStart = () => {
+      if (props.selectable && selectionContext) {
+        selectionContext.selectFeature('marker', markerId.value);
+      }
+      emit('dragstart');
+    };
+
     if (isDraggable) {
       marker.value.on('drag', onDrag);
-      marker.value.on('dragstart', () => emit('dragstart'));
+      marker.value.on('dragstart', onDragStart);
       marker.value.on('dragend', onDragEnd);
     }
 
+    const onMarkerClick = () => {
+      if (props.selectable && selectionContext) {
+        selectionContext.selectFeature('marker', markerId.value);
+      }
+      emit('click');
+    };
+
     // Handle selection
     if (props.selectable && selectionContext) {
-      marker.value.on('click', () => {
-        selectionContext.selectFeature('marker', markerId.value);
-        emit('click');
-      });
-
-      marker.value.on('dragstart', () => {
-        selectionContext.selectFeature('marker', markerId.value);
-        emit('dragstart');
-      });
+      marker.value.on('click', onMarkerClick);
+      if (!isDraggable) {
+        marker.value.on('dragstart', onDragStart);
+      }
     } else {
-      marker.value.on('click', () => emit('click'));
+      marker.value.on('click', onMarkerClick);
     }
 
     marker.value.addTo(map.value);
@@ -176,19 +185,27 @@ watch(
             marker.value.off('click');
             marker.value.off('dragstart');
 
+            const onMarkerClick = () => {
+              if (props.selectable && selectionContext) {
+                selectionContext.selectFeature('marker', markerId.value);
+              }
+              emit('click');
+            };
+
+            const onDragStart = () => {
+              if (props.selectable && selectionContext) {
+                selectionContext.selectFeature('marker', markerId.value);
+              }
+              emit('dragstart');
+            };
+
             // Add new event listeners based on selectable state
             if (props.selectable && selectionContext) {
-              marker.value.on('click', () => {
-                selectionContext.selectFeature('marker', markerId.value);
-                emit('click');
-              });
-              marker.value.on('dragstart', () => {
-                selectionContext.selectFeature('marker', markerId.value);
-                emit('dragstart');
-              });
+              marker.value.on('click', onMarkerClick);
+              marker.value.on('dragstart', onDragStart);
               registerWithSelection();
             } else {
-              marker.value.on('click', () => emit('click'));
+              marker.value.on('click', onMarkerClick);
               if (selectionContext) {
                 selectionContext.unregisterFeature(markerId.value);
               }

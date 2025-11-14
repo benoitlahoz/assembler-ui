@@ -73,7 +73,7 @@ const enableEditing = () => {
       }),
     }).addTo(map.value!);
 
-    marker.on('drag', () => {
+    const onCornerDrag = () => {
       const currentBounds = rectangle.value!.getBounds();
       const newCorner = marker.getLatLng();
 
@@ -115,15 +115,18 @@ const enableEditing = () => {
           m.setLatLng(updatedCorners[i]!);
         }
       });
-    });
+    };
 
-    marker.on('dragend', () => {
+    const onCornerDragEnd = () => {
       const updatedBounds = rectangle.value!.getBounds();
       emit('update:bounds', [
         [updatedBounds.getSouth(), updatedBounds.getWest()],
         [updatedBounds.getNorth(), updatedBounds.getEast()],
       ]);
-    });
+    };
+
+    marker.on('drag', onCornerDrag);
+    marker.on('dragend', onCornerDragEnd);
 
     editMarkers.value.push(marker);
   });
@@ -132,7 +135,7 @@ const enableEditing = () => {
 const enableDragging = () => {
   if (!rectangle.value || !map.value) return;
 
-  rectangle.value.on('mousedown', (e: L.LeafletMouseEvent) => {
+  const onRectangleMouseDown = (e: L.LeafletMouseEvent) => {
     L.value!.DomEvent.stopPropagation(e);
     isDragging.value = true;
 
@@ -151,7 +154,9 @@ const enableDragging = () => {
       map.value.getContainer().style.cursor = 'move';
       map.value.dragging.disable();
     }
-  });
+  };
+
+  rectangle.value.on('mousedown', onRectangleMouseDown);
 };
 
 const disableDragging = () => {
@@ -292,21 +297,25 @@ watch(
           });
           rectangle.value.addTo(map.value);
 
+          const onRectangleClick = () => {
+            if (props.selectable && selectionContext) {
+              selectionContext.selectFeature('rectangle', rectangleId.value);
+            }
+            emit('click');
+          };
+
+          const onRectangleMouseDown = (e: any) => {
+            if (props.draggable && props.selectable && selectionContext) {
+              selectionContext.selectFeature('rectangle', rectangleId.value);
+            }
+          };
+
           // Add click event listener
           if (props.selectable && selectionContext) {
-            rectangle.value.on('click', () => {
-              selectionContext.selectFeature('rectangle', rectangleId.value);
-              emit('click');
-            });
-            rectangle.value.on('mousedown', (e: any) => {
-              if (props.draggable) {
-                selectionContext.selectFeature('rectangle', rectangleId.value);
-              }
-            });
+            rectangle.value.on('click', onRectangleClick);
+            rectangle.value.on('mousedown', onRectangleMouseDown);
           } else {
-            rectangle.value.on('click', () => {
-              emit('click');
-            });
+            rectangle.value.on('click', onRectangleClick);
           }
 
           // Register with selection context if selectable
@@ -323,22 +332,26 @@ watch(
             rectangle.value.off('click');
             rectangle.value.off('mousedown');
 
+            const onRectangleClick = () => {
+              if (props.selectable && selectionContext) {
+                selectionContext.selectFeature('rectangle', rectangleId.value);
+              }
+              emit('click');
+            };
+
+            const onRectangleMouseDown = (e: any) => {
+              if (props.draggable && props.selectable && selectionContext) {
+                selectionContext.selectFeature('rectangle', rectangleId.value);
+              }
+            };
+
             // Add new event listeners based on selectable state
             if (props.selectable && selectionContext) {
-              rectangle.value.on('click', () => {
-                selectionContext.selectFeature('rectangle', rectangleId.value);
-                emit('click');
-              });
-              rectangle.value.on('mousedown', (e: any) => {
-                if (props.draggable) {
-                  selectionContext.selectFeature('rectangle', rectangleId.value);
-                }
-              });
+              rectangle.value.on('click', onRectangleClick);
+              rectangle.value.on('mousedown', onRectangleMouseDown);
               registerWithSelection();
             } else {
-              rectangle.value.on('click', () => {
-                emit('click');
-              });
+              rectangle.value.on('click', onRectangleClick);
               if (selectionContext) {
                 selectionContext.unregisterFeature(rectangleId.value);
               }

@@ -83,22 +83,25 @@ const enableEditing = () => {
       }),
     }).addTo(map.value!);
 
-    marker.on('drag', () => {
+    const onVertexDrag = () => {
       const newLatLngs = [...latlngs];
       newLatLngs[index] = marker.getLatLng();
       polyline.value!.setLatLngs(newLatLngs);
 
       // Mettre à jour les midpoints en temps réel
       updateMidpoints(newLatLngs);
-    });
+    };
 
-    marker.on('dragend', () => {
+    const onVertexDragEnd = () => {
       const updatedLatLngs = polyline.value!.getLatLngs() as L.LatLng[];
       emit(
         'update:latlngs',
         updatedLatLngs.map((ll) => [ll.lat, ll.lng])
       );
-    });
+    };
+
+    marker.on('drag', onVertexDrag);
+    marker.on('dragend', onVertexDragEnd);
 
     editMarkers.value.push(marker);
   });
@@ -134,11 +137,11 @@ const createMidpoints = () => {
 
     let pointAdded = false;
 
-    midMarker.on('dragstart', () => {
+    const onMidpointDragStart = () => {
       if (map.value) map.value.getContainer().style.cursor = 'copy';
-    });
+    };
 
-    midMarker.on('drag', () => {
+    const onMidpointDrag = () => {
       const newPos = midMarker.getLatLng();
       const currentLatlngs = polyline.value!.getLatLngs() as L.LatLng[];
 
@@ -152,9 +155,9 @@ const createMidpoints = () => {
         newLatlngs[i + 1] = newPos;
         polyline.value!.setLatLngs(newLatlngs);
       }
-    });
+    };
 
-    midMarker.on('dragend', () => {
+    const onMidpointDragEnd = () => {
       if (map.value) map.value.getContainer().style.cursor = '';
       const updatedLatLngs = (polyline.value!.getLatLngs() as L.LatLng[]).map((ll) => [
         ll.lat,
@@ -162,17 +165,23 @@ const createMidpoints = () => {
       ]) as Array<[number, number]>;
       emit('update:latlngs', updatedLatLngs);
       enableEditing();
-    });
+    };
 
-    midMarker.on('mouseover', () => {
+    const onMidpointMouseOver = () => {
       if (map.value) map.value.getContainer().style.cursor = 'copy';
-    });
+    };
 
-    midMarker.on('mouseout', () => {
+    const onMidpointMouseOut = () => {
       if (map.value) {
         map.value.getContainer().style.cursor = '';
       }
-    });
+    };
+
+    midMarker.on('dragstart', onMidpointDragStart);
+    midMarker.on('drag', onMidpointDrag);
+    midMarker.on('dragend', onMidpointDragEnd);
+    midMarker.on('mouseover', onMidpointMouseOver);
+    midMarker.on('mouseout', onMidpointMouseOut);
 
     midpointMarkers.value.push(midMarker);
   }
@@ -194,7 +203,7 @@ const updateMidpoints = (latlngs: L.LatLng[]) => {
 const enableDragging = () => {
   if (!polyline.value || !map.value) return;
 
-  polyline.value.on('mousedown', (e: L.LeafletMouseEvent) => {
+  const onPolylineMouseDown = (e: L.LeafletMouseEvent) => {
     L.value!.DomEvent.stopPropagation(e);
     isDragging.value = true;
 
@@ -215,7 +224,9 @@ const enableDragging = () => {
       map.value.getContainer().style.cursor = 'move';
       map.value.dragging.disable();
     }
-  });
+  };
+
+  polyline.value.on('mousedown', onPolylineMouseDown);
 };
 
 const disableDragging = () => {
@@ -396,21 +407,25 @@ watch(
           });
           polyline.value.addTo(map.value);
 
+          const onPolylineClick = () => {
+            if (props.selectable && selectionContext) {
+              selectionContext.selectFeature('polyline', polylineId.value);
+            }
+            emit('click');
+          };
+
+          const onPolylineMouseDown = (e: any) => {
+            if (props.draggable && props.selectable && selectionContext) {
+              selectionContext.selectFeature('polyline', polylineId.value);
+            }
+          };
+
           // Add click event listener
           if (props.selectable && selectionContext) {
-            polyline.value.on('click', () => {
-              selectionContext.selectFeature('polyline', polylineId.value);
-              emit('click');
-            });
-            polyline.value.on('mousedown', (e: any) => {
-              if (props.draggable) {
-                selectionContext.selectFeature('polyline', polylineId.value);
-              }
-            });
+            polyline.value.on('click', onPolylineClick);
+            polyline.value.on('mousedown', onPolylineMouseDown);
           } else {
-            polyline.value.on('click', () => {
-              emit('click');
-            });
+            polyline.value.on('click', onPolylineClick);
           }
 
           // Register with selection context if selectable
@@ -427,22 +442,26 @@ watch(
             polyline.value.off('click');
             polyline.value.off('mousedown');
 
+            const onPolylineClick = () => {
+              if (props.selectable && selectionContext) {
+                selectionContext.selectFeature('polyline', polylineId.value);
+              }
+              emit('click');
+            };
+
+            const onPolylineMouseDown = (e: any) => {
+              if (props.draggable && props.selectable && selectionContext) {
+                selectionContext.selectFeature('polyline', polylineId.value);
+              }
+            };
+
             // Add new event listeners based on selectable state
             if (props.selectable && selectionContext) {
-              polyline.value.on('click', () => {
-                selectionContext.selectFeature('polyline', polylineId.value);
-                emit('click');
-              });
-              polyline.value.on('mousedown', (e: any) => {
-                if (props.draggable) {
-                  selectionContext.selectFeature('polyline', polylineId.value);
-                }
-              });
+              polyline.value.on('click', onPolylineClick);
+              polyline.value.on('mousedown', onPolylineMouseDown);
               registerWithSelection();
             } else {
-              polyline.value.on('click', () => {
-                emit('click');
-              });
+              polyline.value.on('click', onPolylineClick);
               if (selectionContext) {
                 selectionContext.unregisterFeature(polylineId.value);
               }

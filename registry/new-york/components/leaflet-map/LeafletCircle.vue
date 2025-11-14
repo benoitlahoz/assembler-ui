@@ -178,17 +178,20 @@ const enableEditing = () => {
       })
       .addTo(map.value);
 
-    radiusMarker.value.on('drag', () => {
+    const onRadiusMarkerDrag = () => {
       const center = circle.value!.getLatLng();
       const radiusPoint = radiusMarker.value!.getLatLng();
       const newRadius = center.distanceTo(radiusPoint);
       circle.value!.setRadius(newRadius);
-    });
+    };
 
-    radiusMarker.value.on('dragend', () => {
+    const onRadiusMarkerDragEnd = () => {
       const newRadius = circle.value!.getRadius();
       emit('update:radius', newRadius);
-    });
+    };
+
+    radiusMarker.value.on('drag', onRadiusMarkerDrag);
+    radiusMarker.value.on('dragend', onRadiusMarkerDragEnd);
   }
 };
 
@@ -282,20 +285,22 @@ watch(
           circle.value.addTo(map.value);
 
           // Add click event listener
-          if (props.selectable && selectionContext) {
-            circle.value.on('click', () => {
+          const onCircleClick = () => {
+            if (props.selectable && selectionContext) {
               selectionContext.selectFeature('circle', circleId.value);
-              emit('click');
-            });
-            circle.value.on('mousedown', (e: any) => {
-              if (props.draggable) {
-                selectionContext.selectFeature('circle', circleId.value);
-              }
-            });
-          } else {
-            circle.value.on('click', () => {
-              emit('click');
-            });
+            }
+            emit('click');
+          };
+
+          const onCircleMouseDown = (e: any) => {
+            if (props.draggable && props.selectable && selectionContext) {
+              selectionContext.selectFeature('circle', circleId.value);
+            }
+          };
+
+          circle.value.on('click', onCircleClick);
+          if (props.selectable && selectionContext) {
+            circle.value.on('mousedown', onCircleMouseDown);
           }
 
           // Setup map-level drag handlers once
@@ -316,24 +321,25 @@ watch(
             circle.value.off('mousedown');
 
             // Add new event listeners based on selectable state
-            if (props.selectable && selectionContext) {
-              circle.value.on('click', () => {
+            const onCircleClick = () => {
+              if (props.selectable && selectionContext) {
                 selectionContext.selectFeature('circle', circleId.value);
-                emit('click');
-              });
-              circle.value.on('mousedown', (e: any) => {
-                if (props.draggable) {
-                  selectionContext.selectFeature('circle', circleId.value);
-                }
-              });
-              registerWithSelection();
-            } else {
-              circle.value.on('click', () => {
-                emit('click');
-              });
-              if (selectionContext) {
-                selectionContext.unregisterFeature(circleId.value);
               }
+              emit('click');
+            };
+
+            const onCircleMouseDown = (e: any) => {
+              if (props.draggable && props.selectable && selectionContext) {
+                selectionContext.selectFeature('circle', circleId.value);
+              }
+            };
+
+            circle.value.on('click', onCircleClick);
+            if (props.selectable && selectionContext) {
+              circle.value.on('mousedown', onCircleMouseDown);
+              registerWithSelection();
+            } else if (selectionContext) {
+              selectionContext.unregisterFeature(circleId.value);
             }
           }
         }

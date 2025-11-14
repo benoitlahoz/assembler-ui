@@ -140,7 +140,7 @@ const enableEditing = () => {
       icon: L.value!.divIcon(stylesOptions.value.corner),
     }).addTo(map.value!);
 
-    marker.on('drag', () => {
+    const onMarkerDrag = () => {
       const newCorners = [...props.corners];
       const newPos = marker.getLatLng();
       newCorners[index] = { lat: newPos.lat, lng: newPos.lng };
@@ -149,14 +149,17 @@ const enableEditing = () => {
       if (selectionContext) {
         selectionContext.notifyFeatureUpdate(canvasId.value);
       }
-    });
+    };
 
-    marker.on('dragend', () => {
+    const onMarkerDragEnd = () => {
       const newCorners = [...props.corners];
       const newPos = marker.getLatLng();
       newCorners[index] = { lat: newPos.lat, lng: newPos.lng };
       emit('update:corners', newCorners);
-    });
+    };
+
+    marker.on('drag', onMarkerDrag);
+    marker.on('dragend', onMarkerDragEnd);
 
     editMarkers.value.push(marker);
   });

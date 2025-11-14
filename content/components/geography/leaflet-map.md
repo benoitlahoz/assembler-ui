@@ -378,9 +378,11 @@ onMounted(() => {
           .map(mapContainer.value, { zoomControl: false })
           .setView([centerLat.value, centerLng.value], zoom.value);
 
-        map.value.on("click", (event: LeafletMouseEvent) => {
+        const onMapClick = (event: LeafletMouseEvent) => {
           emit("click", event);
-        });
+        };
+
+        map.value.on("click", onMapClick);
         map.value.on("locationfound", onLocationFound);
         map.value.on("locationerror", onLocationError);
 
@@ -613,22 +615,22 @@ const createBoundingBox = () => {
       icon: L.value!.divIcon(stylesOptions.value.corner),
     }).addTo(map.value!);
 
-    handle.on("mousedown", () => {
+    const onCornerMouseDown = () => {
       if (map.value && cornerCursors[index]) {
         map.value.getContainer().style.cursor = cornerCursors[index];
       }
-    });
+    };
 
-    handle.on("dragstart", () => {
+    const onCornerDragStart = () => {
       isScaling.value = true;
       scaleStartBounds = props.bounds;
       scaleCornerIndex = index;
       if (map.value) {
         map.value.dragging.disable();
       }
-    });
+    };
 
-    handle.on("drag", () => {
+    const onCornerDrag = () => {
       if (!isScaling.value || !scaleStartBounds) return;
 
       const newCorner = handle.getLatLng();
@@ -678,9 +680,9 @@ const createBoundingBox = () => {
       updateHandlePositions(newBounds);
 
       emit("update:bounds", newBounds);
-    });
+    };
 
-    handle.on("dragend", () => {
+    const onCornerDragEnd = () => {
       isScaling.value = false;
       if (map.value) {
         map.value.getContainer().style.cursor = "";
@@ -689,7 +691,12 @@ const createBoundingBox = () => {
       if (boundingBox.value) {
         emit("update:bounds", boundingBox.value.getBounds());
       }
-    });
+    };
+
+    handle.on("mousedown", onCornerMouseDown);
+    handle.on("dragstart", onCornerDragStart);
+    handle.on("drag", onCornerDrag);
+    handle.on("dragend", onCornerDragEnd);
 
     cornerHandles.value.push(handle);
   });
@@ -721,21 +728,21 @@ const createBoundingBox = () => {
       icon: L.value!.divIcon(stylesOptions.value.edge),
     }).addTo(map.value!);
 
-    handle.on("mousedown", () => {
+    const onEdgeMouseDown = () => {
       if (map.value && edgeCursors[index]) {
         map.value.getContainer().style.cursor = edgeCursors[index];
       }
-    });
+    };
 
-    handle.on("dragstart", () => {
+    const onEdgeDragStart = () => {
       isScaling.value = true;
       scaleStartBounds = props.bounds;
       if (map.value) {
         map.value.dragging.disable();
       }
-    });
+    };
 
-    handle.on("drag", () => {
+    const onEdgeDrag = () => {
       if (!isScaling.value || !scaleStartBounds) return;
 
       const newPos = handle.getLatLng();
@@ -783,9 +790,9 @@ const createBoundingBox = () => {
       updateHandlePositions(newBounds);
 
       emit("update:bounds", newBounds);
-    });
+    };
 
-    handle.on("dragend", () => {
+    const onEdgeDragEnd = () => {
       isScaling.value = false;
       if (map.value) {
         map.value.getContainer().style.cursor = "";
@@ -794,7 +801,12 @@ const createBoundingBox = () => {
       if (boundingBox.value) {
         emit("update:bounds", boundingBox.value.getBounds());
       }
-    });
+    };
+
+    handle.on("mousedown", onEdgeMouseDown);
+    handle.on("dragstart", onEdgeDragStart);
+    handle.on("drag", onEdgeDrag);
+    handle.on("dragend", onEdgeDragEnd);
 
     edgeHandles.value.push(handle);
   });
@@ -819,13 +831,13 @@ const createBoundingBox = () => {
       })
       .addTo(map.value);
 
-    rotateHandle.value.on("mousedown", () => {
+    const onRotateMouseDown = () => {
       if (map.value) {
         map.value.getContainer().style.cursor = "grabbing";
       }
-    });
+    };
 
-    rotateHandle.value.on("dragstart", () => {
+    const onRotateDragStart = () => {
       isRotating.value = true;
       if (map.value && props.bounds) {
         map.value.dragging.disable();
@@ -840,9 +852,9 @@ const createBoundingBox = () => {
         const dy = handlePos.lat - center.lat;
         rotationStartAngle = Math.atan2(dy, dx) * (180 / Math.PI);
       }
-    });
+    };
 
-    rotateHandle.value.on("drag", () => {
+    const onRotateDrag = () => {
       if (!isRotating.value || !props.bounds) return;
 
       const center = props.bounds.getCenter();
@@ -855,9 +867,9 @@ const createBoundingBox = () => {
       const rotationAngle = currentAngle - rotationStartAngle;
 
       emit("rotate", rotationAngle);
-    });
+    };
 
-    rotateHandle.value.on("dragend", () => {
+    const onRotateDragEnd = () => {
       isRotating.value = false;
       if (map.value) {
         map.value.getContainer().style.cursor = "";
@@ -875,13 +887,19 @@ const createBoundingBox = () => {
           createBoundingBox();
         }
       }, 0);
-    });
+    };
 
-    rotateHandle.value.on("mouseup", () => {
+    const onRotateMouseUp = () => {
       if (map.value) {
         map.value.getContainer().style.cursor = "";
       }
-    });
+    };
+
+    rotateHandle.value.on("mousedown", onRotateMouseDown);
+    rotateHandle.value.on("dragstart", onRotateDragStart);
+    rotateHandle.value.on("drag", onRotateDrag);
+    rotateHandle.value.on("dragend", onRotateDragEnd);
+    rotateHandle.value.on("mouseup", onRotateMouseUp);
   }
 
   const center = props.bounds.getCenter();
@@ -1163,7 +1181,7 @@ const enableEditing = () => {
       icon: L.value!.divIcon(stylesOptions.value.corner),
     }).addTo(map.value!);
 
-    marker.on("drag", () => {
+    const onMarkerDrag = () => {
       const newCorners = [...props.corners];
       const newPos = marker.getLatLng();
       newCorners[index] = { lat: newPos.lat, lng: newPos.lng };
@@ -1172,14 +1190,17 @@ const enableEditing = () => {
       if (selectionContext) {
         selectionContext.notifyFeatureUpdate(canvasId.value);
       }
-    });
+    };
 
-    marker.on("dragend", () => {
+    const onMarkerDragEnd = () => {
       const newCorners = [...props.corners];
       const newPos = marker.getLatLng();
       newCorners[index] = { lat: newPos.lat, lng: newPos.lng };
       emit("update:corners", newCorners);
-    });
+    };
+
+    marker.on("drag", onMarkerDrag);
+    marker.on("dragend", onMarkerDragEnd);
 
     editMarkers.value.push(marker);
   });
@@ -1850,7 +1871,7 @@ const enableEditing = () => {
       icon: L.value!.divIcon(stylesOptions.value.corner),
     }).addTo(map.value!);
 
-    marker.on("drag", () => {
+    const onMarkerDrag = () => {
       const newCorners = [...props.corners];
       const newPos = marker.getLatLng();
       newCorners[index] = { lat: newPos.lat, lng: newPos.lng };
@@ -1859,14 +1880,17 @@ const enableEditing = () => {
       if (selectionContext) {
         selectionContext.notifyFeatureUpdate(canvasId.value);
       }
-    });
+    };
 
-    marker.on("dragend", () => {
+    const onMarkerDragEnd = () => {
       const newCorners = [...props.corners];
       const newPos = marker.getLatLng();
       newCorners[index] = { lat: newPos.lat, lng: newPos.lng };
       emit("update:corners", newCorners);
-    });
+    };
+
+    marker.on("drag", onMarkerDrag);
+    marker.on("dragend", onMarkerDragEnd);
 
     editMarkers.value.push(marker);
   });
@@ -2743,17 +2767,20 @@ const enableEditing = () => {
       })
       .addTo(map.value);
 
-    radiusMarker.value.on("drag", () => {
+    const onRadiusMarkerDrag = () => {
       const center = circle.value!.getLatLng();
       const radiusPoint = radiusMarker.value!.getLatLng();
       const newRadius = center.distanceTo(radiusPoint);
       circle.value!.setRadius(newRadius);
-    });
+    };
 
-    radiusMarker.value.on("dragend", () => {
+    const onRadiusMarkerDragEnd = () => {
       const newRadius = circle.value!.getRadius();
       emit("update:radius", newRadius);
-    });
+    };
+
+    radiusMarker.value.on("drag", onRadiusMarkerDrag);
+    radiusMarker.value.on("dragend", onRadiusMarkerDragEnd);
   }
 };
 
@@ -2842,20 +2869,22 @@ watch(
           );
           circle.value.addTo(map.value);
 
-          if (props.selectable && selectionContext) {
-            circle.value.on("click", () => {
+          const onCircleClick = () => {
+            if (props.selectable && selectionContext) {
               selectionContext.selectFeature("circle", circleId.value);
-              emit("click");
-            });
-            circle.value.on("mousedown", (e: any) => {
-              if (props.draggable) {
-                selectionContext.selectFeature("circle", circleId.value);
-              }
-            });
-          } else {
-            circle.value.on("click", () => {
-              emit("click");
-            });
+            }
+            emit("click");
+          };
+
+          const onCircleMouseDown = (e: any) => {
+            if (props.draggable && props.selectable && selectionContext) {
+              selectionContext.selectFeature("circle", circleId.value);
+            }
+          };
+
+          circle.value.on("click", onCircleClick);
+          if (props.selectable && selectionContext) {
+            circle.value.on("mousedown", onCircleMouseDown);
           }
 
           setupMapDragHandlers();
@@ -2872,24 +2901,25 @@ watch(
             circle.value.off("click");
             circle.value.off("mousedown");
 
-            if (props.selectable && selectionContext) {
-              circle.value.on("click", () => {
+            const onCircleClick = () => {
+              if (props.selectable && selectionContext) {
                 selectionContext.selectFeature("circle", circleId.value);
-                emit("click");
-              });
-              circle.value.on("mousedown", (e: any) => {
-                if (props.draggable) {
-                  selectionContext.selectFeature("circle", circleId.value);
-                }
-              });
-              registerWithSelection();
-            } else {
-              circle.value.on("click", () => {
-                emit("click");
-              });
-              if (selectionContext) {
-                selectionContext.unregisterFeature(circleId.value);
               }
+              emit("click");
+            };
+
+            const onCircleMouseDown = (e: any) => {
+              if (props.draggable && props.selectable && selectionContext) {
+                selectionContext.selectFeature("circle", circleId.value);
+              }
+            };
+
+            circle.value.on("click", onCircleClick);
+            if (props.selectable && selectionContext) {
+              circle.value.on("mousedown", onCircleMouseDown);
+              registerWithSelection();
+            } else if (selectionContext) {
+              selectionContext.unregisterFeature(circleId.value);
             }
           }
         }
@@ -3444,10 +3474,12 @@ const createButton = (
   button.setAttribute("tabindex", "0");
   button.dataset.toolType = type;
 
-  L.value!.DomEvent.on(button, "click", (e: Event) => {
+  const onButtonClick = (e: Event) => {
     L.value!.DomEvent.preventDefault(e);
     toggleDrawMode(type);
-  });
+  };
+
+  L.value!.DomEvent.on(button, "click", onButtonClick);
 
   return button;
 };
@@ -4878,24 +4910,33 @@ const setupMarker = () => {
       icon: new Icon(),
     });
 
+    const onDragStart = () => {
+      if (props.selectable && selectionContext) {
+        selectionContext.selectFeature("marker", markerId.value);
+      }
+      emit("dragstart");
+    };
+
     if (isDraggable) {
       marker.value.on("drag", onDrag);
-      marker.value.on("dragstart", () => emit("dragstart"));
+      marker.value.on("dragstart", onDragStart);
       marker.value.on("dragend", onDragEnd);
     }
 
-    if (props.selectable && selectionContext) {
-      marker.value.on("click", () => {
+    const onMarkerClick = () => {
+      if (props.selectable && selectionContext) {
         selectionContext.selectFeature("marker", markerId.value);
-        emit("click");
-      });
+      }
+      emit("click");
+    };
 
-      marker.value.on("dragstart", () => {
-        selectionContext.selectFeature("marker", markerId.value);
-        emit("dragstart");
-      });
+    if (props.selectable && selectionContext) {
+      marker.value.on("click", onMarkerClick);
+      if (!isDraggable) {
+        marker.value.on("dragstart", onDragStart);
+      }
     } else {
-      marker.value.on("click", () => emit("click"));
+      marker.value.on("click", onMarkerClick);
     }
 
     marker.value.addTo(map.value);
@@ -4967,18 +5008,26 @@ watch(
             marker.value.off("click");
             marker.value.off("dragstart");
 
+            const onMarkerClick = () => {
+              if (props.selectable && selectionContext) {
+                selectionContext.selectFeature("marker", markerId.value);
+              }
+              emit("click");
+            };
+
+            const onDragStart = () => {
+              if (props.selectable && selectionContext) {
+                selectionContext.selectFeature("marker", markerId.value);
+              }
+              emit("dragstart");
+            };
+
             if (props.selectable && selectionContext) {
-              marker.value.on("click", () => {
-                selectionContext.selectFeature("marker", markerId.value);
-                emit("click");
-              });
-              marker.value.on("dragstart", () => {
-                selectionContext.selectFeature("marker", markerId.value);
-                emit("dragstart");
-              });
+              marker.value.on("click", onMarkerClick);
+              marker.value.on("dragstart", onDragStart);
               registerWithSelection();
             } else {
-              marker.value.on("click", () => emit("click"));
+              marker.value.on("click", onMarkerClick);
               if (selectionContext) {
                 selectionContext.unregisterFeature(markerId.value);
               }
@@ -5695,12 +5744,14 @@ const enableEditing = () => {
     if (isFirstPoint && props.autoClose) {
       firstPointMarker.value = marker;
 
-      marker.on("click", () => {
+      const onFirstPointClick = () => {
         emit("closed");
-      });
+      };
+
+      marker.on("click", onFirstPointClick);
     }
 
-    marker.on("drag", () => {
+    const onVertexDrag = () => {
       const newLatLngs = [...latlngs];
       let currentPos = marker.getLatLng();
 
@@ -5708,14 +5759,17 @@ const enableEditing = () => {
       polygon.value!.setLatLngs([newLatLngs]);
 
       updateMidpoints(newLatLngs);
-    });
+    };
 
-    marker.on("dragend", () => {
+    const onVertexDragEnd = () => {
       const updatedLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map(
         (ll) => [ll.lat, ll.lng],
       ) as Array<[number, number]>;
       emit("update:latlngs", updatedLatLngs);
-    });
+    };
+
+    marker.on("drag", onVertexDrag);
+    marker.on("dragend", onVertexDragEnd);
 
     editMarkers.value.push(marker);
   });
@@ -5750,11 +5804,11 @@ const createMidpoints = () => {
 
     let pointAdded = false;
 
-    midMarker.on("dragstart", () => {
+    const onMidpointDragStart = () => {
       if (map.value) map.value.getContainer().style.cursor = "copy";
-    });
+    };
 
-    midMarker.on("drag", () => {
+    const onMidpointDrag = () => {
       const newPos = midMarker.getLatLng();
       const currentLatlngs = polygon.value!.getLatLngs()[0] as L.LatLng[];
 
@@ -5768,26 +5822,32 @@ const createMidpoints = () => {
         newLatlngs[nextIndex] = newPos;
         polygon.value!.setLatLngs([newLatlngs]);
       }
-    });
+    };
 
-    midMarker.on("dragend", () => {
+    const onMidpointDragEnd = () => {
       if (map.value) map.value.getContainer().style.cursor = "";
       const updatedLatLngs = (polygon.value!.getLatLngs()[0] as L.LatLng[]).map(
         (ll) => [ll.lat, ll.lng],
       ) as Array<[number, number]>;
       emit("update:latlngs", updatedLatLngs);
       enableEditing();
-    });
+    };
 
-    midMarker.on("mouseover", () => {
+    const onMidpointMouseOver = () => {
       if (map.value) map.value.getContainer().style.cursor = "copy";
-    });
+    };
 
-    midMarker.on("mouseout", () => {
+    const onMidpointMouseOut = () => {
       if (map.value) {
         map.value.getContainer().style.cursor = "";
       }
-    });
+    };
+
+    midMarker.on("dragstart", onMidpointDragStart);
+    midMarker.on("drag", onMidpointDrag);
+    midMarker.on("dragend", onMidpointDragEnd);
+    midMarker.on("mouseover", onMidpointMouseOver);
+    midMarker.on("mouseout", onMidpointMouseOut);
 
     midpointMarkers.value.push(midMarker);
   }
@@ -5809,7 +5869,7 @@ const updateMidpoints = (latlngs: L.LatLng[]) => {
 const enableDragging = () => {
   if (!polygon.value || !map.value) return;
 
-  polygon.value.on("mousedown", (e: L.LeafletMouseEvent) => {
+  const onPolygonMouseDown = (e: L.LeafletMouseEvent) => {
     L.value!.DomEvent.stopPropagation(e);
     isDragging.value = true;
 
@@ -5826,7 +5886,9 @@ const enableDragging = () => {
       map.value.getContainer().style.cursor = "move";
       map.value.dragging.disable();
     }
-  });
+  };
+
+  polygon.value.on("mousedown", onPolygonMouseDown);
 };
 
 const disableDragging = () => {
@@ -6019,20 +6081,24 @@ watch(
           });
           polygon.value.addTo(map.value);
 
-          if (props.selectable && selectionContext) {
-            polygon.value.on("click", () => {
+          const onPolygonClick = () => {
+            if (props.selectable && selectionContext) {
               selectionContext.selectFeature("polygon", polygonId.value);
-              emit("click");
-            });
-            polygon.value.on("mousedown", (e: any) => {
-              if (props.draggable) {
-                selectionContext.selectFeature("polygon", polygonId.value);
-              }
-            });
+            }
+            emit("click");
+          };
+
+          const onPolygonMouseDown = (e: any) => {
+            if (props.draggable && props.selectable && selectionContext) {
+              selectionContext.selectFeature("polygon", polygonId.value);
+            }
+          };
+
+          if (props.selectable && selectionContext) {
+            polygon.value.on("click", onPolygonClick);
+            polygon.value.on("mousedown", onPolygonMouseDown);
           } else {
-            polygon.value.on("click", () => {
-              emit("click");
-            });
+            polygon.value.on("click", onPolygonClick);
           }
 
           if (props.selectable && selectionContext) {
@@ -6047,21 +6113,25 @@ watch(
             polygon.value.off("click");
             polygon.value.off("mousedown");
 
-            if (props.selectable && selectionContext) {
-              polygon.value.on("click", () => {
+            const onPolygonClick = () => {
+              if (props.selectable && selectionContext) {
                 selectionContext.selectFeature("polygon", polygonId.value);
-                emit("click");
-              });
-              polygon.value.on("mousedown", (e: any) => {
-                if (props.draggable) {
-                  selectionContext.selectFeature("polygon", polygonId.value);
-                }
-              });
+              }
+              emit("click");
+            };
+
+            const onPolygonMouseDown = (e: any) => {
+              if (props.draggable && props.selectable && selectionContext) {
+                selectionContext.selectFeature("polygon", polygonId.value);
+              }
+            };
+
+            if (props.selectable && selectionContext) {
+              polygon.value.on("click", onPolygonClick);
+              polygon.value.on("mousedown", onPolygonMouseDown);
               registerWithSelection();
             } else {
-              polygon.value.on("click", () => {
-                emit("click");
-              });
+              polygon.value.on("click", onPolygonClick);
               if (selectionContext) {
                 selectionContext.unregisterFeature(polygonId.value);
               }
@@ -6197,21 +6267,24 @@ const enableEditing = () => {
       }),
     }).addTo(map.value!);
 
-    marker.on("drag", () => {
+    const onVertexDrag = () => {
       const newLatLngs = [...latlngs];
       newLatLngs[index] = marker.getLatLng();
       polyline.value!.setLatLngs(newLatLngs);
 
       updateMidpoints(newLatLngs);
-    });
+    };
 
-    marker.on("dragend", () => {
+    const onVertexDragEnd = () => {
       const updatedLatLngs = polyline.value!.getLatLngs() as L.LatLng[];
       emit(
         "update:latlngs",
         updatedLatLngs.map((ll) => [ll.lat, ll.lng]),
       );
-    });
+    };
+
+    marker.on("drag", onVertexDrag);
+    marker.on("dragend", onVertexDragEnd);
 
     editMarkers.value.push(marker);
   });
@@ -6245,11 +6318,11 @@ const createMidpoints = () => {
 
     let pointAdded = false;
 
-    midMarker.on("dragstart", () => {
+    const onMidpointDragStart = () => {
       if (map.value) map.value.getContainer().style.cursor = "copy";
-    });
+    };
 
-    midMarker.on("drag", () => {
+    const onMidpointDrag = () => {
       const newPos = midMarker.getLatLng();
       const currentLatlngs = polyline.value!.getLatLngs() as L.LatLng[];
 
@@ -6263,26 +6336,32 @@ const createMidpoints = () => {
         newLatlngs[i + 1] = newPos;
         polyline.value!.setLatLngs(newLatlngs);
       }
-    });
+    };
 
-    midMarker.on("dragend", () => {
+    const onMidpointDragEnd = () => {
       if (map.value) map.value.getContainer().style.cursor = "";
       const updatedLatLngs = (polyline.value!.getLatLngs() as L.LatLng[]).map(
         (ll) => [ll.lat, ll.lng],
       ) as Array<[number, number]>;
       emit("update:latlngs", updatedLatLngs);
       enableEditing();
-    });
+    };
 
-    midMarker.on("mouseover", () => {
+    const onMidpointMouseOver = () => {
       if (map.value) map.value.getContainer().style.cursor = "copy";
-    });
+    };
 
-    midMarker.on("mouseout", () => {
+    const onMidpointMouseOut = () => {
       if (map.value) {
         map.value.getContainer().style.cursor = "";
       }
-    });
+    };
+
+    midMarker.on("dragstart", onMidpointDragStart);
+    midMarker.on("drag", onMidpointDrag);
+    midMarker.on("dragend", onMidpointDragEnd);
+    midMarker.on("mouseover", onMidpointMouseOver);
+    midMarker.on("mouseout", onMidpointMouseOut);
 
     midpointMarkers.value.push(midMarker);
   }
@@ -6302,7 +6381,7 @@ const updateMidpoints = (latlngs: L.LatLng[]) => {
 const enableDragging = () => {
   if (!polyline.value || !map.value) return;
 
-  polyline.value.on("mousedown", (e: L.LeafletMouseEvent) => {
+  const onPolylineMouseDown = (e: L.LeafletMouseEvent) => {
     L.value!.DomEvent.stopPropagation(e);
     isDragging.value = true;
 
@@ -6319,7 +6398,9 @@ const enableDragging = () => {
       map.value.getContainer().style.cursor = "move";
       map.value.dragging.disable();
     }
-  });
+  };
+
+  polyline.value.on("mousedown", onPolylineMouseDown);
 };
 
 const disableDragging = () => {
@@ -6511,20 +6592,24 @@ watch(
           });
           polyline.value.addTo(map.value);
 
-          if (props.selectable && selectionContext) {
-            polyline.value.on("click", () => {
+          const onPolylineClick = () => {
+            if (props.selectable && selectionContext) {
               selectionContext.selectFeature("polyline", polylineId.value);
-              emit("click");
-            });
-            polyline.value.on("mousedown", (e: any) => {
-              if (props.draggable) {
-                selectionContext.selectFeature("polyline", polylineId.value);
-              }
-            });
+            }
+            emit("click");
+          };
+
+          const onPolylineMouseDown = (e: any) => {
+            if (props.draggable && props.selectable && selectionContext) {
+              selectionContext.selectFeature("polyline", polylineId.value);
+            }
+          };
+
+          if (props.selectable && selectionContext) {
+            polyline.value.on("click", onPolylineClick);
+            polyline.value.on("mousedown", onPolylineMouseDown);
           } else {
-            polyline.value.on("click", () => {
-              emit("click");
-            });
+            polyline.value.on("click", onPolylineClick);
           }
 
           if (props.selectable && selectionContext) {
@@ -6539,21 +6624,25 @@ watch(
             polyline.value.off("click");
             polyline.value.off("mousedown");
 
-            if (props.selectable && selectionContext) {
-              polyline.value.on("click", () => {
+            const onPolylineClick = () => {
+              if (props.selectable && selectionContext) {
                 selectionContext.selectFeature("polyline", polylineId.value);
-                emit("click");
-              });
-              polyline.value.on("mousedown", (e: any) => {
-                if (props.draggable) {
-                  selectionContext.selectFeature("polyline", polylineId.value);
-                }
-              });
+              }
+              emit("click");
+            };
+
+            const onPolylineMouseDown = (e: any) => {
+              if (props.draggable && props.selectable && selectionContext) {
+                selectionContext.selectFeature("polyline", polylineId.value);
+              }
+            };
+
+            if (props.selectable && selectionContext) {
+              polyline.value.on("click", onPolylineClick);
+              polyline.value.on("mousedown", onPolylineMouseDown);
               registerWithSelection();
             } else {
-              polyline.value.on("click", () => {
-                emit("click");
-              });
+              polyline.value.on("click", onPolylineClick);
               if (selectionContext) {
                 selectionContext.unregisterFeature(polylineId.value);
               }
@@ -6683,7 +6772,7 @@ const enableEditing = () => {
       }),
     }).addTo(map.value!);
 
-    marker.on("drag", () => {
+    const onCornerDrag = () => {
       const currentBounds = rectangle.value!.getBounds();
       const newCorner = marker.getLatLng();
 
@@ -6730,15 +6819,18 @@ const enableEditing = () => {
           m.setLatLng(updatedCorners[i]!);
         }
       });
-    });
+    };
 
-    marker.on("dragend", () => {
+    const onCornerDragEnd = () => {
       const updatedBounds = rectangle.value!.getBounds();
       emit("update:bounds", [
         [updatedBounds.getSouth(), updatedBounds.getWest()],
         [updatedBounds.getNorth(), updatedBounds.getEast()],
       ]);
-    });
+    };
+
+    marker.on("drag", onCornerDrag);
+    marker.on("dragend", onCornerDragEnd);
 
     editMarkers.value.push(marker);
   });
@@ -6747,7 +6839,7 @@ const enableEditing = () => {
 const enableDragging = () => {
   if (!rectangle.value || !map.value) return;
 
-  rectangle.value.on("mousedown", (e: L.LeafletMouseEvent) => {
+  const onRectangleMouseDown = (e: L.LeafletMouseEvent) => {
     L.value!.DomEvent.stopPropagation(e);
     isDragging.value = true;
 
@@ -6762,7 +6854,9 @@ const enableDragging = () => {
       map.value.getContainer().style.cursor = "move";
       map.value.dragging.disable();
     }
-  });
+  };
+
+  rectangle.value.on("mousedown", onRectangleMouseDown);
 };
 
 const disableDragging = () => {
@@ -6910,20 +7004,24 @@ watch(
           });
           rectangle.value.addTo(map.value);
 
-          if (props.selectable && selectionContext) {
-            rectangle.value.on("click", () => {
+          const onRectangleClick = () => {
+            if (props.selectable && selectionContext) {
               selectionContext.selectFeature("rectangle", rectangleId.value);
-              emit("click");
-            });
-            rectangle.value.on("mousedown", (e: any) => {
-              if (props.draggable) {
-                selectionContext.selectFeature("rectangle", rectangleId.value);
-              }
-            });
+            }
+            emit("click");
+          };
+
+          const onRectangleMouseDown = (e: any) => {
+            if (props.draggable && props.selectable && selectionContext) {
+              selectionContext.selectFeature("rectangle", rectangleId.value);
+            }
+          };
+
+          if (props.selectable && selectionContext) {
+            rectangle.value.on("click", onRectangleClick);
+            rectangle.value.on("mousedown", onRectangleMouseDown);
           } else {
-            rectangle.value.on("click", () => {
-              emit("click");
-            });
+            rectangle.value.on("click", onRectangleClick);
           }
 
           if (props.selectable && selectionContext) {
@@ -6938,24 +7036,25 @@ watch(
             rectangle.value.off("click");
             rectangle.value.off("mousedown");
 
-            if (props.selectable && selectionContext) {
-              rectangle.value.on("click", () => {
+            const onRectangleClick = () => {
+              if (props.selectable && selectionContext) {
                 selectionContext.selectFeature("rectangle", rectangleId.value);
-                emit("click");
-              });
-              rectangle.value.on("mousedown", (e: any) => {
-                if (props.draggable) {
-                  selectionContext.selectFeature(
-                    "rectangle",
-                    rectangleId.value,
-                  );
-                }
-              });
+              }
+              emit("click");
+            };
+
+            const onRectangleMouseDown = (e: any) => {
+              if (props.draggable && props.selectable && selectionContext) {
+                selectionContext.selectFeature("rectangle", rectangleId.value);
+              }
+            };
+
+            if (props.selectable && selectionContext) {
+              rectangle.value.on("click", onRectangleClick);
+              rectangle.value.on("mousedown", onRectangleMouseDown);
               registerWithSelection();
             } else {
-              rectangle.value.on("click", () => {
-                emit("click");
-              });
+              rectangle.value.on("click", onRectangleClick);
               if (selectionContext) {
                 selectionContext.unregisterFeature(rectangleId.value);
               }
@@ -7238,11 +7337,15 @@ const updateVisibleFeaturesQuadtree = () => {
   visibleFeatureIds.value = newVisibleIds;
   emit("update:visible-count", newVisibleIds.size);
 };
+const handleMapUpdate = () => {
+  updateVisibleBounds();
+};
+
 onMounted(() => {
   if (map.value) {
     updateVisibleBounds();
-    map.value.on("moveend", updateVisibleBounds);
-    map.value.on("zoomend", updateVisibleBounds);
+    map.value.on("moveend", handleMapUpdate);
+    map.value.on("zoomend", handleMapUpdate);
   }
 });
 
@@ -7251,12 +7354,13 @@ watch(
   (newMap) => {
     if (newMap) {
       updateVisibleBounds();
-      newMap.on("moveend", updateVisibleBounds);
-      newMap.on("zoomend", updateVisibleBounds);
+      newMap.on("moveend", handleMapUpdate);
+      newMap.on("zoomend", handleMapUpdate);
     }
   },
   { immediate: true },
 );
+
 onBeforeUnmount(() => {
   if (rafId !== null) {
     cancelAnimationFrame(rafId);
@@ -7264,8 +7368,8 @@ onBeforeUnmount(() => {
   }
 
   if (map.value) {
-    map.value.off("moveend", updateVisibleBounds);
-    map.value.off("zoomend", updateVisibleBounds);
+    map.value.off("moveend", handleMapUpdate);
+    map.value.off("zoomend", handleMapUpdate);
   }
 });
 

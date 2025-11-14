@@ -183,22 +183,22 @@ const createBoundingBox = () => {
       icon: L.value!.divIcon(stylesOptions.value.corner),
     }).addTo(map.value!);
 
-    handle.on('mousedown', () => {
+    const onCornerMouseDown = () => {
       if (map.value && cornerCursors[index]) {
         map.value.getContainer().style.cursor = cornerCursors[index];
       }
-    });
+    };
 
-    handle.on('dragstart', () => {
+    const onCornerDragStart = () => {
       isScaling.value = true;
       scaleStartBounds = props.bounds;
       scaleCornerIndex = index;
       if (map.value) {
         map.value.dragging.disable();
       }
-    });
+    };
 
-    handle.on('drag', () => {
+    const onCornerDrag = () => {
       if (!isScaling.value || !scaleStartBounds) return;
 
       const newCorner = handle.getLatLng();
@@ -243,9 +243,9 @@ const createBoundingBox = () => {
 
       // Émettre en temps réel pendant le drag
       emit('update:bounds', newBounds);
-    });
+    };
 
-    handle.on('dragend', () => {
+    const onCornerDragEnd = () => {
       isScaling.value = false;
       if (map.value) {
         map.value.getContainer().style.cursor = '';
@@ -254,7 +254,12 @@ const createBoundingBox = () => {
       if (boundingBox.value) {
         emit('update:bounds', boundingBox.value.getBounds());
       }
-    });
+    };
+
+    handle.on('mousedown', onCornerMouseDown);
+    handle.on('dragstart', onCornerDragStart);
+    handle.on('drag', onCornerDrag);
+    handle.on('dragend', onCornerDragEnd);
 
     cornerHandles.value.push(handle);
   });
@@ -282,21 +287,21 @@ const createBoundingBox = () => {
       icon: L.value!.divIcon(stylesOptions.value.edge),
     }).addTo(map.value!);
 
-    handle.on('mousedown', () => {
+    const onEdgeMouseDown = () => {
       if (map.value && edgeCursors[index]) {
         map.value.getContainer().style.cursor = edgeCursors[index];
       }
-    });
+    };
 
-    handle.on('dragstart', () => {
+    const onEdgeDragStart = () => {
       isScaling.value = true;
       scaleStartBounds = props.bounds;
       if (map.value) {
         map.value.dragging.disable();
       }
-    });
+    };
 
-    handle.on('drag', () => {
+    const onEdgeDrag = () => {
       if (!isScaling.value || !scaleStartBounds) return;
 
       const newPos = handle.getLatLng();
@@ -345,9 +350,9 @@ const createBoundingBox = () => {
 
       // Émettre en temps réel pendant le drag
       emit('update:bounds', newBounds);
-    });
+    };
 
-    handle.on('dragend', () => {
+    const onEdgeDragEnd = () => {
       isScaling.value = false;
       if (map.value) {
         map.value.getContainer().style.cursor = '';
@@ -356,7 +361,12 @@ const createBoundingBox = () => {
       if (boundingBox.value) {
         emit('update:bounds', boundingBox.value.getBounds());
       }
-    });
+    };
+
+    handle.on('mousedown', onEdgeMouseDown);
+    handle.on('dragstart', onEdgeDragStart);
+    handle.on('drag', onEdgeDrag);
+    handle.on('dragend', onEdgeDragEnd);
 
     edgeHandles.value.push(handle);
   });
@@ -380,13 +390,13 @@ const createBoundingBox = () => {
       })
       .addTo(map.value);
 
-    rotateHandle.value.on('mousedown', () => {
+    const onRotateMouseDown = () => {
       if (map.value) {
         map.value.getContainer().style.cursor = 'grabbing';
       }
-    });
+    };
 
-    rotateHandle.value.on('dragstart', () => {
+    const onRotateDragStart = () => {
       isRotating.value = true;
       if (map.value && props.bounds) {
         map.value.dragging.disable();
@@ -403,9 +413,9 @@ const createBoundingBox = () => {
         const dy = handlePos.lat - center.lat;
         rotationStartAngle = Math.atan2(dy, dx) * (180 / Math.PI);
       }
-    });
+    };
 
-    rotateHandle.value.on('drag', () => {
+    const onRotateDrag = () => {
       if (!isRotating.value || !props.bounds) return;
 
       // Calcul de l'angle de rotation
@@ -422,9 +432,9 @@ const createBoundingBox = () => {
 
       // Émettre l'événement de rotation en temps réel
       emit('rotate', rotationAngle);
-    });
+    };
 
-    rotateHandle.value.on('dragend', () => {
+    const onRotateDragEnd = () => {
       isRotating.value = false;
       if (map.value) {
         map.value.getContainer().style.cursor = '';
@@ -445,13 +455,19 @@ const createBoundingBox = () => {
           createBoundingBox();
         }
       }, 0);
-    });
+    };
 
-    rotateHandle.value.on('mouseup', () => {
+    const onRotateMouseUp = () => {
       if (map.value) {
         map.value.getContainer().style.cursor = '';
       }
-    });
+    };
+
+    rotateHandle.value.on('mousedown', onRotateMouseDown);
+    rotateHandle.value.on('dragstart', onRotateDragStart);
+    rotateHandle.value.on('drag', onRotateDrag);
+    rotateHandle.value.on('dragend', onRotateDragEnd);
+    rotateHandle.value.on('mouseup', onRotateMouseUp);
   }
 
   // Créer le handle central orange (non draggable, juste pour visualisation)

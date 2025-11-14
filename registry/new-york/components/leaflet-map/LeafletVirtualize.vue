@@ -233,12 +233,16 @@ const updateVisibleFeaturesQuadtree = () => {
   visibleFeatureIds.value = newVisibleIds;
   emit('update:visible-count', newVisibleIds.size);
 }; // Setup map event listeners for virtualization
+const handleMapUpdate = () => {
+  updateVisibleBounds();
+};
+
 onMounted(() => {
   // If map is already available, set it up immediately
   if (map.value) {
     updateVisibleBounds();
-    map.value.on('moveend', updateVisibleBounds);
-    map.value.on('zoomend', updateVisibleBounds);
+    map.value.on('moveend', handleMapUpdate);
+    map.value.on('zoomend', handleMapUpdate);
   }
 });
 
@@ -248,12 +252,13 @@ watch(
   (newMap) => {
     if (newMap) {
       updateVisibleBounds();
-      newMap.on('moveend', updateVisibleBounds);
-      newMap.on('zoomend', updateVisibleBounds);
+      newMap.on('moveend', handleMapUpdate);
+      newMap.on('zoomend', handleMapUpdate);
     }
   },
   { immediate: true }
 );
+
 onBeforeUnmount(() => {
   // Cancel any pending RAF
   if (rafId !== null) {
@@ -262,21 +267,22 @@ onBeforeUnmount(() => {
   }
 
   if (map.value) {
-    map.value.off('moveend', updateVisibleBounds);
-    map.value.off('zoomend', updateVisibleBounds);
+    map.value.off('moveend', handleMapUpdate);
+    map.value.off('zoomend', handleMapUpdate);
   }
 });
 
 // Consolidate all prop watchers into one
 watch(
-  () => [
-    props.enabled,
-    props.marginMeters,
-    props.marginZoomRatio,
-    props.minZoom,
-    props.maxZoom,
-    props.quadtree,
-  ] as const,
+  () =>
+    [
+      props.enabled,
+      props.marginMeters,
+      props.marginZoomRatio,
+      props.minZoom,
+      props.maxZoom,
+      props.quadtree,
+    ] as const,
   async ([enabled], [oldEnabled]) => {
     // Handle enabled toggle with transition
     if (enabled !== oldEnabled) {
