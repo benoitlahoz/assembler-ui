@@ -157,11 +157,11 @@ function handleChildAdd(path: string[], key: string, value: any) {
     data-slot="object-composer-item"
     :class="cn('select-none hover:bg-accent', props.class)"
   >
-    <div class="flex items-center">
+    <div class="flex items-center w-full">
       <div class="w-8" />
 
       <!-- Slot pour contenu personnalisé -->
-      <div class="item-content">
+      <div class="flex-1">
         <slot
           :item-key="itemKey"
           :value="value"
@@ -214,8 +214,8 @@ function handleChildAdd(path: string[], key: string, value: any) {
       </div>
 
       <!-- Actions -->
-      <div class="item-actions">
-        <Button v-if="!isEditing" class="action-button" title="Éditer" @click="startEdit">
+      <div class="item-actions ml-auto">
+        <Button v-if="!isEditing" variant="ghost" size="icon" title="Éditer" @click="startEdit">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="14"
@@ -233,7 +233,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
         </Button>
 
         <template v-else>
-          <Button class="action-button save" title="Sauvegarder" @click="saveEdit">
+          <Button variant="ghost" size="icon" title="Sauvegarder" @click="saveEdit">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="14"
@@ -248,7 +248,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
               <polyline points="20 6 9 17 4 12" />
             </svg>
           </Button>
-          <Button class="action-button cancel" title="Annuler" @click="cancelEdit">
+          <Button variant="ghost" size="icon" title="Annuler" @click="cancelEdit">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="14"
@@ -266,12 +266,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
           </Button>
         </template>
 
-        <Button
-          v-if="!isEditing"
-          class="action-button delete"
-          title="Supprimer"
-          @click="deleteItem"
-        >
+        <Button v-if="!isEditing" variant="ghost" size="icon" title="Supprimer" @click="deleteItem">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="14"
@@ -296,7 +291,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
   <!-- Accordion pour les éléments expandables -->
   <Accordion v-else v-model="accordionValue" type="single" collapsible>
     <AccordionItem value="item-1" class="border-b-0">
-      <div class="flex items-center hover:bg-accent select-none">
+      <div class="flex items-center w-full hover:bg-accent select-none">
         <AccordionTrigger class="flex-none hover:no-underline select-none py-1! px-2">
           <template #icon>
             <ChevronRight class="transition-transform duration-200 w-4 h-4 text-muted-foreground" />
@@ -304,7 +299,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
         </AccordionTrigger>
 
         <!-- Slot pour contenu personnalisé -->
-        <div class="item-content flex-1">
+        <div class="flex-1">
           <slot
             :item-key="itemKey"
             :value="value"
@@ -357,8 +352,8 @@ function handleChildAdd(path: string[], key: string, value: any) {
         </div>
 
         <!-- Actions -->
-        <div class="item-actions">
-          <Button v-if="!isEditing" class="action-button" title="Éditer" @click="startEdit">
+        <div class="item-actions ml-auto">
+          <Button v-if="!isEditing" variant="ghost" size="icon" title="Éditer" @click="startEdit">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="14"
@@ -376,7 +371,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
           </Button>
 
           <template v-else>
-            <Button class="action-button save" title="Sauvegarder" @click="saveEdit">
+            <Button variant="ghost" size="icon" title="Sauvegarder" @click="saveEdit">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="14"
@@ -391,7 +386,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </Button>
-            <Button class="action-button cancel" title="Annuler" @click="cancelEdit">
+            <Button variant="ghost" size="icon" title="Annuler" @click="cancelEdit">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="14"
@@ -411,7 +406,8 @@ function handleChildAdd(path: string[], key: string, value: any) {
 
           <Button
             v-if="!isEditing"
-            class="action-button"
+            variant="ghost"
+            size="icon"
             title="Ajouter un enfant"
             @click="addChild"
           >
@@ -433,7 +429,8 @@ function handleChildAdd(path: string[], key: string, value: any) {
 
           <Button
             v-if="!isEditing"
-            class="action-button delete"
+            variant="ghost"
+            size="icon"
             title="Supprimer"
             @click="deleteItem"
           >
