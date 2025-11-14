@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, type HTMLAttributes } from 'vue';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/Input';
@@ -9,13 +9,14 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { ChevronLeft } from 'lucide-vue-next';
+import { ChevronRight } from 'lucide-vue-next';
 
 interface ObjectComposerItemProps {
   itemKey: string;
   value: any;
   depth?: number;
   path?: string[];
+  class?: HTMLAttributes['class'];
 }
 
 interface SlotProps {
@@ -81,9 +82,9 @@ const displayValue = computed(() => {
     case 'null':
       return 'null';
     case 'object':
-      return `{ ${Object.keys(props.value).length} }`;
+      return '';
     case 'array':
-      return `[ ${props.value.length} ]`;
+      return '';
     default:
       return String(props.value);
   }
@@ -151,12 +152,8 @@ function handleChildAdd(path: string[], key: string, value: any) {
 </script>
 
 <template>
-  <div
-    v-if="!isExpandable"
-    data-slot="object-composer-item"
-    :class="cn('rounded-md mb-1', { border: depth === 0, 'border-border': depth > 0 })"
-  >
-    <div class="flex items-center py-1 item-header">
+  <div v-if="!isExpandable" data-slot="object-composer-item" :class="cn(props.class)">
+    <div class="flex items-center">
       <div class="expand-spacer" />
 
       <!-- Slot pour contenu personnalisé -->
@@ -282,18 +279,12 @@ function handleChildAdd(path: string[], key: string, value: any) {
   </div>
 
   <!-- Accordion pour les éléments expandables -->
-  <Accordion
-    v-else
-    v-model="accordionValue"
-    type="single"
-    collapsible
-    :class="cn('rounded-md mb-2', { border: depth === 0, 'border-border': depth > 0 })"
-  >
+  <Accordion v-else v-model="accordionValue" type="single" collapsible>
     <AccordionItem value="item-1" class="border-b-0">
-      <div class="flex items-center item-header">
-        <AccordionTrigger class="flex-none hover:no-underline py-1 px-2">
+      <div class="flex items-center">
+        <AccordionTrigger class="flex-none hover:no-underline py-1! px-2">
           <template #icon>
-            <ChevronLeft class="transition-transform duration-200 w-4 h-4" />
+            <ChevronRight class="transition-transform duration-200 w-4 h-4" />
           </template>
         </AccordionTrigger>
 
@@ -440,9 +431,8 @@ function handleChildAdd(path: string[], key: string, value: any) {
         </div>
       </div>
 
-      <!-- Children - Arborescence récursive -->
-      <AccordionContent>
-        <div class="border-l border-white ml-5">
+      <AccordionContent class="pb-0!">
+        <div class="border-l border-border ml-4">
           <ObjectComposerItem
             v-for="[key, val] in childEntries"
             :key="key"
@@ -466,10 +456,6 @@ function handleChildAdd(path: string[], key: string, value: any) {
 </template>
 
 <style scoped>
-.item-header {
-  transition: background-color 0.15s ease;
-}
-
 .item-header:hover {
   background-color: rgba(0, 0, 0, 0.03);
 }

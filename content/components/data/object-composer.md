@@ -64,11 +64,6 @@ const readonlyData = ref({
 <template>
   <div class="demo-container">
     <div class="demo-section">
-      <h2 class="demo-title">Rendu Par Défaut</h2>
-      <p class="demo-description">
-        L'ObjectComposer affiche automatiquement l'arborescence avec le rendu
-        par défaut.
-      </p>
       <ObjectComposer v-model="userData" title="Données Utilisateur">
         <ObjectComposerHeader>
           <ObjectComposerTitle>User Data (Default)</ObjectComposerTitle>
@@ -325,16 +320,18 @@ export { default as ObjectComposerItem } from "./ObjectComposerItem.vue";
 
 ```vue [src/components/ui/object-composer/ObjectComposer.vue]
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, type HTMLAttributes } from "vue";
+import { cn } from "@/lib/utils";
 import { ObjectComposerItem } from ".";
 import { Button } from "@/components/ui/button";
 
 interface ObjectComposerProps {
   title?: string;
   readonly?: boolean;
+  class?: HTMLAttributes["class"];
 }
 
-withDefaults(defineProps<ObjectComposerProps>(), {
+const props = withDefaults(defineProps<ObjectComposerProps>(), {
   title: "JSON Editor",
   readonly: false,
 });
@@ -435,61 +432,13 @@ const downloadJSON = () => {
 </script>
 
 <template>
-  <div data-slot="object-composer">
+  <div
+    data-slot="object-composer"
+    :class="cn('flex flex-col text-sm', props.class)"
+  >
     <slot />
   </div>
 </template>
-
-<style scoped>
-.object-composer {
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.composer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.composer-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #1a1a1a;
-}
-
-.composer-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.header-Button {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border: 1px solid #d0d0d0;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #333;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.header-Button:hover {
-  border-color: #b0b0b0;
-}
-
-.header-Button:active {
-  transform: translateY(1px);
-}
-</style>
 ```
 
 ```vue [src/components/ui/object-composer/ObjectComposerDescription.vue]
@@ -524,16 +473,35 @@ const props = defineProps<ObjectComposerDescriptionProps>();
 
 ```vue [src/components/ui/object-composer/ObjectComposerItem.vue]
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, type HTMLAttributes } from "vue";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/Input";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { ChevronRight } from "lucide-vue-next";
 
 interface ObjectComposerItemProps {
   itemKey: string;
   value: any;
   depth?: number;
   path?: string[];
+  class?: HTMLAttributes["class"];
+}
+
+interface SlotProps {
+  itemKey: string;
+  value: any;
+  valueType: string;
+  displayValue: string;
+  isExpandable: boolean;
+  isEditing: boolean;
+  editKey: string;
+  editValue: string;
 }
 
 const props = withDefaults(defineProps<ObjectComposerItemProps>(), {
@@ -547,7 +515,11 @@ const emit = defineEmits<{
   add: [path: string[], key: string, value: any];
 }>();
 
-const isExpanded = ref(true);
+defineSlots<{
+  default(props: SlotProps): any;
+}>();
+
+const accordionValue = ref<string>("item-1");
 const isEditing = ref(false);
 const editKey = ref(props.itemKey);
 const editValue = ref<string>("");
@@ -584,19 +556,15 @@ const displayValue = computed(() => {
     case "null":
       return "null";
     case "object":
-      return `{ ${Object.keys(props.value).length} }`;
+      return "";
     case "array":
-      return `[ ${props.value.length} ]`;
+      return "";
     default:
       return String(props.value);
   }
 });
 
-function toggleExpand() {
-  if (isExpandable.value) {
-    isExpanded.value = !isExpanded.value;
-  }
-}
+function toggleExpand() {}
 
 function startEdit() {
   isEditing.value = true;
@@ -658,35 +626,12 @@ function handleChildAdd(path: string[], key: string, value: any) {
 
 <template>
   <div
+    v-if="!isExpandable"
     data-slot="object-composer-item"
-    :class="
-      cn('rounded-md mb-1', { border: depth === 0, 'border-border': depth > 0 })
-    "
+    :class="cn(props.class)"
   >
-    <div class="flex items-center py-1 item-header">
-      <Button
-        v-if="isExpandable"
-        variant="ghost"
-        size="icon"
-        class="expand-button"
-        @click="toggleExpand"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          :class="{ 'rotate-90': isExpanded }"
-        >
-          <polyline points="9 18 15 12 9 6" />
-        </svg>
-      </Button>
-      <div v-else class="expand-spacer" />
+    <div class="flex items-center">
+      <div class="expand-spacer" />
 
       <div class="item-content">
         <slot
@@ -695,7 +640,6 @@ function handleChildAdd(path: string[], key: string, value: any) {
           :value-type="valueType"
           :display-value="displayValue"
           :is-expandable="isExpandable"
-          :is-expanded="isExpanded"
           :is-editing="isEditing"
           :edit-key="editKey"
           :edit-value="editValue"
@@ -796,28 +740,6 @@ function handleChildAdd(path: string[], key: string, value: any) {
         </template>
 
         <Button
-          v-if="isExpandable && !isEditing"
-          class="action-button"
-          title="Ajouter un enfant"
-          @click="addChild"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </Button>
-
-        <Button
           v-if="!isEditing"
           class="action-button delete"
           title="Supprimer"
@@ -842,32 +764,197 @@ function handleChildAdd(path: string[], key: string, value: any) {
         </Button>
       </div>
     </div>
-
-    <div v-if="isExpandable && isExpanded" class="border-l border-white ml-5">
-      <ObjectComposerItem
-        v-for="[key, val] in childEntries"
-        :key="key"
-        :item-key="key"
-        :value="val"
-        :depth="depth + 1"
-        :path="currentPath"
-        @update="handleChildUpdate"
-        @delete="handleChildDelete"
-        @add="handleChildAdd"
-      >
-        <template #default="slotProps: any">
-          <slot v-bind="slotProps" />
-        </template>
-      </ObjectComposerItem>
-    </div>
   </div>
+
+  <Accordion v-else v-model="accordionValue" type="single" collapsible>
+    <AccordionItem value="item-1" class="border-b-0">
+      <div class="flex items-center">
+        <AccordionTrigger class="flex-none hover:no-underline py-1! px-2">
+          <template #icon>
+            <ChevronRight class="transition-transform duration-200 w-4 h-4" />
+          </template>
+        </AccordionTrigger>
+
+        <div class="item-content flex-1">
+          <slot
+            :item-key="itemKey"
+            :value="value"
+            :value-type="valueType"
+            :display-value="displayValue"
+            :is-expandable="isExpandable"
+            :is-editing="isEditing"
+            :edit-key="editKey"
+            :edit-value="editValue"
+          >
+            <div v-if="!isEditing" class="default-item-content">
+              <span class="item-key">{{ itemKey }}</span>
+              <span class="item-separator">:</span>
+              <span class="item-value" :class="`type-${valueType}`">
+                {{ displayValue }}
+              </span>
+            </div>
+
+            <div v-else class="item-edit">
+              <Input
+                v-model="editKey"
+                class="edit-key"
+                type="text"
+                @keyup.enter="saveEdit"
+                @keyup.esc="cancelEdit"
+              />
+              <span class="item-separator">:</span>
+              <Input
+                v-model="editValue"
+                class="edit-value"
+                type="text"
+                @keyup.enter="saveEdit"
+                @keyup.esc="cancelEdit"
+              />
+            </div>
+          </slot>
+        </div>
+
+        <div class="item-actions">
+          <Button
+            v-if="!isEditing"
+            class="action-button"
+            title="Éditer"
+            @click="startEdit"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+              />
+              <path
+                d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
+              />
+            </svg>
+          </Button>
+
+          <template v-else>
+            <Button
+              class="action-button save"
+              title="Sauvegarder"
+              @click="saveEdit"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </Button>
+            <Button
+              class="action-button cancel"
+              title="Annuler"
+              @click="cancelEdit"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </Button>
+          </template>
+
+          <Button
+            v-if="!isEditing"
+            class="action-button"
+            title="Ajouter un enfant"
+            @click="addChild"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </Button>
+
+          <Button
+            v-if="!isEditing"
+            class="action-button delete"
+            title="Supprimer"
+            @click="deleteItem"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="3 6 5 6 21 6" />
+              <path
+                d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+              />
+            </svg>
+          </Button>
+        </div>
+      </div>
+
+      <AccordionContent class="-pb-2!">
+        <div class="border-l border-border ml-4">
+          <ObjectComposerItem
+            v-for="[key, val] in childEntries"
+            :key="key"
+            :item-key="key"
+            :value="val"
+            :depth="depth + 1"
+            :path="currentPath"
+            @update="handleChildUpdate"
+            @delete="handleChildDelete"
+            @add="handleChildAdd"
+          >
+            <template v-if="$slots.default" #default="childSlotProps">
+              <slot v-bind="childSlotProps" />
+            </template>
+          </ObjectComposerItem>
+        </div>
+      </AccordionContent>
+    </AccordionItem>
+  </Accordion>
 </template>
 
 <style scoped>
-.item-header {
-  transition: background-color 0.15s ease;
-}
-
 .item-header:hover {
   background-color: rgba(0, 0, 0, 0.03);
 }
@@ -1801,6 +1888,7 @@ const downloadJSON = () => {
 |------|------|---------|-------------|
 | `title`{.primary .text-primary} | `string` | JSON Editor |  |
 | `readonly`{.primary .text-primary} | `boolean` | false |  |
+| `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
   ### Slots
 | Name | Description |
@@ -1857,6 +1945,7 @@ const downloadJSON = () => {
 | `value`{.primary .text-primary} | `any` | - |  |
 | `depth`{.primary .text-primary} | `number` | 0 |  |
 | `path`{.primary .text-primary} | `string[]` |  |  |
+| `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
   ### Slots
 | Name | Description |
@@ -1865,9 +1954,19 @@ const downloadJSON = () => {
 
   ### Child Components
 
+  `Input`{.primary .text-primary}
+
   `Button`{.primary .text-primary}
 
-  `Input`{.primary .text-primary}
+  `Accordion`{.primary .text-primary}
+
+  `AccordionItem`{.primary .text-primary}
+
+  `AccordionTrigger`{.primary .text-primary}
+
+  `ChevronRight`{.primary .text-primary}
+
+  `AccordionContent`{.primary .text-primary}
 
   `ObjectComposerItem`{.primary .text-primary}
 
