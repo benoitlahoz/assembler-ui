@@ -157,7 +157,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
   <div
     v-if="!isExpandable"
     data-slot="object-composer-item"
-    :class="cn('select-none hover:bg-accent', props.class)"
+    :class="cn('group select-none hover:bg-accent', props.class)"
   >
     <div v-if="!isEditing" class="flex items-center w-full">
       <div class="w-8" />
@@ -197,7 +197,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
       </div>
 
       <!-- Actions -->
-      <div class="item-actions ml-auto">
+      <div class="flex ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
         <Button variant="ghost" size="icon" title="Éditer" @click="startEdit">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -281,7 +281,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
   <!-- Accordion pour les éléments expandables -->
   <Accordion v-else v-model="accordionValue" type="single" collapsible>
     <AccordionItem value="item-1" class="border-b-0">
-      <div v-if="!isEditing" class="flex items-center w-full hover:bg-accent select-none">
+      <div v-if="!isEditing" class="group flex items-center w-full hover:bg-accent select-none">
         <AccordionTrigger class="flex-none hover:no-underline select-none py-1! px-2">
           <template #icon>
             <ChevronRight class="transition-transform duration-200 w-4 h-4 text-muted-foreground" />
@@ -323,7 +323,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
         </div>
 
         <!-- Actions -->
-        <div class="item-actions ml-auto">
+        <div class="flex ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
           <Button v-if="!isInArray" variant="ghost" size="icon" title="Éditer" @click="startEdit">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -459,17 +459,5 @@ function handleChildAdd(path: string[], key: string, value: any) {
 <style scoped>
 .expand-spacer {
   width: 20px;
-}
-
-.item-actions {
-  display: flex;
-  gap: 4px;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.item-header:hover .item-actions,
-div:hover > .item-actions {
-  opacity: 1;
 }
 </style>
