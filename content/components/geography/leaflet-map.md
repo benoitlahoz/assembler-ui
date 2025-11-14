@@ -444,8 +444,12 @@ import {
 } from ".";
 import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
 
-const { LatDegreesMeters, radiusToLngDegrees, lngDegreesToRadius } =
-  await useLeaflet();
+const {
+  LatDegreesMeters,
+  radiusToLngDegrees,
+  lngDegreesToRadius,
+  constrainToSquare,
+} = await useLeaflet();
 
 export interface LeafletBoundingBoxStyles {
   rectangle: LeafletFeatureRectangleStyle;
@@ -543,44 +547,6 @@ const clearHandles = () => {
     boundingBox.value.remove();
     boundingBox.value = null;
   }
-};
-
-const constrainToSquare = (
-  bounds: L.LatLngBounds,
-  center?: L.LatLng,
-  originalBounds?: L.LatLngBounds,
-): L.LatLngBounds => {
-  if (!L.value) return bounds;
-
-  const currentCenter = center || bounds.getCenter();
-  const latDiff = bounds.getNorth() - bounds.getSouth();
-  const lngDiff = bounds.getEast() - bounds.getWest();
-
-  const latMeters = latDiff * LatDegreesMeters;
-  const lngMeters = lngDegreesToRadius(lngDiff, currentCenter.lat);
-
-  let targetMeters = latMeters;
-  if (originalBounds) {
-    const origLatDiff = originalBounds.getNorth() - originalBounds.getSouth();
-    const origLngDiff = originalBounds.getEast() - originalBounds.getWest();
-    const origLatMeters = origLatDiff * LatDegreesMeters;
-    const origLngMeters = lngDegreesToRadius(origLngDiff, currentCenter.lat);
-
-    const latChange = Math.abs(latMeters - origLatMeters);
-    const lngChange = Math.abs(lngMeters - origLngMeters);
-
-    targetMeters = lngChange > latChange ? lngMeters : latMeters;
-  } else {
-    targetMeters = (latMeters + lngMeters) / 2;
-  }
-
-  const halfLatDiff = targetMeters / 2 / LatDegreesMeters;
-  const halfLngDiff = radiusToLngDegrees(targetMeters / 2, currentCenter.lat);
-
-  return L.value.latLngBounds(
-    [currentCenter.lat - halfLatDiff, currentCenter.lng - halfLngDiff],
-    [currentCenter.lat + halfLatDiff, currentCenter.lng + halfLngDiff],
-  );
 };
 
 const createBoundingBox = () => {
@@ -7666,6 +7632,44 @@ export const useLeaflet = async () => {
     );
   };
 
+  const constrainToSquare = (
+    bounds: L.LatLngBounds,
+    center?: L.LatLng,
+    originalBounds?: L.LatLngBounds,
+  ): L.LatLngBounds => {
+    if (!L.value) return bounds;
+
+    const currentCenter = center || bounds.getCenter();
+    const latDiff = bounds.getNorth() - bounds.getSouth();
+    const lngDiff = bounds.getEast() - bounds.getWest();
+
+    const latMeters = latDiff * LatDegreesMeters;
+    const lngMeters = lngDegreesToRadius(lngDiff, currentCenter.lat);
+
+    let targetMeters = latMeters;
+    if (originalBounds) {
+      const origLatDiff = originalBounds.getNorth() - originalBounds.getSouth();
+      const origLngDiff = originalBounds.getEast() - originalBounds.getWest();
+      const origLatMeters = origLatDiff * LatDegreesMeters;
+      const origLngMeters = lngDegreesToRadius(origLngDiff, currentCenter.lat);
+
+      const latChange = Math.abs(latMeters - origLatMeters);
+      const lngChange = Math.abs(lngMeters - origLngMeters);
+
+      targetMeters = lngChange > latChange ? lngMeters : latMeters;
+    } else {
+      targetMeters = (latMeters + lngMeters) / 2;
+    }
+
+    const halfLatDiff = targetMeters / 2 / LatDegreesMeters;
+    const halfLngDiff = radiusToLngDegrees(targetMeters / 2, currentCenter.lat);
+
+    return L.value.latLngBounds(
+      [currentCenter.lat - halfLatDiff, currentCenter.lng - halfLngDiff],
+      [currentCenter.lat + halfLatDiff, currentCenter.lng + halfLngDiff],
+    );
+  };
+
   return {
     L,
     LatDegreesMeters,
@@ -7688,6 +7692,8 @@ export const useLeaflet = async () => {
     calculateMidpoint,
     calculateRadiusPoint,
     calculateCircleBounds,
+
+    constrainToSquare,
   };
 };
 ```
