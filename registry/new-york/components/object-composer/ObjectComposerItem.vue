@@ -157,7 +157,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
   <div
     v-if="!isExpandable"
     data-slot="object-composer-item"
-    :class="cn('group select-none hover:bg-accent', props.class)"
+    :class="cn('group select-none hover:bg-accent', !isEditing && 'border-l border-border', props.class)"
   >
     <div v-if="!isEditing" class="flex items-center w-full">
       <div class="w-8" />
@@ -221,7 +221,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
     </div>
 
     <!-- Edit Mode - Pleine largeur -->
-    <div v-else class="flex items-center gap-2 w-full p-3 rounded-md border bg-background">
+    <div v-else class="flex items-center gap-2 w-full p-3 rounded-md border bg-background -ml-8">
       <template v-if="!isInArray">
         <Input
           v-model="editKey"
@@ -278,7 +278,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
   </div>
 
   <!-- Accordion pour les éléments expandables -->
-  <Accordion v-else v-model="accordionValue" type="single" collapsible>
+  <Accordion v-else v-model="accordionValue" type="single" collapsible :class="cn(!isEditing && 'border-l border-border')">
     <AccordionItem value="item-1" class="border-b-0">
       <div v-if="!isEditing" class="group flex items-center w-full hover:bg-accent select-none">
         <AccordionTrigger class="flex-none hover:no-underline select-none py-1! px-2">
@@ -387,7 +387,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
       <!-- Edit Mode - Pleine largeur pour accordion (clé seulement) -->
       <div
         v-if="!isInArray && isEditing"
-        class="flex items-center gap-2 w-full p-3 rounded-md border bg-background"
+        class="flex items-center gap-2 w-full p-3 rounded-md border bg-background -ml-4"
       >
         <Input
           v-model="editKey"
