@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount, type HTMLAttributes } from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
-import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
+import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from '.';
 import type { FeatureReference } from './LeafletFeaturesSelector.vue';
 import './leaflet-editing.css';
 
-const { calculateMidpoint, LatDegreesMeters, lngDegreesToRadius } = await useLeaflet();
+const { calculateMidpoint, LatDegreesMeters, lngDegreesToRadius, normalizeLatLngs } =
+  await useLeaflet();
 
 export interface LeafletPolylineProps {
   id?: string | number;
@@ -47,17 +48,6 @@ const polylineId = ref<string | number>(props.id ?? `polyline-${Date.now()}-${Ma
 // Variables pour le drag
 let dragStartLatLngs: L.LatLng[] = [];
 let dragStartMousePoint: L.Point | null = null;
-
-const normalizeLatLngs = (
-  latlngs: Array<[number, number]> | Array<{ lat: number; lng: number }>
-): Array<[number, number]> => {
-  return latlngs.map((point) => {
-    if (Array.isArray(point)) {
-      return point;
-    }
-    return [point.lat, point.lng] as [number, number];
-  });
-};
 
 const clearEditMarkers = () => {
   editMarkers.value.forEach((marker) => marker.remove());

@@ -17,7 +17,7 @@ import {
   type LeafletFeatureHandleStyle,
 } from '.';
 import type { LatLng, Marker, Circle, DivIcon } from 'leaflet';
-import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
+import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
 
 export interface LeafletMeasureToolStyles {

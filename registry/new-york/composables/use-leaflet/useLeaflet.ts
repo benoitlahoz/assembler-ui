@@ -305,6 +305,17 @@ export const useLeaflet = async () => {
     );
   };
 
+  const normalizeLatLngs = (
+    latlngs: Array<[number, number]> | Array<{ lat: number; lng: number }>
+  ): Array<[number, number]> => {
+    return latlngs.map((point) => {
+      if (Array.isArray(point)) {
+        return point;
+      }
+      return [point.lat, point.lng] as [number, number];
+    });
+  };
+
   return {
     L,
     LatDegreesMeters,
@@ -329,5 +340,7 @@ export const useLeaflet = async () => {
     calculateCircleBounds,
     // Contraintes
     constrainToSquare,
+    // Normalisation
+    normalizeLatLngs,
   };
 };

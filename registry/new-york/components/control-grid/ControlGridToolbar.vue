@@ -3,7 +3,7 @@ import { ref, computed } from 'vue';
 import {
   useControlRegistry,
   type ControlDefinition,
-} from '../../composables/use-control-registry/useControlRegistry';
+} from '~~/registry/new-york/composables/use-control-registry/useControlRegistry';
 
 interface Props {
   /**

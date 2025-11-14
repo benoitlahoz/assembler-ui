@@ -904,7 +904,7 @@ import {
   type LeafletFeatureRectangleStyle,
   type LeafletFeatureHandleStyle,
 } from ".";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 
 const {
   LatDegreesMeters,
@@ -1501,7 +1501,7 @@ import {
   provide,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import {
   LeafletMapKey,
   LeafletModuleKey,
@@ -2221,7 +2221,7 @@ import {
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useColors } from "~~/registry/new-york/composables/use-colors/useColors";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import {
   LeafletMapKey,
   LeafletModuleKey,
@@ -3119,7 +3119,7 @@ import {
   onMounted,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
@@ -5605,7 +5605,7 @@ import {
   type LeafletFeatureHandleStyle,
 } from ".";
 import type { LatLng, Marker, Circle, DivIcon } from "leaflet";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 
 export interface LeafletMeasureToolStyles {
@@ -6160,7 +6160,7 @@ import {
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
@@ -6700,7 +6700,7 @@ import {
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
@@ -7689,7 +7689,7 @@ import type {
   UseQuadtreeReturn,
   Rect,
 } from "~~/registry/new-york/composables/use-quadtree/useQuadtree";
-import { useLeaflet } from "../../composables/use-leaflet/useLeaflet";
+import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 
 const { radiusToLatDegrees, radiusToLngDegrees } = await useLeaflet();
 

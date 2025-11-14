@@ -7,7 +7,7 @@ import {
   type LeafletFeatureRectangleStyle,
   type LeafletFeatureHandleStyle,
 } from '.';
-import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
+import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
 
 const { LatDegreesMeters, radiusToLngDegrees, lngDegreesToRadius, constrainToSquare } =
   await useLeaflet();

@@ -6,7 +6,7 @@ import type {
   UseQuadtreeReturn,
   Rect,
 } from '~~/registry/new-york/composables/use-quadtree/useQuadtree';
-import { useLeaflet } from '../../composables/use-leaflet/useLeaflet';
+import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
 
 const { radiusToLatDegrees, radiusToLngDegrees } = await useLeaflet();
 
