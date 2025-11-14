@@ -695,6 +695,7 @@ watch(
           const leafletPane = newMap.getPanes().overlayPane;
           leafletPane.appendChild(canvasLayer.value);
 
+          newMap.on('move', reset);
           newMap.on('moveend', reset);
           newMap.on('zoom', reset);
           newMap.on('viewreset', reset);
@@ -780,6 +781,7 @@ onBeforeUnmount(() => {
   }
 
   if (map.value) {
+    map.value.off('move', reset);
     map.value.off('moveend', reset);
     map.value.off('zoom', reset);
     map.value.off('viewreset', reset);
