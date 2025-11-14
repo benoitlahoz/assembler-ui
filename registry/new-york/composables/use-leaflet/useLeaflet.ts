@@ -316,6 +316,287 @@ export const useLeaflet = async () => {
     });
   };
 
+  /**
+   * Convertit un point LatLng en point pixel (coordonnées container)
+   * @param latlng - Point géographique
+   * @param map - Instance de la carte Leaflet
+   * @returns Point en coordonnées pixel ou null si map invalide
+   */
+  const latLngToPixel = (latlng: L.LatLng, map: L.Map): L.Point | null => {
+    if (!L.value || !map) return null;
+    return map.latLngToContainerPoint(latlng);
+  };
+
+  /**
+   * Convertit un point pixel (coordonnées container) en LatLng
+   * @param point - Point en coordonnées pixel
+   * @param map - Instance de la carte Leaflet
+   * @returns Point géographique ou null si map invalide
+   */
+  const pixelToLatLng = (point: L.Point, map: L.Map): L.LatLng | null => {
+    if (!L.value || !map) return null;
+    return map.containerPointToLatLng(point);
+  };
+
+  /**
+   * Translate un point LatLng par un offset en pixels
+   * @param latlng - Point géographique de départ
+   * @param deltaX - Offset horizontal en pixels
+   * @param deltaY - Offset vertical en pixels
+   * @param map - Instance de la carte Leaflet
+   * @returns Nouveau point géographique ou null si map invalide
+   */
+  const translatePointByPixels = (
+    latlng: L.LatLng,
+    deltaX: number,
+    deltaY: number,
+    map: L.Map
+  ): L.LatLng | null => {
+    if (!L.value || !map) return null;
+    const point = map.latLngToContainerPoint(latlng);
+    const newPoint = L.value.point(point.x + deltaX, point.y + deltaY);
+    return map.containerPointToLatLng(newPoint);
+  };
+
+  /**
+   * Calcule l'offset en pixels entre deux points LatLng
+   * @param from - Point de départ
+   * @param to - Point d'arrivée
+   * @param map - Instance de la carte Leaflet
+   * @returns Objet {x, y} avec les offsets en pixels ou null si map invalide
+   */
+  const calculatePixelOffset = (
+    from: L.LatLng,
+    to: L.LatLng,
+    map: L.Map
+  ): { x: number; y: number } | null => {
+    if (!L.value || !map) return null;
+    const fromPoint = map.latLngToContainerPoint(from);
+    const toPoint = map.latLngToContainerPoint(to);
+    return {
+      x: toPoint.x - fromPoint.x,
+      y: toPoint.y - fromPoint.y,
+    };
+  };
+
+  /**
+   * Calcule les positions des handles pour une bounding box
+   * @param bounds - Bounds de la feature
+   * @param map - Instance de la carte Leaflet
+   * @param options - Options pour les handles à créer
+   * @returns Objet contenant les positions des différents handles
+   */
+  const calculateHandlePositions = (
+    bounds: L.LatLngBounds,
+    map: L.Map,
+    options: {
+      corners?: boolean;
+      edges?: boolean;
+      rotate?: boolean;
+      center?: boolean;
+      rotateOffsetPx?: number;
+    } = {}
+  ): {
+    corners?: L.LatLng[];
+    edges?: L.LatLng[];
+    rotate?: L.LatLng;
+    center?: L.LatLng;
+  } => {
+    if (!L.value) return {};
+
+    const {
+      corners = true,
+      edges = true,
+      rotate = true,
+      center = true,
+      rotateOffsetPx = 30,
+    } = options;
+
+    const result: {
+      corners?: L.LatLng[];
+      edges?: L.LatLng[];
+      rotate?: L.LatLng;
+      center?: L.LatLng;
+    } = {};
+
+    // Coins (ordre: SW, NW, NE, SE)
+    if (corners) {
+      result.corners = [
+        bounds.getSouthWest(),
+        bounds.getNorthWest(),
+        bounds.getNorthEast(),
+        bounds.getSouthEast(),
+      ];
+    }
+
+    // Bords (ordre: gauche, haut, droite, bas)
+    if (edges) {
+      result.edges = [
+        L.value.latLng((bounds.getSouth() + bounds.getNorth()) / 2, bounds.getWest()), // gauche
+        L.value.latLng(bounds.getNorth(), (bounds.getWest() + bounds.getEast()) / 2), // haut
+        L.value.latLng((bounds.getSouth() + bounds.getNorth()) / 2, bounds.getEast()), // droite
+        L.value.latLng(bounds.getSouth(), (bounds.getWest() + bounds.getEast()) / 2), // bas
+      ];
+    }
+
+    // Handle de rotation (au-dessus du centre haut)
+    if (rotate && map) {
+      const centerTop = L.value.latLng(
+        bounds.getNorth(),
+        (bounds.getWest() + bounds.getEast()) / 2
+      );
+      const centerTopPoint = map.latLngToLayerPoint(centerTop);
+      const rotateHandlePoint = L.value.point(centerTopPoint.x, centerTopPoint.y - rotateOffsetPx);
+      result.rotate = map.layerPointToLatLng(rotateHandlePoint);
+    }
+
+    // Centre
+    if (center) {
+      result.center = bounds.getCenter();
+    }
+
+    return result;
+  };
+
+  /**
+   * Calcule les nouvelles bounds à partir d'un handle déplacé
+   * @param handleType - Type de handle ('corner' | 'edge')
+   * @param handleIndex - Index du handle déplacé
+   * @param newPosition - Nouvelle position du handle
+   * @param originalBounds - Bounds originaux avant le déplacement
+   * @returns Nouvelles bounds ou null si invalide
+   */
+  const calculateBoundsFromHandle = (
+    handleType: 'corner' | 'edge',
+    handleIndex: number,
+    newPosition: L.LatLng,
+    originalBounds: L.LatLngBounds
+  ): L.LatLngBounds | null => {
+    if (!L.value) return null;
+
+    let newBounds: L.LatLngBounds;
+
+    if (handleType === 'corner') {
+      // Coins: 0=SW, 1=NW, 2=NE, 3=SE
+      switch (handleIndex) {
+        case 0: // Sud-Ouest
+          newBounds = L.value.latLngBounds(newPosition, originalBounds.getNorthEast());
+          break;
+        case 1: // Nord-Ouest
+          newBounds = L.value.latLngBounds(
+            [originalBounds.getSouth(), newPosition.lng],
+            [newPosition.lat, originalBounds.getEast()]
+          );
+          break;
+        case 2: // Nord-Est
+          newBounds = L.value.latLngBounds(originalBounds.getSouthWest(), newPosition);
+          break;
+        case 3: // Sud-Est
+          newBounds = L.value.latLngBounds(
+            [newPosition.lat, originalBounds.getWest()],
+            [originalBounds.getNorth(), newPosition.lng]
+          );
+          break;
+        default:
+          return null;
+      }
+    } else if (handleType === 'edge') {
+      // Bords: 0=gauche, 1=haut, 2=droite, 3=bas
+      switch (handleIndex) {
+        case 0: // Gauche
+          newBounds = L.value.latLngBounds(
+            [originalBounds.getSouth(), newPosition.lng],
+            [originalBounds.getNorth(), originalBounds.getEast()]
+          );
+          break;
+        case 1: // Haut
+          newBounds = L.value.latLngBounds(
+            [originalBounds.getSouth(), originalBounds.getWest()],
+            [newPosition.lat, originalBounds.getEast()]
+          );
+          break;
+        case 2: // Droite
+          newBounds = L.value.latLngBounds(
+            [originalBounds.getSouth(), originalBounds.getWest()],
+            [originalBounds.getNorth(), newPosition.lng]
+          );
+          break;
+        case 3: // Bas
+          newBounds = L.value.latLngBounds(
+            [newPosition.lat, originalBounds.getWest()],
+            [originalBounds.getNorth(), originalBounds.getEast()]
+          );
+          break;
+        default:
+          return null;
+      }
+    } else {
+      return null;
+    }
+
+    return newBounds;
+  };
+
+  /**
+   * Définit le curseur sur le container de la carte
+   * @param map - Instance de la carte Leaflet
+   * @param cursor - Type de curseur CSS
+   */
+  const setMapCursor = (map: L.Map | null, cursor: string): void => {
+    if (!map) return;
+    map.getContainer().style.cursor = cursor;
+  };
+
+  /**
+   * Réinitialise le curseur de la carte
+   * @param map - Instance de la carte Leaflet
+   */
+  const resetMapCursor = (map: L.Map | null): void => {
+    setMapCursor(map, '');
+  };
+
+  /**
+   * Crée un marker stylisé avec un DivIcon
+   * @param latlng - Position géographique du marker
+   * @param style - Configuration du style (html, className, iconSize)
+   * @param options - Options Leaflet pour le marker (draggable, etc.)
+   * @param map - Instance de la carte Leaflet (optionnel, si fourni ajoute le marker à la carte)
+   * @returns Marker Leaflet ou null si L invalide
+   */
+  const createStyledMarker = (
+    latlng: L.LatLng | [number, number],
+    style: {
+      html: string;
+      className?: string;
+      iconSize?: [number, number];
+      iconAnchor?: [number, number];
+    },
+    options: L.MarkerOptions = {},
+    map?: L.Map
+  ): L.Marker | null => {
+    if (!L.value) return null;
+
+    const { html, className = 'leaflet-styled-marker', iconSize = [12, 12], iconAnchor } = style;
+
+    const icon = L.value.divIcon({
+      className,
+      html,
+      iconSize,
+      iconAnchor,
+    });
+
+    const marker = L.value.marker(latlng, {
+      ...options,
+      icon,
+    });
+
+    if (map) {
+      marker.addTo(map);
+    }
+
+    return marker;
+  };
+
   return {
     L,
     LatDegreesMeters,
@@ -342,5 +623,18 @@ export const useLeaflet = async () => {
     constrainToSquare,
     // Normalisation
     normalizeLatLngs,
+    // Conversions pixels/LatLng
+    latLngToPixel,
+    pixelToLatLng,
+    translatePointByPixels,
+    calculatePixelOffset,
+    // Gestion des handles
+    calculateHandlePositions,
+    calculateBoundsFromHandle,
+    // Gestion des curseurs
+    setMapCursor,
+    resetMapCursor,
+    // Création de markers
+    createStyledMarker,
   };
 };

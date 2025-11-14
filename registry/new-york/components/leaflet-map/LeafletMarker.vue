@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount, onMounted } from 'vue';
-import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from '.';
-import type { FeatureReference } from './LeafletFeaturesSelector.vue';
+import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount } from 'vue';
+import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey, type FeatureReference } from '.';
 
 export interface LeafletMarkerProps {
   id?: string | number;

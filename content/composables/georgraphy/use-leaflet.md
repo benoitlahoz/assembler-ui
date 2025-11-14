@@ -277,6 +277,259 @@ export const useLeaflet = async () => {
     );
   };
 
+  const normalizeLatLngs = (
+    latlngs: Array<[number, number]> | Array<{ lat: number; lng: number }>,
+  ): Array<[number, number]> => {
+    return latlngs.map((point) => {
+      if (Array.isArray(point)) {
+        return point;
+      }
+      return [point.lat, point.lng] as [number, number];
+    });
+  };
+
+  const latLngToPixel = (latlng: L.LatLng, map: L.Map): L.Point | null => {
+    if (!L.value || !map) return null;
+    return map.latLngToContainerPoint(latlng);
+  };
+
+  const pixelToLatLng = (point: L.Point, map: L.Map): L.LatLng | null => {
+    if (!L.value || !map) return null;
+    return map.containerPointToLatLng(point);
+  };
+
+  const translatePointByPixels = (
+    latlng: L.LatLng,
+    deltaX: number,
+    deltaY: number,
+    map: L.Map,
+  ): L.LatLng | null => {
+    if (!L.value || !map) return null;
+    const point = map.latLngToContainerPoint(latlng);
+    const newPoint = L.value.point(point.x + deltaX, point.y + deltaY);
+    return map.containerPointToLatLng(newPoint);
+  };
+
+  const calculatePixelOffset = (
+    from: L.LatLng,
+    to: L.LatLng,
+    map: L.Map,
+  ): { x: number; y: number } | null => {
+    if (!L.value || !map) return null;
+    const fromPoint = map.latLngToContainerPoint(from);
+    const toPoint = map.latLngToContainerPoint(to);
+    return {
+      x: toPoint.x - fromPoint.x,
+      y: toPoint.y - fromPoint.y,
+    };
+  };
+
+  const calculateHandlePositions = (
+    bounds: L.LatLngBounds,
+    map: L.Map,
+    options: {
+      corners?: boolean;
+      edges?: boolean;
+      rotate?: boolean;
+      center?: boolean;
+      rotateOffsetPx?: number;
+    } = {},
+  ): {
+    corners?: L.LatLng[];
+    edges?: L.LatLng[];
+    rotate?: L.LatLng;
+    center?: L.LatLng;
+  } => {
+    if (!L.value) return {};
+
+    const {
+      corners = true,
+      edges = true,
+      rotate = true,
+      center = true,
+      rotateOffsetPx = 30,
+    } = options;
+
+    const result: {
+      corners?: L.LatLng[];
+      edges?: L.LatLng[];
+      rotate?: L.LatLng;
+      center?: L.LatLng;
+    } = {};
+
+    if (corners) {
+      result.corners = [
+        bounds.getSouthWest(),
+        bounds.getNorthWest(),
+        bounds.getNorthEast(),
+        bounds.getSouthEast(),
+      ];
+    }
+
+    if (edges) {
+      result.edges = [
+        L.value.latLng(
+          (bounds.getSouth() + bounds.getNorth()) / 2,
+          bounds.getWest(),
+        ),
+        L.value.latLng(
+          bounds.getNorth(),
+          (bounds.getWest() + bounds.getEast()) / 2,
+        ),
+        L.value.latLng(
+          (bounds.getSouth() + bounds.getNorth()) / 2,
+          bounds.getEast(),
+        ),
+        L.value.latLng(
+          bounds.getSouth(),
+          (bounds.getWest() + bounds.getEast()) / 2,
+        ),
+      ];
+    }
+
+    if (rotate && map) {
+      const centerTop = L.value.latLng(
+        bounds.getNorth(),
+        (bounds.getWest() + bounds.getEast()) / 2,
+      );
+      const centerTopPoint = map.latLngToLayerPoint(centerTop);
+      const rotateHandlePoint = L.value.point(
+        centerTopPoint.x,
+        centerTopPoint.y - rotateOffsetPx,
+      );
+      result.rotate = map.layerPointToLatLng(rotateHandlePoint);
+    }
+
+    if (center) {
+      result.center = bounds.getCenter();
+    }
+
+    return result;
+  };
+
+  const calculateBoundsFromHandle = (
+    handleType: "corner" | "edge",
+    handleIndex: number,
+    newPosition: L.LatLng,
+    originalBounds: L.LatLngBounds,
+  ): L.LatLngBounds | null => {
+    if (!L.value) return null;
+
+    let newBounds: L.LatLngBounds;
+
+    if (handleType === "corner") {
+      switch (handleIndex) {
+        case 0:
+          newBounds = L.value.latLngBounds(
+            newPosition,
+            originalBounds.getNorthEast(),
+          );
+          break;
+        case 1:
+          newBounds = L.value.latLngBounds(
+            [originalBounds.getSouth(), newPosition.lng],
+            [newPosition.lat, originalBounds.getEast()],
+          );
+          break;
+        case 2:
+          newBounds = L.value.latLngBounds(
+            originalBounds.getSouthWest(),
+            newPosition,
+          );
+          break;
+        case 3:
+          newBounds = L.value.latLngBounds(
+            [newPosition.lat, originalBounds.getWest()],
+            [originalBounds.getNorth(), newPosition.lng],
+          );
+          break;
+        default:
+          return null;
+      }
+    } else if (handleType === "edge") {
+      switch (handleIndex) {
+        case 0:
+          newBounds = L.value.latLngBounds(
+            [originalBounds.getSouth(), newPosition.lng],
+            [originalBounds.getNorth(), originalBounds.getEast()],
+          );
+          break;
+        case 1:
+          newBounds = L.value.latLngBounds(
+            [originalBounds.getSouth(), originalBounds.getWest()],
+            [newPosition.lat, originalBounds.getEast()],
+          );
+          break;
+        case 2:
+          newBounds = L.value.latLngBounds(
+            [originalBounds.getSouth(), originalBounds.getWest()],
+            [originalBounds.getNorth(), newPosition.lng],
+          );
+          break;
+        case 3:
+          newBounds = L.value.latLngBounds(
+            [newPosition.lat, originalBounds.getWest()],
+            [originalBounds.getNorth(), originalBounds.getEast()],
+          );
+          break;
+        default:
+          return null;
+      }
+    } else {
+      return null;
+    }
+
+    return newBounds;
+  };
+
+  const setMapCursor = (map: L.Map | null, cursor: string): void => {
+    if (!map) return;
+    map.getContainer().style.cursor = cursor;
+  };
+
+  const resetMapCursor = (map: L.Map | null): void => {
+    setMapCursor(map, "");
+  };
+
+  const createStyledMarker = (
+    latlng: L.LatLng | [number, number],
+    style: {
+      html: string;
+      className?: string;
+      iconSize?: [number, number];
+      iconAnchor?: [number, number];
+    },
+    options: L.MarkerOptions = {},
+    map?: L.Map,
+  ): L.Marker | null => {
+    if (!L.value) return null;
+
+    const {
+      html,
+      className = "leaflet-styled-marker",
+      iconSize = [12, 12],
+      iconAnchor,
+    } = style;
+
+    const icon = L.value.divIcon({
+      className,
+      html,
+      iconSize,
+      iconAnchor,
+    });
+
+    const marker = L.value.marker(latlng, {
+      ...options,
+      icon,
+    });
+
+    if (map) {
+      marker.addTo(map);
+    }
+
+    return marker;
+  };
+
   return {
     L,
     LatDegreesMeters,
@@ -301,6 +554,21 @@ export const useLeaflet = async () => {
     calculateCircleBounds,
 
     constrainToSquare,
+
+    normalizeLatLngs,
+
+    latLngToPixel,
+    pixelToLatLng,
+    translatePointByPixels,
+    calculatePixelOffset,
+
+    calculateHandlePositions,
+    calculateBoundsFromHandle,
+
+    setMapCursor,
+    resetMapCursor,
+
+    createStyledMarker,
   };
 };
 ```
@@ -334,6 +602,16 @@ Circonférence de la Terre en mètres
 | `calculateRadiusPoint`{.primary .text-primary} | `any` | — |
 | `calculateCircleBounds`{.primary .text-primary} | `any` | — |
 | `constrainToSquare`{.primary .text-primary} | `any` | Contraintes |
+| `normalizeLatLngs`{.primary .text-primary} | `any` | Normalisation |
+| `latLngToPixel`{.primary .text-primary} | `any` | Conversions pixels/LatLng |
+| `pixelToLatLng`{.primary .text-primary} | `any` | — |
+| `translatePointByPixels`{.primary .text-primary} | `any` | — |
+| `calculatePixelOffset`{.primary .text-primary} | `any` | — |
+| `calculateHandlePositions`{.primary .text-primary} | `any` | Gestion des handles |
+| `calculateBoundsFromHandle`{.primary .text-primary} | `any` | — |
+| `setMapCursor`{.primary .text-primary} | `any` | Gestion des curseurs |
+| `resetMapCursor`{.primary .text-primary} | `any` | — |
+| `createStyledMarker`{.primary .text-primary} | `any` | Création de markers |
 
   ### Types
 | Name | Type | Description |

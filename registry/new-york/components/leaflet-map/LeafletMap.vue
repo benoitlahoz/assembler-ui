@@ -11,10 +11,11 @@ import {
   onBeforeUnmount,
 } from 'vue';
 import { cn } from '@/lib/utils';
-import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
-import { LeafletErrorsKey, LeafletMapKey, LeafletModuleKey, LeafletTileLayersKey } from '.';
 import type Leaflet from 'leaflet';
 import type { LeafletMouseEvent } from 'leaflet';
+import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
+import { LeafletErrorsKey, LeafletMapKey, LeafletModuleKey, LeafletTileLayersKey } from '.';
+
 type Leaflet = typeof Leaflet;
 
 export interface LeafletMapExposed {

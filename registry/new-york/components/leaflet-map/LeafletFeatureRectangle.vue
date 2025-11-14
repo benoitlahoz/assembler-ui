@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import { removeWhitespaces } from '@assemblerjs/core';
 import { watch, inject, type HTMLAttributes, ref } from 'vue';
 import { cn } from '@/lib/utils';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
 import { LeafletStylesKey } from '.';
-import { removeWhitespaces } from '@assemblerjs/core';
 
 export interface LeafletFeatureRectangleStyle {
   color: string;

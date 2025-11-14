@@ -1,14 +1,5 @@
 <script setup lang="ts">
-import {
-  inject,
-  watch,
-  ref,
-  type Ref,
-  nextTick,
-  onBeforeUnmount,
-  type HTMLAttributes,
-  onMounted,
-} from 'vue';
+import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount, type HTMLAttributes } from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
 import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from '.';
@@ -16,11 +7,14 @@ import type { FeatureReference } from './LeafletFeaturesSelector.vue';
 import './leaflet-editing.css';
 
 const {
+  LatDegreesMeters,
   calculateRadiusPoint,
   calculateCircleBounds,
-  radiusToLngDegrees,
   lngDegreesToRadius,
-  LatDegreesMeters,
+  setMapCursor,
+  resetMapCursor,
+  translatePointByPixels,
+  createStyledMarker,
 } = await useLeaflet();
 
 export interface LeafletCircleProps {
@@ -89,7 +83,7 @@ const enableDragging = () => {
     dragStartMousePoint = e.containerPoint;
     L.value!.DomEvent.stopPropagation(e);
     map.value.dragging.disable();
-    map.value.getContainer().style.cursor = 'move';
+    setMapCursor(map.value, 'move');
 
     // Émettre dragstart
     emit('dragstart');
@@ -114,9 +108,8 @@ const setupMapDragHandlers = () => {
     const dx = currentPoint.x - dragStartMousePoint.x;
     const dy = currentPoint.y - dragStartMousePoint.y;
 
-    const startPoint = map.value.latLngToContainerPoint(dragStartLatLng);
-    const newPoint = L.value!.point(startPoint.x + dx, startPoint.y + dy);
-    const newLatLng = map.value.containerPointToLatLng(newPoint);
+    const newLatLng = translatePointByPixels(dragStartLatLng, dx, dy, map.value);
+    if (!newLatLng) return;
 
     circle.value.setLatLng(newLatLng);
 
@@ -144,7 +137,7 @@ const setupMapDragHandlers = () => {
     emit('update:lat', newLatLng.lat);
     emit('update:lng', newLatLng.lng);
     map.value.dragging.enable();
-    map.value.getContainer().style.cursor = '';
+    resetMapCursor(map.value);
   };
 
   map.value.on('mousemove', onMouseMove);
@@ -168,16 +161,17 @@ const enableEditing = () => {
   if (props.editable) {
     const [lat, lng] = calculateRadiusPoint(center, radius);
     const radiusLatLng = L.value.latLng(lat, lng);
-    radiusMarker.value = L.value
-      .marker(radiusLatLng, {
-        draggable: true,
-        icon: L.value.divIcon({
-          className: 'leaflet-editing-icon',
-          html: '<div style="width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #3388ff;"></div>',
-          iconSize: [8, 8],
-        }),
-      })
-      .addTo(map.value);
+    radiusMarker.value = createStyledMarker(
+      radiusLatLng,
+      {
+        className: 'leaflet-editing-icon',
+        html: '<div style="width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #3388ff;"></div>',
+        iconSize: [8, 8],
+      },
+      { draggable: true },
+      map.value
+    );
+    if (!radiusMarker.value) return;
 
     const onRadiusMarkerDrag = () => {
       const center = circle.value!.getLatLng();

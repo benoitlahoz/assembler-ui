@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { inject, watch, ref, type Ref, onBeforeUnmount, provide } from 'vue';
+import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
 import {
   LeafletStylesKey,
   LeafletMapKey,
@@ -7,10 +8,15 @@ import {
   type LeafletFeatureRectangleStyle,
   type LeafletFeatureHandleStyle,
 } from '.';
-import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
 
-const { LatDegreesMeters, radiusToLngDegrees, lngDegreesToRadius, constrainToSquare } =
-  await useLeaflet();
+const {
+  constrainToSquare,
+  calculateHandlePositions,
+  calculateBoundsFromHandle,
+  setMapCursor,
+  resetMapCursor,
+  createStyledMarker,
+} = await useLeaflet();
 
 export interface LeafletBoundingBoxStyles {
   rectangle: LeafletFeatureRectangleStyle;
@@ -122,22 +128,28 @@ const createBoundingBox = () => {
     .rectangle(props.bounds, stylesOptions.value.rectangle)
     .addTo(map.value);
 
-  const corners = [
-    props.bounds.getSouthWest(), // 0: bas-gauche
-    props.bounds.getNorthWest(), // 1: haut-gauche
-    props.bounds.getNorthEast(), // 2: haut-droit
-    props.bounds.getSouthEast(), // 3: bas-droit
-  ];
+  // Calculer toutes les positions de handles
+  const handlePositions = calculateHandlePositions(props.bounds, map.value, {
+    corners: true,
+    edges: true,
+    rotate: props.showRotateHandle,
+    center: true,
+    rotateOffsetPx: 30,
+  });
 
   const cornerCursors = ['nesw-resize', 'nwse-resize', 'nesw-resize', 'nwse-resize'];
   const edgeCursors = ['ew-resize', 'ns-resize', 'ew-resize', 'ns-resize'];
   const rotateCursor = 'ew-resize';
 
-  corners.forEach((corner, index) => {
-    const handle = L.value!.marker(corner, {
-      draggable: true,
-      icon: L.value!.divIcon(stylesOptions.value.corner),
-    }).addTo(map.value!);
+  // Créer les handles de coins
+  handlePositions.corners?.forEach((corner, index) => {
+    const handle = createStyledMarker(
+      corner,
+      stylesOptions.value.corner,
+      { draggable: true },
+      map.value!
+    );
+    if (!handle) return;
 
     // Définir le curseur sur l'élément du marker
     const handleElement = handle.getElement();
@@ -146,9 +158,7 @@ const createBoundingBox = () => {
     }
 
     const onCornerMouseDown = () => {
-      if (map.value && cornerCursors[index]) {
-        map.value.getContainer().style.cursor = cornerCursors[index];
-      }
+      if (map.value) setMapCursor(map.value, cornerCursors[index] || '');
     };
 
     const onCornerDragStart = () => {
@@ -164,31 +174,8 @@ const createBoundingBox = () => {
       if (!isScaling.value || !scaleStartBounds) return;
 
       const newCorner = handle.getLatLng();
-      let newBounds: L.LatLngBounds;
-
-      // Calculer les nouvelles bornes en fonction du coin déplacé
-      switch (index) {
-        case 0: // Sud-Ouest
-          newBounds = L.value!.latLngBounds(newCorner, scaleStartBounds.getNorthEast());
-          break;
-        case 1: // Nord-Ouest
-          newBounds = L.value!.latLngBounds(
-            [scaleStartBounds.getSouth(), newCorner.lng],
-            [newCorner.lat, scaleStartBounds.getEast()]
-          );
-          break;
-        case 2: // Nord-Est
-          newBounds = L.value!.latLngBounds(scaleStartBounds.getSouthWest(), newCorner);
-          break;
-        case 3: // Sud-Est
-          newBounds = L.value!.latLngBounds(
-            [newCorner.lat, scaleStartBounds.getWest()],
-            [scaleStartBounds.getNorth(), newCorner.lng]
-          );
-          break;
-        default:
-          return;
-      }
+      let newBounds = calculateBoundsFromHandle('corner', index, newCorner, scaleStartBounds);
+      if (!newBounds) return;
 
       // Constrain to square if needed (for circles)
       if (props.constrainSquare) {
@@ -210,7 +197,7 @@ const createBoundingBox = () => {
     const onCornerDragEnd = () => {
       isScaling.value = false;
       if (map.value) {
-        map.value.getContainer().style.cursor = '';
+        resetMapCursor(map.value);
         map.value.dragging.enable();
       }
       if (boundingBox.value) {
@@ -227,25 +214,14 @@ const createBoundingBox = () => {
   });
 
   // Créer les handles sur les bords (pour scale uniaxial)
-  const edges = [
-    // Milieu de chaque côté
-    L.value!.latLng(
-      (props.bounds.getSouth() + props.bounds.getNorth()) / 2,
-      props.bounds.getWest()
-    ), // 0: gauche
-    L.value!.latLng(props.bounds.getNorth(), (props.bounds.getWest() + props.bounds.getEast()) / 2), // 1: haut
-    L.value!.latLng(
-      (props.bounds.getSouth() + props.bounds.getNorth()) / 2,
-      props.bounds.getEast()
-    ), // 2: droite
-    L.value!.latLng(props.bounds.getSouth(), (props.bounds.getWest() + props.bounds.getEast()) / 2), // 3: bas
-  ];
-
-  edges.forEach((edge, index) => {
-    const handle = L.value!.marker(edge, {
-      draggable: true,
-      icon: L.value!.divIcon(stylesOptions.value.edge),
-    }).addTo(map.value!);
+  handlePositions.edges?.forEach((edge, index) => {
+    const handle = createStyledMarker(
+      edge,
+      stylesOptions.value.edge,
+      { draggable: true },
+      map.value!
+    );
+    if (!handle) return;
 
     // Définir le curseur sur l'élément du marker
     const handleElement = handle.getElement();
@@ -254,9 +230,7 @@ const createBoundingBox = () => {
     }
 
     const onEdgeMouseDown = () => {
-      if (map.value && edgeCursors[index]) {
-        map.value.getContainer().style.cursor = edgeCursors[index];
-      }
+      if (map.value) setMapCursor(map.value, edgeCursors[index] || '');
     };
 
     const onEdgeDragStart = () => {
@@ -271,35 +245,8 @@ const createBoundingBox = () => {
       if (!isScaling.value || !scaleStartBounds) return;
 
       const newPos = handle.getLatLng();
-      let newBounds: L.LatLngBounds = scaleStartBounds;
-
-      // Scale selon le bord déplacé
-      switch (index) {
-        case 0: // Gauche
-          newBounds = L.value!.latLngBounds(
-            [scaleStartBounds.getSouth(), newPos.lng],
-            [scaleStartBounds.getNorth(), scaleStartBounds.getEast()]
-          );
-          break;
-        case 1: // Haut
-          newBounds = L.value!.latLngBounds(
-            [scaleStartBounds.getSouth(), scaleStartBounds.getWest()],
-            [newPos.lat, scaleStartBounds.getEast()]
-          );
-          break;
-        case 2: // Droite
-          newBounds = L.value!.latLngBounds(
-            [scaleStartBounds.getSouth(), scaleStartBounds.getWest()],
-            [scaleStartBounds.getNorth(), newPos.lng]
-          );
-          break;
-        case 3: // Bas
-          newBounds = L.value!.latLngBounds(
-            [newPos.lat, scaleStartBounds.getWest()],
-            [scaleStartBounds.getNorth(), scaleStartBounds.getEast()]
-          );
-          break;
-      }
+      let newBounds = calculateBoundsFromHandle('edge', index, newPos, scaleStartBounds);
+      if (!newBounds) return;
 
       // Constrain to square if needed (for circles)
       if (props.constrainSquare) {
@@ -321,7 +268,7 @@ const createBoundingBox = () => {
     const onEdgeDragEnd = () => {
       isScaling.value = false;
       if (map.value) {
-        map.value.getContainer().style.cursor = '';
+        resetMapCursor(map.value);
         map.value.dragging.enable();
       }
       if (boundingBox.value) {
@@ -338,23 +285,15 @@ const createBoundingBox = () => {
   });
 
   // Créer le handle de rotation (au-dessus du centre haut) seulement si activé
-  if (props.showRotateHandle) {
-    const centerTop = L.value!.latLng(
-      props.bounds.getNorth(),
-      (props.bounds.getWest() + props.bounds.getEast()) / 2
+  if (props.showRotateHandle && handlePositions.rotate) {
+    rotateHandle.value = createStyledMarker(
+      handlePositions.rotate,
+      stylesOptions.value.rotate,
+      { draggable: true },
+      map.value
     );
 
-    // Calculer la position du handle de rotation (20px au-dessus en pixels)
-    const centerTopPoint = map.value.latLngToLayerPoint(centerTop);
-    const rotateHandlePoint = L.value!.point(centerTopPoint.x, centerTopPoint.y - 30);
-    const rotateHandleLatLng = map.value.layerPointToLatLng(rotateHandlePoint);
-
-    rotateHandle.value = L.value
-      .marker(rotateHandleLatLng, {
-        draggable: true,
-        icon: L.value.divIcon(stylesOptions.value.rotate),
-      })
-      .addTo(map.value);
+    if (!rotateHandle.value) return;
 
     // Définir le curseur sur l'élément du marker
     const handleElement = rotateHandle.value.getElement();
@@ -363,9 +302,7 @@ const createBoundingBox = () => {
     }
 
     const onRotateMouseDown = () => {
-      if (map.value) {
-        map.value.getContainer().style.cursor = rotateCursor;
-      }
+      if (map.value) setMapCursor(map.value, rotateCursor);
       // Changer le curseur du handle aussi
       const handleElement = rotateHandle.value?.getElement();
       if (handleElement) {
@@ -414,7 +351,7 @@ const createBoundingBox = () => {
     const onRotateDragEnd = () => {
       isRotating.value = false;
       if (map.value) {
-        map.value.getContainer().style.cursor = '';
+        resetMapCursor(map.value);
         map.value.dragging.enable();
       }
 
@@ -441,9 +378,7 @@ const createBoundingBox = () => {
     };
 
     const onRotateMouseUp = () => {
-      if (map.value) {
-        map.value.getContainer().style.cursor = '';
-      }
+      resetMapCursor(map.value);
     };
 
     rotateHandle.value.on('mousedown', onRotateMouseDown);
@@ -454,53 +389,46 @@ const createBoundingBox = () => {
   }
 
   // Créer le handle central orange (non draggable, juste pour visualisation)
-  const center = props.bounds.getCenter();
-  centerHandle.value = L.value
-    .marker(center, {
-      draggable: false,
-      icon: L.value.divIcon(stylesOptions.value.center),
-    })
-    .addTo(map.value);
+  if (handlePositions.center) {
+    centerHandle.value = createStyledMarker(
+      handlePositions.center,
+      stylesOptions.value.center,
+      { draggable: false },
+      map.value
+    );
+  }
 };
 
 const updateHandlePositions = (bounds: L.LatLngBounds) => {
   if (!L.value || !map.value) return;
 
+  // Calculer toutes les nouvelles positions
+  const handlePositions = calculateHandlePositions(bounds, map.value, {
+    corners: true,
+    edges: true,
+    rotate: props.showRotateHandle,
+    center: true,
+    rotateOffsetPx: 30,
+  });
+
   // Mettre à jour les coins
-  const corners = [
-    bounds.getSouthWest(),
-    bounds.getNorthWest(),
-    bounds.getNorthEast(),
-    bounds.getSouthEast(),
-  ];
-  cornerHandles.value.forEach((handle, i) => {
-    if (corners[i]) handle.setLatLng(corners[i]);
+  handlePositions.corners?.forEach((corner, i) => {
+    if (cornerHandles.value[i]) cornerHandles.value[i].setLatLng(corner);
   });
 
   // Mettre à jour les bords
-  const edges = [
-    L.value.latLng((bounds.getSouth() + bounds.getNorth()) / 2, bounds.getWest()),
-    L.value.latLng(bounds.getNorth(), (bounds.getWest() + bounds.getEast()) / 2),
-    L.value.latLng((bounds.getSouth() + bounds.getNorth()) / 2, bounds.getEast()),
-    L.value.latLng(bounds.getSouth(), (bounds.getWest() + bounds.getEast()) / 2),
-  ];
-  edgeHandles.value.forEach((handle, i) => {
-    if (edges[i]) handle.setLatLng(edges[i]);
+  handlePositions.edges?.forEach((edge, i) => {
+    if (edgeHandles.value[i]) edgeHandles.value[i].setLatLng(edge);
   });
 
   // Mettre à jour le handle de rotation
-  if (rotateHandle.value) {
-    const centerTop = L.value.latLng(bounds.getNorth(), (bounds.getWest() + bounds.getEast()) / 2);
-    const centerTopPoint = map.value.latLngToLayerPoint(centerTop);
-    const rotateHandlePoint = L.value.point(centerTopPoint.x, centerTopPoint.y - 30);
-    const rotateHandleLatLng = map.value.layerPointToLatLng(rotateHandlePoint);
-    rotateHandle.value.setLatLng(rotateHandleLatLng);
+  if (rotateHandle.value && handlePositions.rotate) {
+    rotateHandle.value.setLatLng(handlePositions.rotate);
   }
 
   // Mettre à jour le handle central
-  if (centerHandle.value) {
-    const center = bounds.getCenter();
-    centerHandle.value.setLatLng(center);
+  if (centerHandle.value && handlePositions.center) {
+    centerHandle.value.setLatLng(handlePositions.center);
   }
 };
 
