@@ -52,6 +52,18 @@ export const useLeaflet = async () => {
   };
 
   /**
+   * Convert GeoJSON coords [lng, lat] to a LatLng array.
+   */
+  const fromGeoJSONCoords = (coords: Position[]): LatLng[] => {
+    return coords
+      .filter(
+        (c): c is [number, number] | [number, number, number] =>
+          c[0] !== undefined && c[1] !== undefined
+      )
+      .map((c) => new L.value!.LatLng(c[1], c[0]));
+  };
+
+  /**
    * Calcule la distance d'une ligne (polyline) en mètres avec Turf.js (géodésique précis)
    * @param latlngs - Array de points LatLng
    * @param unit - Unité de mesure ('metric' | 'imperial')
@@ -314,28 +326,6 @@ export const useLeaflet = async () => {
       }
       return [point.lat, point.lng] as [number, number];
     });
-  };
-
-  /**
-   * Convertit un point LatLng en point pixel (coordonnées container)
-   * @param latlng - Point géographique
-   * @param map - Instance de la carte Leaflet
-   * @returns Point en coordonnées pixel ou null si map invalide
-   */
-  const latLngToPixel = (latlng: L.LatLng, map: L.Map): L.Point | null => {
-    if (!L.value || !map) return null;
-    return map.latLngToContainerPoint(latlng);
-  };
-
-  /**
-   * Convertit un point pixel (coordonnées container) en LatLng
-   * @param point - Point en coordonnées pixel
-   * @param map - Instance de la carte Leaflet
-   * @returns Point géographique ou null si map invalide
-   */
-  const pixelToLatLng = (point: L.Point, map: L.Map): L.LatLng | null => {
-    if (!L.value || !map) return null;
-    return map.containerPointToLatLng(point);
   };
 
   /**
@@ -608,6 +598,7 @@ export const useLeaflet = async () => {
     pixelsToMeters,
     // Fonctions Turf.js (géométrie)
     toGeoJSONCoords,
+    fromGeoJSONCoords,
     calculateLineDistance,
     calculatePolygonArea,
     calculateCentroid,
@@ -623,9 +614,7 @@ export const useLeaflet = async () => {
     constrainToSquare,
     // Normalisation
     normalizeLatLngs,
-    // Conversions pixels/LatLng
-    latLngToPixel,
-    pixelToLatLng,
+    // Translation et offset
     translatePointByPixels,
     calculatePixelOffset,
     // Gestion des handles
