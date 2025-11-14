@@ -1,23 +1,26 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, provide } from 'vue';
 import { useCheckIn } from '../useCheckIn';
 import ToolbarButton from './ToolbarButton.vue';
 import ToolbarSeparator from './ToolbarSeparator.vue';
-import { ToolbarDesk } from './desk-keys';
 
-// ==========================================
-// Toolbar Check-In Setup
-// ==========================================
+// Type de données pour les outils de la toolbar
+interface ToolItemData {
+  label: string;
+  icon?: string;
+  type: 'button' | 'toggle' | 'separator';
+  active?: boolean;
+  disabled?: boolean;
+}
 
-// ==========================================
 // Parent: Toolbar Container
-// ==========================================
-const { openDesk } = useCheckIn();
+const { openDesk } = useCheckIn<ToolItemData>();
 
 const activeTool = ref<string | number | null>(null);
 const clickHistory = ref<Array<{ id: string | number; time: number }>>([]);
 
-const desk = openDesk(ToolbarDesk, {
+// Le parent ouvre un desk et le fournit à ses enfants
+const { desk, deskSymbol: toolbarDesk } = openDesk({
   extraContext: {
     activeTool,
     handleClick: (id: string | number, type: 'button' | 'toggle') => {
@@ -36,6 +39,9 @@ const desk = openDesk(ToolbarDesk, {
     console.log('Tool checked in:', id, data);
   },
 });
+
+// Fournir le deskSymbol dans un objet aux enfants
+provide('toolbarDesk', { deskSymbol: toolbarDesk });
 
 const allTools = computed(() =>
   desk.getAll().sort((a, b) => String(a.id).localeCompare(String(b.id)))

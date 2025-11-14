@@ -1,7 +1,17 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useCheckIn } from '../useCheckIn';
-import { AccordionDesk } from './desk-keys';
+import { computed, inject, type InjectionKey } from 'vue';
+import { useCheckIn, type CheckInDesk } from '../useCheckIn';
+
+// Le type de données pour les items de l'accordéon
+interface AccordionItemData {
+  title: string;
+  open?: boolean;
+}
+
+// Récupère le Symbol du desk fourni par le parent
+const accordionDesk = inject<{ deskSymbol: InjectionKey<CheckInDesk<AccordionItemData>> }>(
+  'accordionDesk'
+)!;
 
 const props = withDefaults(
   defineProps<{
@@ -14,9 +24,9 @@ const props = withDefaults(
   }
 );
 
-const { checkIn } = useCheckIn();
+const { checkIn } = useCheckIn<AccordionItemData>();
 
-const { desk: accordionDesk } = checkIn(AccordionDesk, {
+const { desk } = checkIn(accordionDesk, {
   required: true,
   autoCheckIn: true,
   id: props.id,
@@ -27,10 +37,10 @@ const { desk: accordionDesk } = checkIn(AccordionDesk, {
   watchData: true,
 });
 
-const isOpen = computed(() => (accordionDesk as any)?.isOpen(props.id) || false);
+const isOpen = computed(() => (desk as any)?.isOpen(props.id) || false);
 
 const toggle = () => {
-  (accordionDesk as any)?.toggle(props.id);
+  (desk as any)?.toggle(props.id);
 };
 </script>
 

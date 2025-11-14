@@ -1,7 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useCheckIn } from '../useCheckIn';
-import { TabsDesk } from './desk-keys';
+import { computed, inject, type InjectionKey } from 'vue';
+import { useCheckIn, type CheckInDesk } from '../useCheckIn';
+
+interface TabItemData {
+  label: string;
+  disabled?: boolean;
+  icon?: string;
+}
+
+// Récupère le Symbol du desk fourni par le parent
+const tabsDesk = inject<{ deskSymbol: InjectionKey<CheckInDesk<TabItemData>> }>('tabsDesk')!;
 
 const props = withDefaults(
   defineProps<{
@@ -15,9 +23,9 @@ const props = withDefaults(
   }
 );
 
-const { checkIn } = useCheckIn();
+const { checkIn } = useCheckIn<TabItemData>();
 
-const { desk: tabDesk } = checkIn(TabsDesk, {
+const { desk } = checkIn(tabsDesk, {
   required: true,
   autoCheckIn: true,
   id: props.id,
@@ -29,7 +37,7 @@ const { desk: tabDesk } = checkIn(TabsDesk, {
   watchData: true,
 });
 
-const isActive = computed(() => (tabDesk as any)?.activeTab.value === props.id);
+const isActive = computed(() => (desk as any)?.activeTab.value === props.id);
 </script>
 
 <template>

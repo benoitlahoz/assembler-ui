@@ -7,23 +7,454 @@ description: Generic check-in system for parent/child component registration pat
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <form-demo />
+  :::
+
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
+```vue
+<script setup lang="ts">
+import { ref, computed, provide } from "vue";
+import { useCheckIn } from "../useCheckIn";
+import FormField from "./FormField.vue";
+
+interface FormFieldData {
+  name: string;
+  label: string;
+  value: any;
+  required?: boolean;
+}
+
+const { openDesk } = useCheckIn<FormFieldData>();
+
+const formData = ref<Record<string, any>>({});
+const errors = ref<Record<string, string>>({});
+
+const { desk, deskSymbol: formDesk } = openDesk({
+  extraContext: {
+    updateValue: (name: string, value: any) => {
+      formData.value[name] = value;
+      if (errors.value[name]) {
+        delete errors.value[name];
+        errors.value = { ...errors.value };
+      }
+    },
+    getValue: (name: string) => formData.value[name],
+    setError: (name: string, error: string) => {
+      errors.value[name] = error;
+      errors.value = { ...errors.value };
+    },
+    getError: (name: string) => errors.value[name],
+  },
+  onCheckIn: (id, data) => {
+    console.log("Field checked in:", id, data);
+    if (data.value !== undefined) {
+      formData.value[data.name] = data.value;
+    }
+  },
+  onCheckOut: (id) => {
+    console.log("Field checked out:", id);
+  },
+});
+
+provide("formDesk", { deskSymbol: formDesk });
+
+const allFields = computed(() => desk.getAll());
+const isValid = computed(() => Object.keys(errors.value).length === 0);
+const fieldCount = computed(() => allFields.value.length);
+
+const validateForm = () => {
+  errors.value = {};
+  allFields.value.forEach((field) => {
+    if (field.data.required && !formData.value[field.data.name]) {
+      errors.value[field.data.name] = `${field.data.label} is required`;
+    }
+  });
+  errors.value = { ...errors.value };
+  return Object.keys(errors.value).length === 0;
+};
+
+const handleSubmit = () => {
+  if (validateForm()) {
+    alert(`Form submitted!\n\n${JSON.stringify(formData.value, null, 2)}`);
+  }
+};
+
+const resetForm = () => {
+  formData.value = {};
+  errors.value = {};
+};
+</script>
+
+<template>
+  <div class="w-full max-w-2xl mx-auto space-y-6 p-6">
+    <div class="space-y-2">
+      <h2 class="text-2xl font-bold">useCheckIn - Form Demo</h2>
+      <p class="text-muted-foreground">
+        Form fields check in with parent for centralized state management
+      </p>
+    </div>
+
+    <div class="flex items-center gap-4 p-4 bg-muted rounded-lg">
+      <span class="text-sm font-medium">{{ fieldCount }} fields</span>
+      <span
+        :class="[
+          'text-sm font-medium',
+          isValid ? 'text-green-600' : 'text-red-600',
+        ]"
+      >
+        {{ isValid ? "✓ Valid" : "✗ Invalid" }}
+      </span>
+    </div>
+
+    <form
+      @submit.prevent="handleSubmit"
+      class="space-y-4 p-6 border border-border rounded-lg"
+    >
+      <FormField
+        name="username"
+        label="Username"
+        :required="true"
+        placeholder="Enter username"
+      />
+      <FormField
+        name="email"
+        label="Email"
+        type="email"
+        :required="true"
+        placeholder="email@example.com"
+      />
+      <FormField
+        name="bio"
+        label="Bio"
+        type="textarea"
+        placeholder="Tell us about yourself..."
+      />
+
+      <div class="flex gap-2 pt-4">
+        <button
+          type="submit"
+          class="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+        >
+          Submit
+        </button>
+        <button
+          type="button"
+          @click="resetForm"
+          class="px-4 py-2 bg-secondary text-secondary-foreground rounded hover:bg-secondary/80"
+        >
+          Reset
+        </button>
+      </div>
+    </form>
+
+    <div class="p-4 bg-muted rounded-lg space-y-2">
+      <h4 class="font-semibold">Debug Info</h4>
+      <div class="text-sm space-y-1">
+        <pre class="bg-background p-2 rounded">{{
+          JSON.stringify(formData, null, 2)
+        }}</pre>
+        <p>
+          <strong>Fields:</strong>
+          {{ allFields.map((f) => f.data.name).join(", ") }}
+        </p>
+      </div>
+    </div>
+  </div>
+</template>
+```
+  :::
+::
+
+## Install with CLI
+::hr-underline
+::
+
+This will install the composable in the path defined by your `components.json` file, thanks to shadcn-vue.
+
+:::code-group{.w-full}
+```bash [yarn]
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-check-in.json"
+  ```
+
+```bash [npm]
+  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-check-in.json"
+  ```
+
+```bash [pnpm]
+  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-check-in.json"
+  ```
+
+```bash [bun]
+  bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-check-in.json"
+  ```
+:::
+
+## Install Manually
+::hr-underline
+::
+
+Copy and paste these files into your project.
+
+:::code-tree{default-value="src/composables/use-check-in/useCheckIn.ts"}
+
+```ts [src/composables/use-check-in/useCheckIn.ts]
+import {
+  ref,
+  provide,
+  inject,
+  onMounted,
+  onBeforeUnmount,
+  watch,
+  type InjectionKey,
+  type Ref,
+} from "vue";
+
+export interface CheckInItem<T = any> {
+  id: string | number;
+  data: T;
+}
+
+export interface CheckInDesk<T = any> {
+  registry: Ref<Map<string | number, CheckInItem<T>>>;
+  checkIn: (id: string | number, data: T) => void;
+  checkOut: (id: string | number) => void;
+  get: (id: string | number) => CheckInItem<T> | undefined;
+  getAll: () => CheckInItem<T>[];
+  update: (id: string | number, data: Partial<T>) => void;
+  has: (id: string | number) => boolean;
+  clear: () => void;
+}
+
+export interface CheckInDeskOptions<T = any> {
+  extraContext?: Record<string, any>;
+
+  onCheckIn?: (id: string | number, data: T) => void;
+
+  onCheckOut?: (id: string | number) => void;
+}
+
+export interface CheckInOptions<T = any> {
+  required?: boolean;
+
+  autoCheckIn?: boolean;
+
+  id?: string | number;
+
+  data?: T | (() => T);
+
+  generateId?: () => string | number;
+
+  watchData?: boolean;
+}
+
+export const useCheckIn = <T = any,>() => {
+  const createDeskContext = <T = any,>(
+    options?: CheckInDeskOptions<T>,
+  ): CheckInDesk<T> => {
+    const registry = ref<Map<string | number, CheckInItem<T>>>(
+      new Map(),
+    ) as Ref<Map<string | number, CheckInItem<T>>>;
+
+    const checkIn = (id: string | number, data: T) => {
+      registry.value.set(id, { id, data: data as any });
+      registry.value = new Map(registry.value);
+      options?.onCheckIn?.(id, data);
+    };
+
+    const checkOut = (id: string | number) => {
+      const existed = registry.value.has(id);
+      registry.value.delete(id);
+      registry.value = new Map(registry.value);
+      if (existed) {
+        options?.onCheckOut?.(id);
+      }
+    };
+
+    const get = (id: string | number) => registry.value.get(id);
+
+    const getAll = () => Array.from(registry.value.values());
+
+    const update = (id: string | number, data: Partial<T>) => {
+      const existing = registry.value.get(id);
+      if (
+        existing &&
+        typeof existing.data === "object" &&
+        typeof data === "object"
+      ) {
+        checkIn(id, { ...existing.data, ...data } as T);
+      }
+    };
+
+    const has = (id: string | number) => registry.value.has(id);
+
+    const clear = () => {
+      registry.value.clear();
+      registry.value = new Map();
+    };
+
+    return { registry, checkIn, checkOut, get, getAll, update, has, clear };
+  };
+
+  const openDesk = (options?: CheckInDeskOptions<T>) => {
+    const deskSymbol = Symbol("CheckInDesk") as InjectionKey<CheckInDesk<T>>;
+    const deskContext = createDeskContext<T>(options);
+
+    const fullContext = {
+      ...deskContext,
+      ...(options?.extraContext || {}),
+    } as any;
+
+    provide(deskSymbol, fullContext);
+
+    return {
+      desk: fullContext as CheckInDesk<T> & Record<string, any>,
+      deskSymbol,
+    };
+  };
+
+  const checkIn = (
+    parentDesk: { deskSymbol: InjectionKey<CheckInDesk<T>> },
+    options?: CheckInOptions<T>,
+  ) => {
+    const desk = inject(
+      parentDesk.deskSymbol,
+      options?.required ? undefined : null,
+    );
+
+    if (options?.required && !desk) {
+      throw new Error(
+        `[useCheckIn] Check-in desk not found. ` +
+          `Make sure a desk is open (parent provides context).`,
+      );
+    }
+
+    if (options?.autoCheckIn && desk) {
+      const itemId = ref<string | number | undefined>(options.id);
+
+      if (!itemId.value && options.generateId) {
+        itemId.value = options.generateId();
+      }
+
+      if (!itemId.value) {
+        throw new Error(
+          '[useCheckIn] Auto check-in requires an "id" or "generateId" option',
+        );
+      }
+
+      const getData = () => {
+        return typeof options.data === "function"
+          ? (options.data as () => T)()
+          : options.data!;
+      };
+
+      onMounted(() => {
+        if (itemId.value) {
+          desk.checkIn(itemId.value, getData());
+        }
+      });
+
+      if (options.watchData && options.data) {
+        watch(
+          () => getData(),
+          (newData) => {
+            if (itemId.value && newData) {
+              desk.update(itemId.value, newData);
+            }
+          },
+          { deep: true },
+        );
+      }
+
+      onBeforeUnmount(() => {
+        if (itemId.value) {
+          desk.checkOut(itemId.value);
+        }
+      });
+
+      return {
+        desk,
+        itemId,
+        updateSelf: (data: Partial<T>) => {
+          if (itemId.value) {
+            desk.update(itemId.value, data);
+          }
+        },
+      };
+    }
+
+    return { desk, itemId: ref(undefined), updateSelf: () => {} };
+  };
+
+  const generateId = (prefix = "passenger"): string => {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  };
+
+  const standaloneDesk = <T = any,>(options?: CheckInDeskOptions<T>) => {
+    return createDeskContext<T>(options);
+  };
+
+  return {
+    openDesk,
+    checkIn,
+    generateId,
+    standaloneDesk,
+  };
+};
+```
+:::
+
+## API
+::hr-underline
+::
+
+  ### Returns
+
+Return both the desk and its symbol for children to inject
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `openDesk`{.primary .text-primary} | `any` | — |
+| `checkIn`{.primary .text-primary} | `any` | — |
+| `generateId`{.primary .text-primary} | `any` | — |
+| `standaloneDesk`{.primary .text-primary} | `any` | — |
+
+  ### Types
+| Name | Type | Description |
+|------|------|-------------|
+| `CheckInItem`{.primary .text-primary} | `interface` | — |
+| `CheckInDesk`{.primary .text-primary} | `interface` | — |
+| `CheckInDeskOptions`{.primary .text-primary} | `interface` | — |
+| `CheckInOptions`{.primary .text-primary} | `interface` | — |
+
+---
+
+  ## Examples
+  ::hr-underline
+  ::
+
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
     <accordion-demo />
   :::
 
   :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, provide } from "vue";
 import { useCheckIn } from "../useCheckIn";
 import AccordionItem from "./AccordionItem.vue";
-import { AccordionDesk } from "./desk-keys";
 
-const { openDesk } = useCheckIn();
+interface AccordionItemData {
+  title: string;
+  open?: boolean;
+}
+
+const { openDesk } = useCheckIn<AccordionItemData>();
 
 const openItems = ref<Set<string | number>>(new Set());
 const allowMultiple = ref(false);
 
-const desk = openDesk(AccordionDesk, {
+const { desk, deskSymbol: accordionDesk } = openDesk({
   extraContext: {
     openItems,
     toggle: (id: string | number) => {
@@ -50,6 +481,8 @@ const desk = openDesk(AccordionDesk, {
     }
   },
 });
+
+provide("accordionDesk", { deskSymbol: accordionDesk });
 
 const itemCount = computed(() => desk.getAll().length);
 </script>
@@ -152,262 +585,6 @@ const itemCount = computed(() => desk.getAll().length);
   :::
 ::
 
-## Install with CLI
-::hr-underline
-::
-
-This will install the component in the path defined by your `components.json` file, thanks to shadcn-vue.
-
-:::code-group{.w-full}
-```bash [yarn]
-  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-check-in.json"
-  ```
-
-```bash [npm]
-  npx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-check-in.json"
-  ```
-
-```bash [pnpm]
-  pnpm dlx shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-check-in.json"
-  ```
-
-```bash [bun]
-  bunx --bun shadcn-vue@latest add "https://benoitlahoz.github.io/assembler-ui/r/use-check-in.json"
-  ```
-:::
-
-## Install Manually
-::hr-underline
-::
-
-Copy and paste these files into your project.
-
-:::code-tree{default-value="src/components/ui/use-check-in/useCheckIn.ts"}
-
-```ts [src/components/ui/use-check-in/useCheckIn.ts]
-import {
-  ref,
-  provide,
-  inject,
-  onMounted,
-  onBeforeUnmount,
-  watch,
-  type InjectionKey,
-  type Ref,
-} from "vue";
-
-export interface CheckInItem<T = any> {
-  id: string | number;
-  data: T;
-}
-
-export interface CheckInDesk<T = any> {
-  registry: Ref<Map<string | number, CheckInItem<T>>>;
-  checkIn: (id: string | number, data: T) => void;
-  checkOut: (id: string | number) => void;
-  get: (id: string | number) => CheckInItem<T> | undefined;
-  getAll: () => CheckInItem<T>[];
-  update: (id: string | number, data: Partial<T>) => void;
-  has: (id: string | number) => boolean;
-  clear: () => void;
-}
-
-export interface CheckInDeskOptions<T = any> {
-  extraContext?: Record<string, any>;
-
-  onCheckIn?: (id: string | number, data: T) => void;
-
-  onCheckOut?: (id: string | number) => void;
-}
-
-export interface CheckInOptions<T = any> {
-  required?: boolean;
-
-  autoCheckIn?: boolean;
-
-  id?: string | number;
-
-  data?: T | (() => T);
-
-  generateId?: () => string | number;
-
-  watchData?: boolean;
-}
-
-export const useCheckIn = () => {
-  const createDesk = <T = any,>(
-    namespace: string,
-  ): InjectionKey<CheckInDesk<T>> => {
-    return Symbol(`CheckInDesk:${namespace}`) as InjectionKey<CheckInDesk<T>>;
-  };
-
-  const createDeskContext = <T = any,>(
-    options?: CheckInDeskOptions<T>,
-  ): CheckInDesk<T> => {
-    const registry = ref<Map<string | number, CheckInItem<T>>>(
-      new Map(),
-    ) as Ref<Map<string | number, CheckInItem<T>>>;
-
-    const checkIn = (id: string | number, data: T) => {
-      registry.value.set(id, { id, data: data as any });
-      registry.value = new Map(registry.value);
-      options?.onCheckIn?.(id, data);
-    };
-
-    const checkOut = (id: string | number) => {
-      const existed = registry.value.has(id);
-      registry.value.delete(id);
-      registry.value = new Map(registry.value);
-      if (existed) {
-        options?.onCheckOut?.(id);
-      }
-    };
-
-    const get = (id: string | number) => registry.value.get(id);
-
-    const getAll = () => Array.from(registry.value.values());
-
-    const update = (id: string | number, data: Partial<T>) => {
-      const existing = registry.value.get(id);
-      if (
-        existing &&
-        typeof existing.data === "object" &&
-        typeof data === "object"
-      ) {
-        checkIn(id, { ...existing.data, ...data } as T);
-      }
-    };
-
-    const has = (id: string | number) => registry.value.has(id);
-
-    const clear = () => {
-      registry.value.clear();
-      registry.value = new Map();
-    };
-
-    return { registry, checkIn, checkOut, get, getAll, update, has, clear };
-  };
-
-  const openDesk = <T = any,>(
-    key: InjectionKey<CheckInDesk<T>>,
-    options?: CheckInDeskOptions<T>,
-  ) => {
-    const deskContext = createDeskContext<T>(options);
-
-    const fullContext = {
-      ...deskContext,
-      ...(options?.extraContext || {}),
-    } as any;
-
-    provide(key, fullContext);
-
-    return fullContext as CheckInDesk<T> & Record<string, any>;
-  };
-
-  const checkIn = <T = any,>(
-    key: InjectionKey<CheckInDesk<T>>,
-    options?: CheckInOptions<T>,
-  ) => {
-    const desk = inject(key, options?.required ? undefined : null);
-
-    if (options?.required && !desk) {
-      const keyName = key.description || String(key);
-      throw new Error(
-        `[useCheckIn] Check-in desk not found for key: ${keyName}. ` +
-          `Make sure a desk is open (parent provides context).`,
-      );
-    }
-
-    if (options?.autoCheckIn && desk) {
-      const itemId = ref<string | number | undefined>(options.id);
-
-      if (!itemId.value && options.generateId) {
-        itemId.value = options.generateId();
-      }
-
-      if (!itemId.value) {
-        throw new Error(
-          '[useCheckIn] Auto check-in requires an "id" or "generateId" option',
-        );
-      }
-
-      const getData = () => {
-        return typeof options.data === "function"
-          ? (options.data as () => T)()
-          : options.data!;
-      };
-
-      onMounted(() => {
-        if (itemId.value) {
-          desk.checkIn(itemId.value, getData());
-        }
-      });
-
-      if (options.watchData && options.data) {
-        watch(
-          () => getData(),
-          (newData) => {
-            if (itemId.value && newData) {
-              desk.update(itemId.value, newData);
-            }
-          },
-          { deep: true },
-        );
-      }
-
-      onBeforeUnmount(() => {
-        if (itemId.value) {
-          desk.checkOut(itemId.value);
-        }
-      });
-
-      return {
-        desk,
-        itemId,
-        updateSelf: (data: Partial<T>) => {
-          if (itemId.value) {
-            desk.update(itemId.value, data);
-          }
-        },
-      };
-    }
-
-    return { desk, itemId: ref(undefined), updateSelf: () => {} };
-  };
-
-  const generateId = (prefix = "passenger"): string => {
-    return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  };
-
-  const standaloneDesk = <T = any,>(options?: CheckInDeskOptions<T>) => {
-    return createDeskContext<T>(options);
-  };
-
-  return {
-    createDesk,
-    openDesk,
-    checkIn,
-    generateId,
-    standaloneDesk,
-  };
-};
-```
-:::
-
-## useCheckIn
-::hr-underline
-::
-
-Generic check-in system for parent/child component registration pattern.
-Like an airport check-in desk: parent components provide a check-in counter
-where child components register themselves with their data.
-
----
-
-  ## Examples
-  ::hr-underline
-  ::
-
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
     <tabs-demo />
@@ -416,17 +593,22 @@ where child components register themselves with their data.
   :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, provide } from "vue";
 import { useCheckIn } from "../useCheckIn";
 import TabPanel from "./TabPanel.vue";
-import { TabsDesk } from "./desk-keys";
 
-const { openDesk } = useCheckIn();
+interface TabItemData {
+  label: string;
+  disabled?: boolean;
+  icon?: string;
+}
+
+const { openDesk } = useCheckIn<TabItemData>();
 
 const activeTab = ref<string>("tab1");
 const tabCount = ref(0);
 
-const desk = openDesk(TabsDesk, {
+const { desk, deskSymbol: tabsDesk } = openDesk({
   extraContext: {
     activeTab,
     setActive: (id: string) => {
@@ -439,7 +621,6 @@ const desk = openDesk(TabsDesk, {
   onCheckIn: (id, data) => {
     console.log("Tab checked in:", id, data);
     tabCount.value++;
-
     if (tabCount.value === 1) {
       activeTab.value = id as string;
     }
@@ -450,6 +631,8 @@ const desk = openDesk(TabsDesk, {
   },
 });
 
+provide("tabsDesk", { deskSymbol: tabsDesk });
+
 const allTabs = computed(() => desk.getAll());
 const activeTabData = computed(() => desk.get(activeTab.value));
 </script>
@@ -459,7 +642,7 @@ const activeTabData = computed(() => desk.get(activeTab.value));
     <div class="space-y-2">
       <h2 class="text-2xl font-bold">useCheckIn - Tabs Demo</h2>
       <p class="text-muted-foreground">
-        Example of a tabs system using the generic check-in pattern
+        Tabs system using parent provide / child inject pattern
       </p>
     </div>
 
@@ -488,64 +671,21 @@ const activeTabData = computed(() => desk.get(activeTab.value));
       <TabPanel id="tab1" label="Profile" icon="👤">
         <div class="space-y-4">
           <h3 class="text-xl font-semibold">Profile Settings</h3>
-          <p class="text-muted-foreground">
-            Manage your profile information and preferences.
-          </p>
-          <div class="space-y-2">
-            <div class="flex items-center gap-2">
-              <span class="font-medium">Username:</span>
-              <span>john.doe</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="font-medium">Email:</span>
-              <span>john@example.com</span>
-            </div>
-          </div>
+          <p class="text-muted-foreground">Manage your profile information.</p>
         </div>
       </TabPanel>
 
-      <TabPanel id="tab2" label="Notifications" icon="🔔">
+      <TabPanel id="tab2" label="Settings" icon="⚙️">
         <div class="space-y-4">
-          <h3 class="text-xl font-semibold">Notification Settings</h3>
-          <p class="text-muted-foreground">
-            Configure how you receive notifications.
-          </p>
-          <div class="space-y-2">
-            <label class="flex items-center gap-2">
-              <input type="checkbox" class="rounded" checked />
-              <span>Email notifications</span>
-            </label>
-            <label class="flex items-center gap-2">
-              <input type="checkbox" class="rounded" />
-              <span>Push notifications</span>
-            </label>
-          </div>
+          <h3 class="text-xl font-semibold">Settings</h3>
+          <p class="text-muted-foreground">Configure your preferences.</p>
         </div>
       </TabPanel>
 
       <TabPanel id="tab3" label="Security" icon="🔒">
         <div class="space-y-4">
-          <h3 class="text-xl font-semibold">Security Settings</h3>
+          <h3 class="text-xl font-semibold">Security</h3>
           <p class="text-muted-foreground">Keep your account secure.</p>
-          <div class="space-y-2">
-            <button
-              class="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
-            >
-              Change Password
-            </button>
-            <button
-              class="px-4 py-2 bg-secondary text-secondary-foreground rounded hover:bg-secondary/80"
-            >
-              Enable 2FA
-            </button>
-          </div>
-        </div>
-      </TabPanel>
-
-      <TabPanel id="tab4" label="Disabled Tab" :disabled="true" icon="❌">
-        <div class="space-y-4">
-          <h3 class="text-xl font-semibold">This tab is disabled</h3>
-          <p class="text-muted-foreground">You should not see this content.</p>
         </div>
       </TabPanel>
     </div>
@@ -554,14 +694,8 @@ const activeTabData = computed(() => desk.get(activeTab.value));
       <h4 class="font-semibold">Debug Info</h4>
       <div class="text-sm space-y-1">
         <p><strong>Active Tab:</strong> {{ activeTab }}</p>
-        <p>
-          <strong>Active Tab Label:</strong> {{ activeTabData?.data.label }}
-        </p>
+        <p><strong>Active Label:</strong> {{ activeTabData?.data.label }}</p>
         <p><strong>Total Tabs:</strong> {{ tabCount }}</p>
-        <p>
-          <strong>Registered Tabs:</strong>
-          {{ allTabs.map((t) => t.id).join(", ") }}
-        </p>
       </div>
     </div>
   </div>
@@ -578,18 +712,25 @@ const activeTabData = computed(() => desk.get(activeTab.value));
   :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, provide } from "vue";
 import { useCheckIn } from "../useCheckIn";
 import ToolbarButton from "./ToolbarButton.vue";
 import ToolbarSeparator from "./ToolbarSeparator.vue";
-import { ToolbarDesk } from "./desk-keys";
 
-const { openDesk } = useCheckIn();
+interface ToolItemData {
+  label: string;
+  icon?: string;
+  type: "button" | "toggle" | "separator";
+  active?: boolean;
+  disabled?: boolean;
+}
+
+const { openDesk } = useCheckIn<ToolItemData>();
 
 const activeTool = ref<string | number | null>(null);
 const clickHistory = ref<Array<{ id: string | number; time: number }>>([]);
 
-const desk = openDesk(ToolbarDesk, {
+const { desk, deskSymbol: toolbarDesk } = openDesk({
   extraContext: {
     activeTool,
     handleClick: (id: string | number, type: "button" | "toggle") => {
@@ -607,6 +748,8 @@ const desk = openDesk(ToolbarDesk, {
     console.log("Tool checked in:", id, data);
   },
 });
+
+provide("toolbarDesk", { deskSymbol: toolbarDesk });
 
 const allTools = computed(() =>
   desk.getAll().sort((a, b) => String(a.id).localeCompare(String(b.id))),
@@ -684,7 +827,7 @@ const lastAction = computed(() => {
       <div class="p-4 border border-border rounded-lg">
         <h3 class="font-semibold mb-2">Active Toggles</h3>
         <div class="text-sm text-muted-foreground">
-          {{ activeTool ? context.get(activeTool)?.data.label : "None" }}
+          {{ activeTool ? desk.get(activeTool)?.data.label : "None" }}
         </div>
       </div>
 
@@ -714,5 +857,5 @@ const lastAction = computed(() => {
 ::
 
 ::tip
-You can copy and adapt this template for any component documentation.
+You can copy and adapt this template for any composable documentation.
 ::

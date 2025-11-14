@@ -1,22 +1,23 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, provide } from 'vue';
 import { useCheckIn } from '../useCheckIn';
 import TabPanel from './TabPanel.vue';
-import { TabsDesk } from './desk-keys';
 
-// ==========================================
-// Tabs Demo Setup
-// ==========================================
+// Type de données pour les tabs
+interface TabItemData {
+  label: string;
+  disabled?: boolean;
+  icon?: string;
+}
 
-// ==========================================
-// 3. Parent Component Logic
-// ==========================================
-const { openDesk } = useCheckIn();
+// Parent: Tabs Container
+const { openDesk } = useCheckIn<TabItemData>();
 
 const activeTab = ref<string>('tab1');
 const tabCount = ref(0);
 
-const desk = openDesk(TabsDesk, {
+// Le parent ouvre un desk et le fournit à ses enfants
+const { desk, deskSymbol: tabsDesk } = openDesk({
   extraContext: {
     activeTab,
     setActive: (id: string) => {
@@ -29,7 +30,6 @@ const desk = openDesk(TabsDesk, {
   onCheckIn: (id, data) => {
     console.log('Tab checked in:', id, data);
     tabCount.value++;
-    // Set first tab as active
     if (tabCount.value === 1) {
       activeTab.value = id as string;
     }
@@ -40,6 +40,9 @@ const desk = openDesk(TabsDesk, {
   },
 });
 
+// Fournir le deskSymbol dans un objet aux enfants
+provide('tabsDesk', { deskSymbol: tabsDesk });
+
 const allTabs = computed(() => desk.getAll());
 const activeTabData = computed(() => desk.get(activeTab.value));
 </script>
@@ -48,9 +51,7 @@ const activeTabData = computed(() => desk.get(activeTab.value));
   <div class="w-full max-w-2xl mx-auto space-y-6 p-6">
     <div class="space-y-2">
       <h2 class="text-2xl font-bold">useCheckIn - Tabs Demo</h2>
-      <p class="text-muted-foreground">
-        Example of a tabs system using the generic check-in pattern
-      </p>
+      <p class="text-muted-foreground">Tabs system using parent provide / child inject pattern</p>
     </div>
 
     <!-- Tabs Navigation -->
@@ -80,60 +81,21 @@ const activeTabData = computed(() => desk.get(activeTab.value));
       <TabPanel id="tab1" label="Profile" icon="👤">
         <div class="space-y-4">
           <h3 class="text-xl font-semibold">Profile Settings</h3>
-          <p class="text-muted-foreground">Manage your profile information and preferences.</p>
-          <div class="space-y-2">
-            <div class="flex items-center gap-2">
-              <span class="font-medium">Username:</span>
-              <span>john.doe</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="font-medium">Email:</span>
-              <span>john@example.com</span>
-            </div>
-          </div>
+          <p class="text-muted-foreground">Manage your profile information.</p>
         </div>
       </TabPanel>
 
-      <TabPanel id="tab2" label="Notifications" icon="🔔">
+      <TabPanel id="tab2" label="Settings" icon="⚙️">
         <div class="space-y-4">
-          <h3 class="text-xl font-semibold">Notification Settings</h3>
-          <p class="text-muted-foreground">Configure how you receive notifications.</p>
-          <div class="space-y-2">
-            <label class="flex items-center gap-2">
-              <input type="checkbox" class="rounded" checked />
-              <span>Email notifications</span>
-            </label>
-            <label class="flex items-center gap-2">
-              <input type="checkbox" class="rounded" />
-              <span>Push notifications</span>
-            </label>
-          </div>
+          <h3 class="text-xl font-semibold">Settings</h3>
+          <p class="text-muted-foreground">Configure your preferences.</p>
         </div>
       </TabPanel>
 
       <TabPanel id="tab3" label="Security" icon="🔒">
         <div class="space-y-4">
-          <h3 class="text-xl font-semibold">Security Settings</h3>
+          <h3 class="text-xl font-semibold">Security</h3>
           <p class="text-muted-foreground">Keep your account secure.</p>
-          <div class="space-y-2">
-            <button
-              class="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
-            >
-              Change Password
-            </button>
-            <button
-              class="px-4 py-2 bg-secondary text-secondary-foreground rounded hover:bg-secondary/80"
-            >
-              Enable 2FA
-            </button>
-          </div>
-        </div>
-      </TabPanel>
-
-      <TabPanel id="tab4" label="Disabled Tab" :disabled="true" icon="❌">
-        <div class="space-y-4">
-          <h3 class="text-xl font-semibold">This tab is disabled</h3>
-          <p class="text-muted-foreground">You should not see this content.</p>
         </div>
       </TabPanel>
     </div>
@@ -143,9 +105,8 @@ const activeTabData = computed(() => desk.get(activeTab.value));
       <h4 class="font-semibold">Debug Info</h4>
       <div class="text-sm space-y-1">
         <p><strong>Active Tab:</strong> {{ activeTab }}</p>
-        <p><strong>Active Tab Label:</strong> {{ activeTabData?.data.label }}</p>
+        <p><strong>Active Label:</strong> {{ activeTabData?.data.label }}</p>
         <p><strong>Total Tabs:</strong> {{ tabCount }}</p>
-        <p><strong>Registered Tabs:</strong> {{ allTabs.map((t) => t.id).join(', ') }}</p>
       </div>
     </div>
   </div>

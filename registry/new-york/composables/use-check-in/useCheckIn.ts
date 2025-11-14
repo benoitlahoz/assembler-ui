@@ -3,9 +3,10 @@
  * Like an airport check-in desk: parent components provide a check-in counter
  * where child components register themselves with their data.
  *
- * @type registry:hooks
+ * @type registry:hook
  * @category data
  *
+ * @demo FormDemo
  * @demo AccordionDemo
  * @demo TabsDemo
  * @demo ToolbarDemo
@@ -76,32 +77,22 @@ export interface CheckInOptions<T = any> {
  *
  * @example
  * ```ts
- * // Create a check-in desk key
- * const TabsDesk = checkIn.createDesk<TabItem>('Tabs');
- *
- * // In parent component (check-in desk)
- * const { openDesk } = useCheckIn();
- * const desk = openDesk(TabsDesk, {
+ * // In parent component - open a desk
+ * const { openDesk } = useCheckIn<TabItem>();
+ * const desk = openDesk({
  *   extraContext: { activeTab: ref(null) }
  * });
  *
- * // In child component (passenger checking in)
- * const { checkIn } = useCheckIn();
- * const { desk } = checkIn(TabsDesk, {
+ * // In child component - check in at parent's desk
+ * const { checkIn } = useCheckIn<TabItem>();
+ * checkIn(desk, {
  *   autoCheckIn: true,
  *   id: props.id,
  *   data: () => ({ label: props.label })
  * });
  * ```
  */
-export const useCheckIn = () => {
-  /**
-   * Creates a typed InjectionKey for a check-in desk
-   */
-  const createDesk = <T = any>(namespace: string): InjectionKey<CheckInDesk<T>> => {
-    return Symbol(`CheckInDesk:${namespace}`) as InjectionKey<CheckInDesk<T>>;
-  };
-
+export const useCheckIn = <T = any>() => {
   /**
    * Creates a check-in desk context (internal helper)
    */
@@ -149,10 +140,8 @@ export const useCheckIn = () => {
   /**
    * Opens a check-in desk (parent component provides the desk)
    */
-  const openDesk = <T = any>(
-    key: InjectionKey<CheckInDesk<T>>,
-    options?: CheckInDeskOptions<T>
-  ) => {
+  const openDesk = (options?: CheckInDeskOptions<T>) => {
+    const deskSymbol = Symbol('CheckInDesk') as InjectionKey<CheckInDesk<T>>;
     const deskContext = createDeskContext<T>(options);
 
     const fullContext = {
@@ -160,21 +149,27 @@ export const useCheckIn = () => {
       ...(options?.extraContext || {}),
     } as any;
 
-    provide(key, fullContext);
+    provide(deskSymbol, fullContext);
 
-    return fullContext as CheckInDesk<T> & Record<string, any>;
+    // Return both the desk and its symbol for children to inject
+    return {
+      desk: fullContext as CheckInDesk<T> & Record<string, any>,
+      deskSymbol,
+    };
   };
 
   /**
    * Check in at a desk (child component registers itself)
    */
-  const checkIn = <T = any>(key: InjectionKey<CheckInDesk<T>>, options?: CheckInOptions<T>) => {
-    const desk = inject(key, options?.required ? undefined : null);
+  const checkIn = (
+    parentDesk: { deskSymbol: InjectionKey<CheckInDesk<T>> },
+    options?: CheckInOptions<T>
+  ) => {
+    const desk = inject(parentDesk.deskSymbol, options?.required ? undefined : null);
 
     if (options?.required && !desk) {
-      const keyName = key.description || String(key);
       throw new Error(
-        `[useCheckIn] Check-in desk not found for key: ${keyName}. ` +
+        `[useCheckIn] Check-in desk not found. ` +
           `Make sure a desk is open (parent provides context).`
       );
     }
@@ -247,7 +242,6 @@ export const useCheckIn = () => {
   };
 
   return {
-    createDesk,
     openDesk,
     checkIn,
     generateId,

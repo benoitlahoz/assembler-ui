@@ -1,7 +1,17 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useCheckIn } from '../useCheckIn';
-import { ToolbarDesk } from './desk-keys';
+import { computed, inject, type InjectionKey } from 'vue';
+import { useCheckIn, type CheckInDesk } from '../useCheckIn';
+
+interface ToolItemData {
+  label: string;
+  icon?: string;
+  type: 'button' | 'toggle' | 'separator';
+  active?: boolean;
+  disabled?: boolean;
+}
+
+// Récupère le Symbol du desk fourni par le parent
+const toolbarDesk = inject<{ deskSymbol: InjectionKey<CheckInDesk<ToolItemData>> }>('toolbarDesk')!;
 
 const props = withDefaults(
   defineProps<{
@@ -16,9 +26,9 @@ const props = withDefaults(
   }
 );
 
-const { checkIn } = useCheckIn();
+const { checkIn } = useCheckIn<ToolItemData>();
 
-const { desk: toolbarDesk } = checkIn(ToolbarDesk, {
+const { desk } = checkIn(toolbarDesk, {
   required: true,
   autoCheckIn: true,
   id: props.id,
@@ -33,12 +43,12 @@ const { desk: toolbarDesk } = checkIn(ToolbarDesk, {
 
 const isActive = computed(() => {
   if (props.type !== 'toggle') return false;
-  return (toolbarDesk as any)?.isActive(props.id) || false;
+  return (desk as any)?.isActive(props.id) || false;
 });
 
 const handleClick = () => {
-  if (!props.disabled && toolbarDesk) {
-    (toolbarDesk as any).handleClick(props.id, props.type);
+  if (!props.disabled && desk) {
+    (desk as any).handleClick(props.id, props.type);
   }
 };
 </script>

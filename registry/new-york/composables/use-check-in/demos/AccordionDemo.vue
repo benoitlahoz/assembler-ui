@@ -1,22 +1,27 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, provide } from 'vue';
 import { useCheckIn } from '../useCheckIn';
 import AccordionItem from './AccordionItem.vue';
-import { AccordionDesk } from './desk-keys';
 
 // ==========================================
 // Accordion Check-In Setup
 // ==========================================
 
+interface AccordionItemData {
+  title: string;
+  open?: boolean;
+}
+
 // ==========================================
 // Parent: Accordion Container
 // ==========================================
-const { openDesk } = useCheckIn();
+const { openDesk } = useCheckIn<AccordionItemData>();
 
 const openItems = ref<Set<string | number>>(new Set());
 const allowMultiple = ref(false);
 
-const desk = openDesk(AccordionDesk, {
+// Le parent ouvre un desk et le fournit à ses enfants
+const { desk, deskSymbol: accordionDesk } = openDesk({
   extraContext: {
     openItems,
     toggle: (id: string | number) => {
@@ -43,6 +48,9 @@ const desk = openDesk(AccordionDesk, {
     }
   },
 });
+
+// Fournir le deskSymbol dans un objet aux enfants
+provide('accordionDesk', { deskSymbol: accordionDesk });
 
 const itemCount = computed(() => desk.getAll().length);
 </script>
