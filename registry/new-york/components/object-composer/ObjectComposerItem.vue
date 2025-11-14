@@ -3,12 +3,29 @@ import { ref, computed } from 'vue';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/Input';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 
 interface ObjectComposerItemProps {
   itemKey: string;
   value: any;
   depth?: number;
   path?: string[];
+}
+
+interface SlotProps {
+  itemKey: string;
+  value: any;
+  valueType: string;
+  displayValue: string;
+  isExpandable: boolean;
+  isEditing: boolean;
+  editKey: string;
+  editValue: string;
 }
 
 const props = withDefaults(defineProps<ObjectComposerItemProps>(), {
@@ -22,7 +39,11 @@ const emit = defineEmits<{
   add: [path: string[], key: string, value: any];
 }>();
 
-const isExpanded = ref(true);
+defineSlots<{
+  default(props: SlotProps): any;
+}>();
+
+const accordionValue = ref<string>('item-1');
 const isEditing = ref(false);
 const editKey = ref(props.itemKey);
 const editValue = ref<string>('');
@@ -68,9 +89,7 @@ const displayValue = computed(() => {
 });
 
 function toggleExpand() {
-  if (isExpandable.value) {
-    isExpanded.value = !isExpanded.value;
-  }
+  // Géré par l'accordion
 }
 
 function startEdit() {
@@ -132,34 +151,12 @@ function handleChildAdd(path: string[], key: string, value: any) {
 
 <template>
   <div
+    v-if="!isExpandable"
     data-slot="object-composer-item"
     :class="cn('rounded-md mb-1', { border: depth === 0, 'border-border': depth > 0 })"
   >
     <div class="flex items-center py-1 item-header">
-      <!-- Expand/Collapse Icon -->
-      <Button
-        v-if="isExpandable"
-        variant="ghost"
-        size="icon"
-        class="expand-button"
-        @click="toggleExpand"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          :class="{ 'rotate-90': isExpanded }"
-        >
-          <polyline points="9 18 15 12 9 6" />
-        </svg>
-      </Button>
-      <div v-else class="expand-spacer" />
+      <div class="expand-spacer" />
 
       <!-- Slot pour contenu personnalisé -->
       <div class="item-content">
@@ -169,7 +166,6 @@ function handleChildAdd(path: string[], key: string, value: any) {
           :value-type="valueType"
           :display-value="displayValue"
           :is-expandable="isExpandable"
-          :is-expanded="isExpanded"
           :is-editing="isEditing"
           :edit-key="editKey"
           :edit-value="editValue"
@@ -258,28 +254,6 @@ function handleChildAdd(path: string[], key: string, value: any) {
         </template>
 
         <Button
-          v-if="isExpandable && !isEditing"
-          class="action-button"
-          title="Ajouter un enfant"
-          @click="addChild"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </Button>
-
-        <Button
           v-if="!isEditing"
           class="action-button delete"
           title="Supprimer"
@@ -304,27 +278,203 @@ function handleChildAdd(path: string[], key: string, value: any) {
         </Button>
       </div>
     </div>
-
-    <!-- Children - Arborescence récursive -->
-    <div v-if="isExpandable && isExpanded" class="border-l border-white ml-5">
-      <ObjectComposerItem
-        v-for="[key, val] in childEntries"
-        :key="key"
-        :item-key="key"
-        :value="val"
-        :depth="depth + 1"
-        :path="currentPath"
-        @update="handleChildUpdate"
-        @delete="handleChildDelete"
-        @add="handleChildAdd"
-      >
-        <!-- Propagation du slot personnalisé aux enfants -->
-        <template #default="slotProps: any">
-          <slot v-bind="slotProps" />
-        </template>
-      </ObjectComposerItem>
-    </div>
   </div>
+
+  <!-- Accordion pour les éléments expandables -->
+  <Accordion
+    v-else
+    v-model="accordionValue"
+    type="single"
+    collapsible
+    :class="cn('rounded-md mb-1', { border: depth === 0, 'border-border': depth > 0 })"
+  >
+    <AccordionItem value="item-1" class="border-b-0">
+      <div class="flex items-center item-header">
+        <AccordionTrigger class="flex-none hover:no-underline py-1 px-2">
+          <template #icon>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="transition-transform duration-200"
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </template>
+        </AccordionTrigger>
+
+        <!-- Slot pour contenu personnalisé -->
+        <div class="item-content flex-1">
+          <slot
+            :item-key="itemKey"
+            :value="value"
+            :value-type="valueType"
+            :display-value="displayValue"
+            :is-expandable="isExpandable"
+            :is-editing="isEditing"
+            :edit-key="editKey"
+            :edit-value="editValue"
+          >
+            <!-- Rendu par défaut si aucun slot n'est fourni -->
+            <div v-if="!isEditing" class="default-item-content">
+              <span class="item-key">{{ itemKey }}</span>
+              <span class="item-separator">:</span>
+              <span class="item-value" :class="`type-${valueType}`">
+                {{ displayValue }}
+              </span>
+            </div>
+
+            <!-- Edit Mode par défaut -->
+            <div v-else class="item-edit">
+              <Input
+                v-model="editKey"
+                class="edit-key"
+                type="text"
+                @keyup.enter="saveEdit"
+                @keyup.esc="cancelEdit"
+              />
+              <span class="item-separator">:</span>
+              <Input
+                v-model="editValue"
+                class="edit-value"
+                type="text"
+                @keyup.enter="saveEdit"
+                @keyup.esc="cancelEdit"
+              />
+            </div>
+          </slot>
+        </div>
+
+        <!-- Actions -->
+        <div class="item-actions">
+          <Button v-if="!isEditing" class="action-button" title="Éditer" @click="startEdit">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+          </Button>
+
+          <template v-else>
+            <Button class="action-button save" title="Sauvegarder" @click="saveEdit">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </Button>
+            <Button class="action-button cancel" title="Annuler" @click="cancelEdit">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </Button>
+          </template>
+
+          <Button
+            v-if="!isEditing"
+            class="action-button"
+            title="Ajouter un enfant"
+            @click="addChild"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </Button>
+
+          <Button
+            v-if="!isEditing"
+            class="action-button delete"
+            title="Supprimer"
+            @click="deleteItem"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="3 6 5 6 21 6" />
+              <path
+                d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+              />
+            </svg>
+          </Button>
+        </div>
+      </div>
+
+      <!-- Children - Arborescence récursive -->
+      <AccordionContent>
+        <div class="border-l border-white ml-5">
+          <ObjectComposerItem
+            v-for="[key, val] in childEntries"
+            :key="key"
+            :item-key="key"
+            :value="val"
+            :depth="depth + 1"
+            :path="currentPath"
+            @update="handleChildUpdate"
+            @delete="handleChildDelete"
+            @add="handleChildAdd"
+          >
+            <!-- Propagation du slot personnalisé aux enfants -->
+            <template v-if="$slots.default" #default="childSlotProps">
+              <slot v-bind="childSlotProps" />
+            </template>
+          </ObjectComposerItem>
+        </div>
+      </AccordionContent>
+    </AccordionItem>
+  </Accordion>
 </template>
 
 <style scoped>
