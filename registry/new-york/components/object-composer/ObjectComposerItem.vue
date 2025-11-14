@@ -17,6 +17,7 @@ interface ObjectComposerItemProps {
   depth?: number;
   path?: string[];
   isInArray?: boolean;
+  editingPath?: string[] | null;
   class?: HTMLAttributes['class'];
 }
 
@@ -35,12 +36,15 @@ const props = withDefaults(defineProps<ObjectComposerItemProps>(), {
   depth: 0,
   path: () => [],
   isInArray: false,
+  editingPath: null,
 });
 
 const emit = defineEmits<{
   update: [path: string[], value: any];
   delete: [path: string[]];
   add: [path: string[], key: string, value: any];
+  startEdit: [path: string[]];
+  cancelEdit: [];
 }>();
 
 defineSlots<{
@@ -48,11 +52,17 @@ defineSlots<{
 }>();
 
 const accordionValue = ref<string>('item-1');
-const isEditing = ref(false);
 const editKey = ref(props.itemKey);
 const editValue = ref<string>('');
 
 const currentPath = computed(() => [...props.path, props.itemKey]);
+
+// Vérifier si cet élément est en cours d'édition
+const isEditing = computed(() => {
+  if (!props.editingPath) return false;
+  if (props.editingPath.length !== currentPath.value.length) return false;
+  return props.editingPath.every((key, i) => key === currentPath.value[i]);
+});
 
 const valueType = computed(() => {
   if (props.value === null) return 'null';
@@ -97,14 +107,14 @@ function toggleExpand() {
 }
 
 function startEdit() {
-  isEditing.value = true;
   editKey.value = props.itemKey;
   editValue.value = valueType.value === 'string' ? props.value : JSON.stringify(props.value);
+  emit('startEdit', currentPath.value);
 }
 
 function cancelEdit() {
-  isEditing.value = false;
   editKey.value = props.itemKey;
+  emit('cancelEdit');
 }
 
 function saveEdit() {
@@ -125,7 +135,6 @@ function saveEdit() {
     }
 
     emit('update', currentPath.value, newValue);
-    isEditing.value = false;
   } catch (e) {
     console.error('Invalid value', e);
   }
@@ -151,13 +160,27 @@ function handleChildDelete(path: string[]) {
 function handleChildAdd(path: string[], key: string, value: any) {
   emit('add', path, key, value);
 }
+
+function handleChildStartEdit(path: string[]) {
+  emit('startEdit', path);
+}
+
+function handleChildCancelEdit() {
+  emit('cancelEdit');
+}
 </script>
 
 <template>
   <div
     v-if="!isExpandable"
     data-slot="object-composer-item"
-    :class="cn('group select-none hover:bg-accent', !isEditing && 'border-l border-border', props.class)"
+    :class="
+      cn(
+        'group select-none',
+        !isEditing && 'hover:bg-accent border-l border-border relative',
+        props.class
+      )
+    "
   >
     <div v-if="!isEditing" class="flex items-center w-full">
       <div class="w-8" />
@@ -221,7 +244,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
     </div>
 
     <!-- Edit Mode - Pleine largeur -->
-    <div v-else class="flex items-center gap-2 w-full p-3 rounded-md border bg-background -ml-8">
+    <div v-else class="flex items-center gap-2 p-3 rounded-md border bg-background w-full ml-0">
       <template v-if="!isInArray">
         <Input
           v-model="editKey"
@@ -278,7 +301,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
   </div>
 
   <!-- Accordion pour les éléments expandables -->
-  <Accordion v-else v-model="accordionValue" type="single" collapsible :class="cn(!isEditing && 'border-l border-border')">
+  <Accordion v-else v-model="accordionValue" type="single" collapsible :class="cn(!isEditing)">
     <AccordionItem value="item-1" class="border-b-0">
       <div v-if="!isEditing" class="group flex items-center w-full hover:bg-accent select-none">
         <AccordionTrigger class="flex-none hover:no-underline select-none py-1! px-2">
@@ -387,7 +410,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
       <!-- Edit Mode - Pleine largeur pour accordion (clé seulement) -->
       <div
         v-if="!isInArray && isEditing"
-        class="flex items-center gap-2 w-full p-3 rounded-md border bg-background -ml-4"
+        class="flex items-center gap-2 p-3 rounded-md border bg-background w-full"
       >
         <Input
           v-model="editKey"
@@ -442,9 +465,12 @@ function handleChildAdd(path: string[], key: string, value: any) {
             :depth="depth + 1"
             :path="currentPath"
             :is-in-array="valueType === 'array'"
+            :editing-path="editingPath"
             @update="handleChildUpdate"
             @delete="handleChildDelete"
             @add="handleChildAdd"
+            @start-edit="handleChildStartEdit"
+            @cancel-edit="handleChildCancelEdit"
           >
             <!-- Propagation du slot personnalisé aux enfants -->
             <template v-if="$slots.default" #default="childSlotProps">

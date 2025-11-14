@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, type HTMLAttributes } from 'vue';
+import { computed, ref, type HTMLAttributes } from 'vue';
 import { cn } from '@/lib/utils';
 import { ObjectComposerItem } from '.';
 import { Button } from '@/components/ui/button';
@@ -17,12 +17,23 @@ const props = withDefaults(defineProps<ObjectComposerProps>(), {
 
 const model = defineModel<Record<string, any> | any[]>({ required: true });
 
+// Chemin de l'élément en cours d'édition (null si aucun)
+const editingPath = ref<string[] | null>(null);
+
 const rootEntries = computed(() => {
   if (Array.isArray(model.value)) {
     return model.value.map((item, index) => [String(index), item]);
   }
   return Object.entries(model.value);
 });
+
+const startEdit = (path: string[]) => {
+  editingPath.value = path;
+};
+
+const cancelEdit = () => {
+  editingPath.value = null;
+};
 
 const handleUpdate = (path: string[], value: any) => {
   const newData = JSON.parse(JSON.stringify(model.value));
@@ -39,6 +50,7 @@ const handleUpdate = (path: string[], value: any) => {
   current[lastKey as keyof typeof current] = value;
 
   model.value = newData;
+  editingPath.value = null; // Fermer l'édition après la mise à jour
 };
 
 const handleDelete = (path: string[]) => {
@@ -118,6 +130,20 @@ const downloadJSON = () => {
 
 <template>
   <div data-slot="object-composer" :class="cn('flex flex-col text-sm', props.class)">
-    <slot />
+    <ObjectComposerItem
+      v-for="[key, val] in rootEntries"
+      :key="key"
+      :item-key="key"
+      :value="val"
+      :depth="0"
+      :path="[]"
+      :is-in-array="Array.isArray(model)"
+      :editing-path="editingPath"
+      @update="handleUpdate"
+      @delete="handleDelete"
+      @add="handleAdd"
+      @start-edit="startEdit"
+      @cancel-edit="cancelEdit"
+    />
   </div>
 </template>

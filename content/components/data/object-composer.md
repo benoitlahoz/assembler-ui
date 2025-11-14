@@ -320,7 +320,7 @@ export { default as ObjectComposerItem } from "./ObjectComposerItem.vue";
 
 ```vue [src/components/ui/object-composer/ObjectComposer.vue]
 <script setup lang="ts">
-import { computed, type HTMLAttributes } from "vue";
+import { computed, ref, type HTMLAttributes } from "vue";
 import { cn } from "@/lib/utils";
 import { ObjectComposerItem } from ".";
 import { Button } from "@/components/ui/button";
@@ -338,12 +338,22 @@ const props = withDefaults(defineProps<ObjectComposerProps>(), {
 
 const model = defineModel<Record<string, any> | any[]>({ required: true });
 
+const editingPath = ref<string[] | null>(null);
+
 const rootEntries = computed(() => {
   if (Array.isArray(model.value)) {
     return model.value.map((item, index) => [String(index), item]);
   }
   return Object.entries(model.value);
 });
+
+const startEdit = (path: string[]) => {
+  editingPath.value = path;
+};
+
+const cancelEdit = () => {
+  editingPath.value = null;
+};
 
 const handleUpdate = (path: string[], value: any) => {
   const newData = JSON.parse(JSON.stringify(model.value));
@@ -358,6 +368,7 @@ const handleUpdate = (path: string[], value: any) => {
   current[lastKey as keyof typeof current] = value;
 
   model.value = newData;
+  editingPath.value = null;
 };
 
 const handleDelete = (path: string[]) => {
@@ -436,7 +447,21 @@ const downloadJSON = () => {
     data-slot="object-composer"
     :class="cn('flex flex-col text-sm', props.class)"
   >
-    <slot />
+    <ObjectComposerItem
+      v-for="[key, val] in rootEntries"
+      :key="key"
+      :item-key="key"
+      :value="val"
+      :depth="0"
+      :path="[]"
+      :is-in-array="Array.isArray(model)"
+      :editing-path="editingPath"
+      @update="handleUpdate"
+      @delete="handleDelete"
+      @add="handleAdd"
+      @start-edit="startEdit"
+      @cancel-edit="cancelEdit"
+    />
   </div>
 </template>
 ```
@@ -491,6 +516,7 @@ interface ObjectComposerItemProps {
   depth?: number;
   path?: string[];
   isInArray?: boolean;
+  editingPath?: string[] | null;
   class?: HTMLAttributes["class"];
 }
 
@@ -509,12 +535,15 @@ const props = withDefaults(defineProps<ObjectComposerItemProps>(), {
   depth: 0,
   path: () => [],
   isInArray: false,
+  editingPath: null,
 });
 
 const emit = defineEmits<{
   update: [path: string[], value: any];
   delete: [path: string[]];
   add: [path: string[], key: string, value: any];
+  startEdit: [path: string[]];
+  cancelEdit: [];
 }>();
 
 defineSlots<{
@@ -522,11 +551,16 @@ defineSlots<{
 }>();
 
 const accordionValue = ref<string>("item-1");
-const isEditing = ref(false);
 const editKey = ref(props.itemKey);
 const editValue = ref<string>("");
 
 const currentPath = computed(() => [...props.path, props.itemKey]);
+
+const isEditing = computed(() => {
+  if (!props.editingPath) return false;
+  if (props.editingPath.length !== currentPath.value.length) return false;
+  return props.editingPath.every((key, i) => key === currentPath.value[i]);
+});
 
 const valueType = computed(() => {
   if (props.value === null) return "null";
@@ -569,15 +603,15 @@ const displayValue = computed(() => {
 function toggleExpand() {}
 
 function startEdit() {
-  isEditing.value = true;
   editKey.value = props.itemKey;
   editValue.value =
     valueType.value === "string" ? props.value : JSON.stringify(props.value);
+  emit("startEdit", currentPath.value);
 }
 
 function cancelEdit() {
-  isEditing.value = false;
   editKey.value = props.itemKey;
+  emit("cancelEdit");
 }
 
 function saveEdit() {
@@ -597,7 +631,6 @@ function saveEdit() {
     }
 
     emit("update", currentPath.value, newValue);
-    isEditing.value = false;
   } catch (e) {
     console.error("Invalid value", e);
   }
@@ -624,6 +657,14 @@ function handleChildDelete(path: string[]) {
 function handleChildAdd(path: string[], key: string, value: any) {
   emit("add", path, key, value);
 }
+
+function handleChildStartEdit(path: string[]) {
+  emit("startEdit", path);
+}
+
+function handleChildCancelEdit() {
+  emit("cancelEdit");
+}
 </script>
 
 <template>
@@ -632,8 +673,8 @@ function handleChildAdd(path: string[], key: string, value: any) {
     data-slot="object-composer-item"
     :class="
       cn(
-        'group select-none hover:bg-accent',
-        !isEditing && 'border-l border-border',
+        'group select-none',
+        !isEditing && 'hover:bg-accent border-l border-border relative',
         props.class,
       )
     "
@@ -708,7 +749,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
 
     <div
       v-else
-      class="flex items-center gap-2 w-full p-3 rounded-md border bg-background -ml-8"
+      class="flex items-center gap-2 p-3 rounded-md border bg-background w-full ml-0"
     >
       <template v-if="!isInArray">
         <Input
@@ -775,7 +816,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
     v-model="accordionValue"
     type="single"
     collapsible
-    :class="cn(!isEditing && 'border-l border-border')"
+    :class="cn(!isEditing && 'border-l border-border relative')"
   >
     <AccordionItem value="item-1" class="border-b-0">
       <div
@@ -906,7 +947,8 @@ function handleChildAdd(path: string[], key: string, value: any) {
 
       <div
         v-if="!isInArray && isEditing"
-        class="flex items-center gap-2 w-full p-3 rounded-md border bg-background -ml-4"
+        class="flex items-center gap-2 p-3 rounded-md border bg-background w-full"
+        :style="{ marginLeft: `-${2 + depth * 1}rem` }"
       >
         <Input
           v-model="editKey"
@@ -971,9 +1013,12 @@ function handleChildAdd(path: string[], key: string, value: any) {
             :depth="depth + 1"
             :path="currentPath"
             :is-in-array="valueType === 'array'"
+            :editing-path="editingPath"
             @update="handleChildUpdate"
             @delete="handleChildDelete"
             @add="handleChildAdd"
+            @start-edit="handleChildStartEdit"
+            @cancel-edit="handleChildCancelEdit"
           >
             <template v-if="$slots.default" #default="childSlotProps">
               <slot v-bind="childSlotProps" />
@@ -1767,10 +1812,9 @@ const downloadJSON = () => {
 | `readonly`{.primary .text-primary} | `boolean` | false |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
-  ### Slots
-| Name | Description |
-|------|-------------|
-| `default`{.primary .text-primary} | — |
+  ### Child Components
+
+  `ObjectComposerItem`{.primary .text-primary}
 
 ---
 
@@ -1823,6 +1867,7 @@ const downloadJSON = () => {
 | `depth`{.primary .text-primary} | `number` | 0 |  |
 | `path`{.primary .text-primary} | `string[]` |  |  |
 | `isInArray`{.primary .text-primary} | `boolean` | false |  |
+| `editingPath`{.primary .text-primary} | `string[] \| null` |  |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
   ### Slots
