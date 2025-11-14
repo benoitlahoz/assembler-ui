@@ -92,44 +92,11 @@ const handleAdd = (path: string[], key: string, value: any) => {
 
   model.value = newData;
 };
-
-const addRootItem = () => {
-  const newData = JSON.parse(JSON.stringify(model.value));
-
-  if (Array.isArray(newData)) {
-    newData.push('');
-  } else {
-    let counter = 1;
-    let newKey = 'newKey';
-    while (newKey in newData) {
-      newKey = `newKey${counter}`;
-      counter++;
-    }
-    newData[newKey] = '';
-  }
-
-  model.value = newData;
-};
-
-const copyToClipboard = () => {
-  const jsonString = JSON.stringify(model.value, null, 2);
-  navigator.clipboard.writeText(jsonString);
-};
-
-const downloadJSON = () => {
-  const jsonString = JSON.stringify(model.value, null, 2);
-  const blob = new Blob([jsonString], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'data.json';
-  a.click();
-  URL.revokeObjectURL(url);
-};
 </script>
 
 <template>
   <div data-slot="object-composer" :class="cn('flex flex-col text-sm', props.class)">
+    <slot />
     <ObjectComposerItem
       v-for="[key, val] in rootEntries"
       :key="key"
