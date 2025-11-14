@@ -83,6 +83,7 @@ const enableDragging = () => {
 
   const onMouseDown = (e: any) => {
     if (!map.value || !circle.value) return;
+
     isDragging.value = true;
     dragStartLatLng = circle.value.getLatLng();
     dragStartMousePoint = e.containerPoint;

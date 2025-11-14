@@ -166,14 +166,35 @@ const enableEditing = () => {
 };
 
 let mouseDownHandler: ((e: MouseEvent) => void) | null = null;
+let mouseMoveHandler: ((e: MouseEvent) => void) | null = null;
 
 const enableDragging = () => {
   if (!canvasLayer.value || !map.value || !L.value) return;
 
-  // Retirer l'ancien handler si existe
+  // Retirer les anciens handlers si existent
   if (mouseDownHandler) {
     canvasLayer.value.removeEventListener('mousedown', mouseDownHandler);
   }
+  if (mouseMoveHandler) {
+    canvasLayer.value.removeEventListener('mousemove', mouseMoveHandler);
+  }
+
+  // Handler pour le hover
+  mouseMoveHandler = (e: MouseEvent) => {
+    if (!map.value || !L.value || isDragging.value) return;
+
+    const containerPoint = map.value.mouseEventToContainerPoint(e as any);
+    const corners = props.corners.map((corner) => {
+      const point = map.value!.latLngToContainerPoint([corner.lat, corner.lng]);
+      return { x: point.x, y: point.y };
+    });
+
+    if (isPointInPolygon({ x: containerPoint.x, y: containerPoint.y }, corners)) {
+      map.value.getContainer().style.cursor = 'pointer';
+    } else {
+      map.value.getContainer().style.cursor = '';
+    }
+  };
 
   mouseDownHandler = (e: MouseEvent) => {
     if (!map.value || !L.value) return;
@@ -211,12 +232,21 @@ const enableDragging = () => {
   };
 
   canvasLayer.value.addEventListener('mousedown', mouseDownHandler);
+  canvasLayer.value.addEventListener('mousemove', mouseMoveHandler);
 };
 
 const disableDragging = () => {
-  if (!canvasLayer.value || !mouseDownHandler) return;
-  canvasLayer.value.removeEventListener('mousedown', mouseDownHandler);
-  mouseDownHandler = null;
+  if (!canvasLayer.value) return;
+
+  if (mouseDownHandler) {
+    canvasLayer.value.removeEventListener('mousedown', mouseDownHandler);
+    mouseDownHandler = null;
+  }
+
+  if (mouseMoveHandler) {
+    canvasLayer.value.removeEventListener('mousemove', mouseMoveHandler);
+    mouseMoveHandler = null;
+  }
 };
 
 const setupMapDragHandlers = () => {

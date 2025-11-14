@@ -7,89 +7,551 @@ description: Quadtree composable return value for spatial indexing (required)
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <leaflet-simple />
+    <leaflet-edition-demo />
   :::
 
   :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
-import { ref, type ComponentPublicInstance } from "vue";
-import { ClientOnly } from "#components";
+import { ref, computed, type ComponentPublicInstance } from "vue";
+import { Button } from "@/components/ui/button";
 import {
   LeafletMap,
   LeafletTileLayer,
   LeafletZoomControl,
   LeafletControls,
   LeafletControlItem,
+  LeafletFeaturesEditor,
+  LeafletFeaturesSelector,
+  LeafletFeatureHandle,
+  LeafletFeatureRectangle,
+  LeafletMarker,
   LeafletCircle,
+  LeafletPolyline,
+  LeafletPolygon,
+  LeafletRectangle,
+  LeafletMeasureTool,
+  LeafletCanvasGL,
   type LeafletMapExposed,
+  type FeatureDrawEvent,
+  type FeatureShapeType,
+  type FeatureSelectMode,
 } from "@/components/ui/leaflet-map";
 import { Icon } from "@iconify/vue";
 
-type LeafletMapInstance = ComponentPublicInstance & LeafletMapExposed;
-
-const mapRef = ref<LeafletMapInstance | null>(null);
-const zoom = ref(13);
-const locationCoords = ref<{ lat: number; lng: number; accuracy: number }>({
-  lat: 43.3026,
-  lng: 5.3691,
-  accuracy: 500,
-});
-
-const onLocate = () => {
-  mapRef.value?.locate();
+type LeafletCanvasInstance = ComponentPublicInstance & {
+  sourceCanvas: HTMLCanvasElement | null;
+  redraw: () => void;
 };
 
-const onLocationFound = (event: any) => {
-  locationCoords.value = {
-    lat: event.latitude,
-    lng: event.longitude,
-    accuracy: event.accuracy,
-  };
+const mapRef = ref<LeafletMapExposed | null>(null);
+
+const editMode = ref(true);
+
+const currentMode = ref<FeatureShapeType | FeatureSelectMode | null>("select");
+
+const measureMode = ref<"line" | "polygon" | false>(false);
+const lastMeasurement = ref<{ distance: number; area?: number } | null>(null);
+
+const selectionMode = computed<FeatureSelectMode | null>(() => {
+  if (currentMode.value === "select") return "select";
+  if (currentMode.value === "direct-select") return "direct-select";
+  return null;
+});
+
+const isSelectMode = computed(() => selectionMode.value !== null);
+
+const markers = ref([
+  { id: 1, lat: 48.8566, lng: 2.3522, label: "Paris" },
+  { id: 2, lat: 48.8738, lng: 2.295, label: "Arc de Triomphe" },
+  { id: 3, lat: 48.8584, lng: 2.2945, label: "Tour Eiffel" },
+]);
+
+const circles = ref([
+  {
+    id: 1,
+    lat: 48.8566,
+    lng: 2.3522,
+    radius: 500,
+    class: "border border-blue-500 bg-blue-500/20",
+  },
+  {
+    id: 2,
+    lat: 48.8738,
+    lng: 2.295,
+    radius: 300,
+    class: "border border-green-500 bg-green-500/30",
+  },
+]);
+
+const polylines = ref([
+  {
+    id: 1,
+    latlngs: [
+      [48.8566, 2.3522],
+      [48.8738, 2.295],
+      [48.8584, 2.2945],
+    ] as Array<[number, number]>,
+    class: "border border-red-500",
+    weight: 4,
+  },
+]);
+
+const polygons = ref([
+  {
+    id: 1,
+    latlngs: [
+      [48.86, 2.34],
+      [48.86, 2.36],
+      [48.85, 2.36],
+      [48.85, 2.34],
+    ] as Array<[number, number]>,
+    class: "border border-purple-500 bg-purple-500/30",
+  },
+]);
+
+const rectangles = ref([
+  {
+    id: 1,
+    bounds: [
+      [48.84, 2.28],
+      [48.845, 2.29],
+    ] as [[number, number], [number, number]],
+    class: "border border-orange-500 bg-orange-500/20",
+  },
+]);
+
+const canvasRef = ref<LeafletCanvasInstance | null>(null);
+const canvasCorners = ref([
+  { lat: 48.865, lng: 2.34 },
+  { lat: 48.865, lng: 2.365 },
+  { lat: 48.85, lng: 2.365 },
+  { lat: 48.85, lng: 2.34 },
+]);
+const canvasOpacity = ref(0.7);
+const sourceCanvas = ref<HTMLCanvasElement | null>(null);
+
+const onCanvasReady = (canvas: HTMLCanvasElement) => {
+  sourceCanvas.value = canvas;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  gradient.addColorStop(0, "#667eea");
+  gradient.addColorStop(1, "#764ba2");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "white";
+  ctx.font = "bold 24px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("Canvas Overlay", canvas.width / 2, canvas.height / 2 - 10);
+
+  ctx.font = "16px Arial";
+  ctx.fillText(
+    "Editable & Draggable",
+    canvas.width / 2,
+    canvas.height / 2 + 20,
+  );
+};
+
+const handleModeSelected = (mode: string | null) => {
+  if (mode === "measure-line" || mode === "measure-polygon") {
+    const newMode = mode === "measure-line" ? "line" : "polygon";
+
+    if (measureMode.value === newMode) {
+      measureMode.value = false;
+    } else {
+      measureMode.value = newMode;
+      currentMode.value = null;
+    }
+    return;
+  }
+
+  if (measureMode.value) {
+    measureMode.value = false;
+  }
+
+  if (currentMode.value === mode) {
+    currentMode.value = null;
+  } else {
+    currentMode.value = mode as FeatureShapeType | FeatureSelectMode | null;
+  }
+};
+
+const handleMeasurementComplete = (data: {
+  distance: number;
+  area?: number;
+}) => {
+  lastMeasurement.value = data;
+};
+
+const handleShapeCreated = (event: FeatureDrawEvent) => {
+  const { layer, layerType } = event;
+
+  switch (layerType) {
+    case "marker": {
+      const latlng = (layer as any).getLatLng();
+      const newId =
+        markers.value.length > 0
+          ? Math.max(...markers.value.map((m) => m.id)) + 1
+          : 1;
+      markers.value.push({
+        id: newId,
+        lat: latlng.lat,
+        lng: latlng.lng,
+        label: `Marker ${newId}`,
+      });
+      break;
+    }
+    case "circle": {
+      const latlng = (layer as any).getLatLng();
+      const radius = (layer as any).getRadius();
+      const newId =
+        circles.value.length > 0
+          ? Math.max(...circles.value.map((c) => c.id)) + 1
+          : 1;
+      circles.value.push({
+        id: newId,
+        lat: latlng.lat,
+        lng: latlng.lng,
+        radius: radius,
+        class: "border border-blue-500 bg-blue-500/20",
+      });
+      break;
+    }
+    case "polyline": {
+      const latlngs = (layer as any)
+        .getLatLngs()
+        .map((ll: any) => [ll.lat, ll.lng] as [number, number]);
+      const newId =
+        polylines.value.length > 0
+          ? Math.max(...polylines.value.map((p) => p.id)) + 1
+          : 1;
+      polylines.value.push({
+        id: newId,
+        latlngs: latlngs,
+        class: "border border-red-500",
+        weight: 4,
+      });
+      break;
+    }
+    case "polygon": {
+      const latlngs = (layer as any)
+        .getLatLngs()[0]
+        .map((ll: any) => [ll.lat, ll.lng] as [number, number]);
+      const newId =
+        polygons.value.length > 0
+          ? Math.max(...polygons.value.map((p) => p.id)) + 1
+          : 1;
+      polygons.value.push({
+        id: newId,
+        latlngs: latlngs,
+        class: "border border-purple-500 bg-purple-500/30",
+      });
+      break;
+    }
+    case "rectangle": {
+      const bounds = (layer as any).getBounds();
+      const newId =
+        rectangles.value.length > 0
+          ? Math.max(...rectangles.value.map((r) => r.id)) + 1
+          : 1;
+      rectangles.value.push({
+        id: newId,
+        bounds: [
+          [bounds.getSouth(), bounds.getWest()],
+          [bounds.getNorth(), bounds.getEast()],
+        ] as [[number, number], [number, number]],
+        class: "border border-orange-500 bg-orange-500/20",
+      });
+      break;
+    }
+  }
+
+  currentMode.value = "select";
 };
 </script>
 
 <template>
-  <ClientOnly>
-    <div class="h-128 min-h-128 mb-4">
+  <div class="w-full h-full flex flex-col gap-4">
+    <div class="rounded flex items-center justify-between gap-4 flex-wrap">
+      <div class="flex gap-2 items-center">
+        <Button
+          @click="editMode = !editMode"
+          class="px-4 py-2 rounded transition-colors"
+          :class="
+            editMode
+              ? 'bg-blue-500 text-white hover:bg-blue-600'
+              : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+          "
+        >
+          {{ editMode ? "Disable edition" : "Enable edition" }}
+        </Button>
+      </div>
+
+      <div
+        v-if="measureMode && lastMeasurement"
+        class="px-4 py-2 bg-orange-50 border border-orange-200 rounded-lg shadow-sm"
+      >
+        <div class="text-sm font-medium text-orange-900">
+          Measurement Result:
+        </div>
+        <div class="text-xs text-orange-700 mt-1">
+          <span class="font-semibold">Distance:</span>
+          {{
+            lastMeasurement.distance > 1000
+              ? `${(lastMeasurement.distance / 1000).toFixed(2)} km`
+              : `${lastMeasurement.distance.toFixed(2)} m`
+          }}
+        </div>
+        <div
+          v-if="lastMeasurement.area !== undefined"
+          class="text-xs text-orange-700"
+        >
+          <span class="font-semibold">Area:</span>
+          {{
+            lastMeasurement.area > 10000
+              ? `${(lastMeasurement.area / 1000000).toFixed(2)} km²`
+              : `${lastMeasurement.area.toFixed(2)} m²`
+          }}
+        </div>
+      </div>
+    </div>
+
+    <div class="flex-1 relative">
       <LeafletMap
         ref="mapRef"
-        name="marseille"
-        tile-layer="openstreetmap"
-        :center-lat="locationCoords.lat"
-        :center-lng="locationCoords.lng"
-        :zoom="zoom"
-        class="rounded-lg"
-        @location:found="onLocationFound"
+        name="shapes-demo"
+        class="w-full h-[600px] rounded-lg shadow-lg"
+        tile-layer="osm"
+        :center-lat="48.8566"
+        :center-lng="2.3522"
+        :zoom="13"
       >
         <LeafletTileLayer
-          name="openstreetmap"
+          name="osm"
           url-template="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         />
-
-        <LeafletControls
-          position="topleft"
-          :enabled="true"
-          @item-clicked="onLocate"
-        >
-          <LeafletControlItem name="locate" type="push" title="Locate me">
-            <Icon icon="gis:location-arrow" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-        </LeafletControls>
 
         <LeafletZoomControl position="topleft" />
 
-        <LeafletCircle
-          :key="`circle-${locationCoords.lat}-${locationCoords.lng}`"
-          :lat="locationCoords.lat"
-          :lng="locationCoords.lng"
-          :radius="locationCoords.accuracy"
-          class="bg-red-500/20 border border-red-500"
-        />
+        <LeafletControls
+          position="topleft"
+          :enabled="editMode"
+          :active-item="currentMode"
+          @item-clicked="handleModeSelected"
+        >
+          <LeafletControlItem
+            name="select"
+            type="toggle"
+            title="Selection Tool (V)"
+          >
+            <Icon icon="gis:arrow" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem
+            name="direct-select"
+            type="toggle"
+            title="Direct Selection Tool (A)"
+          >
+            <Icon icon="gis:arrow-o" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem name="marker" type="toggle" title="Draw Marker">
+            <Icon icon="gis:poi" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem
+            name="rectangle"
+            type="toggle"
+            title="Draw Rectangle"
+          >
+            <Icon icon="gis:rectangle" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem name="circle" type="toggle" title="Draw Circle">
+            <Icon icon="gis:circle" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem
+            name="polyline"
+            type="toggle"
+            title="Draw Polyline"
+          >
+            <Icon icon="gis:polyline" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem name="polygon" type="toggle" title="Draw Polygon">
+            <Icon icon="gis:polygon" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+        </LeafletControls>
+
+        <LeafletControls
+          position="topright"
+          :enabled="editMode"
+          :active-item="
+            measureMode === 'line'
+              ? 'measure-line'
+              : measureMode === 'polygon'
+                ? 'measure-polygon'
+                : null
+          "
+          @item-clicked="handleModeSelected"
+        >
+          <LeafletControlItem
+            name="measure-line"
+            type="toggle"
+            title="Measure Distance (Line)"
+          >
+            <Icon icon="ri:ruler-line" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+          <LeafletControlItem
+            name="measure-polygon"
+            type="toggle"
+            title="Measure Distance & Area (Polygon)"
+          >
+            <Icon icon="raphael:ruler" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+        </LeafletControls>
+
+        <LeafletMeasureTool
+          :enabled="!!measureMode"
+          :mode="measureMode || 'polygon'"
+          unit="metric"
+          :show-area="true"
+          class="border border-blue-500 bg-blue-500/20"
+          @measurement-complete="handleMeasurementComplete"
+          @measurement-update="(data) => (lastMeasurement = data)"
+        >
+          <LeafletFeatureHandle
+            role="corner"
+            class="bg-blue-500/20 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+            :size="12"
+          />
+        </LeafletMeasureTool>
+
+        <LeafletFeaturesEditor
+          :enabled="editMode"
+          :mode="currentMode"
+          :shape-options="{ color: '#3388ff', fillOpacity: 0.2 }"
+          @draw:created="handleShapeCreated"
+        >
+          <LeafletFeaturesSelector
+            :enabled="isSelectMode"
+            :mode="selectionMode"
+          >
+            <LeafletMarker
+              v-for="marker in markers"
+              :key="`marker-${marker.id}`"
+              :id="`marker-${marker.id}`"
+              v-model:lat="marker.lat"
+              v-model:lng="marker.lng"
+              :selectable="currentMode === 'select'"
+              :editable="currentMode === 'direct-select'"
+              :draggable="currentMode === 'select'"
+            />
+
+            <LeafletCircle
+              v-for="circle in circles"
+              :key="`circle-${circle.id}`"
+              :id="`circle-${circle.id}`"
+              v-model:lat="circle.lat"
+              v-model:lng="circle.lng"
+              v-model:radius="circle.radius"
+              :class="circle.class"
+              :selectable="currentMode === 'select'"
+              :editable="currentMode === 'direct-select'"
+              :draggable="currentMode === 'select'"
+            />
+
+            <LeafletPolyline
+              v-for="polyline in polylines"
+              :key="`polyline-${polyline.id}`"
+              :id="`polyline-${polyline.id}`"
+              v-model:latlngs="polyline.latlngs"
+              :weight="polyline.weight"
+              :class="polyline.class"
+              :selectable="currentMode === 'select'"
+              :editable="currentMode === 'direct-select'"
+              :draggable="currentMode === 'select'"
+            />
+
+            <LeafletPolygon
+              v-for="polygon in polygons"
+              :key="`polygon-${polygon.id}`"
+              :id="`polygon-${polygon.id}`"
+              v-model:latlngs="polygon.latlngs"
+              :class="polygon.class"
+              :selectable="currentMode === 'select'"
+              :editable="currentMode === 'direct-select'"
+              :draggable="currentMode === 'select'"
+              :auto-close="true"
+            />
+
+            <LeafletRectangle
+              v-for="rectangle in rectangles"
+              :key="`rectangle-${rectangle.id}`"
+              :id="`rectangle-${rectangle.id}`"
+              v-model:bounds="rectangle.bounds"
+              :class="rectangle.class"
+              :selectable="currentMode === 'select'"
+              :editable="currentMode === 'direct-select'"
+              :draggable="currentMode === 'select'"
+            />
+
+            <LeafletCanvasGL
+              ref="canvasRef"
+              :corners="canvasCorners"
+              :width="400"
+              :height="300"
+              :selectable="currentMode === 'select'"
+              :editable="currentMode === 'direct-select'"
+              :draggable="currentMode === 'select'"
+              :subdivisions="20"
+              :opacity="canvasOpacity"
+              class="border-2 border-red-500"
+              @canvas-ready="onCanvasReady"
+              @update:corners="(corners) => (canvasCorners = corners)"
+            >
+              <LeafletFeatureHandle
+                role="corner"
+                class="bg-white border-2 border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+                :size="10"
+              />
+            </LeafletCanvasGL>
+
+            <template #bounding-box-styles>
+              <LeafletFeatureRectangle
+                class="border-2 border-orange-400"
+                :dashed="[5, 5]"
+              />
+
+              <LeafletFeatureHandle
+                role="corner"
+                class="bg-red-500/30 border border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+                :size="10"
+              />
+
+              <LeafletFeatureHandle
+                role="edge"
+                class="bg-blue-500/20 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+                :size="8"
+              />
+
+              <LeafletFeatureHandle
+                role="rotate"
+                class="bg-blue-500/40 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+                :size="12"
+              />
+
+              <LeafletFeatureHandle
+                role="center"
+                class="bg-orange-500/40 border border-orange-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
+                :size="12"
+              />
+            </template>
+          </LeafletFeaturesSelector>
+        </LeafletFeaturesEditor>
       </LeafletMap>
     </div>
-  </ClientOnly>
+  </div>
 </template>
 ```
   :::
@@ -569,17 +1031,24 @@ const createBoundingBox = () => {
   ];
 
   const cornerCursors = [
-    "nwse-resize",
     "nesw-resize",
     "nwse-resize",
     "nesw-resize",
+    "nwse-resize",
   ];
+  const edgeCursors = ["ew-resize", "ns-resize", "ew-resize", "ns-resize"];
+  const rotateCursor = "ew-resize";
 
   corners.forEach((corner, index) => {
     const handle = L.value!.marker(corner, {
       draggable: true,
       icon: L.value!.divIcon(stylesOptions.value.corner),
     }).addTo(map.value!);
+
+    const handleElement = handle.getElement();
+    if (handleElement && cornerCursors[index]) {
+      handleElement.style.cursor = cornerCursors[index];
+    }
 
     const onCornerMouseDown = () => {
       if (map.value && cornerCursors[index]) {
@@ -686,13 +1155,16 @@ const createBoundingBox = () => {
     ),
   ];
 
-  const edgeCursors = ["ew-resize", "ns-resize", "ew-resize", "ns-resize"];
-
   edges.forEach((edge, index) => {
     const handle = L.value!.marker(edge, {
       draggable: true,
       icon: L.value!.divIcon(stylesOptions.value.edge),
     }).addTo(map.value!);
+
+    const handleElement = handle.getElement();
+    if (handleElement && edgeCursors[index]) {
+      handleElement.style.cursor = edgeCursors[index];
+    }
 
     const onEdgeMouseDown = () => {
       if (map.value && edgeCursors[index]) {
@@ -797,9 +1269,19 @@ const createBoundingBox = () => {
       })
       .addTo(map.value);
 
+    const handleElement = rotateHandle.value.getElement();
+    if (handleElement) {
+      handleElement.style.cursor = rotateCursor;
+    }
+
     const onRotateMouseDown = () => {
       if (map.value) {
-        map.value.getContainer().style.cursor = "grabbing";
+        map.value.getContainer().style.cursor = rotateCursor;
+      }
+
+      const handleElement = rotateHandle.value?.getElement();
+      if (handleElement) {
+        handleElement.style.cursor = rotateCursor;
       }
     };
 
@@ -840,6 +1322,11 @@ const createBoundingBox = () => {
       if (map.value) {
         map.value.getContainer().style.cursor = "";
         map.value.dragging.enable();
+      }
+
+      const handleElement = rotateHandle.value?.getElement();
+      if (handleElement) {
+        handleElement.style.cursor = "grab";
       }
 
       if (boundingBox.value) boundingBox.value.setStyle({ opacity: 1 });
@@ -1173,6 +1660,7 @@ const enableEditing = () => {
 };
 
 let mouseDownHandler: ((e: MouseEvent) => void) | null = null;
+let mouseMoveHandler: ((e: MouseEvent) => void) | null = null;
 
 const enableDragging = () => {
   if (!canvasLayer.value || !map.value || !L.value) return;
@@ -1180,6 +1668,27 @@ const enableDragging = () => {
   if (mouseDownHandler) {
     canvasLayer.value.removeEventListener("mousedown", mouseDownHandler);
   }
+  if (mouseMoveHandler) {
+    canvasLayer.value.removeEventListener("mousemove", mouseMoveHandler);
+  }
+
+  mouseMoveHandler = (e: MouseEvent) => {
+    if (!map.value || !L.value || isDragging.value) return;
+
+    const containerPoint = map.value.mouseEventToContainerPoint(e as any);
+    const corners = props.corners.map((corner) => {
+      const point = map.value!.latLngToContainerPoint([corner.lat, corner.lng]);
+      return { x: point.x, y: point.y };
+    });
+
+    if (
+      isPointInPolygon({ x: containerPoint.x, y: containerPoint.y }, corners)
+    ) {
+      map.value.getContainer().style.cursor = "pointer";
+    } else {
+      map.value.getContainer().style.cursor = "";
+    }
+  };
 
   mouseDownHandler = (e: MouseEvent) => {
     if (!map.value || !L.value) return;
@@ -1218,12 +1727,21 @@ const enableDragging = () => {
   };
 
   canvasLayer.value.addEventListener("mousedown", mouseDownHandler);
+  canvasLayer.value.addEventListener("mousemove", mouseMoveHandler);
 };
 
 const disableDragging = () => {
-  if (!canvasLayer.value || !mouseDownHandler) return;
-  canvasLayer.value.removeEventListener("mousedown", mouseDownHandler);
-  mouseDownHandler = null;
+  if (!canvasLayer.value) return;
+
+  if (mouseDownHandler) {
+    canvasLayer.value.removeEventListener("mousedown", mouseDownHandler);
+    mouseDownHandler = null;
+  }
+
+  if (mouseMoveHandler) {
+    canvasLayer.value.removeEventListener("mousemove", mouseMoveHandler);
+    mouseMoveHandler = null;
+  }
 };
 
 const setupMapDragHandlers = () => {
@@ -1863,6 +2381,7 @@ const enableEditing = () => {
 };
 
 let mouseDownHandler: ((e: MouseEvent) => void) | null = null;
+let mouseMoveHandler: ((e: MouseEvent) => void) | null = null;
 
 const enableDragging = () => {
   if (!canvasLayer.value || !map.value || !L.value) return;
@@ -1870,6 +2389,27 @@ const enableDragging = () => {
   if (mouseDownHandler) {
     canvasLayer.value.removeEventListener("mousedown", mouseDownHandler);
   }
+  if (mouseMoveHandler) {
+    canvasLayer.value.removeEventListener("mousemove", mouseMoveHandler);
+  }
+
+  mouseMoveHandler = (e: MouseEvent) => {
+    if (!map.value || !L.value || isDragging.value) return;
+
+    const containerPoint = map.value.mouseEventToContainerPoint(e as any);
+    const corners = props.corners.map((corner) => {
+      const point = map.value!.latLngToContainerPoint([corner.lat, corner.lng]);
+      return { x: point.x, y: point.y };
+    });
+
+    if (
+      isPointInPolygon({ x: containerPoint.x, y: containerPoint.y }, corners)
+    ) {
+      map.value.getContainer().style.cursor = "pointer";
+    } else {
+      map.value.getContainer().style.cursor = "";
+    }
+  };
 
   mouseDownHandler = (e: MouseEvent) => {
     if (!map.value || !L.value) return;
@@ -1902,18 +2442,27 @@ const enableDragging = () => {
     setupMapDragHandlers();
 
     if (map.value) {
-      map.value.getContainer().style.cursor = "move";
+      map.value.getContainer().style.cursor = "pointer";
       map.value.dragging.disable();
     }
   };
 
   canvasLayer.value.addEventListener("mousedown", mouseDownHandler);
+  canvasLayer.value.addEventListener("mousemove", mouseMoveHandler);
 };
 
 const disableDragging = () => {
-  if (!canvasLayer.value || !mouseDownHandler) return;
-  canvasLayer.value.removeEventListener("mousedown", mouseDownHandler);
-  mouseDownHandler = null;
+  if (!canvasLayer.value) return;
+
+  if (mouseDownHandler) {
+    canvasLayer.value.removeEventListener("mousedown", mouseDownHandler);
+    mouseDownHandler = null;
+  }
+
+  if (mouseMoveHandler) {
+    canvasLayer.value.removeEventListener("mousemove", mouseMoveHandler);
+    mouseMoveHandler = null;
+  }
 };
 
 const setupMapDragHandlers = () => {
@@ -1956,7 +2505,7 @@ const setupMapDragHandlers = () => {
     isDragging.value = false;
 
     if (map.value) {
-      map.value.getContainer().style.cursor = "";
+      map.value.getContainer().style.cursor = "pointer";
       map.value.dragging.enable();
       map.value.off("mousemove", onMouseMove as any);
       map.value.off("mouseup", onMouseUp);
@@ -2644,6 +3193,7 @@ const enableDragging = () => {
 
   const onMouseDown = (e: any) => {
     if (!map.value || !circle.value) return;
+
     isDragging.value = true;
     dragStartLatLng = circle.value.getLatLng();
     dragStartMousePoint = e.containerPoint;
@@ -9117,6 +9667,96 @@ Helps smooth transitions when toggling virtualization on/off
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <leaflet-simple />
+  :::
+
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
+```vue
+<script setup lang="ts">
+import { ref, type ComponentPublicInstance } from "vue";
+import { ClientOnly } from "#components";
+import {
+  LeafletMap,
+  LeafletTileLayer,
+  LeafletZoomControl,
+  LeafletControls,
+  LeafletControlItem,
+  LeafletCircle,
+  type LeafletMapExposed,
+} from "@/components/ui/leaflet-map";
+import { Icon } from "@iconify/vue";
+
+type LeafletMapInstance = ComponentPublicInstance & LeafletMapExposed;
+
+const mapRef = ref<LeafletMapInstance | null>(null);
+const zoom = ref(13);
+const locationCoords = ref<{ lat: number; lng: number; accuracy: number }>({
+  lat: 43.3026,
+  lng: 5.3691,
+  accuracy: 500,
+});
+
+const onLocate = () => {
+  mapRef.value?.locate();
+};
+
+const onLocationFound = (event: any) => {
+  locationCoords.value = {
+    lat: event.latitude,
+    lng: event.longitude,
+    accuracy: event.accuracy,
+  };
+};
+</script>
+
+<template>
+  <ClientOnly>
+    <div class="h-128 min-h-128 mb-4">
+      <LeafletMap
+        ref="mapRef"
+        name="marseille"
+        tile-layer="openstreetmap"
+        :center-lat="locationCoords.lat"
+        :center-lng="locationCoords.lng"
+        :zoom="zoom"
+        class="rounded-lg"
+        @location:found="onLocationFound"
+      >
+        <LeafletTileLayer
+          name="openstreetmap"
+          url-template="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        />
+
+        <LeafletControls
+          position="topleft"
+          :enabled="true"
+          @item-clicked="onLocate"
+        >
+          <LeafletControlItem name="locate" type="push" title="Locate me">
+            <Icon icon="gis:location-arrow" class="w-4 h-4 text-black" />
+          </LeafletControlItem>
+        </LeafletControls>
+
+        <LeafletZoomControl position="topleft" />
+
+        <LeafletCircle
+          :key="`circle-${locationCoords.lat}-${locationCoords.lng}`"
+          :lat="locationCoords.lat"
+          :lng="locationCoords.lng"
+          :radius="locationCoords.accuracy"
+          class="bg-red-500/20 border border-red-500"
+        />
+      </LeafletMap>
+    </div>
+  </ClientOnly>
+</template>
+```
+  :::
+::
+
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
     <leaflet-canvas-demo />
   :::
 
@@ -9483,558 +10123,6 @@ watch(
       </div>
     </div>
   </ClientOnly>
-</template>
-```
-  :::
-::
-
-::tabs
-  :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <leaflet-edition-demo />
-  :::
-
-  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
-```vue
-<script setup lang="ts">
-import { ref, computed, type ComponentPublicInstance } from "vue";
-import { Button } from "@/components/ui/button";
-import {
-  LeafletMap,
-  LeafletTileLayer,
-  LeafletZoomControl,
-  LeafletControls,
-  LeafletControlItem,
-  LeafletFeaturesEditor,
-  LeafletFeaturesSelector,
-  LeafletFeatureHandle,
-  LeafletFeatureRectangle,
-  LeafletMarker,
-  LeafletCircle,
-  LeafletPolyline,
-  LeafletPolygon,
-  LeafletRectangle,
-  LeafletMeasureTool,
-  LeafletCanvasGL,
-  type LeafletMapExposed,
-  type FeatureDrawEvent,
-  type FeatureShapeType,
-  type FeatureSelectMode,
-} from "@/components/ui/leaflet-map";
-import { Icon } from "@iconify/vue";
-
-type LeafletCanvasInstance = ComponentPublicInstance & {
-  sourceCanvas: HTMLCanvasElement | null;
-  redraw: () => void;
-};
-
-const mapRef = ref<LeafletMapExposed | null>(null);
-
-const editMode = ref(true);
-
-const currentMode = ref<FeatureShapeType | FeatureSelectMode | null>("select");
-
-const measureMode = ref<"line" | "polygon" | false>(false);
-const lastMeasurement = ref<{ distance: number; area?: number } | null>(null);
-
-const selectionMode = computed<FeatureSelectMode | null>(() => {
-  if (currentMode.value === "select") return "select";
-  if (currentMode.value === "direct-select") return "direct-select";
-  return null;
-});
-
-const isSelectMode = computed(() => selectionMode.value !== null);
-
-const markers = ref([
-  { id: 1, lat: 48.8566, lng: 2.3522, label: "Paris" },
-  { id: 2, lat: 48.8738, lng: 2.295, label: "Arc de Triomphe" },
-  { id: 3, lat: 48.8584, lng: 2.2945, label: "Tour Eiffel" },
-]);
-
-const circles = ref([
-  {
-    id: 1,
-    lat: 48.8566,
-    lng: 2.3522,
-    radius: 500,
-    class: "border border-blue-500 bg-blue-500/20",
-  },
-  {
-    id: 2,
-    lat: 48.8738,
-    lng: 2.295,
-    radius: 300,
-    class: "border border-green-500 bg-green-500/30",
-  },
-]);
-
-const polylines = ref([
-  {
-    id: 1,
-    latlngs: [
-      [48.8566, 2.3522],
-      [48.8738, 2.295],
-      [48.8584, 2.2945],
-    ] as Array<[number, number]>,
-    class: "border border-red-500",
-    weight: 4,
-  },
-]);
-
-const polygons = ref([
-  {
-    id: 1,
-    latlngs: [
-      [48.86, 2.34],
-      [48.86, 2.36],
-      [48.85, 2.36],
-      [48.85, 2.34],
-    ] as Array<[number, number]>,
-    class: "border border-purple-500 bg-purple-500/30",
-  },
-]);
-
-const rectangles = ref([
-  {
-    id: 1,
-    bounds: [
-      [48.84, 2.28],
-      [48.845, 2.29],
-    ] as [[number, number], [number, number]],
-    class: "border border-orange-500 bg-orange-500/20",
-  },
-]);
-
-const canvasRef = ref<LeafletCanvasInstance | null>(null);
-const canvasCorners = ref([
-  { lat: 48.865, lng: 2.34 },
-  { lat: 48.865, lng: 2.365 },
-  { lat: 48.85, lng: 2.365 },
-  { lat: 48.85, lng: 2.34 },
-]);
-const canvasOpacity = ref(0.7);
-const sourceCanvas = ref<HTMLCanvasElement | null>(null);
-
-const onCanvasReady = (canvas: HTMLCanvasElement) => {
-  sourceCanvas.value = canvas;
-
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  gradient.addColorStop(0, "#667eea");
-  gradient.addColorStop(1, "#764ba2");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.fillStyle = "white";
-  ctx.font = "bold 24px Arial";
-  ctx.textAlign = "center";
-  ctx.fillText("Canvas Overlay", canvas.width / 2, canvas.height / 2 - 10);
-
-  ctx.font = "16px Arial";
-  ctx.fillText(
-    "Editable & Draggable",
-    canvas.width / 2,
-    canvas.height / 2 + 20,
-  );
-};
-
-const handleModeSelected = (mode: string | null) => {
-  if (mode === "measure-line" || mode === "measure-polygon") {
-    const newMode = mode === "measure-line" ? "line" : "polygon";
-
-    if (measureMode.value === newMode) {
-      measureMode.value = false;
-    } else {
-      measureMode.value = newMode;
-      currentMode.value = null;
-    }
-    return;
-  }
-
-  if (measureMode.value) {
-    measureMode.value = false;
-  }
-
-  if (currentMode.value === mode) {
-    currentMode.value = null;
-  } else {
-    currentMode.value = mode as FeatureShapeType | FeatureSelectMode | null;
-  }
-};
-
-const handleMeasurementComplete = (data: {
-  distance: number;
-  area?: number;
-}) => {
-  lastMeasurement.value = data;
-};
-
-const handleShapeCreated = (event: FeatureDrawEvent) => {
-  const { layer, layerType } = event;
-
-  switch (layerType) {
-    case "marker": {
-      const latlng = (layer as any).getLatLng();
-      const newId =
-        markers.value.length > 0
-          ? Math.max(...markers.value.map((m) => m.id)) + 1
-          : 1;
-      markers.value.push({
-        id: newId,
-        lat: latlng.lat,
-        lng: latlng.lng,
-        label: `Marker ${newId}`,
-      });
-      break;
-    }
-    case "circle": {
-      const latlng = (layer as any).getLatLng();
-      const radius = (layer as any).getRadius();
-      const newId =
-        circles.value.length > 0
-          ? Math.max(...circles.value.map((c) => c.id)) + 1
-          : 1;
-      circles.value.push({
-        id: newId,
-        lat: latlng.lat,
-        lng: latlng.lng,
-        radius: radius,
-        class: "border border-blue-500 bg-blue-500/20",
-      });
-      break;
-    }
-    case "polyline": {
-      const latlngs = (layer as any)
-        .getLatLngs()
-        .map((ll: any) => [ll.lat, ll.lng] as [number, number]);
-      const newId =
-        polylines.value.length > 0
-          ? Math.max(...polylines.value.map((p) => p.id)) + 1
-          : 1;
-      polylines.value.push({
-        id: newId,
-        latlngs: latlngs,
-        class: "border border-red-500",
-        weight: 4,
-      });
-      break;
-    }
-    case "polygon": {
-      const latlngs = (layer as any)
-        .getLatLngs()[0]
-        .map((ll: any) => [ll.lat, ll.lng] as [number, number]);
-      const newId =
-        polygons.value.length > 0
-          ? Math.max(...polygons.value.map((p) => p.id)) + 1
-          : 1;
-      polygons.value.push({
-        id: newId,
-        latlngs: latlngs,
-        class: "border border-purple-500 bg-purple-500/30",
-      });
-      break;
-    }
-    case "rectangle": {
-      const bounds = (layer as any).getBounds();
-      const newId =
-        rectangles.value.length > 0
-          ? Math.max(...rectangles.value.map((r) => r.id)) + 1
-          : 1;
-      rectangles.value.push({
-        id: newId,
-        bounds: [
-          [bounds.getSouth(), bounds.getWest()],
-          [bounds.getNorth(), bounds.getEast()],
-        ] as [[number, number], [number, number]],
-        class: "border border-orange-500 bg-orange-500/20",
-      });
-      break;
-    }
-  }
-
-  currentMode.value = "select";
-};
-</script>
-
-<template>
-  <div class="w-full h-full flex flex-col gap-4">
-    <div class="rounded flex items-center justify-between gap-4 flex-wrap">
-      <div class="flex gap-2 items-center">
-        <Button
-          @click="editMode = !editMode"
-          class="px-4 py-2 rounded transition-colors"
-          :class="
-            editMode
-              ? 'bg-blue-500 text-white hover:bg-blue-600'
-              : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-          "
-        >
-          {{ editMode ? "Disable edition" : "Enable edition" }}
-        </Button>
-      </div>
-
-      <div
-        v-if="measureMode && lastMeasurement"
-        class="px-4 py-2 bg-orange-50 border border-orange-200 rounded-lg shadow-sm"
-      >
-        <div class="text-sm font-medium text-orange-900">
-          Measurement Result:
-        </div>
-        <div class="text-xs text-orange-700 mt-1">
-          <span class="font-semibold">Distance:</span>
-          {{
-            lastMeasurement.distance > 1000
-              ? `${(lastMeasurement.distance / 1000).toFixed(2)} km`
-              : `${lastMeasurement.distance.toFixed(2)} m`
-          }}
-        </div>
-        <div
-          v-if="lastMeasurement.area !== undefined"
-          class="text-xs text-orange-700"
-        >
-          <span class="font-semibold">Area:</span>
-          {{
-            lastMeasurement.area > 10000
-              ? `${(lastMeasurement.area / 1000000).toFixed(2)} km²`
-              : `${lastMeasurement.area.toFixed(2)} m²`
-          }}
-        </div>
-      </div>
-    </div>
-
-    <div class="flex-1 relative">
-      <LeafletMap
-        ref="mapRef"
-        name="shapes-demo"
-        class="w-full h-[600px] rounded-lg shadow-lg"
-        tile-layer="osm"
-        :center-lat="48.8566"
-        :center-lng="2.3522"
-        :zoom="13"
-      >
-        <LeafletTileLayer
-          name="osm"
-          url-template="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        />
-
-        <LeafletZoomControl position="topleft" />
-
-        <LeafletControls
-          position="topleft"
-          :enabled="editMode"
-          :active-item="currentMode"
-          @item-clicked="handleModeSelected"
-        >
-          <LeafletControlItem
-            name="select"
-            type="toggle"
-            title="Selection Tool (V)"
-          >
-            <Icon icon="gis:arrow" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-          <LeafletControlItem
-            name="direct-select"
-            type="toggle"
-            title="Direct Selection Tool (A)"
-          >
-            <Icon icon="gis:arrow-o" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-          <LeafletControlItem name="marker" type="toggle" title="Draw Marker">
-            <Icon icon="gis:poi" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-          <LeafletControlItem
-            name="rectangle"
-            type="toggle"
-            title="Draw Rectangle"
-          >
-            <Icon icon="gis:rectangle" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-          <LeafletControlItem name="circle" type="toggle" title="Draw Circle">
-            <Icon icon="gis:circle" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-          <LeafletControlItem
-            name="polyline"
-            type="toggle"
-            title="Draw Polyline"
-          >
-            <Icon icon="gis:polyline" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-          <LeafletControlItem name="polygon" type="toggle" title="Draw Polygon">
-            <Icon icon="gis:polygon" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-        </LeafletControls>
-
-        <LeafletControls
-          position="topright"
-          :enabled="editMode"
-          :active-item="
-            measureMode === 'line'
-              ? 'measure-line'
-              : measureMode === 'polygon'
-                ? 'measure-polygon'
-                : null
-          "
-          @item-clicked="handleModeSelected"
-        >
-          <LeafletControlItem
-            name="measure-line"
-            type="toggle"
-            title="Measure Distance (Line)"
-          >
-            <Icon icon="ri:ruler-line" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-          <LeafletControlItem
-            name="measure-polygon"
-            type="toggle"
-            title="Measure Distance & Area (Polygon)"
-          >
-            <Icon icon="raphael:ruler" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-        </LeafletControls>
-
-        <LeafletMeasureTool
-          :enabled="!!measureMode"
-          :mode="measureMode || 'polygon'"
-          unit="metric"
-          :show-area="true"
-          class="border border-blue-500 bg-blue-500/20"
-          @measurement-complete="handleMeasurementComplete"
-          @measurement-update="(data) => (lastMeasurement = data)"
-        >
-          <LeafletFeatureHandle
-            role="corner"
-            class="bg-blue-500/20 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
-            :size="12"
-          />
-        </LeafletMeasureTool>
-
-        <LeafletFeaturesEditor
-          :enabled="editMode"
-          :mode="currentMode"
-          :shape-options="{ color: '#3388ff', fillOpacity: 0.2 }"
-          @draw:created="handleShapeCreated"
-        >
-          <LeafletFeaturesSelector
-            :enabled="isSelectMode"
-            :mode="selectionMode"
-          >
-            <LeafletMarker
-              v-for="marker in markers"
-              :key="`marker-${marker.id}`"
-              :id="`marker-${marker.id}`"
-              v-model:lat="marker.lat"
-              v-model:lng="marker.lng"
-              :selectable="currentMode === 'select'"
-              :editable="currentMode === 'direct-select'"
-              :draggable="currentMode === 'select'"
-            />
-
-            <LeafletCircle
-              v-for="circle in circles"
-              :key="`circle-${circle.id}`"
-              :id="`circle-${circle.id}`"
-              v-model:lat="circle.lat"
-              v-model:lng="circle.lng"
-              v-model:radius="circle.radius"
-              :class="circle.class"
-              :selectable="currentMode === 'select'"
-              :editable="currentMode === 'direct-select'"
-              :draggable="currentMode === 'select'"
-            />
-
-            <LeafletPolyline
-              v-for="polyline in polylines"
-              :key="`polyline-${polyline.id}`"
-              :id="`polyline-${polyline.id}`"
-              v-model:latlngs="polyline.latlngs"
-              :weight="polyline.weight"
-              :class="polyline.class"
-              :selectable="currentMode === 'select'"
-              :editable="currentMode === 'direct-select'"
-              :draggable="currentMode === 'select'"
-            />
-
-            <LeafletPolygon
-              v-for="polygon in polygons"
-              :key="`polygon-${polygon.id}`"
-              :id="`polygon-${polygon.id}`"
-              v-model:latlngs="polygon.latlngs"
-              :class="polygon.class"
-              :selectable="currentMode === 'select'"
-              :editable="currentMode === 'direct-select'"
-              :draggable="currentMode === 'select'"
-              :auto-close="true"
-            />
-
-            <LeafletRectangle
-              v-for="rectangle in rectangles"
-              :key="`rectangle-${rectangle.id}`"
-              :id="`rectangle-${rectangle.id}`"
-              v-model:bounds="rectangle.bounds"
-              :class="rectangle.class"
-              :selectable="currentMode === 'select'"
-              :editable="currentMode === 'direct-select'"
-              :draggable="currentMode === 'select'"
-            />
-
-            <LeafletCanvasGL
-              ref="canvasRef"
-              :corners="canvasCorners"
-              :width="400"
-              :height="300"
-              :selectable="currentMode === 'select'"
-              :editable="currentMode === 'direct-select'"
-              :draggable="currentMode === 'select'"
-              :subdivisions="20"
-              :opacity="canvasOpacity"
-              class="border-2 border-red-500"
-              @canvas-ready="onCanvasReady"
-              @update:corners="(corners) => (canvasCorners = corners)"
-            >
-              <LeafletFeatureHandle
-                role="corner"
-                class="bg-white border-2 border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
-                :size="10"
-              />
-            </LeafletCanvasGL>
-
-            <template #bounding-box-styles>
-              <LeafletFeatureRectangle
-                class="border-2 border-orange-400"
-                :dashed="[5, 5]"
-              />
-
-              <LeafletFeatureHandle
-                role="corner"
-                class="bg-red-500/30 border border-red-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
-                :size="10"
-              />
-
-              <LeafletFeatureHandle
-                role="edge"
-                class="bg-blue-500/20 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
-                :size="8"
-              />
-
-              <LeafletFeatureHandle
-                role="rotate"
-                class="bg-blue-500/40 border border-blue-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
-                :size="12"
-              />
-
-              <LeafletFeatureHandle
-                role="center"
-                class="bg-orange-500/40 border border-orange-500 rounded-full shadow-[0_0_4px_0_rgba(0,0,0,0.2)]"
-                :size="12"
-              />
-            </template>
-          </LeafletFeaturesSelector>
-        </LeafletFeaturesEditor>
-      </LeafletMap>
-    </div>
-  </div>
 </template>
 ```
   :::
