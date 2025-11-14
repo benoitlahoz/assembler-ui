@@ -9,7 +9,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { ChevronRight } from 'lucide-vue-next';
+import { ChevronRight, Trash } from 'lucide-vue-next';
 
 interface ObjectComposerItemProps {
   itemKey: string;
@@ -215,28 +215,16 @@ function handleChildAdd(path: string[], key: string, value: any) {
           </svg>
         </Button>
         <Button variant="ghost" size="icon" title="Supprimer" @click="deleteItem">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <polyline points="3 6 5 6 21 6" />
-            <path
-              d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-            />
-          </svg>
+          <Trash class="w-4 h-4" />
         </Button>
       </div>
     </div>
 
     <!-- Edit Mode - Pleine largeur -->
-    <div v-else class="flex items-center gap-2 w-full p-3 rounded-md border border-border bg-background">
+    <div
+      v-else
+      class="flex items-center gap-2 w-full p-3 rounded-md border border-border bg-background"
+    >
       <template v-if="!isInArray">
         <Input
           v-model="editKey"
@@ -398,7 +386,10 @@ function handleChildAdd(path: string[], key: string, value: any) {
       </div>
 
       <!-- Edit Mode - Pleine largeur pour accordion (clé seulement) -->
-      <div v-if="!isInArray && isEditing" class="flex items-center gap-2 w-full p-3 rounded-md border border-border bg-background">
+      <div
+        v-if="!isInArray && isEditing"
+        class="flex items-center gap-2 w-full p-3 rounded-md border border-border bg-background"
+      >
         <Input
           v-model="editKey"
           class="flex-1"
