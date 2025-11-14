@@ -221,10 +221,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
     </div>
 
     <!-- Edit Mode - Pleine largeur -->
-    <div
-      v-else
-      class="flex items-center gap-2 w-full p-3 rounded-md border border-border bg-background"
-    >
+    <div v-else class="flex items-center gap-2 w-full p-3 rounded-md border bg-background">
       <template v-if="!isInArray">
         <Input
           v-model="editKey"
@@ -246,36 +243,36 @@ function handleChildAdd(path: string[], key: string, value: any) {
       />
       <div class="flex ml-auto">
         <Button variant="ghost" size="icon" title="Sauvegarder" @click="saveEdit">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <polyline points="20 6 9 17 4 12" />
-        </svg>
-      </Button>
-      <Button variant="ghost" size="icon" title="Annuler" @click="cancelEdit">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </Button>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </Button>
+        <Button variant="ghost" size="icon" title="Annuler" @click="cancelEdit">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </Button>
       </div>
     </div>
   </div>
@@ -390,7 +387,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
       <!-- Edit Mode - Pleine largeur pour accordion (clé seulement) -->
       <div
         v-if="!isInArray && isEditing"
-        class="flex items-center gap-2 w-full p-3 rounded-md border border-border bg-background"
+        class="flex items-center gap-2 w-full p-3 rounded-md border bg-background"
       >
         <Input
           v-model="editKey"
@@ -402,36 +399,36 @@ function handleChildAdd(path: string[], key: string, value: any) {
         />
         <div class="flex ml-auto">
           <Button variant="ghost" size="icon" title="Sauvegarder" @click="saveEdit">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </Button>
-        <Button variant="ghost" size="icon" title="Annuler" @click="cancelEdit">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </Button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </Button>
+          <Button variant="ghost" size="icon" title="Annuler" @click="cancelEdit">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </Button>
         </div>
       </div>
 
