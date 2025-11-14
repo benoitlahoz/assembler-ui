@@ -7916,6 +7916,15 @@ export const useLeaflet = async () => {
     return latlngs.map((ll) => [ll.lng, ll.lat]);
   };
 
+  const fromGeoJSONCoords = (coords: Position[]): LatLng[] => {
+    return coords
+      .filter(
+        (c): c is [number, number] | [number, number, number] =>
+          c[0] !== undefined && c[1] !== undefined,
+      )
+      .map((c) => new L.value!.LatLng(c[1], c[0]));
+  };
+
   const calculateLineDistance = (
     latlngs: LatLng[],
     unit: "metric" | "imperial" = "metric",
@@ -8123,16 +8132,6 @@ export const useLeaflet = async () => {
       }
       return [point.lat, point.lng] as [number, number];
     });
-  };
-
-  const latLngToPixel = (latlng: L.LatLng, map: L.Map): L.Point | null => {
-    if (!L.value || !map) return null;
-    return map.latLngToContainerPoint(latlng);
-  };
-
-  const pixelToLatLng = (point: L.Point, map: L.Map): L.LatLng | null => {
-    if (!L.value || !map) return null;
-    return map.containerPointToLatLng(point);
   };
 
   const translatePointByPixels = (
@@ -8378,6 +8377,7 @@ export const useLeaflet = async () => {
     pixelsToMeters,
 
     toGeoJSONCoords,
+    fromGeoJSONCoords,
     calculateLineDistance,
     calculatePolygonArea,
     calculateCentroid,
@@ -8394,8 +8394,6 @@ export const useLeaflet = async () => {
 
     normalizeLatLngs,
 
-    latLngToPixel,
-    pixelToLatLng,
     translatePointByPixels,
     calculatePixelOffset,
 
