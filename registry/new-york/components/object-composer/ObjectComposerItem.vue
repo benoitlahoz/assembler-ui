@@ -157,7 +157,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
     data-slot="object-composer-item"
     :class="cn('select-none hover:bg-accent', props.class)"
   >
-    <div class="flex items-center w-full">
+    <div v-if="!isEditing" class="flex items-center w-full">
       <div class="w-8" />
 
       <!-- Slot pour contenu personnalisé -->
@@ -173,7 +173,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
           :edit-value="editValue"
         >
           <!-- Rendu par défaut si aucun slot n'est fourni -->
-          <div v-if="!isEditing" class="flex items-center gap-1.5">
+          <div class="flex items-center gap-1.5">
             <span class="font-medium text-foreground">{{ itemKey }}</span>
             <span class="text-muted-foreground">:</span>
             <span
@@ -191,31 +191,12 @@ function handleChildAdd(path: string[], key: string, value: any) {
               {{ displayValue }}
             </span>
           </div>
-
-          <!-- Edit Mode par défaut -->
-          <div v-else class="flex items-center gap-1.5 flex-1">
-            <Input
-              v-model="editKey"
-              class="flex-none min-w-[100px]"
-              type="text"
-              @keyup.enter="saveEdit"
-              @keyup.esc="cancelEdit"
-            />
-            <span class="text-muted-foreground">:</span>
-            <Input
-              v-model="editValue"
-              class="flex-1 min-w-[150px]"
-              type="text"
-              @keyup.enter="saveEdit"
-              @keyup.esc="cancelEdit"
-            />
-          </div>
         </slot>
       </div>
 
       <!-- Actions -->
       <div class="item-actions ml-auto">
-        <Button v-if="!isEditing" variant="ghost" size="icon" title="Éditer" @click="startEdit">
+        <Button variant="ghost" size="icon" title="Éditer" @click="startEdit">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="14"
@@ -231,42 +212,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
           </svg>
         </Button>
-
-        <template v-else>
-          <Button variant="ghost" size="icon" title="Sauvegarder" @click="saveEdit">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </Button>
-          <Button variant="ghost" size="icon" title="Annuler" @click="cancelEdit">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </Button>
-        </template>
-
-        <Button v-if="!isEditing" variant="ghost" size="icon" title="Supprimer" @click="deleteItem">
+        <Button variant="ghost" size="icon" title="Supprimer" @click="deleteItem">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="14"
@@ -286,12 +232,68 @@ function handleChildAdd(path: string[], key: string, value: any) {
         </Button>
       </div>
     </div>
+
+    <!-- Edit Mode - Pleine largeur -->
+    <div v-else class="flex flex-col gap-2 w-full px-2 py-2">
+      <div class="flex items-center gap-2 w-full">
+        <Input
+          v-model="editKey"
+          class="flex-none w-32"
+          placeholder="Clé"
+          type="text"
+          @keyup.enter="saveEdit"
+          @keyup.esc="cancelEdit"
+        />
+        <span class="text-muted-foreground">:</span>
+        <Input
+          v-model="editValue"
+          class="flex-1"
+          placeholder="Valeur"
+          type="text"
+          @keyup.enter="saveEdit"
+          @keyup.esc="cancelEdit"
+        />
+      </div>
+      <div class="flex items-center justify-end gap-1">
+        <Button variant="ghost" size="icon" title="Sauvegarder" @click="saveEdit">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </Button>
+        <Button variant="ghost" size="icon" title="Annuler" @click="cancelEdit">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </Button>
+      </div>
+    </div>
   </div>
 
   <!-- Accordion pour les éléments expandables -->
   <Accordion v-else v-model="accordionValue" type="single" collapsible>
     <AccordionItem value="item-1" class="border-b-0">
-      <div class="flex items-center w-full hover:bg-accent select-none">
+      <div v-if="!isEditing" class="flex items-center w-full hover:bg-accent select-none">
         <AccordionTrigger class="flex-none hover:no-underline select-none py-1! px-2">
           <template #icon>
             <ChevronRight class="transition-transform duration-200 w-4 h-4 text-muted-foreground" />
@@ -311,7 +313,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
             :edit-value="editValue"
           >
             <!-- Rendu par défaut si aucun slot n'est fourni -->
-            <div v-if="!isEditing" class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5">
               <span class="font-medium text-foreground">{{ itemKey }}</span>
               <span class="text-muted-foreground">:</span>
               <span
@@ -329,31 +331,12 @@ function handleChildAdd(path: string[], key: string, value: any) {
                 {{ displayValue }}
               </span>
             </div>
-
-            <!-- Edit Mode par défaut -->
-            <div v-else class="flex items-center gap-1.5 flex-1">
-              <Input
-                v-model="editKey"
-                class="flex-none min-w-[100px]"
-                type="text"
-                @keyup.enter="saveEdit"
-                @keyup.esc="cancelEdit"
-              />
-              <span class="text-muted-foreground">:</span>
-              <Input
-                v-model="editValue"
-                class="flex-1 min-w-[150px]"
-                type="text"
-                @keyup.enter="saveEdit"
-                @keyup.esc="cancelEdit"
-              />
-            </div>
           </slot>
         </div>
 
         <!-- Actions -->
         <div class="item-actions ml-auto">
-          <Button v-if="!isEditing" variant="ghost" size="icon" title="Éditer" @click="startEdit">
+          <Button variant="ghost" size="icon" title="Éditer" @click="startEdit">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="14"
@@ -370,47 +353,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
             </svg>
           </Button>
 
-          <template v-else>
-            <Button variant="ghost" size="icon" title="Sauvegarder" @click="saveEdit">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            </Button>
-            <Button variant="ghost" size="icon" title="Annuler" @click="cancelEdit">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </Button>
-          </template>
-
-          <Button
-            v-if="!isEditing"
-            variant="ghost"
-            size="icon"
-            title="Ajouter un enfant"
-            @click="addChild"
-          >
+          <Button variant="ghost" size="icon" title="Ajouter un enfant" @click="addChild">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="14"
@@ -449,6 +392,63 @@ function handleChildAdd(path: string[], key: string, value: any) {
               <path
                 d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
               />
+            </svg>
+          </Button>
+        </div>
+      </div>
+
+      <!-- Edit Mode - Pleine largeur pour accordion -->
+      <div v-else class="flex flex-col gap-2 w-full px-2 py-2 hover:bg-accent">
+        <div class="flex items-center gap-2 w-full">
+          <div class="w-8" />
+          <Input
+            v-model="editKey"
+            class="flex-none w-32"
+            placeholder="Clé"
+            type="text"
+            @keyup.enter="saveEdit"
+            @keyup.esc="cancelEdit"
+          />
+          <span class="text-muted-foreground">:</span>
+          <Input
+            v-model="editValue"
+            class="flex-1"
+            placeholder="Valeur"
+            type="text"
+            @keyup.enter="saveEdit"
+            @keyup.esc="cancelEdit"
+          />
+        </div>
+        <div class="flex items-center justify-end gap-1">
+          <Button variant="ghost" size="icon" title="Sauvegarder" @click="saveEdit">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </Button>
+          <Button variant="ghost" size="icon" title="Annuler" @click="cancelEdit">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </Button>
         </div>
