@@ -9,6 +9,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { ChevronLeft } from 'lucide-vue-next';
 
 interface ObjectComposerItemProps {
   itemKey: string;
@@ -286,26 +287,13 @@ function handleChildAdd(path: string[], key: string, value: any) {
     v-model="accordionValue"
     type="single"
     collapsible
-    :class="cn('rounded-md mb-1', { border: depth === 0, 'border-border': depth > 0 })"
+    :class="cn('rounded-md mb-2', { border: depth === 0, 'border-border': depth > 0 })"
   >
     <AccordionItem value="item-1" class="border-b-0">
       <div class="flex items-center item-header">
         <AccordionTrigger class="flex-none hover:no-underline py-1 px-2">
           <template #icon>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="transition-transform duration-200"
-            >
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
+            <ChevronLeft class="transition-transform duration-200 w-4 h-4" />
           </template>
         </AccordionTrigger>
 
