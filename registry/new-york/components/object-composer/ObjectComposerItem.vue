@@ -236,18 +236,18 @@ function handleChildAdd(path: string[], key: string, value: any) {
     </div>
 
     <!-- Edit Mode - Pleine largeur -->
-    <div v-else class="flex items-center gap-2 w-full px-2 py-2">
-      <span v-if="isInArray" class="flex-none w-32 font-medium text-foreground">{{ editKey }}</span>
-      <Input
-        v-else
-        v-model="editKey"
-        class="flex-none w-32"
-        placeholder="Clé"
-        type="text"
-        @keyup.enter="saveEdit"
-        @keyup.esc="cancelEdit"
-      />
-      <span class="text-muted-foreground">:</span>
+    <div v-else class="flex items-center gap-2 w-full p-3 rounded-md border border-border bg-background">
+      <template v-if="!isInArray">
+        <Input
+          v-model="editKey"
+          class="flex-none w-32"
+          placeholder="Clé"
+          type="text"
+          @keyup.enter="saveEdit"
+          @keyup.esc="cancelEdit"
+        />
+        <span class="text-muted-foreground">:</span>
+      </template>
       <Input
         v-model="editValue"
         class="flex-1"
@@ -336,7 +336,7 @@ function handleChildAdd(path: string[], key: string, value: any) {
 
         <!-- Actions -->
         <div class="item-actions ml-auto">
-          <Button variant="ghost" size="icon" title="Éditer" @click="startEdit">
+          <Button v-if="!isInArray" variant="ghost" size="icon" title="Éditer" @click="startEdit">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="14"
@@ -398,11 +398,8 @@ function handleChildAdd(path: string[], key: string, value: any) {
       </div>
 
       <!-- Edit Mode - Pleine largeur pour accordion (clé seulement) -->
-      <div v-else class="flex items-center gap-2 w-full px-2 py-2 hover:bg-accent">
-        <div class="w-8" />
-        <span v-if="isInArray" class="flex-1 font-medium text-foreground">{{ editKey }}</span>
+      <div v-if="!isInArray && isEditing" class="flex items-center gap-2 w-full p-3 rounded-md border border-border bg-background">
         <Input
-          v-else
           v-model="editKey"
           class="flex-1"
           placeholder="Clé"
