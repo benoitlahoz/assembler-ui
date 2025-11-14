@@ -1111,6 +1111,31 @@ const isDragging = ref(false);
 let dragStartCorners: Array<{ lat: number; lng: number }> = [];
 let dragStartMousePoint: L.Point | null = null;
 
+const isPointInPolygon = (
+  point: { x: number; y: number },
+  polygon: Array<{ x: number; y: number }>,
+) => {
+  if (polygon.length < 3) {
+    return false;
+  }
+
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const pi = polygon[i];
+    const pj = polygon[j];
+    if (!pi || !pj) continue;
+
+    const intersects =
+      pi.y > point.y !== pj.y > point.y &&
+      point.x <
+        ((pj.x - pi.x) * (point.y - pi.y)) / (pj.y - pi.y || 1e-6) + pi.x;
+
+    if (intersects) inside = !inside;
+  }
+
+  return inside;
+};
+
 const createSourceCanvas = () => {
   if (sourceCanvas.value) return sourceCanvas.value;
 
@@ -1171,6 +1196,18 @@ const enableDragging = () => {
 
   mouseDownHandler = (e: MouseEvent) => {
     if (!map.value || !L.value) return;
+
+    const containerPoint = map.value.mouseEventToContainerPoint(e as any);
+    const corners = props.corners.map((corner) => {
+      const point = map.value!.latLngToContainerPoint([corner.lat, corner.lng]);
+      return { x: point.x, y: point.y };
+    });
+
+    if (
+      !isPointInPolygon({ x: containerPoint.x, y: containerPoint.y }, corners)
+    ) {
+      return;
+    }
 
     L.value.DomEvent.stopPropagation(e as any);
 
@@ -1458,12 +1495,6 @@ const draw = () => {
   }
 };
 
-const handleClick = () => {
-  if (!isDragging.value) {
-    emit("click");
-  }
-};
-
 const registerWithSelection = () => {
   if (!props.selectable || !selectionContext) return;
 
@@ -1584,19 +1615,12 @@ watch(
           const leafletPane = newMap.getPanes().overlayPane;
           leafletPane.appendChild(canvasLayer.value);
 
-          canvasLayer.value.addEventListener("click", handleClick);
-
           newMap.on("moveend", reset);
           newMap.on("zoom", reset);
           newMap.on("viewreset", reset);
 
           if (newSelectable && selectionContext) {
             registerWithSelection();
-
-            canvasLayer.value.addEventListener("click", () => {
-              selectionContext.selectFeature("polygon", canvasId.value);
-              emit("click");
-            });
           }
 
           reset();
@@ -1606,19 +1630,10 @@ watch(
           const selectableChanged =
             oldVal && Boolean(oldVal[5]) !== Boolean(newSelectable);
           if (selectableChanged) {
-            const oldClickHandler = canvasLayer.value.onclick;
-            if (oldClickHandler) {
-              canvasLayer.value.removeEventListener("click", oldClickHandler);
-            }
-
             if (newSelectable && selectionContext) {
-              canvasLayer.value.addEventListener("click", () => {
-                selectionContext.selectFeature("polygon", canvasId.value);
-                emit("click");
-              });
               registerWithSelection();
-            } else {
-              canvasLayer.value.addEventListener("click", handleClick);
+            } else if (selectionContext) {
+              selectionContext.unregisterFeature(canvasId.value);
             }
           }
         }
@@ -1656,7 +1671,6 @@ onBeforeUnmount(() => {
   clearEditMarkers();
 
   if (canvasLayer.value) {
-    canvasLayer.value.removeEventListener("click", handleClick);
     canvasLayer.value.remove();
   }
 
@@ -1782,6 +1796,31 @@ let program: WebGLProgram | null = null;
 let positionBuffer: WebGLBuffer | null = null;
 let texCoordBuffer: WebGLBuffer | null = null;
 
+const isPointInPolygon = (
+  point: { x: number; y: number },
+  polygon: Array<{ x: number; y: number }>,
+) => {
+  if (polygon.length < 3) {
+    return false;
+  }
+
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const pi = polygon[i];
+    const pj = polygon[j];
+    if (!pi || !pj) continue;
+
+    const intersects =
+      pi.y > point.y !== pj.y > point.y &&
+      point.x <
+        ((pj.x - pi.x) * (point.y - pi.y)) / (pj.y - pi.y || 1e-6) + pi.x;
+
+    if (intersects) inside = !inside;
+  }
+
+  return inside;
+};
+
 const createSourceCanvas = () => {
   if (sourceCanvas.value) return sourceCanvas.value;
 
@@ -1842,6 +1881,18 @@ const enableDragging = () => {
 
   mouseDownHandler = (e: MouseEvent) => {
     if (!map.value || !L.value) return;
+
+    const containerPoint = map.value.mouseEventToContainerPoint(e as any);
+    const corners = props.corners.map((corner) => {
+      const point = map.value!.latLngToContainerPoint([corner.lat, corner.lng]);
+      return { x: point.x, y: point.y };
+    });
+
+    if (
+      !isPointInPolygon({ x: containerPoint.x, y: containerPoint.y }, corners)
+    ) {
+      return;
+    }
 
     L.value.DomEvent.stopPropagation(e as any);
 
@@ -2285,12 +2336,6 @@ const draw = () => {
   }
 };
 
-const handleClick = () => {
-  if (!isDragging.value) {
-    emit("click");
-  }
-};
-
 const registerWithSelection = () => {
   if (!props.selectable || !selectionContext) return;
 
@@ -2414,19 +2459,12 @@ watch(
           const leafletPane = newMap.getPanes().overlayPane;
           leafletPane.appendChild(canvasLayer.value);
 
-          canvasLayer.value.addEventListener("click", handleClick);
-
           newMap.on("moveend", reset);
           newMap.on("zoom", reset);
           newMap.on("viewreset", reset);
 
           if (newSelectable && selectionContext) {
             registerWithSelection();
-
-            canvasLayer.value.addEventListener("click", () => {
-              selectionContext.selectFeature("polygon", canvasId.value);
-              emit("click");
-            });
           }
 
           reset();
@@ -2436,19 +2474,10 @@ watch(
           const selectableChanged =
             oldVal && Boolean(oldVal[5]) !== Boolean(newSelectable);
           if (selectableChanged) {
-            const oldClickHandler = canvasLayer.value.onclick;
-            if (oldClickHandler) {
-              canvasLayer.value.removeEventListener("click", oldClickHandler);
-            }
-
             if (newSelectable && selectionContext) {
-              canvasLayer.value.addEventListener("click", () => {
-                selectionContext.selectFeature("polygon", canvasId.value);
-                emit("click");
-              });
               registerWithSelection();
-            } else {
-              canvasLayer.value.addEventListener("click", handleClick);
+            } else if (selectionContext) {
+              selectionContext.unregisterFeature(canvasId.value);
             }
           }
         }
@@ -2505,7 +2534,6 @@ onBeforeUnmount(() => {
   }
 
   if (canvasLayer.value) {
-    canvasLayer.value.removeEventListener("click", handleClick);
     canvasLayer.value.remove();
   }
 
