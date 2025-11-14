@@ -173,27 +173,38 @@ function handleChildAdd(path: string[], key: string, value: any) {
           :edit-value="editValue"
         >
           <!-- Rendu par défaut si aucun slot n'est fourni -->
-          <div v-if="!isEditing" class="default-item-content">
-            <span class="item-key">{{ itemKey }}</span>
-            <span class="item-separator">:</span>
-            <span class="item-value" :class="`type-${valueType}`">
+          <div v-if="!isEditing" class="flex items-center gap-1.5">
+            <span class="font-medium text-foreground">{{ itemKey }}</span>
+            <span class="text-muted-foreground">:</span>
+            <span
+              :class="
+                cn({
+                  'text-red-600 dark:text-red-400': valueType === 'string',
+                  'text-blue-600 dark:text-blue-400': valueType === 'number',
+                  'text-purple-600 dark:text-purple-400': valueType === 'boolean',
+                  'text-muted-foreground italic': valueType === 'null',
+                  'text-muted-foreground italic text-sm':
+                    valueType === 'object' || valueType === 'array',
+                })
+              "
+            >
               {{ displayValue }}
             </span>
           </div>
 
           <!-- Edit Mode par défaut -->
-          <div v-else class="item-edit">
+          <div v-else class="flex items-center gap-1.5 flex-1">
             <Input
               v-model="editKey"
-              class="edit-key"
+              class="flex-none min-w-[100px]"
               type="text"
               @keyup.enter="saveEdit"
               @keyup.esc="cancelEdit"
             />
-            <span class="item-separator">:</span>
+            <span class="text-muted-foreground">:</span>
             <Input
               v-model="editValue"
-              class="edit-value"
+              class="flex-1 min-w-[150px]"
               type="text"
               @keyup.enter="saveEdit"
               @keyup.esc="cancelEdit"
@@ -305,27 +316,38 @@ function handleChildAdd(path: string[], key: string, value: any) {
             :edit-value="editValue"
           >
             <!-- Rendu par défaut si aucun slot n'est fourni -->
-            <div v-if="!isEditing" class="default-item-content">
-              <span class="item-key">{{ itemKey }}</span>
+            <div v-if="!isEditing" class="flex items-center gap-1.5">
+              <span class="font-medium text-foreground">{{ itemKey }}</span>
               <span class="text-muted-foreground">:</span>
-              <span class="item-value" :class="`type-${valueType}`">
+              <span
+                :class="
+                  cn({
+                    'text-red-600 dark:text-red-400': valueType === 'string',
+                    'text-blue-600 dark:text-blue-400': valueType === 'number',
+                    'text-purple-600 dark:text-purple-400': valueType === 'boolean',
+                    'text-muted-foreground italic': valueType === 'null',
+                    'text-muted-foreground italic text-sm':
+                      valueType === 'object' || valueType === 'array',
+                  })
+                "
+              >
                 {{ displayValue }}
               </span>
             </div>
 
             <!-- Edit Mode par défaut -->
-            <div v-else class="item-edit">
+            <div v-else class="flex items-center gap-1.5 flex-1">
               <Input
                 v-model="editKey"
-                class="edit-key"
+                class="flex-none min-w-[100px]"
                 type="text"
                 @keyup.enter="saveEdit"
                 @keyup.esc="cancelEdit"
               />
-              <span class="item-separator">:</span>
+              <span class="text-muted-foreground">:</span>
               <Input
                 v-model="editValue"
-                class="edit-value"
+                class="flex-1 min-w-[150px]"
                 type="text"
                 @keyup.enter="saveEdit"
                 @keyup.esc="cancelEdit"
@@ -460,108 +482,8 @@ function handleChildAdd(path: string[], key: string, value: any) {
 </template>
 
 <style scoped>
-.item-header:hover {
-  background-color: rgba(0, 0, 0, 0.03);
-}
-
-.expand-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #666;
-  transition: transform 0.2s ease;
-}
-
-.expand-button:hover {
-  color: #000;
-}
-
-.expand-button svg {
-  transition: transform 0.2s ease;
-}
-
-.expand-button svg.rotate-90 {
-  transform: rotate(90deg);
-}
-
 .expand-spacer {
   width: 20px;
-}
-
-.item-content {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-}
-
-.default-item-content {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.item-value {
-  color: #1c01ce;
-}
-
-.item-value.type-string {
-  color: #c41a16;
-}
-
-.item-value.type-number {
-  color: #1c00cf;
-}
-
-.item-value.type-boolean {
-  color: #0f68a0;
-}
-
-.item-value.type-null {
-  color: #808080;
-}
-
-.item-value.type-object,
-.item-value.type-array {
-  color: #666;
-  font-style: italic;
-}
-
-.item-edit {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-}
-
-.edit-key,
-.edit-value {
-  padding: 2px 6px;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-  font-family: inherit;
-  font-size: inherit;
-}
-
-.edit-key {
-  flex: 0 0 auto;
-  min-width: 100px;
-}
-
-.edit-value {
-  flex: 1;
-  min-width: 150px;
-}
-
-.edit-key:focus,
-.edit-value:focus {
-  outline: none;
-  border-color: #007acc;
-  box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.1);
 }
 
 .item-actions {
@@ -571,46 +493,8 @@ function handleChildAdd(path: string[], key: string, value: any) {
   transition: opacity 0.15s ease;
 }
 
-.item-header:hover .item-actions {
+.item-header:hover .item-actions,
+div:hover > .item-actions {
   opacity: 1;
-}
-
-.action-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #666;
-  border-radius: 3px;
-  transition: all 0.15s ease;
-}
-
-.action-button:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-  color: #000;
-}
-
-.action-button.save:hover {
-  background-color: rgba(0, 128, 0, 0.1);
-  color: #008000;
-}
-
-.action-button.cancel:hover {
-  background-color: rgba(128, 128, 128, 0.1);
-  color: #666;
-}
-
-.action-button.delete:hover {
-  background-color: rgba(255, 0, 0, 0.1);
-  color: #ff0000;
-}
-
-.children-container {
-  margin-left: 8px;
-  padding-left: 16px;
-  border-left: 1px solid white;
 }
 </style>
