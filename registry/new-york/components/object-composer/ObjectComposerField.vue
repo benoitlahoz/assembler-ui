@@ -20,6 +20,33 @@ const itemContext = inject<{
   isEditing: boolean;
 }>('objectComposerItemContext');
 
+// Computed helpers for styling (exposed in slot props)
+const typeColor = computed(() => {
+  switch (itemContext?.valueType) {
+    case 'string':
+      return 'bg-red-500';
+    case 'number':
+      return 'bg-blue-500';
+    case 'boolean':
+      return 'bg-purple-500';
+    case 'null':
+      return 'bg-gray-400';
+    default:
+      return 'bg-gray-300';
+  }
+});
+
+const badgeVariant = computed<'destructive' | 'default' | 'secondary'>(() => {
+  switch (itemContext?.valueType) {
+    case 'string':
+      return 'destructive';
+    case 'number':
+      return 'default';
+    default:
+      return 'secondary';
+  }
+});
+
 // Expose all data as slot props for custom field rendering (asChild pattern)
 const slotProps = computed(() => ({
   itemKey: itemContext?.itemKey,
@@ -29,6 +56,9 @@ const slotProps = computed(() => ({
   isExpandable: itemContext?.isExpandable,
   isEditing: itemContext?.isEditing,
   desk: itemContext?.desk,
+  itemDesk: itemContext?.desk,
+  typeColor: typeColor.value,
+  badgeVariant: badgeVariant.value,
 }));
 </script>
 

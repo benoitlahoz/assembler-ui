@@ -18,6 +18,7 @@ import {
   ObjectComposerTitle,
   ObjectComposerDescription,
   ObjectComposerItem,
+  ObjectComposerField,
 } from "@/components/ui/object-composer";
 import { Separator } from "@/components/ui/separator";
 
@@ -98,40 +99,7 @@ const readonlyData = ref({
         <Separator class="my-4" />
 
         <ObjectComposerItem>
-          <template #default="{ itemKey, value, valueType }">
-            <div class="flex items-center gap-2">
-              <span class="flex items-center gap-1.5">
-                <span v-if="valueType === 'string'" class="text-red-500"
-                  >📝</span
-                >
-                <span v-else-if="valueType === 'number'" class="text-blue-500"
-                  >🔢</span
-                >
-                <span
-                  v-else-if="valueType === 'boolean'"
-                  class="text-purple-500"
-                  >✓</span
-                >
-                <span v-else class="text-gray-500">📦</span>
-                <span class="font-mono text-sm">{{ itemKey }}</span>
-              </span>
-              <span class="text-muted-foreground">=</span>
-
-              <span
-                class="px-2 py-0.5 rounded-md text-xs font-medium"
-                :class="{
-                  'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300':
-                    valueType === 'string',
-                  'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300':
-                    valueType === 'number',
-                  'bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300':
-                    valueType === 'boolean',
-                }"
-              >
-                {{ typeof value === "string" ? `"${value}"` : String(value) }}
-              </span>
-            </div>
-          </template>
+          <ObjectComposerField />
         </ObjectComposerItem>
       </ObjectComposer>
     </div>
@@ -355,7 +323,6 @@ interface ObjectComposerFieldProps {
 }
 
 const props = defineProps<ObjectComposerFieldProps>();
-const slots = useSlots();
 
 const itemContext = inject<{
   desk: CheckInDesk<any>;
@@ -367,6 +334,32 @@ const itemContext = inject<{
   isEditing: boolean;
 }>("objectComposerItemContext");
 
+const typeColor = computed(() => {
+  switch (itemContext?.valueType) {
+    case "string":
+      return "bg-red-500";
+    case "number":
+      return "bg-blue-500";
+    case "boolean":
+      return "bg-purple-500";
+    case "null":
+      return "bg-gray-400";
+    default:
+      return "bg-gray-300";
+  }
+});
+
+const badgeVariant = computed<"destructive" | "default" | "secondary">(() => {
+  switch (itemContext?.valueType) {
+    case "string":
+      return "destructive";
+    case "number":
+      return "default";
+    default:
+      return "secondary";
+  }
+});
+
 const slotProps = computed(() => ({
   itemKey: itemContext?.itemKey,
   value: itemContext?.value,
@@ -375,6 +368,9 @@ const slotProps = computed(() => ({
   isExpandable: itemContext?.isExpandable,
   isEditing: itemContext?.isEditing,
   desk: itemContext?.desk,
+  itemDesk: itemContext?.desk,
+  typeColor: typeColor.value,
+  badgeVariant: badgeVariant.value,
 }));
 </script>
 
@@ -2413,7 +2409,7 @@ export const useCheckIn = <
   :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref } from "vue";
 import {
   ObjectComposer,
   ObjectComposerHeader,
@@ -2421,9 +2417,11 @@ import {
   ObjectComposerDescription,
   ObjectComposerItem,
   ObjectComposerField,
-} from '@/components/ui/object-composer';
-import { Separator } from '@/components/ui/separator';
-import CustomObjectComposerField from './CustomObjectComposerField.vue';
+} from "@/components/ui/object-composer";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import CustomObjectComposerField from "./CustomObjectComposerField.vue";
 
 const serverMetrics = ref({
   cpu: 78,
@@ -2434,34 +2432,36 @@ const serverMetrics = ref({
   errors: 12,
   latency: 45.6,
   healthy: true,
-  region: 'us-east-1',
-  environment: 'production',
+  region: "us-east-1",
+  environment: "production",
 });
 
 const userProfile = ref({
-  username: 'john.doe',
-  email: 'john@example.com',
-  role: 'admin',
+  username: "john.doe",
+  email: "john@example.com",
+  role: "admin",
   active: true,
   loginCount: 342,
-  lastLogin: '2025-11-15',
-  permissions: ['read', 'write', 'delete'],
+  lastLogin: "2025-11-15",
+  permissions: ["read", "write", "delete"],
 });
 </script>
 
 <template>
   <div class="space-y-8">
     <div>
-      <h2 class="text-2xl font-bold mb-2">Custom ObjectComposerField (asChild Pattern)</h2>
+      <h2 class="text-2xl font-bold mb-2">
+        Custom ObjectComposerField (asChild Pattern)
+      </h2>
       <p class="text-muted-foreground mb-6">
-        Use the <code class="bg-muted px-1 rounded text-sm">asChild</code> pattern to replace ObjectComposerField rendering.
-        Data flows via useCheckIn (desk context) - no props needed!
+        Use the
+        <code class="bg-muted px-1 rounded text-sm">asChild</code> pattern to
+        replace ObjectComposerField rendering. Data flows via useCheckIn (desk
+        context) - no props needed!
       </p>
     </div>
 
-    
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      
       <div class="border rounded-lg p-4 bg-card">
         <ObjectComposer v-model="serverMetrics">
           <ObjectComposerHeader>
@@ -2486,7 +2486,6 @@ const userProfile = ref({
         </ObjectComposer>
       </div>
 
-      
       <div class="border rounded-lg p-4 bg-card">
         <ObjectComposer v-model="userProfile">
           <ObjectComposerHeader>
@@ -2499,14 +2498,38 @@ const userProfile = ref({
           </ObjectComposerHeader>
           <Separator class="mb-4" />
           <ObjectComposerItem>
-            <template #default="{ itemKey, value, valueType, displayValue }">
-              <CustomObjectComposerField
-                :item-key="itemKey"
-                :value="value"
-                :value-type="valueType"
-                :display-value="displayValue"
-              />
-            </template>
+            <ObjectComposerField
+              as-child
+              v-slot="{
+                itemKey,
+                displayValue,
+                typeColor,
+                badgeVariant,
+                itemDesk,
+              }"
+            >
+              <div
+                class="flex items-center gap-2 p-2 rounded hover:bg-accent/50 transition-colors"
+              >
+                <div :class="cn('w-2 h-2 rounded-full', typeColor)" />
+
+                <span class="font-mono text-xs text-muted-foreground min-w-24">
+                  {{ itemKey }}
+                </span>
+
+                <Badge :variant="badgeVariant" class="font-mono text-xs">
+                  {{ displayValue }}
+                </Badge>
+
+                <span
+                  v-if="itemDesk"
+                  class="ml-auto text-xs text-green-600"
+                  title="Desk connected"
+                >
+                  ●
+                </span>
+              </div>
+            </ObjectComposerField>
           </ObjectComposerItem>
         </ObjectComposer>
       </div>
@@ -2514,53 +2537,35 @@ const userProfile = ref({
 
     <Separator />
 
-    
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div class="border rounded-lg p-4">
         <h4 class="font-semibold mb-2 text-sm">🎨 Custom Styling</h4>
         <p class="text-xs text-muted-foreground">
-          Badge components with color-coded types, hover effects, and visual indicators
+          Badge components with color-coded types, hover effects, and visual
+          indicators
         </p>
       </div>
       <div class="border rounded-lg p-4">
         <h4 class="font-semibold mb-2 text-sm">🔌 Desk Access</h4>
         <p class="text-xs text-muted-foreground">
-          Injects desk from parent item for advanced features like live updates and validation
+          Injects desk from parent item for advanced features like live updates
+          and validation
         </p>
       </div>
       <div class="border rounded-lg p-4">
         <h4 class="font-semibold mb-2 text-sm">⚡ Type Indicators</h4>
         <p class="text-xs text-muted-foreground">
-          Visual dots showing string (red), number (blue), boolean (purple), null (gray)
+          Visual dots showing string (red), number (blue), boolean (purple),
+          null (gray)
         </p>
       </div>
       <div class="border rounded-lg p-4">
         <h4 class="font-semibold mb-2 text-sm">🔄 Reusable</h4>
         <p class="text-xs text-muted-foreground">
-          Single component works across all data types with automatic type detection
+          Single component works across all data types with automatic type
+          detection
         </p>
       </div>
-    </div>
-
-    <Separator />
-
-    
-    <div class="space-y-3">
-      <h3 class="font-semibold">Usage (asChild pattern)</h3>
-      <div class="bg-muted/50 rounded-lg p-4 font-mono text-xs space-y-2">
-        <div><ObjectComposerItem></div>
-        <div class="ml-4"><template #field></div>
-        <div class="ml-8"><ObjectComposerField as-child></div>
-        <div class="ml-12"><CustomObjectComposerField /></div>
-        <div class="ml-8"></ObjectComposerField></div>
-        <div class="ml-4"></template></div>
-        <div class="ml-0"></ObjectComposerItem></div>
-      </div>
-      <p class="text-sm text-muted-foreground">
-        Use the <code class="bg-muted px-1 py-0.5 rounded">asChild</code> pattern with the <code class="bg-muted px-1 py-0.5 rounded">field</code> slot.
-        ObjectComposerField provides data via useCheckIn (desk), no props needed!
-        Your custom component receives all data via slot props (itemKey, value, valueType, displayValue, desk).
-      </p>
     </div>
   </div>
 </template>
