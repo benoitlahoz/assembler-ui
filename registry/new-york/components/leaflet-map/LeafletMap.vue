@@ -10,9 +10,9 @@ import {
   type Ref,
   onBeforeUnmount,
 } from 'vue';
-import { cn } from '@/lib/utils';
 import type Leaflet from 'leaflet';
 import type { LeafletMouseEvent } from 'leaflet';
+import { cn } from '@/lib/utils';
 import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
 import { LeafletErrorsKey, LeafletMapKey, LeafletModuleKey, LeafletTileLayersKey } from '.';
 

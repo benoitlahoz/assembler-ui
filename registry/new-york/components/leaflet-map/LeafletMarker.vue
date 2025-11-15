@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { inject, watch, ref, type Ref, nextTick, computed } from 'vue';
-import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey, type FeatureReference } from '.';
 import { useCheckIn } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
+import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey, type FeatureReference } from '.';
 
 export interface LeafletMarkerProps {
   id?: string | number;

@@ -10,13 +10,13 @@ import {
   type InjectionKey,
   computed,
 } from 'vue';
-import { cn } from '@/lib/utils';
 import type { ControlOptions } from 'leaflet';
-import { LeafletControlsKey, LeafletMapKey, LeafletModuleKey } from '.';
 import {
   useCheckIn,
   type CheckInDesk,
 } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
+import { cn } from '@/lib/utils';
+import { LeafletControlsKey, LeafletMapKey, LeafletModuleKey } from '.';
 
 export interface ControlItemReference {
   name: string;
@@ -109,9 +109,12 @@ const createButton = (container: HTMLElement, name: string, title: string) => {
   if (!controlItem) {
     return;
   }
-  const button = L.value!.DomUtil.create('div', 'leaflet-draw-button', container);
+  // Use <a> instead of <div> for proper Leaflet styling (.leaflet-bar a)
+  const button = L.value!.DomUtil.create('a', '', container);
+  button.href = '#';
   button.title = title;
-  button.innerHTML = controlItem.html;
+  // Wrap content in a flex div for centering
+  button.innerHTML = `<div class="flex items-center justify-center h-full">${controlItem.html}</div>`;
   button.setAttribute('role', 'button');
   button.setAttribute('aria-label', title);
   button.setAttribute('tabindex', '0');
@@ -147,14 +150,17 @@ const updateButtonContent = () => {
   const container = control.value.getContainer();
   if (!container) return;
 
-  const buttons = container.querySelectorAll('.leaflet-draw-button');
+  const buttons = container.querySelectorAll('a[data-tool-type]');
   buttons.forEach((button: Element) => {
     const htmlButton = button as HTMLElement;
     const toolType = htmlButton.dataset.toolType;
     if (toolType) {
       const controlItem = controlsRegistry.value.get(toolType);
-      if (controlItem && htmlButton.innerHTML !== controlItem.html) {
-        htmlButton.innerHTML = controlItem.html;
+      if (controlItem) {
+        const wrappedHtml = `<div class="flex items-center justify-center h-full">${controlItem.html}</div>`;
+        if (htmlButton.innerHTML !== wrappedHtml) {
+          htmlButton.innerHTML = wrappedHtml;
+        }
       }
     }
   });
@@ -166,7 +172,7 @@ const updateActiveButton = () => {
   const container = control.value.getContainer();
   if (!container) return;
 
-  const buttons = container.querySelectorAll('.leaflet-draw-button');
+  const buttons = container.querySelectorAll('a[data-tool-type]');
   buttons.forEach((button: Element) => {
     const htmlButton = button as HTMLElement;
     const toolType = htmlButton.dataset.toolType;
@@ -221,7 +227,12 @@ const createControl = () => {
 const tryCreateControl = () => {
   const itemsCount = controlsRegistry.value.size;
 
-  if (map.value && props.enabled && itemsCount > 0 && !control.value) {
+  // Check if all items have HTML content (icons loaded)
+  const allItemsHaveContent = Array.from(controlsRegistry.value.values()).every(
+    (item) => item.html && item.html.trim().length > 0
+  );
+
+  if (map.value && props.enabled && itemsCount > 0 && !control.value && allItemsHaveContent) {
     nextTick(() => {
       createControl();
     });

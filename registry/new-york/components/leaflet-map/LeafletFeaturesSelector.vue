@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, provide, watch, nextTick, type Ref, type InjectionKey } from 'vue';
-import LeafletBoundingBox from './LeafletBoundingBox.vue';
-import type { FeatureShapeType } from './LeafletFeaturesEditor.vue';
-import { LeafletSelectionKey } from '.';
 import {
   useCheckIn,
   type CheckInDesk,
 } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
+import LeafletBoundingBox from './LeafletBoundingBox.vue';
+import type { FeatureShapeType } from './LeafletFeaturesEditor.vue';
+import { LeafletSelectionKey } from '.';
 
 export type FeatureSelectMode = 'select' | 'direct-select';
 

@@ -9,9 +9,8 @@ import {
   onBeforeUnmount,
   computed,
 } from 'vue';
-import { LeafletControlsKey } from '.';
 import { useCheckIn } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
-import type { ControlItemReference } from './LeafletControls.vue';
+import { LeafletControlsKey, type ControlItemReference } from '.';
 
 export interface LeafletControlItemProps {
   name: string;

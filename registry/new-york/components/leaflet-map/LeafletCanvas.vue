@@ -12,18 +12,18 @@ import {
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
 import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
 import { useCheckIn } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
-
-const { checkIn } = useCheckIn<FeatureReference>();
 import {
   LeafletMapKey,
   LeafletModuleKey,
   LeafletSelectionKey,
   LeafletStylesKey,
   type LeafletFeatureHandleStyle,
+  type FeatureReference,
 } from '.';
-import type { FeatureReference } from './LeafletFeaturesSelector.vue';
+
 import './leaflet-editing.css';
 
+const { checkIn } = useCheckIn<FeatureReference>();
 const { LatDegreesMeters, lngDegreesToRadius } = await useLeaflet();
 
 export interface LeafletCanvasStyles {

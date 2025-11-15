@@ -20,7 +20,6 @@ type L = typeof L;
 
 export { default as LeafletMap } from './LeafletMap.vue';
 export { default as LeafletZoomControl } from './LeafletZoomControl.vue';
-export { default as LeafletDrawControl } from './LeafletDrawControl.vue';
 export { default as LeafletControls } from './LeafletControls.vue';
 export { default as LeafletControlItem } from './LeafletControlItem.vue';
 export { default as LeafletFeaturesEditor } from './LeafletFeaturesEditor.vue';
@@ -55,7 +54,11 @@ export const LeafletControlsKey: InjectionKey<LeafletControlsContext | undefined
 export type { LeafletMapProps } from './LeafletMap.vue';
 export type { LeafletMapExposed } from './LeafletMap.vue';
 export type { LeafletZoomControlProps } from './LeafletZoomControl.vue';
-export type { LeafletDrawControlProps } from './LeafletDrawControl.vue';
+export type {
+  LeafletControlsProps,
+  LeafletControlsContext,
+  ControlItemReference,
+} from './LeafletControls.vue';
 export type {
   LeafletFeaturesEditorProps,
   FeatureDrawEvent,
