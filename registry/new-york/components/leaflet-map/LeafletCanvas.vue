@@ -91,87 +91,77 @@ const isDragging = ref(false);
 
 // Check in with selection desk
 const { desk } = selectionContext
-  ? checkIn(
-      // @ts-ignore - selectionContext has deskSymbol property
-      selectionContext,
-      {
-        autoCheckIn: props.selectable,
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: canvasId.value,
+      data: () => ({
         id: canvasId.value,
-        data: () => ({
-          id: canvasId.value,
-          type: 'polygon' as const,
-          getBounds: () => {
-            if (!L.value) return null;
-            const latlngs = props.corners.map((c) => L.value!.latLng(c.lat, c.lng));
-            return L.value!.latLngBounds(latlngs);
-          },
-          getInitialData: () => {
-            return props.corners.map((c) => [c.lat, c.lng] as [number, number]);
-          },
-          applyTransform: (bounds: L.LatLngBounds) => {
-            if (!L.value) return;
+        type: 'polygon' as const,
+        getBounds: () => {
+          if (!L.value) return null;
+          const latlngs = props.corners.map((c) => L.value!.latLng(c.lat, c.lng));
+          return L.value!.latLngBounds(latlngs);
+        },
+        getInitialData: () => {
+          return props.corners.map((c) => [c.lat, c.lng] as [number, number]);
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!L.value) return;
 
-            const currentBounds = L.value.latLngBounds(
-              props.corners.map((c) => L.value!.latLng(c.lat, c.lng))
-            );
-            const currentCenter = currentBounds.getCenter();
-            const newCenter = bounds.getCenter();
+          const currentBounds = L.value.latLngBounds(
+            props.corners.map((c) => L.value!.latLng(c.lat, c.lng))
+          );
+          const currentCenter = currentBounds.getCenter();
+          const newCenter = bounds.getCenter();
 
-            const scaleX =
-              (bounds.getEast() - bounds.getWest()) /
-              (currentBounds.getEast() - currentBounds.getWest());
-            const scaleY =
-              (bounds.getNorth() - bounds.getSouth()) /
-              (currentBounds.getNorth() - currentBounds.getSouth());
+          const scaleX =
+            (bounds.getEast() - bounds.getWest()) /
+            (currentBounds.getEast() - currentBounds.getWest());
+          const scaleY =
+            (bounds.getNorth() - bounds.getSouth()) /
+            (currentBounds.getNorth() - currentBounds.getSouth());
 
-            const newCorners = props.corners.map((corner) => {
-              const relativeX = (corner.lng - currentCenter.lng) * scaleX;
-              const relativeY = (corner.lat - currentCenter.lat) * scaleY;
-              return {
-                lat: newCenter.lat + relativeY,
-                lng: newCenter.lng + relativeX,
-              };
-            });
+          const newCorners = props.corners.map((corner) => {
+            const relativeX = (corner.lng - currentCenter.lng) * scaleX;
+            const relativeY = (corner.lat - currentCenter.lat) * scaleY;
+            return {
+              lat: newCenter.lat + relativeY,
+              lng: newCenter.lng + relativeX,
+            };
+          });
 
-            emit('update:corners', newCorners);
-          },
-          applyRotation: (
-            angle: number,
-            center: { lat: number; lng: number },
-            initialData: any
-          ) => {
-            if (!L.value || !initialData) return;
+          emit('update:corners', newCorners);
+        },
+        applyRotation: (angle: number, center: { lat: number; lng: number }, initialData: any) => {
+          if (!L.value || !initialData) return;
 
-            const initialCorners = initialData as Array<[number, number]>;
-            const angleRad = (-angle * Math.PI) / 180;
+          const initialCorners = initialData as Array<[number, number]>;
+          const angleRad = (-angle * Math.PI) / 180;
 
-            const metersPerDegreeLat = LatDegreesMeters;
-            const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
+          const metersPerDegreeLat = LatDegreesMeters;
+          const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
 
-            const newCorners = initialCorners.map((corner) => {
-              const lat = corner[0];
-              const lng = corner[1];
+          const newCorners = initialCorners.map((corner) => {
+            const lat = corner[0];
+            const lng = corner[1];
 
-              const relMetersY = (lat - center.lat) * metersPerDegreeLat;
-              const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+            const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+            const relMetersX = (lng - center.lng) * metersPerDegreeLng;
 
-              const newRelMetersY =
-                relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
-              const newRelMetersX =
-                relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+            const newRelMetersY = relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+            const newRelMetersX = relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
 
-              return {
-                lat: center.lat + newRelMetersY / metersPerDegreeLat,
-                lng: center.lng + newRelMetersX / metersPerDegreeLng,
-              };
-            });
+            return {
+              lat: center.lat + newRelMetersY / metersPerDegreeLat,
+              lng: center.lng + newRelMetersX / metersPerDegreeLng,
+            };
+          });
 
-            emit('update:corners', newCorners);
-          },
-        }),
-        watchData: [() => props.selectable],
-      }
-    )
+          emit('update:corners', newCorners);
+        },
+      }),
+      watchData: true,
+    })
   : { desk: ref(null) };
 
 let dragStartCorners: Array<{ lat: number; lng: number }> = [];

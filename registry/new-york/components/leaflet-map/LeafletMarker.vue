@@ -39,35 +39,31 @@ const { checkIn } = useCheckIn<FeatureReference>();
 
 // Check-in with the selection desk when selectable (only if context exists)
 const { desk: featureDesk } = selectionContext
-  ? checkIn(
-      // @ts-ignore - selectionContext has deskSymbol property
-      selectionContext,
-      {
-        autoCheckIn: props.selectable,
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: markerId.value,
+      data: () => ({
         id: markerId.value,
-        data: () => ({
-          id: markerId.value,
-          type: 'marker' as const,
-          getBounds: () => {
-            if (!marker.value || !L.value) return null;
-            const latlng = marker.value.getLatLng();
-            const offset = 0.0001; // Small offset for marker bounds
-            return L.value.latLngBounds(
-              [latlng.lat - offset, latlng.lng - offset],
-              [latlng.lat + offset, latlng.lng + offset]
-            );
-          },
-          applyTransform: (bounds: L.LatLngBounds) => {
-            if (!marker.value) return;
-            const center = bounds.getCenter();
-            marker.value.setLatLng(center);
-            emit('update:lat', center.lat);
-            emit('update:lng', center.lng);
-          },
-        }),
-        watchData: true,
-      }
-    )
+        type: 'marker' as const,
+        getBounds: () => {
+          if (!marker.value || !L.value) return null;
+          const latlng = marker.value.getLatLng();
+          const offset = 0.0001; // Small offset for marker bounds
+          return L.value.latLngBounds(
+            [latlng.lat - offset, latlng.lng - offset],
+            [latlng.lat + offset, latlng.lng + offset]
+          );
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!marker.value) return;
+          const center = bounds.getCenter();
+          marker.value.setLatLng(center);
+          emit('update:lat', center.lat);
+          emit('update:lng', center.lng);
+        },
+      }),
+      watchData: true,
+    })
   : { desk: ref(null) };
 
 let Icon: any;

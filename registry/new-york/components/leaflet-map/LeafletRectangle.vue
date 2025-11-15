@@ -55,32 +55,28 @@ const rectangleId = ref<string | number>(props.id ?? `rectangle-${Date.now()}-${
 
 // Check in with selection desk
 const { desk } = selectionContext
-  ? checkIn(
-      // @ts-ignore - selectionContext has deskSymbol property
-      selectionContext,
-      {
-        autoCheckIn: props.selectable,
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: rectangleId.value,
+      data: () => ({
         id: rectangleId.value,
-        data: () => ({
-          id: rectangleId.value,
-          type: 'rectangle' as const,
-          getBounds: () => {
-            if (!rectangle.value) return null;
-            return rectangle.value.getBounds();
-          },
-          applyTransform: (bounds: L.LatLngBounds) => {
-            if (!rectangle.value) return;
+        type: 'rectangle' as const,
+        getBounds: () => {
+          if (!rectangle.value) return null;
+          return rectangle.value.getBounds();
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!rectangle.value) return;
 
-            rectangle.value.setBounds(bounds);
-            emit('update:bounds', [
-              [bounds.getSouth(), bounds.getWest()],
-              [bounds.getNorth(), bounds.getEast()],
-            ] as [[number, number], [number, number]]);
-          },
-        }),
-        watchData: [() => props.selectable],
-      }
-    )
+          rectangle.value.setBounds(bounds);
+          emit('update:bounds', [
+            [bounds.getSouth(), bounds.getWest()],
+            [bounds.getNorth(), bounds.getEast()],
+          ] as [[number, number], [number, number]]);
+        },
+      }),
+      watchData: true,
+    })
   : { desk: ref(null) };
 
 // Variables pour le drag

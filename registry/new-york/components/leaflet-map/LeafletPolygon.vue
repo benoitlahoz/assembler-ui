@@ -67,82 +67,72 @@ const { checkIn } = useCheckIn<FeatureReference>();
 
 // Check in with selection desk
 const { desk } = selectionContext
-  ? checkIn(
-      // @ts-ignore - selectionContext has deskSymbol property
-      selectionContext,
-      {
-        autoCheckIn: props.selectable,
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: polygonId.value,
+      data: () => ({
         id: polygonId.value,
-        data: () => ({
-          id: polygonId.value,
-          type: 'polygon' as const,
-          getBounds: () => {
-            if (!polygon.value || !L.value) return null;
-            return polygon.value.getBounds();
-          },
-          getInitialData: () => {
-            if (!polygon.value) return null;
-            return polygon.value.getLatLngs()[0] as L.LatLng[];
-          },
-          applyTransform: (bounds: L.LatLngBounds) => {
-            if (!polygon.value) return;
-            const currentLatLngs = polygon.value.getLatLngs()[0] as L.LatLng[];
-            const currentBounds = polygon.value.getBounds();
-            const scaleX =
-              (bounds.getEast() - bounds.getWest()) /
-              (currentBounds.getEast() - currentBounds.getWest());
-            const scaleY =
-              (bounds.getNorth() - bounds.getSouth()) /
-              (currentBounds.getNorth() - currentBounds.getSouth());
-            const newCenter = bounds.getCenter();
-            const currentCenter = currentBounds.getCenter();
-            const offsetLat = newCenter.lat - currentCenter.lat;
-            const offsetLng = newCenter.lng - currentCenter.lng;
-            const newLatLngs = currentLatLngs.map((latlng) => {
-              const relLat = (latlng.lat - currentCenter.lat) * scaleY;
-              const relLng = (latlng.lng - currentCenter.lng) * scaleX;
-              return L.value!.latLng(newCenter.lat + relLat, newCenter.lng + relLng);
-            });
-            polygon.value.setLatLngs([newLatLngs]);
-            emit(
-              'update:latlngs',
-              newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>
+        type: 'polygon' as const,
+        getBounds: () => {
+          if (!polygon.value || !L.value) return null;
+          return polygon.value.getBounds();
+        },
+        getInitialData: () => {
+          if (!polygon.value) return null;
+          return polygon.value.getLatLngs()[0] as L.LatLng[];
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!polygon.value) return;
+          const currentLatLngs = polygon.value.getLatLngs()[0] as L.LatLng[];
+          const currentBounds = polygon.value.getBounds();
+          const scaleX =
+            (bounds.getEast() - bounds.getWest()) /
+            (currentBounds.getEast() - currentBounds.getWest());
+          const scaleY =
+            (bounds.getNorth() - bounds.getSouth()) /
+            (currentBounds.getNorth() - currentBounds.getSouth());
+          const newCenter = bounds.getCenter();
+          const currentCenter = currentBounds.getCenter();
+          const offsetLat = newCenter.lat - currentCenter.lat;
+          const offsetLng = newCenter.lng - currentCenter.lng;
+          const newLatLngs = currentLatLngs.map((latlng) => {
+            const relLat = (latlng.lat - currentCenter.lat) * scaleY;
+            const relLng = (latlng.lng - currentCenter.lng) * scaleX;
+            return L.value!.latLng(newCenter.lat + relLat, newCenter.lng + relLng);
+          });
+          polygon.value.setLatLngs([newLatLngs]);
+          emit(
+            'update:latlngs',
+            newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>
+          );
+        },
+        applyRotation: (angle: number, center: { lat: number; lng: number }, initialData: any) => {
+          if (!polygon.value || !L.value) return;
+          const initialLatLngs = initialData as L.LatLng[];
+          const angleRad = (-angle * Math.PI) / 180;
+          const metersPerDegreeLat = LatDegreesMeters;
+          const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
+          const newLatLngs = initialLatLngs.map((latlng) => {
+            const lat = latlng.lat;
+            const lng = latlng.lng;
+            const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+            const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+            const newRelMetersY = relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+            const newRelMetersX = relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+            return L.value!.latLng(
+              center.lat + newRelMetersY / metersPerDegreeLat,
+              center.lng + newRelMetersX / metersPerDegreeLng
             );
-          },
-          applyRotation: (
-            angle: number,
-            center: { lat: number; lng: number },
-            initialData: any
-          ) => {
-            if (!polygon.value || !L.value) return;
-            const initialLatLngs = initialData as L.LatLng[];
-            const angleRad = (-angle * Math.PI) / 180;
-            const metersPerDegreeLat = LatDegreesMeters;
-            const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
-            const newLatLngs = initialLatLngs.map((latlng) => {
-              const lat = latlng.lat;
-              const lng = latlng.lng;
-              const relMetersY = (lat - center.lat) * metersPerDegreeLat;
-              const relMetersX = (lng - center.lng) * metersPerDegreeLng;
-              const newRelMetersY =
-                relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
-              const newRelMetersX =
-                relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
-              return L.value!.latLng(
-                center.lat + newRelMetersY / metersPerDegreeLat,
-                center.lng + newRelMetersX / metersPerDegreeLng
-              );
-            });
-            polygon.value.setLatLngs([newLatLngs]);
-            emit(
-              'update:latlngs',
-              newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>
-            );
-          },
-        }),
-        watchData: true,
-      }
-    )
+          });
+          polygon.value.setLatLngs([newLatLngs]);
+          emit(
+            'update:latlngs',
+            newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>
+          );
+        },
+      }),
+      watchData: true,
+    })
   : { desk: ref(null) };
 
 const clearEditMarkers = () => {

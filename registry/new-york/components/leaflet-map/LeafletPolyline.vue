@@ -58,92 +58,82 @@ const polylineId = ref<string | number>(props.id ?? `polyline-${Date.now()}-${Ma
 
 // Check in with selection desk
 const { desk } = selectionContext
-  ? checkIn(
-      // @ts-ignore - selectionContext has deskSymbol property
-      selectionContext,
-      {
-        autoCheckIn: props.selectable,
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: polylineId.value,
+      data: () => ({
         id: polylineId.value,
-        data: () => ({
-          id: polylineId.value,
-          type: 'polyline' as const,
-          getBounds: () => {
-            if (!polyline.value) return null;
-            return polyline.value.getBounds();
-          },
-          getInitialData: () => {
-            if (!polyline.value) return null;
-            const latlngs = polyline.value.getLatLngs() as L.LatLng[];
-            return latlngs.map((ll) => [ll.lat, ll.lng] as [number, number]);
-          },
-          applyTransform: (bounds: L.LatLngBounds) => {
-            if (!polyline.value || !L.value) return;
+        type: 'polyline' as const,
+        getBounds: () => {
+          if (!polyline.value) return null;
+          return polyline.value.getBounds();
+        },
+        getInitialData: () => {
+          if (!polyline.value) return null;
+          const latlngs = polyline.value.getLatLngs() as L.LatLng[];
+          return latlngs.map((ll) => [ll.lat, ll.lng] as [number, number]);
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!polyline.value || !L.value) return;
 
-            const currentBounds = polyline.value.getBounds();
-            const currentCenter = currentBounds.getCenter();
-            const newCenter = bounds.getCenter();
+          const currentBounds = polyline.value.getBounds();
+          const currentCenter = currentBounds.getCenter();
+          const newCenter = bounds.getCenter();
 
-            const currentLatLngs = polyline.value.getLatLngs() as L.LatLng[];
-            const scaleX =
-              (bounds.getEast() - bounds.getWest()) /
-              (currentBounds.getEast() - currentBounds.getWest());
-            const scaleY =
-              (bounds.getNorth() - bounds.getSouth()) /
-              (currentBounds.getNorth() - currentBounds.getSouth());
+          const currentLatLngs = polyline.value.getLatLngs() as L.LatLng[];
+          const scaleX =
+            (bounds.getEast() - bounds.getWest()) /
+            (currentBounds.getEast() - currentBounds.getWest());
+          const scaleY =
+            (bounds.getNorth() - bounds.getSouth()) /
+            (currentBounds.getNorth() - currentBounds.getSouth());
 
-            const newLatLngs = currentLatLngs.map((latlng) => {
-              const relativeX = (latlng.lng - currentCenter.lng) * scaleX;
-              const relativeY = (latlng.lat - currentCenter.lat) * scaleY;
-              return L.value!.latLng(newCenter.lat + relativeY, newCenter.lng + relativeX);
-            });
+          const newLatLngs = currentLatLngs.map((latlng) => {
+            const relativeX = (latlng.lng - currentCenter.lng) * scaleX;
+            const relativeY = (latlng.lat - currentCenter.lat) * scaleY;
+            return L.value!.latLng(newCenter.lat + relativeY, newCenter.lng + relativeX);
+          });
 
-            polyline.value.setLatLngs(newLatLngs);
-            emit(
-              'update:latlngs',
-              newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>
+          polyline.value.setLatLngs(newLatLngs);
+          emit(
+            'update:latlngs',
+            newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>
+          );
+        },
+        applyRotation: (angle: number, center: { lat: number; lng: number }, initialData: any) => {
+          if (!polyline.value || !L.value || !initialData) return;
+
+          const initialLatLngs = initialData as Array<[number, number]>;
+          const angleRad = (-angle * Math.PI) / 180;
+
+          const metersPerDegreeLat = LatDegreesMeters;
+          const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
+
+          const newLatLngs = initialLatLngs.map((latlng) => {
+            const lat = latlng[0];
+            const lng = latlng[1];
+
+            const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+            const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+
+            const newRelMetersY = relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+            const newRelMetersX = relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+
+            return L.value!.latLng(
+              center.lat + newRelMetersY / metersPerDegreeLat,
+              center.lng + newRelMetersX / metersPerDegreeLng
             );
-          },
-          applyRotation: (
-            angle: number,
-            center: { lat: number; lng: number },
-            initialData: any
-          ) => {
-            if (!polyline.value || !L.value || !initialData) return;
+          });
 
-            const initialLatLngs = initialData as Array<[number, number]>;
-            const angleRad = (-angle * Math.PI) / 180;
-
-            const metersPerDegreeLat = LatDegreesMeters;
-            const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
-
-            const newLatLngs = initialLatLngs.map((latlng) => {
-              const lat = latlng[0];
-              const lng = latlng[1];
-
-              const relMetersY = (lat - center.lat) * metersPerDegreeLat;
-              const relMetersX = (lng - center.lng) * metersPerDegreeLng;
-
-              const newRelMetersY =
-                relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
-              const newRelMetersX =
-                relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
-
-              return L.value!.latLng(
-                center.lat + newRelMetersY / metersPerDegreeLat,
-                center.lng + newRelMetersX / metersPerDegreeLng
-              );
-            });
-
-            polyline.value.setLatLngs(newLatLngs);
-            emit(
-              'update:latlngs',
-              newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>
-            );
-          },
-        }),
-        watchData: [() => props.selectable],
-      }
-    )
+          polyline.value.setLatLngs(newLatLngs);
+          emit(
+            'update:latlngs',
+            newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>
+          );
+        },
+      }),
+      watchData: true,
+    })
   : { desk: ref(null) };
 
 // Variables pour le drag

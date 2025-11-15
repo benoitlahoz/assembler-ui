@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, provide, watch, nextTick, type Ref } from 'vue';
+import { ref, computed, provide, watch, nextTick, type Ref, type InjectionKey } from 'vue';
 import LeafletBoundingBox from './LeafletBoundingBox.vue';
 import type { FeatureShapeType } from './LeafletFeaturesEditor.vue';
 import { LeafletSelectionKey } from '.';
-import { useCheckIn } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
+import {
+  useCheckIn,
+  type CheckInDesk,
+} from '~~/registry/new-york/composables/use-check-in/useCheckIn';
 
 export type FeatureSelectMode = 'select' | 'direct-select';
 
@@ -27,7 +30,7 @@ export interface LeafletSelectionContext {
   selectFeature: (type: FeatureShapeType, id: string | number) => void;
   deselectAll: () => void;
   notifyFeatureUpdate: (id: string | number) => void;
-  deskSymbol?: symbol; // For useCheckIn integration
+  deskSymbol: InjectionKey<CheckInDesk<FeatureReference>>; // For useCheckIn integration
 }
 
 export interface LeafletFeaturesSelectorProps {

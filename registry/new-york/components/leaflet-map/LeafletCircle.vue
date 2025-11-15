@@ -67,40 +67,36 @@ const { checkIn } = useCheckIn<FeatureReference>();
 
 // Check in with selection desk
 const { desk } = selectionContext
-  ? checkIn(
-      // @ts-ignore - selectionContext has deskSymbol property
-      selectionContext,
-      {
-        autoCheckIn: props.selectable,
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: circleId.value,
+      data: () => ({
         id: circleId.value,
-        data: () => ({
-          id: circleId.value,
-          type: 'circle' as const,
-          getBounds: () => {
-            if (!circle.value || !L.value) return null;
-            const center = circle.value.getLatLng();
-            const radius = circle.value.getRadius();
-            const { southWest, northEast } = calculateCircleBounds(center, radius);
-            return L.value.latLngBounds(southWest, northEast);
-          },
-          applyTransform: (bounds: L.LatLngBounds) => {
-            if (!circle.value) return;
-            const center = bounds.getCenter();
-            const latDiff = bounds.getNorth() - bounds.getSouth();
-            const lngDiff = bounds.getEast() - bounds.getWest();
-            const radiusLat = (latDiff / 2) * LatDegreesMeters;
-            const radiusLng = lngDegreesToRadius(lngDiff / 2, center.lat);
-            const radius = (radiusLat + radiusLng) / 2;
-            circle.value.setLatLng(center);
-            circle.value.setRadius(radius);
-            emit('update:lat', center.lat);
-            emit('update:lng', center.lng);
-            emit('update:radius', radius);
-          },
-        }),
-        watchData: true,
-      }
-    )
+        type: 'circle' as const,
+        getBounds: () => {
+          if (!circle.value || !L.value) return null;
+          const center = circle.value.getLatLng();
+          const radius = circle.value.getRadius();
+          const { southWest, northEast } = calculateCircleBounds(center, radius);
+          return L.value.latLngBounds(southWest, northEast);
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!circle.value) return;
+          const center = bounds.getCenter();
+          const latDiff = bounds.getNorth() - bounds.getSouth();
+          const lngDiff = bounds.getEast() - bounds.getWest();
+          const radiusLat = (latDiff / 2) * LatDegreesMeters;
+          const radiusLng = lngDegreesToRadius(lngDiff / 2, center.lat);
+          const radius = (radiusLat + radiusLng) / 2;
+          circle.value.setLatLng(center);
+          circle.value.setRadius(radius);
+          emit('update:lat', center.lat);
+          emit('update:lng', center.lng);
+          emit('update:radius', radius);
+        },
+      }),
+      watchData: true,
+    })
   : { desk: ref(null) };
 
 const clearEditMarkers = () => {
