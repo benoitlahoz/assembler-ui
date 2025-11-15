@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, provide } from 'vue';
+import { ref, computed, provide, type Ref } from 'vue';
 import { useCheckIn } from '../useCheckIn';
 import TabPanel from './TabPanel.vue';
 
@@ -10,17 +10,17 @@ interface TabItemData {
   icon?: string;
 }
 
+const activeTab = ref<string>('tab1');
+const tabCount = ref(0);
+
 // Parent: Tabs Container
 const { openDesk } = useCheckIn<
   TabItemData,
   {
-    activeTab: typeof activeTab;
+    activeTab: Ref<string>;
     setActive: (id: string) => void;
   }
 >();
-
-const activeTab = ref<string>('tab1');
-const tabCount = ref(0);
 
 // Le parent ouvre un desk et le fournit à ses enfants
 const { desk, deskSymbol: tabsDesk } = openDesk({

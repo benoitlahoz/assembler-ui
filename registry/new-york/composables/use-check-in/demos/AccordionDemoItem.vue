@@ -26,7 +26,7 @@ const props = withDefaults(
 
 const { checkIn } = useCheckIn<AccordionItemData>();
 
-const { desk } = checkIn(accordionDesk, {
+const { desk } = checkIn(accordionDesk?.deskSymbol, {
   required: true,
   autoCheckIn: true,
   id: props.id,

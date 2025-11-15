@@ -449,10 +449,6 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
     return createDeskContext<T>(options);
   };
 
-  // ==========================================
-  // HELPER COMPOSABLES
-  // ==========================================
-
   /**
    * Computed helper to check if a specific ID is checked in
    */
