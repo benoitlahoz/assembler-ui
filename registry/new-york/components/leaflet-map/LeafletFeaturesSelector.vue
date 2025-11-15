@@ -101,8 +101,8 @@ const notifyFeatureUpdate = (id: string | number) => {
 };
 
 // Open desk for feature registration
-const { desk, deskSymbol } = openDesk({
-  extraContext: {
+const { desk, DeskInjectionKey } = openDesk({
+  context: {
     // Expose selection state and methods to child features
     selectedFeature,
     selectFeature,
@@ -245,7 +245,7 @@ const context: LeafletSelectionContext = {
   selectFeature,
   deselectAll,
   notifyFeatureUpdate,
-  deskSymbol,
+  deskSymbol: DeskInjectionKey,
 };
 
 provide(LeafletSelectionKey, context as any);

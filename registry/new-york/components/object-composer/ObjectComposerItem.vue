@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, type HTMLAttributes } from 'vue';
+import { ref, computed, inject, type HTMLAttributes, type InjectionKey, onMounted } from 'vue';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/Input';
@@ -10,6 +10,18 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { ChevronRight, Trash } from 'lucide-vue-next';
+import {
+  useCheckIn,
+  type CheckInDesk,
+} from '~~/registry/new-york/composables/use-check-in/useCheckIn';
+
+interface ComposerItemData {
+  key: string;
+  value: any;
+  path: string[];
+  depth: number;
+  isInArray: boolean;
+}
 
 interface ObjectComposerItemProps {
   itemKey: string;
@@ -17,7 +29,6 @@ interface ObjectComposerItemProps {
   depth?: number;
   path?: string[];
   isInArray?: boolean;
-  editingPath?: string[] | null;
   class?: HTMLAttributes['class'];
 }
 
@@ -36,32 +47,55 @@ const props = withDefaults(defineProps<ObjectComposerItemProps>(), {
   depth: 0,
   path: () => [],
   isInArray: false,
-  editingPath: null,
 });
-
-const emit = defineEmits<{
-  update: [path: string[], value: any];
-  delete: [path: string[]];
-  add: [path: string[], key: string, value: any];
-  startEdit: [path: string[]];
-  cancelEdit: [];
-}>();
 
 defineSlots<{
   default(props: SlotProps): any;
 }>();
 
+// Inject desk from parent ObjectComposer
+const composerDesk = inject<{ deskSymbol: InjectionKey<CheckInDesk<ComposerItemData>> }>(
+  'objectComposerDesk'
+)!;
+
+if (!composerDesk) {
+  throw new Error('ObjectComposerItem must be used within ObjectComposer');
+}
+
+const { checkIn } = useCheckIn<ComposerItemData>();
+
+const currentPath = computed(() => [...props.path, props.itemKey]);
+
+// Register this item with the desk
+const { desk } = checkIn(composerDesk.deskSymbol, {
+  autoCheckIn: true,
+  id: currentPath.value.join('.'),
+  data: {
+    key: props.itemKey,
+    value: props.value,
+    path: currentPath.value,
+    depth: props.depth,
+    isInArray: props.isInArray,
+  },
+});
+
+// Access context from desk
+const editingPath = (desk as any).editingPath;
+const updateValueInDesk = (desk as any).updateValue;
+const deleteValueInDesk = (desk as any).deleteValue;
+const addValueInDesk = (desk as any).addValue;
+const startEditInDesk = (desk as any).startEdit;
+const cancelEditInDesk = (desk as any).cancelEdit;
+
 const accordionValue = ref<string>('item-1');
 const editKey = ref(props.itemKey);
 const editValue = ref<string>('');
 
-const currentPath = computed(() => [...props.path, props.itemKey]);
-
-// Vérifier si cet élément est en cours d'édition
+// Check if this item is currently being edited
 const isEditing = computed(() => {
-  if (!props.editingPath) return false;
-  if (props.editingPath.length !== currentPath.value.length) return false;
-  return props.editingPath.every((key, i) => key === currentPath.value[i]);
+  if (!editingPath.value) return false;
+  if (editingPath.value.length !== currentPath.value.length) return false;
+  return editingPath.value.every((key: string, i: number) => key === currentPath.value[i]);
 });
 
 const valueType = computed(() => {
@@ -102,19 +136,15 @@ const displayValue = computed(() => {
   }
 });
 
-function toggleExpand() {
-  // Géré par l'accordion
-}
-
-function startEdit() {
+function handleStartEdit() {
   editKey.value = props.itemKey;
   editValue.value = valueType.value === 'string' ? props.value : JSON.stringify(props.value);
-  emit('startEdit', currentPath.value);
+  startEditInDesk(currentPath.value);
 }
 
-function cancelEdit() {
+function handleCancelEdit() {
   editKey.value = props.itemKey;
-  emit('cancelEdit');
+  cancelEditInDesk();
 }
 
 function saveEdit() {
@@ -134,39 +164,20 @@ function saveEdit() {
       newValue = editValue.value;
     }
 
-    emit('update', currentPath.value, newValue);
+    updateValueInDesk(currentPath.value, newValue);
+    cancelEditInDesk();
   } catch (e) {
     console.error('Invalid value', e);
   }
 }
 
 function deleteItem() {
-  emit('delete', currentPath.value);
+  deleteValueInDesk(currentPath.value);
 }
 
 function addChild() {
   const key = valueType.value === 'array' ? String(props.value.length) : 'newKey';
-  emit('add', currentPath.value, key, '');
-}
-
-function handleChildUpdate(path: string[], value: any) {
-  emit('update', path, value);
-}
-
-function handleChildDelete(path: string[]) {
-  emit('delete', path);
-}
-
-function handleChildAdd(path: string[], key: string, value: any) {
-  emit('add', path, key, value);
-}
-
-function handleChildStartEdit(path: string[]) {
-  emit('startEdit', path);
-}
-
-function handleChildCancelEdit() {
-  emit('cancelEdit');
+  addValueInDesk(currentPath.value, key, '');
 }
 </script>
 
@@ -221,7 +232,7 @@ function handleChildCancelEdit() {
 
       <!-- Actions -->
       <div class="flex ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button variant="ghost" size="icon" title="Éditer" @click="startEdit">
+        <Button variant="ghost" size="icon" title="Éditer" @click="handleStartEdit">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="14"
@@ -252,7 +263,7 @@ function handleChildCancelEdit() {
           placeholder="Clé"
           type="text"
           @keyup.enter="saveEdit"
-          @keyup.esc="cancelEdit"
+          @keyup.esc="handleCancelEdit"
         />
         <span class="text-muted-foreground">:</span>
       </template>
@@ -262,7 +273,7 @@ function handleChildCancelEdit() {
         placeholder="Valeur"
         type="text"
         @keyup.enter="saveEdit"
-        @keyup.esc="cancelEdit"
+        @keyup.esc="handleCancelEdit"
       />
       <div class="flex ml-auto">
         <Button variant="ghost" size="icon" title="Sauvegarder" @click="saveEdit">
@@ -280,7 +291,7 @@ function handleChildCancelEdit() {
             <polyline points="20 6 9 17 4 12" />
           </svg>
         </Button>
-        <Button variant="ghost" size="icon" title="Annuler" @click="cancelEdit">
+        <Button variant="ghost" size="icon" title="Annuler" @click="handleCancelEdit">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="14"
@@ -346,7 +357,13 @@ function handleChildCancelEdit() {
 
         <!-- Actions -->
         <div class="flex ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button v-if="!isInArray" variant="ghost" size="icon" title="Éditer" @click="startEdit">
+          <Button
+            v-if="!isInArray"
+            variant="ghost"
+            size="icon"
+            title="Éditer"
+            @click="handleStartEdit"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="14"
@@ -418,7 +435,7 @@ function handleChildCancelEdit() {
           placeholder="Clé"
           type="text"
           @keyup.enter="saveEdit"
-          @keyup.esc="cancelEdit"
+          @keyup.esc="handleCancelEdit"
         />
         <div class="flex ml-auto">
           <Button variant="ghost" size="icon" title="Sauvegarder" @click="saveEdit">
@@ -436,7 +453,7 @@ function handleChildCancelEdit() {
               <polyline points="20 6 9 17 4 12" />
             </svg>
           </Button>
-          <Button variant="ghost" size="icon" title="Annuler" @click="cancelEdit">
+          <Button variant="ghost" size="icon" title="Annuler" @click="handleCancelEdit">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="14"
@@ -465,14 +482,8 @@ function handleChildCancelEdit() {
             :depth="depth + 1"
             :path="currentPath"
             :is-in-array="valueType === 'array'"
-            :editing-path="editingPath"
-            @update="handleChildUpdate"
-            @delete="handleChildDelete"
-            @add="handleChildAdd"
-            @start-edit="handleChildStartEdit"
-            @cancel-edit="handleChildCancelEdit"
           >
-            <!-- Propagation du slot personnalisé aux enfants -->
+            <!-- Propagate custom slot to children -->
             <template v-if="$slots.default" #default="childSlotProps">
               <slot v-bind="childSlotProps" />
             </template>

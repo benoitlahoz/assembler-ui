@@ -23,8 +23,8 @@ const { openDesk } = useCheckIn<
 >();
 
 // Le parent ouvre un desk et le fournit à ses enfants
-const { desk, deskSymbol: tabsDesk } = openDesk({
-  extraContext: {
+const { desk, DeskInjectionKey: tabsDesk } = openDesk({
+  context: {
     activeTab,
     setActive: (id: string) => {
       const tab = desk.get(id as string);
@@ -34,14 +34,12 @@ const { desk, deskSymbol: tabsDesk } = openDesk({
     },
   },
   onCheckIn: (id, data) => {
-    console.log('Tab checked in:', id, data);
     tabCount.value++;
     if (tabCount.value === 1) {
       activeTab.value = id as string;
     }
   },
   onCheckOut: (id) => {
-    console.log('Tab checked out:', id);
     tabCount.value--;
   },
 });

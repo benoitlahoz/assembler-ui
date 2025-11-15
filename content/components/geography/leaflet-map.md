@@ -3610,7 +3610,7 @@ const control = ref<any>(null);
 
 const { openDesk } = useCheckIn<ControlItemReference>();
 const { desk, deskSymbol } = openDesk({
-  extraContext: {
+  context: {
     activeItem: () => props.activeItem,
   },
   onCheckIn: (id, itemRef) => {
@@ -4888,7 +4888,7 @@ const notifyFeatureUpdate = (id: string | number) => {
 };
 
 const { desk, deskSymbol } = openDesk({
-  extraContext: {
+  context: {
     selectedFeature,
     selectFeature,
     deselectAll,
@@ -8481,7 +8481,7 @@ export interface CheckInDeskOptions<
   T = any,
   TContext extends Record<string, any> = {},
 > {
-  extraContext?: TContext;
+  context?: TContext;
 
   onBeforeCheckIn?: (id: string | number, data: T) => void | boolean;
 
@@ -8676,7 +8676,7 @@ export const useCheckIn = <
 
     const fullContext = {
       ...deskContext,
-      ...(options?.extraContext || {}),
+      ...(options?.context || {}),
     } as CheckInDesk<T, TContext> & TContext;
 
     provide(deskSymbol, fullContext);

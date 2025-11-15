@@ -21,8 +21,8 @@ const openItems = ref<Set<string | number>>(new Set());
 const allowMultiple = ref(false);
 
 // Le parent ouvre un desk et le fournit à ses enfants
-const { desk, deskSymbol: accordionDesk } = openDesk({
-  extraContext: {
+const { desk, DeskInjectionKey: accordionDesk } = openDesk({
+  context: {
     openItems,
     toggle: (id: string | number) => {
       if (openItems.value.has(id)) {

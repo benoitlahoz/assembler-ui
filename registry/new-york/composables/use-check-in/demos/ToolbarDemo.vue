@@ -20,8 +20,8 @@ const activeTool = ref<string | number | null>(null);
 const clickHistory = ref<Array<{ id: string | number; time: number }>>([]);
 
 // Le parent ouvre un desk et le fournit à ses enfants
-const { desk, deskSymbol: toolbarDesk } = openDesk({
-  extraContext: {
+const { desk, DeskInjectionKey: toolbarDesk } = openDesk({
+  context: {
     activeTool,
     handleClick: (id: string | number, type: 'button' | 'toggle') => {
       clickHistory.value.push({ id, time: Date.now() });
@@ -36,7 +36,7 @@ const { desk, deskSymbol: toolbarDesk } = openDesk({
     isActive: (id: string | number) => activeTool.value === id,
   },
   onCheckIn: (id, data) => {
-    console.log('Tool checked in:', id, data);
+    // console.log('Tool checked in:', id, data);
   },
 });
 

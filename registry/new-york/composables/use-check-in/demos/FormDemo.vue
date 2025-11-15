@@ -18,8 +18,8 @@ const formData = ref<Record<string, any>>({});
 const errors = ref<Record<string, string>>({});
 
 // Le parent ouvre un desk et le fournit à ses enfants
-const { desk, deskSymbol: formDesk } = openDesk({
-  extraContext: {
+const { desk, DeskInjectionKey: formDesk } = openDesk({
+  context: {
     updateValue: (name: string, value: any) => {
       formData.value[name] = value;
       if (errors.value[name]) {
@@ -35,13 +35,12 @@ const { desk, deskSymbol: formDesk } = openDesk({
     getError: (name: string) => errors.value[name],
   },
   onCheckIn: (id, data) => {
-    console.log('Field checked in:', id, data);
     if (data.value !== undefined) {
       formData.value[data.name] = data.value;
     }
   },
   onCheckOut: (id) => {
-    console.log('Field checked out:', id);
+    // console.log('Field checked out:', id);
   },
 });
 
