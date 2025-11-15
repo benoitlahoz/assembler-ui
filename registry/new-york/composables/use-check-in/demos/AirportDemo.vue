@@ -112,6 +112,15 @@ const boardGroup = (group: 'A' | 'B' | 'C') => {
   console.log(`📢 Embarquement du groupe ${group}: ${groupPassengers.length} passagers`);
 };
 
+// Liste initiale des passagers (données de base)
+const passengersList = ref([
+  { id: 'passenger-1', name: 'Sophie Martin', baggage: 2, fareClass: 'Business' as const },
+  { id: 'passenger-2', name: 'Jean Dupont', baggage: 1, fareClass: 'Premium' as const },
+  { id: 'passenger-3', name: 'Marie Lambert', baggage: 2, fareClass: 'Business' as const },
+  { id: 'passenger-4', name: 'Pierre Dubois', baggage: 1, fareClass: 'Eco' as const },
+  { id: 'passenger-5', name: 'Claire Bernard', baggage: 3, fareClass: 'Premium' as const },
+]);
+
 // Changer de porte
 const changeGate = () => {
   const gates = ['A12', 'B5', 'C8', 'D3'];
@@ -212,24 +221,12 @@ const changeGate = () => {
       <h4 class="font-semibold">🛂 Comptoir d'enregistrement</h4>
       <div class="space-y-2">
         <AirportPassenger
-          id="passenger-1"
-          name="Sophie Martin"
-          :baggage="2"
-          fare-class="Business"
-        />
-        <AirportPassenger id="passenger-2" name="Jean Dupont" :baggage="1" fare-class="Premium" />
-        <AirportPassenger
-          id="passenger-3"
-          name="Marie Lambert"
-          :baggage="2"
-          fare-class="Business"
-        />
-        <AirportPassenger id="passenger-4" name="Pierre Dubois" :baggage="1" fare-class="Eco" />
-        <AirportPassenger
-          id="passenger-5"
-          name="Claire Bernard"
-          :baggage="3"
-          fare-class="Premium"
+          v-for="passenger in passengersList"
+          :key="passenger.id"
+          :id="passenger.id"
+          :name="passenger.name"
+          :baggage="passenger.baggage"
+          :fare-class="passenger.fareClass"
         />
       </div>
     </div>
