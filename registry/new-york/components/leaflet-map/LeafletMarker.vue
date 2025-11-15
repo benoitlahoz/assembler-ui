@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount } from 'vue';
+import { inject, watch, ref, type Ref, nextTick } from 'vue';
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey, type FeatureReference } from '.';
+import { useCheckIn } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
 
 export interface LeafletMarkerProps {
   id?: string | number;
@@ -33,6 +34,42 @@ const selectionContext = inject(LeafletSelectionKey, undefined);
 const marker = ref<L.Marker | null>(null);
 const markerId = ref<string | number>(props.id ?? `marker-${Date.now()}-${Math.random()}`);
 
+// Use checkIn for automatic registration/cleanup
+const { checkIn } = useCheckIn<FeatureReference>();
+
+// Check-in with the selection desk when selectable (only if context exists)
+const { desk: featureDesk } = selectionContext
+  ? checkIn(
+      // @ts-ignore - selectionContext has deskSymbol property
+      selectionContext,
+      {
+        autoCheckIn: props.selectable,
+        id: markerId.value,
+        data: () => ({
+          id: markerId.value,
+          type: 'marker' as const,
+          getBounds: () => {
+            if (!marker.value || !L.value) return null;
+            const latlng = marker.value.getLatLng();
+            const offset = 0.0001; // Small offset for marker bounds
+            return L.value.latLngBounds(
+              [latlng.lat - offset, latlng.lng - offset],
+              [latlng.lat + offset, latlng.lng + offset]
+            );
+          },
+          applyTransform: (bounds: L.LatLngBounds) => {
+            if (!marker.value) return;
+            const center = bounds.getCenter();
+            marker.value.setLatLng(center);
+            emit('update:lat', center.lat);
+            emit('update:lng', center.lng);
+          },
+        }),
+        watchData: true,
+      }
+    )
+  : { desk: ref(null) };
+
 let Icon: any;
 const iconOptions = {
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -44,39 +81,11 @@ const iconOptions = {
   shadowSize: [41, 41],
 };
 
-// Selection context integration
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext || !marker.value) return;
-
-  const featureRef: FeatureReference = {
-    id: markerId.value,
-    type: 'marker',
-    getBounds: () => {
-      if (!marker.value || !L.value) return null;
-      const latlng = marker.value.getLatLng();
-      const offset = 0.0001; // Small offset for marker bounds
-      return L.value.latLngBounds(
-        [latlng.lat - offset, latlng.lng - offset],
-        [latlng.lat + offset, latlng.lng + offset]
-      );
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!marker.value) return;
-      const center = bounds.getCenter();
-      marker.value.setLatLng(center);
-      emit('update:lat', center.lat);
-      emit('update:lng', center.lng);
-    },
-  };
-
-  selectionContext.registerFeature(featureRef);
-};
-
 const setupMarker = () => {
   if (map.value && L.value && !marker.value) {
     if (!Icon) {
       Icon = L.value.Icon.extend({
-        options: iconOptions,
+        options: iconOptions, //
       });
     }
 
@@ -118,10 +127,8 @@ const setupMarker = () => {
 
     marker.value.addTo(map.value);
 
-    // Register with selection context if selectable
-    if (props.selectable && selectionContext) {
-      registerWithSelection();
-    }
+    // Note: Registration is now handled automatically by checkIn
+    // No need to manually call registerWithSelection()
   }
 };
 
@@ -202,12 +209,10 @@ watch(
             if (props.selectable && selectionContext) {
               marker.value.on('click', onMarkerClick);
               marker.value.on('dragstart', onDragStart);
-              registerWithSelection();
+              // Note: checkIn handles registration automatically based on autoCheckIn
             } else {
               marker.value.on('click', onMarkerClick);
-              if (selectionContext) {
-                selectionContext.unregisterFeature(markerId.value);
-              }
+              // Note: checkIn handles unregistration automatically
             }
           }
         } else {
@@ -232,16 +237,7 @@ watch(
   { immediate: true }
 );
 
-onBeforeUnmount(() => {
-  // Unregister from selection context
-  if (props.selectable && selectionContext) {
-    selectionContext.unregisterFeature(markerId.value);
-  }
-
-  if (marker.value) {
-    marker.value.remove();
-  }
-});
+// Note: onBeforeUnmount removed - checkIn handles cleanup automatically
 </script>
 
 <template><slot /></template>

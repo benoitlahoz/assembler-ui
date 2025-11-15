@@ -3,9 +3,6 @@
  * @category geography
  *
  * @demo LeafletEditionDemo
- * @demo LeafletSimple
- * @demo LeafletCanvasDemo
- * @demo LeafletVirtualizationDemo
  */
 
 import type { InjectionKey, Ref } from 'vue';
@@ -14,6 +11,12 @@ import type { Map, TileLayerOptions } from 'leaflet';
 import type { LeafletSelectionContext } from './LeafletFeaturesSelector.vue';
 import type { LeafletControlsContext } from './LeafletControls.vue';
 type L = typeof L;
+
+/*
+ * @demo LeafletSimple
+ * @demo LeafletCanvasDemo
+ * @demo LeafletVirtualizationDemo
+ */
 
 export { default as LeafletMap } from './LeafletMap.vue';
 export { default as LeafletZoomControl } from './LeafletZoomControl.vue';
