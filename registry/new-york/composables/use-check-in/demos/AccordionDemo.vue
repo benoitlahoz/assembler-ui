@@ -22,7 +22,7 @@ const allowMultiple = ref(false);
 
 // Le parent ouvre un desk et le fournit à ses enfants
 const { desk, deskSymbol: accordionDesk } = openDesk({
-  extraContext: {
+  context: {
     openItems,
     toggle: (id: string | number) => {
       if (openItems.value.has(id)) {

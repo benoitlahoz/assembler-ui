@@ -23,6 +23,55 @@ const boardingGroups = ref({
   Eco: 'C',
 });
 
+// Poids maximum de bagages par classe tarifaire (en kg)
+const maxBaggageWeight = {
+  Business: 40,
+  Premium: 30,
+  Eco: 23,
+};
+
+// Fonction pour ajouter un bagage (vérifie le poids maximum)
+const addBaggage = (passengerId: string, weight: number = 10): boolean => {
+  const passenger = airportDesk.desk.get(passengerId);
+  if (!passenger) return false;
+
+  const currentWeight = passenger.data.baggage;
+  const maxWeight = maxBaggageWeight[passenger.data.fareClass];
+  const newWeight = currentWeight + weight;
+
+  if (newWeight > maxWeight) {
+    console.log(
+      `❌ ${passenger.data.name}: Impossible d'ajouter ${weight}kg (max ${maxWeight}kg, actuel ${currentWeight}kg)`
+    );
+    return false;
+  }
+
+  // Mise à jour directe du registry
+  passenger.data.baggage = newWeight;
+  airportDesk.desk.registry.value.set(passengerId, passenger);
+  console.log(
+    `➕ ${passenger.data.name}: Ajout de ${weight}kg de bagages (${currentWeight}kg → ${newWeight}kg)`
+  );
+  return true;
+};
+
+// Fonction pour retirer un bagage
+const removeBaggage = (passengerId: string, weight: number = 10): boolean => {
+  const passenger = airportDesk.desk.get(passengerId);
+  if (!passenger) return false;
+
+  const currentWeight = passenger.data.baggage;
+  const newWeight = Math.max(0, currentWeight - weight);
+
+  // Mise à jour directe du registry
+  passenger.data.baggage = newWeight;
+  airportDesk.desk.registry.value.set(passengerId, passenger);
+  console.log(
+    `➖ ${passenger.data.name}: Retrait de ${weight}kg de bagages (${currentWeight}kg → ${newWeight}kg)`
+  );
+  return true;
+};
+
 // Fonction pour assigner un nouveau siège (responsabilité du desk)
 const assignSeat = (passengerId: string, passengerName: string) => {
   const rows = ['8', '12', '15', '18', '22', '25'];
@@ -59,18 +108,24 @@ const { openDesk } = useCheckIn<
     gate: typeof gate;
     departureTime: typeof departureTime;
     boardingGroups: typeof boardingGroups;
+    maxBaggageWeight: typeof maxBaggageWeight;
     assignSeat: typeof assignSeat;
+    addBaggage: typeof addBaggage;
+    removeBaggage: typeof removeBaggage;
   }
 >();
 
 // Ouverture du comptoir d'enregistrement avec les infos du vol
 const airportDesk = openDesk({
-  extraContext: {
+  context: {
     flightNumber,
     gate,
     departureTime,
     boardingGroups,
+    maxBaggageWeight,
     assignSeat,
+    addBaggage,
+    removeBaggage,
   },
   debug: true,
   onCheckIn: (id, data) => {
@@ -100,7 +155,7 @@ const stats = computed(() => ({
   groupA: passengers.value.filter((p) => boardingGroups.value[p.data.fareClass] === 'A').length,
   groupB: passengers.value.filter((p) => boardingGroups.value[p.data.fareClass] === 'B').length,
   groupC: passengers.value.filter((p) => boardingGroups.value[p.data.fareClass] === 'C').length,
-  totalBaggage: passengers.value.reduce((sum, p) => sum + p.data.baggage, 0),
+  totalWeight: passengers.value.reduce((sum, p) => sum + p.data.baggage, 0),
 }));
 
 // Embarquement de tous les passagers d'un groupe
@@ -114,11 +169,11 @@ const boardGroup = (group: 'A' | 'B' | 'C') => {
 
 // Liste initiale des passagers (données de base)
 const passengersList = ref([
-  { id: 'passenger-1', name: 'Sophie Martin', baggage: 2, fareClass: 'Business' as const },
-  { id: 'passenger-2', name: 'Jean Dupont', baggage: 1, fareClass: 'Premium' as const },
-  { id: 'passenger-3', name: 'Marie Lambert', baggage: 2, fareClass: 'Business' as const },
-  { id: 'passenger-4', name: 'Pierre Dubois', baggage: 1, fareClass: 'Eco' as const },
-  { id: 'passenger-5', name: 'Claire Bernard', baggage: 3, fareClass: 'Premium' as const },
+  { id: 'passenger-1', name: 'Sophie Martin', fareClass: 'Business' as const },
+  { id: 'passenger-2', name: 'Jean Dupont', fareClass: 'Premium' as const },
+  { id: 'passenger-3', name: 'Marie Lambert', fareClass: 'Business' as const },
+  { id: 'passenger-4', name: 'Pierre Dubois', fareClass: 'Eco' as const },
+  { id: 'passenger-5', name: 'Claire Bernard', fareClass: 'Premium' as const },
 ]);
 
 // Changer de porte
@@ -131,7 +186,7 @@ const changeGate = () => {
 </script>
 
 <template>
-  <div class="space-y-6 p-6 border rounded-lg bg-background">
+  <div class="space-y-6">
     <!-- Panneau d'affichage du vol -->
     <div class="bg-primary/10 p-4 rounded-lg border-2 border-primary">
       <h3 class="text-lg font-bold mb-3">✈️ Panneau d'affichage - Comptoir d'enregistrement</h3>
@@ -164,8 +219,8 @@ const changeGate = () => {
         <div class="text-3xl font-bold">{{ stats.total }}</div>
       </div>
       <div class="bg-muted p-4 rounded-lg">
-        <h4 class="font-semibold mb-2">🧳 Bagages totaux</h4>
-        <div class="text-3xl font-bold">{{ stats.totalBaggage }}</div>
+        <h4 class="font-semibold mb-2">🧳 Total Luggages Weight</h4>
+        <div class="text-3xl font-bold">{{ stats.totalWeight }}kg</div>
       </div>
     </div>
 
@@ -225,7 +280,6 @@ const changeGate = () => {
           :key="passenger.id"
           :id="passenger.id"
           :name="passenger.name"
-          :baggage="passenger.baggage"
           :fare-class="passenger.fareClass"
         />
       </div>

@@ -35,6 +35,50 @@ const boardingGroups = ref({
   Eco: "C",
 });
 
+const maxBaggageWeight = {
+  Business: 40,
+  Premium: 30,
+  Eco: 23,
+};
+
+const addBaggage = (passengerId: string, weight: number = 10): boolean => {
+  const passenger = airportDesk.desk.get(passengerId);
+  if (!passenger) return false;
+
+  const currentWeight = passenger.data.baggage;
+  const maxWeight = maxBaggageWeight[passenger.data.fareClass];
+  const newWeight = currentWeight + weight;
+
+  if (newWeight > maxWeight) {
+    console.log(
+      `❌ ${passenger.data.name}: Impossible d'ajouter ${weight}kg (max ${maxWeight}kg, actuel ${currentWeight}kg)`,
+    );
+    return false;
+  }
+
+  passenger.data.baggage = newWeight;
+  airportDesk.desk.registry.value.set(passengerId, passenger);
+  console.log(
+    `➕ ${passenger.data.name}: Ajout de ${weight}kg de bagages (${currentWeight}kg → ${newWeight}kg)`,
+  );
+  return true;
+};
+
+const removeBaggage = (passengerId: string, weight: number = 10): boolean => {
+  const passenger = airportDesk.desk.get(passengerId);
+  if (!passenger) return false;
+
+  const currentWeight = passenger.data.baggage;
+  const newWeight = Math.max(0, currentWeight - weight);
+
+  passenger.data.baggage = newWeight;
+  airportDesk.desk.registry.value.set(passengerId, passenger);
+  console.log(
+    `➖ ${passenger.data.name}: Retrait de ${weight}kg de bagages (${currentWeight}kg → ${newWeight}kg)`,
+  );
+  return true;
+};
+
 const assignSeat = (passengerId: string, passengerName: string) => {
   const rows = ["8", "12", "15", "18", "22", "25"];
   const letters = ["A", "B", "C", "D", "E", "F"];
@@ -73,17 +117,23 @@ const { openDesk } = useCheckIn<
     gate: typeof gate;
     departureTime: typeof departureTime;
     boardingGroups: typeof boardingGroups;
+    maxBaggageWeight: typeof maxBaggageWeight;
     assignSeat: typeof assignSeat;
+    addBaggage: typeof addBaggage;
+    removeBaggage: typeof removeBaggage;
   }
 >();
 
 const airportDesk = openDesk({
-  extraContext: {
+  context: {
     flightNumber,
     gate,
     departureTime,
     boardingGroups,
+    maxBaggageWeight,
     assignSeat,
+    addBaggage,
+    removeBaggage,
   },
   debug: true,
   onCheckIn: (id, data) => {
@@ -119,7 +169,7 @@ const stats = computed(() => ({
   groupC: passengers.value.filter(
     (p) => boardingGroups.value[p.data.fareClass] === "C",
   ).length,
-  totalBaggage: passengers.value.reduce((sum, p) => sum + p.data.baggage, 0),
+  totalWeight: passengers.value.reduce((sum, p) => sum + p.data.baggage, 0),
 }));
 
 const boardGroup = (group: "A" | "B" | "C") => {
@@ -132,6 +182,14 @@ const boardGroup = (group: "A" | "B" | "C") => {
   );
 };
 
+const passengersList = ref([
+  { id: "passenger-1", name: "Sophie Martin", fareClass: "Business" as const },
+  { id: "passenger-2", name: "Jean Dupont", fareClass: "Premium" as const },
+  { id: "passenger-3", name: "Marie Lambert", fareClass: "Business" as const },
+  { id: "passenger-4", name: "Pierre Dubois", fareClass: "Eco" as const },
+  { id: "passenger-5", name: "Claire Bernard", fareClass: "Premium" as const },
+]);
+
 const changeGate = () => {
   const gates = ["A12", "B5", "C8", "D3"];
   const currentIndex = gates.indexOf(gate.value);
@@ -141,7 +199,7 @@ const changeGate = () => {
 </script>
 
 <template>
-  <div class="space-y-6 p-6 border rounded-lg bg-background">
+  <div class="space-y-6">
     <div class="bg-primary/10 p-4 rounded-lg border-2 border-primary">
       <h3 class="text-lg font-bold mb-3">
         ✈️ Panneau d'affichage - Comptoir d'enregistrement
@@ -174,8 +232,8 @@ const changeGate = () => {
         <div class="text-3xl font-bold">{{ stats.total }}</div>
       </div>
       <div class="bg-muted p-4 rounded-lg">
-        <h4 class="font-semibold mb-2">🧳 Bagages totaux</h4>
-        <div class="text-3xl font-bold">{{ stats.totalBaggage }}</div>
+        <h4 class="font-semibold mb-2">🧳 Total Luggages Weight</h4>
+        <div class="text-3xl font-bold">{{ stats.totalWeight }}kg</div>
       </div>
     </div>
 
@@ -228,34 +286,11 @@ const changeGate = () => {
       <h4 class="font-semibold">🛂 Comptoir d'enregistrement</h4>
       <div class="space-y-2">
         <AirportPassenger
-          id="passenger-1"
-          name="Sophie Martin"
-          :baggage="2"
-          fare-class="Business"
-        />
-        <AirportPassenger
-          id="passenger-2"
-          name="Jean Dupont"
-          :baggage="1"
-          fare-class="Premium"
-        />
-        <AirportPassenger
-          id="passenger-3"
-          name="Marie Lambert"
-          :baggage="2"
-          fare-class="Business"
-        />
-        <AirportPassenger
-          id="passenger-4"
-          name="Pierre Dubois"
-          :baggage="1"
-          fare-class="Eco"
-        />
-        <AirportPassenger
-          id="passenger-5"
-          name="Claire Bernard"
-          :baggage="3"
-          fare-class="Premium"
+          v-for="passenger in passengersList"
+          :key="passenger.id"
+          :id="passenger.id"
+          :name="passenger.name"
+          :fare-class="passenger.fareClass"
         />
       </div>
     </div>
@@ -372,7 +407,7 @@ export interface CheckInDeskOptions<
   T = any,
   TContext extends Record<string, any> = {},
 > {
-  extraContext?: TContext;
+  context?: TContext;
 
   onBeforeCheckIn?: (id: string | number, data: T) => void | boolean;
 
@@ -567,7 +602,7 @@ export const useCheckIn = <
 
     const fullContext = {
       ...deskContext,
-      ...(options?.extraContext || {}),
+      ...(options?.context || {}),
     } as CheckInDesk<T, TContext> & TContext;
 
     provide(deskSymbol, fullContext);
@@ -823,7 +858,7 @@ const formData = ref<Record<string, any>>({});
 const errors = ref<Record<string, string>>({});
 
 const { desk, deskSymbol: formDesk } = openDesk({
-  extraContext: {
+  context: {
     updateValue: (name: string, value: any) => {
       formData.value[name] = value;
       if (errors.value[name]) {
@@ -981,7 +1016,7 @@ const openItems = ref<Set<string | number>>(new Set());
 const allowMultiple = ref(false);
 
 const { desk, deskSymbol: accordionDesk } = openDesk({
-  extraContext: {
+  context: {
     openItems,
     toggle: (id: string | number) => {
       if (openItems.value.has(id)) {
@@ -1141,7 +1176,7 @@ const { openDesk } = useCheckIn<
 >();
 
 const { desk, deskSymbol: tabsDesk } = openDesk({
-  extraContext: {
+  context: {
     activeTab,
     setActive: (id: string) => {
       const tab = desk.get(id as string);
@@ -1263,7 +1298,7 @@ const activeTool = ref<string | number | null>(null);
 const clickHistory = ref<Array<{ id: string | number; time: number }>>([]);
 
 const { desk, deskSymbol: toolbarDesk } = openDesk({
-  extraContext: {
+  context: {
     activeTool,
     handleClick: (id: string | number, type: "button" | "toggle") => {
       clickHistory.value.push({ id, time: Date.now() });

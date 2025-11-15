@@ -102,7 +102,7 @@ const notifyFeatureUpdate = (id: string | number) => {
 
 // Open desk for feature registration
 const { desk, deskSymbol } = openDesk({
-  extraContext: {
+  context: {
     // Expose selection state and methods to child features
     selectedFeature,
     selectFeature,

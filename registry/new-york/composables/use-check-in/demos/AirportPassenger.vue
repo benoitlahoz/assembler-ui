@@ -18,7 +18,6 @@ const airportDesk = inject<{ deskSymbol: InjectionKey<CheckInDesk<PassengerData>
 const props = defineProps<{
   id: string;
   name: string;
-  baggage: number;
   fareClass: 'Business' | 'Premium' | 'Eco';
 }>();
 
@@ -35,7 +34,7 @@ const { desk } = checkIn(airportDesk?.deskSymbol, {
   data: {
     name: props.name,
     seat: '', // Le siège sera assigné par le desk via onCheckIn
-    baggage: props.baggage,
+    baggage: 0, // Le passager commence sans bagages
     fareClass: props.fareClass,
     checkedInAt: checkInTime.value,
   },
@@ -59,6 +58,25 @@ console.log(
 
 // Le siège est géré uniquement par le desk - on le lit directement
 const currentSeat = computed(() => desk.get(props.id)?.data.seat || '');
+
+// Le poids des bagages est géré par le desk
+const currentBaggageWeight = computed(() => desk.get(props.id)?.data.baggage || 0);
+
+// Poids maximum pour cette classe
+const maxWeight = computed(() => (desk as any).maxBaggageWeight[props.fareClass]);
+
+// Vérifier si on peut ajouter des bagages
+const canAddBaggage = computed(() => currentBaggageWeight.value < maxWeight.value);
+
+// Ajouter un bagage
+const handleAddBaggage = () => {
+  (desk as any).addBaggage(props.id, 10);
+};
+
+// Retirer un bagage
+const handleRemoveBaggage = () => {
+  (desk as any).removeBaggage(props.id, 10);
+};
 
 // Accès aux infos du vol partagées via extraContext injecté
 const flightInfo = computed(() => ({
@@ -97,7 +115,7 @@ const toggleCheckIn = () => {
     desk.checkIn(props.id, {
       name: props.name,
       seat: '', // Sera assigné par le desk via onCheckIn
-      baggage: props.baggage,
+      baggage: 0, // Le passager recommence sans bagages
       fareClass: props.fareClass,
       checkedInAt: new Date(),
     });
@@ -130,8 +148,17 @@ const toggleCheckIn = () => {
           {{ fareClass }} (Groupe {{ boardingGroup }})
         </span>
       </div>
-      <div class="text-sm text-muted-foreground">
-        💺 Siège {{ currentSeat || '—' }} • 🧳 {{ baggage }} bagage{{ baggage > 1 ? 's' : '' }}
+      <div class="text-sm text-muted-foreground">💺 Siège {{ currentSeat || '—' }}</div>
+      <div class="text-sm flex items-center gap-2">
+        <span class="text-muted-foreground"
+          >🧳 {{ currentBaggageWeight }}kg / {{ maxWeight }}kg</span
+        >
+        <span
+          v-if="currentBaggageWeight >= maxWeight"
+          class="text-xs px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-medium"
+        >
+          Max atteint
+        </span>
       </div>
       <div v-if="isCheckedIn && checkInTime" class="text-xs text-muted-foreground">
         ⏰ Enregistré à
@@ -144,7 +171,28 @@ const toggleCheckIn = () => {
     </div>
 
     <!-- Actions -->
-    <div class="flex gap-2">
+    <div class="flex flex-col gap-1">
+      <!-- Gestion des bagages -->
+      <div v-if="isCheckedIn" class="flex gap-1">
+        <button
+          @click="handleRemoveBaggage"
+          :disabled="currentBaggageWeight === 0"
+          class="px-2 py-1 rounded text-xs font-medium bg-muted hover:bg-muted/80 disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Retirer 10kg"
+        >
+          ➖
+        </button>
+        <button
+          @click="handleAddBaggage"
+          :disabled="!canAddBaggage"
+          class="px-2 py-1 rounded text-xs font-medium bg-muted hover:bg-muted/80 disabled:opacity-30 disabled:cursor-not-allowed"
+          :title="canAddBaggage ? 'Ajouter 10kg' : 'Poids maximum atteint'"
+        >
+          ➕
+        </button>
+      </div>
+
+      <!-- Check-in / Check-out -->
       <button
         @click="toggleCheckIn"
         class="px-3 py-1 rounded text-xs font-medium"

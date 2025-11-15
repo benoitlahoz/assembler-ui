@@ -59,7 +59,7 @@ export interface CheckInDesk<T = any, TContext extends Record<string, any> = {}>
 
 export interface CheckInDeskOptions<T = any, TContext extends Record<string, any> = {}> {
   /** Contexte additionnel à merger avec le desk (typé) */
-  extraContext?: TContext;
+  context?: TContext;
   /** Callback appelé avant le check-in d'un item */
   onBeforeCheckIn?: (id: string | number, data: T) => void | boolean;
   /** Callback appelé après le check-in d'un item */
@@ -265,7 +265,7 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
 
     const fullContext = {
       ...deskContext,
-      ...(options?.extraContext || {}),
+      ...(options?.context || {}),
     } as CheckInDesk<T, TContext> & TContext;
 
     provide(deskSymbol, fullContext);

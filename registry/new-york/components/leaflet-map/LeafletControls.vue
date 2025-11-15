@@ -64,7 +64,7 @@ const control = ref<any>(null);
 // Initialize useCheckIn for control items management
 const { openDesk } = useCheckIn<ControlItemReference>();
 const { desk, deskSymbol } = openDesk({
-  extraContext: {
+  context: {
     // Expose activeItem to child controls
     activeItem: () => props.activeItem,
   },
