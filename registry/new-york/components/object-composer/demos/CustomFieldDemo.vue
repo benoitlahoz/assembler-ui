@@ -85,14 +85,27 @@ const userProfile = ref({
           </ObjectComposerHeader>
           <Separator class="mb-4" />
           <ObjectComposerItem>
-            <template #default="{ itemKey, value, valueType, displayValue }">
-              <CustomObjectComposerField
-                :item-key="itemKey"
-                :value="value"
-                :value-type="valueType"
-                :display-value="displayValue"
-              />
-            </template>
+            <ObjectComposerField as-child v-slot="{}">
+              <div class="flex items-center gap-2 p-2 rounded hover:bg-accent/50 transition-colors">
+                <!-- Type indicator dot -->
+                <div :class="cn('w-2 h-2 rounded-full', typeColor)" />
+
+                <!-- Key with fixed width -->
+                <span class="font-mono text-xs text-muted-foreground min-w-24">
+                  {{ itemKey }}
+                </span>
+
+                <!-- Value as badge -->
+                <Badge :variant="badgeVariant" class="font-mono text-xs">
+                  {{ displayValue }}
+                </Badge>
+
+                <!-- Desk status indicator -->
+                <span v-if="itemDesk" class="ml-auto text-xs text-green-600" title="Desk connected">
+                  ●
+                </span>
+              </div>
+            </ObjectComposerField>
           </ObjectComposerItem>
         </ObjectComposer>
       </div>

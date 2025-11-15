@@ -8,7 +8,6 @@ interface ObjectComposerFieldProps {
 }
 
 const props = defineProps<ObjectComposerFieldProps>();
-const slots = useSlots();
 
 // Inject desk from parent ObjectComposerItem (useCheckIn pattern)
 const itemContext = inject<{
