@@ -62,8 +62,8 @@ const readonlyData = ref({
 </script>
 
 <template>
-  <div class="demo-container">
-    <div class="demo-section">
+  <div class="h-128 max-h-128 overflow-auto">
+    <div class="mb-4">
       <ObjectComposer v-model="userData" title="Données Utilisateur">
         <ObjectComposerHeader>
           <ObjectComposerTitle>User Data (Default)</ObjectComposerTitle>
@@ -75,20 +75,7 @@ const readonlyData = ref({
       </ObjectComposer>
     </div>
 
-    <div class="demo-section">
-      <h2 class="demo-title">Mode Lecture Seule</h2>
-      <p class="demo-description">
-        Cet éditeur est en mode lecture seule. Les modifications ne sont pas
-        autorisées.
-      </p>
-      <ObjectComposer
-        v-model="readonlyData"
-        title="Configuration Système"
-        :readonly="true"
-      />
-    </div>
-
-    <div class="demo-section">
+    <div>
       <h2 class="demo-title">Données JSON</h2>
       <p class="demo-description">
         Voici le contenu JSON actuel de l'éditeur :
@@ -97,120 +84,6 @@ const readonlyData = ref({
     </div>
   </div>
 </template>
-
-<style scoped>
-.demo-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 32px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 48px;
-}
-
-.demo-section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.demo-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1a1a1a;
-  margin: 0;
-}
-
-.demo-description {
-  font-size: 14px;
-  color: #666;
-  margin: 0;
-  line-height: 1.6;
-}
-
-.json-output {
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 16px;
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  color: white;
-  overflow-x: auto;
-  margin: 0;
-}
-
-.json-output::-webkit-scrollbar {
-  height: 8px;
-}
-
-.json-output::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-.json-output::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 4px;
-}
-
-.json-output::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
-}
-
-.custom-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.custom-key {
-  font-weight: 600;
-  color: #2563eb;
-}
-
-.custom-separator {
-  color: #94a3b8;
-  font-weight: 500;
-}
-
-.custom-value {
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 13px;
-}
-
-.custom-value.custom-type-string {
-  color: #059669;
-}
-
-.custom-value.custom-type-number {
-  color: #dc2626;
-}
-
-.custom-value.custom-type-boolean {
-  color: #7c3aed;
-}
-
-.custom-value.custom-type-null {
-  color: #64748b;
-  font-style: italic;
-}
-
-.custom-value.custom-type-object,
-.custom-value.custom-type-array {
-  color: #ea580c;
-  font-weight: 500;
-}
-
-.custom-badge {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background-color: #e2e8f0;
-  color: #475569;
-}
-</style>
 ```
   :::
 ::
@@ -263,13 +136,12 @@ import { ObjectComposerItem } from ".";
 import { Button } from "@/components/ui/button";
 
 interface ObjectComposerProps {
-  title?: string;
+  data: Record<string, any> | any[];
   readonly?: boolean;
   class?: HTMLAttributes["class"];
 }
 
 const props = withDefaults(defineProps<ObjectComposerProps>(), {
-  title: "JSON Editor",
   readonly: false,
 });
 
@@ -283,100 +155,6 @@ const rootEntries = computed(() => {
   }
   return Object.entries(model.value);
 });
-
-const startEdit = (path: string[]) => {
-  editingPath.value = path;
-};
-
-const cancelEdit = () => {
-  editingPath.value = null;
-};
-
-const handleUpdate = (path: string[], value: any) => {
-  const newData = JSON.parse(JSON.stringify(model.value));
-
-  let current: any = newData;
-  for (let i = 0; i < path.length - 1; i++) {
-    const key = path[i];
-    current = current[key as keyof typeof current];
-  }
-
-  const lastKey = path[path.length - 1];
-  current[lastKey as keyof typeof current] = value;
-
-  model.value = newData;
-  editingPath.value = null;
-};
-
-const handleDelete = (path: string[]) => {
-  const newData = JSON.parse(JSON.stringify(model.value));
-
-  let current: any = newData;
-  for (let i = 0; i < path.length - 1; i++) {
-    const key = path[i];
-    current = current[key as keyof typeof current];
-  }
-
-  const lastKey = path[path.length - 1];
-  if (Array.isArray(current)) {
-    current.splice(Number(lastKey), 1);
-  } else {
-    delete current[lastKey as keyof typeof current];
-  }
-
-  model.value = newData;
-};
-
-const handleAdd = (path: string[], key: string, value: any) => {
-  const newData = JSON.parse(JSON.stringify(model.value));
-
-  let current: any = newData;
-  for (const k of path) {
-    current = current[k];
-  }
-
-  if (Array.isArray(current)) {
-    current.push(value);
-  } else {
-    current[key] = value;
-  }
-
-  model.value = newData;
-};
-
-const addRootItem = () => {
-  const newData = JSON.parse(JSON.stringify(model.value));
-
-  if (Array.isArray(newData)) {
-    newData.push("");
-  } else {
-    let counter = 1;
-    let newKey = "newKey";
-    while (newKey in newData) {
-      newKey = `newKey${counter}`;
-      counter++;
-    }
-    newData[newKey] = "";
-  }
-
-  model.value = newData;
-};
-
-const copyToClipboard = () => {
-  const jsonString = JSON.stringify(model.value, null, 2);
-  navigator.clipboard.writeText(jsonString);
-};
-
-const downloadJSON = () => {
-  const jsonString = JSON.stringify(model.value, null, 2);
-  const blob = new Blob([jsonString], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "data.json";
-  a.click();
-  URL.revokeObjectURL(url);
-};
 </script>
 
 <template>
@@ -385,23 +163,18 @@ const downloadJSON = () => {
     :class="cn('flex flex-col text-sm', props.class)"
   >
     <slot />
-    <ObjectComposerItem
-      v-for="[key, val] in rootEntries"
-      :key="key"
-      :item-key="key"
-      :value="val"
-      :depth="0"
-      :path="[]"
-      :is-in-array="Array.isArray(model)"
-      :editing-path="editingPath"
-      @update="handleUpdate"
-      @delete="handleDelete"
-      @add="handleAdd"
-      @start-edit="startEdit"
-      @cancel-edit="cancelEdit"
-    />
   </div>
 </template>
+```
+
+```vue [src/components/ui/object-composer/ObjectComposerContent.vue]
+<script setup lang="ts"></script>
+
+<template>
+  <div data-slot="object-composer-content">Foo</div>
+</template>
+
+<style scoped></style>
 ```
 
 ```vue [src/components/ui/object-composer/ObjectComposerDescription.vue]
@@ -1745,7 +1518,7 @@ const downloadJSON = () => {
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `title`{.primary .text-primary} | `string` | JSON Editor |  |
+| `data`{.primary .text-primary} | `Record<string, any> \| any[]` | - |  |
 | `readonly`{.primary .text-primary} | `boolean` | false |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
 
@@ -1754,9 +1527,13 @@ const downloadJSON = () => {
 |------|-------------|
 | `default`{.primary .text-primary} | — |
 
-  ### Child Components
+---
 
-  `ObjectComposerItem`{.primary .text-primary}
+## ObjectComposerContent
+::hr-underline
+::
+
+**API**: composition
 
 ---
 
