@@ -11,7 +11,6 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import CustomObjectComposerField from './CustomObjectComposerField.vue';
 
 const serverMetrics = ref({
   cpu: 78,
