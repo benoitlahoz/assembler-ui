@@ -18,7 +18,6 @@ import {
   ObjectComposerTitle,
   ObjectComposerDescription,
   ObjectComposerItem,
-  ObjectComposerField,
 } from "@/components/ui/object-composer";
 import { Separator } from "@/components/ui/separator";
 
@@ -351,7 +350,7 @@ import { inject } from "vue";
 import { cn } from "@/lib/utils";
 import type { CheckInDesk } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
 
-interface SlotProps {
+interface ObjectComposerFieldProps {
   itemKey: string;
   value: any;
   valueType: string;
@@ -362,11 +361,7 @@ interface SlotProps {
   editValue: string;
 }
 
-defineProps<SlotProps>();
-
-defineSlots<{
-  default?: (props: SlotProps) => any;
-}>();
+defineProps<ObjectComposerFieldProps>();
 
 const itemDesk = inject<{ desk: CheckInDesk<any> }>("objectComposerItemDesk");
 
@@ -375,26 +370,24 @@ if (itemDesk) {
 </script>
 
 <template>
-  <slot v-bind="$props">
-    <div class="flex items-center gap-1.5">
-      <span class="font-medium text-foreground">{{ itemKey }}</span>
-      <span class="text-muted-foreground">:</span>
-      <span
-        :class="
-          cn({
-            'text-red-600 dark:text-red-400': valueType === 'string',
-            'text-blue-600 dark:text-blue-400': valueType === 'number',
-            'text-purple-600 dark:text-purple-400': valueType === 'boolean',
-            'text-muted-foreground italic': valueType === 'null',
-            'text-muted-foreground italic text-sm':
-              valueType === 'object' || valueType === 'array',
-          })
-        "
-      >
-        {{ displayValue }}
-      </span>
-    </div>
-  </slot>
+  <div class="flex items-center gap-1.5">
+    <span class="font-medium text-foreground">{{ itemKey }}</span>
+    <span class="text-muted-foreground">:</span>
+    <span
+      :class="
+        cn({
+          'text-red-600 dark:text-red-400': valueType === 'string',
+          'text-blue-600 dark:text-blue-400': valueType === 'number',
+          'text-purple-600 dark:text-purple-400': valueType === 'boolean',
+          'text-muted-foreground italic': valueType === 'null',
+          'text-muted-foreground italic text-sm':
+            valueType === 'object' || valueType === 'array',
+        })
+      "
+    >
+      {{ displayValue }}
+    </span>
+  </div>
 </template>
 ```
 
@@ -2257,11 +2250,6 @@ export const useCheckIn = <
 | `isEditing`{.primary .text-primary} | `boolean` | - |  |
 | `editKey`{.primary .text-primary} | `string` | - |  |
 | `editValue`{.primary .text-primary} | `string` | - |  |
-
-  ### Slots
-| Name | Description |
-|------|-------------|
-| `default`{.primary .text-primary} | — |
 
   ### Inject
 | Key | Default | Type | Description |

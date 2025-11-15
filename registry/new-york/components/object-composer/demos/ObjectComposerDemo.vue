@@ -6,7 +6,6 @@ import {
   ObjectComposerTitle,
   ObjectComposerDescription,
   ObjectComposerItem,
-  ObjectComposerField,
 } from '~~/registry/new-york/components/object-composer';
 import { Separator } from '@/components/ui/separator';
 
@@ -65,7 +64,7 @@ const readonlyData = ref({
           </ObjectComposerDescription>
         </ObjectComposerHeader>
         <Separator class="my-4" />
-        
+
         <!-- ObjectComposerItem auto-iterates over model -->
         <ObjectComposerItem />
       </ObjectComposer>
@@ -86,7 +85,7 @@ const readonlyData = ref({
           </ObjectComposerDescription>
         </ObjectComposerHeader>
         <Separator class="my-4" />
-        
+
         <!-- Custom rendering: slot propagates to ObjectComposerField -->
         <ObjectComposerItem>
           <template #default="{ itemKey, value, valueType }">
@@ -119,7 +118,6 @@ const readonlyData = ref({
         </ObjectComposerItem>
       </ObjectComposer>
     </div>
-
 
     <Separator class="my-8" />
 

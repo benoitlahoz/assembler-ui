@@ -63,7 +63,7 @@ defineSlots<{
 }>();
 
 // Inject desk from parent ObjectComposer
-const composerDesk = inject<{ 
+const composerDesk = inject<{
   deskSymbol: InjectionKey<CheckInDesk<ComposerItemData>>;
   model: any;
 }>('objectComposerDesk')!;
@@ -92,17 +92,19 @@ const currentPath = computed(() => {
 });
 
 // Register this item with the desk (only if we have itemKey)
-const deskResult = props.itemKey ? checkIn(composerDesk.deskSymbol, {
-  autoCheckIn: true,
-  id: currentPath.value.join('.'),
-  data: {
-    key: props.itemKey!,
-    value: props.value,
-    path: currentPath.value,
-    depth: props.depth,
-    isInArray: props.isInArray,
-  },
-}) : null;
+const deskResult = props.itemKey
+  ? checkIn(composerDesk.deskSymbol, {
+      autoCheckIn: true,
+      id: currentPath.value.join('.'),
+      data: {
+        key: props.itemKey!,
+        value: props.value,
+        path: currentPath.value,
+        depth: props.depth,
+        isInArray: props.isInArray,
+      },
+    })
+  : null;
 
 const desk = deskResult?.desk;
 
