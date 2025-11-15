@@ -256,20 +256,6 @@ const handleShapeCreated = (event: FeatureDrawEvent) => {
 <template>
   <div class="w-full h-full flex flex-col gap-4">
     <div class="rounded flex items-center justify-between gap-4 flex-wrap">
-      <div class="flex gap-2 items-center">
-        <Button
-          @click="editMode = !editMode"
-          class="px-4 py-2 rounded transition-colors"
-          :class="
-            editMode
-              ? 'bg-blue-500 text-white hover:bg-blue-600'
-              : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-          "
-        >
-          {{ editMode ? 'Disable edition' : 'Enable edition' }}
-        </Button>
-      </div>
-
       <!-- Affichage des mesures -->
       <div
         v-if="measureMode && lastMeasurement"
