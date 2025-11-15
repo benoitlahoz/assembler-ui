@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount, type HTMLAttributes } from 'vue';
+import { inject, watch, ref, type Ref, nextTick, type HTMLAttributes } from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
 import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
+import { useCheckIn } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
+
+const { checkIn } = useCheckIn<FeatureReference>();
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from '.';
 import type { FeatureReference } from './LeafletFeaturesSelector.vue';
 import './leaflet-editing.css';
@@ -52,6 +55,86 @@ const editMarkers = ref<L.Marker[]>([]);
 const midpointMarkers = ref<L.Marker[]>([]);
 const isDragging = ref(false);
 const polylineId = ref<string | number>(props.id ?? `polyline-${Date.now()}-${Math.random()}`);
+
+// Check in with selection desk
+const { desk } = selectionContext
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: polylineId.value,
+      data: () => ({
+        id: polylineId.value,
+        type: 'polyline' as const,
+        getBounds: () => {
+          if (!polyline.value) return null;
+          return polyline.value.getBounds();
+        },
+        getInitialData: () => {
+          if (!polyline.value) return null;
+          const latlngs = polyline.value.getLatLngs() as L.LatLng[];
+          return latlngs.map((ll) => [ll.lat, ll.lng] as [number, number]);
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!polyline.value || !L.value) return;
+
+          const currentBounds = polyline.value.getBounds();
+          const currentCenter = currentBounds.getCenter();
+          const newCenter = bounds.getCenter();
+
+          const currentLatLngs = polyline.value.getLatLngs() as L.LatLng[];
+          const scaleX =
+            (bounds.getEast() - bounds.getWest()) /
+            (currentBounds.getEast() - currentBounds.getWest());
+          const scaleY =
+            (bounds.getNorth() - bounds.getSouth()) /
+            (currentBounds.getNorth() - currentBounds.getSouth());
+
+          const newLatLngs = currentLatLngs.map((latlng) => {
+            const relativeX = (latlng.lng - currentCenter.lng) * scaleX;
+            const relativeY = (latlng.lat - currentCenter.lat) * scaleY;
+            return L.value!.latLng(newCenter.lat + relativeY, newCenter.lng + relativeX);
+          });
+
+          polyline.value.setLatLngs(newLatLngs);
+          emit(
+            'update:latlngs',
+            newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>
+          );
+        },
+        applyRotation: (angle: number, center: { lat: number; lng: number }, initialData: any) => {
+          if (!polyline.value || !L.value || !initialData) return;
+
+          const initialLatLngs = initialData as Array<[number, number]>;
+          const angleRad = (-angle * Math.PI) / 180;
+
+          const metersPerDegreeLat = LatDegreesMeters;
+          const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
+
+          const newLatLngs = initialLatLngs.map((latlng) => {
+            const lat = latlng[0];
+            const lng = latlng[1];
+
+            const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+            const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+
+            const newRelMetersY = relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+            const newRelMetersX = relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+
+            return L.value!.latLng(
+              center.lat + newRelMetersY / metersPerDegreeLat,
+              center.lng + newRelMetersX / metersPerDegreeLng
+            );
+          });
+
+          polyline.value.setLatLngs(newLatLngs);
+          emit(
+            'update:latlngs',
+            newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>
+          );
+        },
+      }),
+      watchData: true,
+    })
+  : { desk: ref(null) };
 
 // Variables pour le drag
 let dragStartLatLngs: L.LatLng[] = [];
@@ -296,84 +379,7 @@ const setupMapDragHandlers = () => {
   }
 };
 
-// Selection context integration
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext || !polyline.value) return;
-
-  const featureRef: FeatureReference = {
-    id: polylineId.value,
-    type: 'polyline',
-    getBounds: () => {
-      if (!polyline.value) return null;
-      return polyline.value.getBounds();
-    },
-    getInitialData: () => {
-      if (!polyline.value) return null;
-      const latlngs = polyline.value.getLatLngs() as L.LatLng[];
-      return latlngs.map((ll) => [ll.lat, ll.lng] as [number, number]);
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!polyline.value || !L.value) return;
-
-      const currentBounds = polyline.value.getBounds();
-      const currentCenter = currentBounds.getCenter();
-      const newCenter = bounds.getCenter();
-
-      const currentLatLngs = polyline.value.getLatLngs() as L.LatLng[];
-      const scaleX =
-        (bounds.getEast() - bounds.getWest()) / (currentBounds.getEast() - currentBounds.getWest());
-      const scaleY =
-        (bounds.getNorth() - bounds.getSouth()) /
-        (currentBounds.getNorth() - currentBounds.getSouth());
-
-      const newLatLngs = currentLatLngs.map((latlng) => {
-        const relativeX = (latlng.lng - currentCenter.lng) * scaleX;
-        const relativeY = (latlng.lat - currentCenter.lat) * scaleY;
-        return L.value!.latLng(newCenter.lat + relativeY, newCenter.lng + relativeX);
-      });
-
-      polyline.value.setLatLngs(newLatLngs);
-      emit('update:latlngs', newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>);
-    },
-    applyRotation: (
-      angle: number,
-      center: { lat: number; lng: number },
-      initialLatLngs: Array<[number, number]>
-    ) => {
-      if (!polyline.value || !L.value || !initialLatLngs) return;
-
-      const angleRad = (-angle * Math.PI) / 180; // Inverser l'angle pour corriger le sens
-
-      // Conversion en coordonnées métriques pour une rotation correcte
-      const metersPerDegreeLat = LatDegreesMeters;
-      const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
-
-      const newLatLngs = initialLatLngs.map((latlng) => {
-        const lat = latlng[0];
-        const lng = latlng[1];
-
-        // Convertir en mètres relatifs au centre
-        const relMetersY = (lat - center.lat) * metersPerDegreeLat;
-        const relMetersX = (lng - center.lng) * metersPerDegreeLng;
-
-        // Appliquer la rotation en coordonnées métriques
-        const newRelMetersY = relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
-        const newRelMetersX = relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
-
-        // Reconvertir en degrés
-        return L.value!.latLng(
-          center.lat + newRelMetersY / metersPerDegreeLat,
-          center.lng + newRelMetersX / metersPerDegreeLng
-        );
-      });
-
-      polyline.value.setLatLngs(newLatLngs);
-      emit('update:latlngs', newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>);
-    },
-  };
-
-  selectionContext.registerFeature(featureRef);
-};
+// Selection handled by checkIn above
 
 watch(
   () => [map.value, props.latlngs, props.weight, props.editable, props.draggable, props.selectable],
@@ -427,46 +433,6 @@ watch(
           } else {
             polyline.value.on('click', onPolylineClick);
           }
-
-          // Register with selection context if selectable
-          if (props.selectable && selectionContext) {
-            registerWithSelection();
-          }
-        }
-
-        // Check if selectable changed and we need to register/unregister
-        if (polyline.value) {
-          const selectableChanged = oldVal && Boolean(oldVal[5]) !== Boolean(newVal[5]);
-          if (selectableChanged) {
-            // Remove old event listeners
-            polyline.value.off('click');
-            polyline.value.off('mousedown');
-
-            const onPolylineClick = () => {
-              if (props.selectable && selectionContext) {
-                selectionContext.selectFeature('polyline', polylineId.value);
-              }
-              emit('click');
-            };
-
-            const onPolylineMouseDown = (e: any) => {
-              if (props.draggable && props.selectable && selectionContext) {
-                selectionContext.selectFeature('polyline', polylineId.value);
-              }
-            };
-
-            // Add new event listeners based on selectable state
-            if (props.selectable && selectionContext) {
-              polyline.value.on('click', onPolylineClick);
-              polyline.value.on('mousedown', onPolylineMouseDown);
-              registerWithSelection();
-            } else {
-              polyline.value.on('click', onPolylineClick);
-              if (selectionContext) {
-                selectionContext.unregisterFeature(polylineId.value);
-              }
-            }
-          }
         }
 
         // Gestion des modes : draggable OU editable, pas les deux
@@ -491,18 +457,6 @@ watch(
   },
   { immediate: true, flush: 'post' }
 );
-
-onBeforeUnmount(() => {
-  // Unregister from selection context
-  if (props.selectable && selectionContext) {
-    selectionContext.unregisterFeature(polylineId.value);
-  }
-
-  clearEditMarkers();
-  if (polyline.value) {
-    polyline.value.remove();
-  }
-});
 </script>
 
 <template><slot /></template>

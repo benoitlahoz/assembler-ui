@@ -11,6 +11,9 @@ import {
 } from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
 import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
+import { useCheckIn } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
+
+const { checkIn } = useCheckIn<FeatureReference>();
 import {
   LeafletMapKey,
   LeafletModuleKey,
@@ -85,6 +88,81 @@ const ctx = ref<CanvasRenderingContext2D | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
 const canvasId = ref<string | number>(props.id ?? `canvas-${Date.now()}-${Math.random()}`);
 const isDragging = ref(false);
+
+// Check in with selection desk
+const { desk } = selectionContext
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: canvasId.value,
+      data: () => ({
+        id: canvasId.value,
+        type: 'polygon' as const,
+        getBounds: () => {
+          if (!L.value) return null;
+          const latlngs = props.corners.map((c) => L.value!.latLng(c.lat, c.lng));
+          return L.value!.latLngBounds(latlngs);
+        },
+        getInitialData: () => {
+          return props.corners.map((c) => [c.lat, c.lng] as [number, number]);
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!L.value) return;
+
+          const currentBounds = L.value.latLngBounds(
+            props.corners.map((c) => L.value!.latLng(c.lat, c.lng))
+          );
+          const currentCenter = currentBounds.getCenter();
+          const newCenter = bounds.getCenter();
+
+          const scaleX =
+            (bounds.getEast() - bounds.getWest()) /
+            (currentBounds.getEast() - currentBounds.getWest());
+          const scaleY =
+            (bounds.getNorth() - bounds.getSouth()) /
+            (currentBounds.getNorth() - currentBounds.getSouth());
+
+          const newCorners = props.corners.map((corner) => {
+            const relativeX = (corner.lng - currentCenter.lng) * scaleX;
+            const relativeY = (corner.lat - currentCenter.lat) * scaleY;
+            return {
+              lat: newCenter.lat + relativeY,
+              lng: newCenter.lng + relativeX,
+            };
+          });
+
+          emit('update:corners', newCorners);
+        },
+        applyRotation: (angle: number, center: { lat: number; lng: number }, initialData: any) => {
+          if (!L.value || !initialData) return;
+
+          const initialCorners = initialData as Array<[number, number]>;
+          const angleRad = (-angle * Math.PI) / 180;
+
+          const metersPerDegreeLat = LatDegreesMeters;
+          const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
+
+          const newCorners = initialCorners.map((corner) => {
+            const lat = corner[0];
+            const lng = corner[1];
+
+            const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+            const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+
+            const newRelMetersY = relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+            const newRelMetersX = relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+
+            return {
+              lat: center.lat + newRelMetersY / metersPerDegreeLat,
+              lng: center.lng + newRelMetersX / metersPerDegreeLng,
+            };
+          });
+
+          emit('update:corners', newCorners);
+        },
+      }),
+      watchData: true,
+    })
+  : { desk: ref(null) };
 
 let dragStartCorners: Array<{ lat: number; lng: number }> = [];
 let dragStartMousePoint: L.Point | null = null;
@@ -476,79 +554,7 @@ const draw = () => {
   }
 };
 
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext) return;
-
-  const feature: FeatureReference = {
-    id: canvasId.value,
-    type: 'polygon',
-    getBounds: () => {
-      if (!L.value) return null;
-      const latlngs = props.corners.map((c) => L.value!.latLng(c.lat, c.lng));
-      return L.value!.latLngBounds(latlngs);
-    },
-    getInitialData: () => {
-      return props.corners.map((c) => [c.lat, c.lng] as [number, number]);
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!L.value) return;
-
-      const currentBounds = L.value.latLngBounds(
-        props.corners.map((c) => L.value!.latLng(c.lat, c.lng))
-      );
-      const currentCenter = currentBounds.getCenter();
-      const newCenter = bounds.getCenter();
-
-      const scaleX =
-        (bounds.getEast() - bounds.getWest()) / (currentBounds.getEast() - currentBounds.getWest());
-      const scaleY =
-        (bounds.getNorth() - bounds.getSouth()) /
-        (currentBounds.getNorth() - currentBounds.getSouth());
-
-      const newCorners = props.corners.map((corner) => {
-        const relativeX = (corner.lng - currentCenter.lng) * scaleX;
-        const relativeY = (corner.lat - currentCenter.lat) * scaleY;
-        return {
-          lat: newCenter.lat + relativeY,
-          lng: newCenter.lng + relativeX,
-        };
-      });
-
-      emit('update:corners', newCorners);
-    },
-    applyRotation: (
-      angle: number,
-      center: { lat: number; lng: number },
-      initialCorners: Array<[number, number]>
-    ) => {
-      if (!L.value || !initialCorners) return;
-
-      const angleRad = (-angle * Math.PI) / 180;
-
-      const metersPerDegreeLat = LatDegreesMeters;
-      const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
-
-      const newCorners = initialCorners.map((corner) => {
-        const lat = corner[0];
-        const lng = corner[1];
-
-        const relMetersY = (lat - center.lat) * metersPerDegreeLat;
-        const relMetersX = (lng - center.lng) * metersPerDegreeLng;
-
-        const newRelMetersY = relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
-        const newRelMetersX = relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
-
-        return {
-          lat: center.lat + newRelMetersY / metersPerDegreeLat,
-          lng: center.lng + newRelMetersX / metersPerDegreeLng,
-        };
-      });
-
-      emit('update:corners', newCorners);
-    },
-  };
-  selectionContext.registerFeature(feature);
-};
+// Selection handled by checkIn above
 
 let isUpdating = false;
 
@@ -592,26 +598,8 @@ watch(
           newMap.on('zoom', reset);
           newMap.on('viewreset', reset);
 
-          // Register with selection
-          if (newSelectable && selectionContext) {
-            registerWithSelection();
-          }
-
           // Dessiner
           reset();
-        }
-
-        // Check if selectable changed and we need to register/unregister
-        if (canvasLayer.value) {
-          const selectableChanged = oldVal && Boolean(oldVal[5]) !== Boolean(newSelectable);
-          if (selectableChanged) {
-            // Re-register or unregister with selection context
-            if (newSelectable && selectionContext) {
-              registerWithSelection();
-            } else if (selectionContext) {
-              selectionContext.unregisterFeature(canvasId.value);
-            }
-          }
         }
 
         // Gestion des modes : draggable OU editable, pas les deux
@@ -657,10 +645,6 @@ onBeforeUnmount(() => {
     map.value.off('moveend', reset);
     map.value.off('zoom', reset);
     map.value.off('viewreset', reset);
-  }
-
-  if (selectionContext) {
-    selectionContext.unregisterFeature(canvasId.value);
   }
 });
 

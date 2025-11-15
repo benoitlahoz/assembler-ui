@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, provide, watch, nextTick, type Ref } from 'vue';
+import { ref, computed, provide, watch, nextTick, type Ref, type InjectionKey } from 'vue';
 import LeafletBoundingBox from './LeafletBoundingBox.vue';
 import type { FeatureShapeType } from './LeafletFeaturesEditor.vue';
 import { LeafletSelectionKey } from '.';
+import {
+  useCheckIn,
+  type CheckInDesk,
+} from '~~/registry/new-york/composables/use-check-in/useCheckIn';
 
 export type FeatureSelectMode = 'select' | 'direct-select';
 
@@ -25,9 +29,8 @@ export interface LeafletSelectionContext {
   featuresRegistry: Ref<Map<string | number, FeatureReference>>;
   selectFeature: (type: FeatureShapeType, id: string | number) => void;
   deselectAll: () => void;
-  registerFeature: (feature: FeatureReference) => void;
-  unregisterFeature: (id: string | number) => void;
   notifyFeatureUpdate: (id: string | number) => void;
+  deskSymbol: InjectionKey<CheckInDesk<FeatureReference>>; // For useCheckIn integration
 }
 
 export interface LeafletFeaturesSelectorProps {
@@ -47,12 +50,14 @@ const emit = defineEmits<{
 
 // Selection state
 const selectedFeature = ref<SelectedFeature | null>(null);
-const featuresRegistry = ref<Map<string | number, FeatureReference>>(new Map());
 const boundingBoxTrigger = ref(0); // Trigger to force bounding box recalculation
 
 // Rotation state
 const rotationStartPositions = ref<any>(null);
 const rotationCenter = ref<{ lat: number; lng: number } | null>(null);
+
+// Initialize useCheckIn for feature management
+const { openDesk } = useCheckIn<FeatureReference>();
 
 // Selection methods
 const selectFeature = (type: FeatureShapeType, id: string | number) => {
@@ -87,18 +92,6 @@ const deselectAll = () => {
   emit('selection-changed', null);
 };
 
-// Feature registration
-const registerFeature = (feature: FeatureReference) => {
-  featuresRegistry.value.set(feature.id, feature);
-};
-
-const unregisterFeature = (id: string | number) => {
-  featuresRegistry.value.delete(id);
-  if (selectedFeature.value?.id === id) {
-    deselectAll();
-  }
-};
-
 // Notify that a feature's properties have changed (for bounding box updates)
 const notifyFeatureUpdate = (id: string | number) => {
   // Only trigger update if the feature being updated is currently selected
@@ -106,6 +99,29 @@ const notifyFeatureUpdate = (id: string | number) => {
     boundingBoxTrigger.value++;
   }
 };
+
+// Open desk for feature registration
+const { desk, deskSymbol } = openDesk({
+  onCheckIn: (id, featureRef) => {
+    // Feature automatically added to desk registry
+    console.log('[LeafletFeaturesSelector] Feature registered:', id, featureRef.type);
+  },
+  onCheckOut: (id) => {
+    console.log('[LeafletFeaturesSelector] Feature unregistered:', id);
+    // Auto-deselect if the removed feature was selected
+    if (selectedFeature.value?.id === id) {
+      deselectAll();
+    }
+  },
+});
+
+// Legacy API compatibility - featuresRegistry now uses the desk
+const featuresRegistry = computed(() =>
+  desk.getAll().reduce((map, item) => {
+    map.set(item.id, item.data);
+    return map;
+  }, new Map<string | number, FeatureReference>())
+);
 
 // Watch mode changes
 watch(
@@ -219,12 +235,11 @@ const context: LeafletSelectionContext = {
   featuresRegistry,
   selectFeature,
   deselectAll,
-  registerFeature,
-  unregisterFeature,
   notifyFeatureUpdate,
+  deskSymbol,
 };
 
-provide(LeafletSelectionKey, context);
+provide(LeafletSelectionKey, context as any);
 </script>
 
 <template>

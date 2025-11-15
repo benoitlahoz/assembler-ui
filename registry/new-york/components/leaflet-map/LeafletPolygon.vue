@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount, type HTMLAttributes } from 'vue';
+import { inject, watch, ref, type Ref, nextTick, type HTMLAttributes } from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
 import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
+import { useCheckIn } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from '.';
 import type { FeatureReference } from './LeafletFeaturesSelector.vue';
 import './leaflet-editing.css';
@@ -60,6 +61,79 @@ const polygonId = ref<string | number>(props.id ?? `polygon-${Date.now()}-${Math
 // Variables pour le drag
 let dragStartLatLngs: L.LatLng[] = [];
 let dragStartMousePoint: L.Point | null = null;
+
+// Use checkIn for automatic registration/cleanup
+const { checkIn } = useCheckIn<FeatureReference>();
+
+// Check in with selection desk
+const { desk } = selectionContext
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: polygonId.value,
+      data: () => ({
+        id: polygonId.value,
+        type: 'polygon' as const,
+        getBounds: () => {
+          if (!polygon.value || !L.value) return null;
+          return polygon.value.getBounds();
+        },
+        getInitialData: () => {
+          if (!polygon.value) return null;
+          return polygon.value.getLatLngs()[0] as L.LatLng[];
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!polygon.value) return;
+          const currentLatLngs = polygon.value.getLatLngs()[0] as L.LatLng[];
+          const currentBounds = polygon.value.getBounds();
+          const scaleX =
+            (bounds.getEast() - bounds.getWest()) /
+            (currentBounds.getEast() - currentBounds.getWest());
+          const scaleY =
+            (bounds.getNorth() - bounds.getSouth()) /
+            (currentBounds.getNorth() - currentBounds.getSouth());
+          const newCenter = bounds.getCenter();
+          const currentCenter = currentBounds.getCenter();
+          const offsetLat = newCenter.lat - currentCenter.lat;
+          const offsetLng = newCenter.lng - currentCenter.lng;
+          const newLatLngs = currentLatLngs.map((latlng) => {
+            const relLat = (latlng.lat - currentCenter.lat) * scaleY;
+            const relLng = (latlng.lng - currentCenter.lng) * scaleX;
+            return L.value!.latLng(newCenter.lat + relLat, newCenter.lng + relLng);
+          });
+          polygon.value.setLatLngs([newLatLngs]);
+          emit(
+            'update:latlngs',
+            newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>
+          );
+        },
+        applyRotation: (angle: number, center: { lat: number; lng: number }, initialData: any) => {
+          if (!polygon.value || !L.value) return;
+          const initialLatLngs = initialData as L.LatLng[];
+          const angleRad = (-angle * Math.PI) / 180;
+          const metersPerDegreeLat = LatDegreesMeters;
+          const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
+          const newLatLngs = initialLatLngs.map((latlng) => {
+            const lat = latlng.lat;
+            const lng = latlng.lng;
+            const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+            const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+            const newRelMetersY = relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+            const newRelMetersX = relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+            return L.value!.latLng(
+              center.lat + newRelMetersY / metersPerDegreeLat,
+              center.lng + newRelMetersX / metersPerDegreeLng
+            );
+          });
+          polygon.value.setLatLngs([newLatLngs]);
+          emit(
+            'update:latlngs',
+            newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>
+          );
+        },
+      }),
+      watchData: true,
+    })
+  : { desk: ref(null) };
 
 const clearEditMarkers = () => {
   editMarkers.value.forEach((marker) => marker.remove());
@@ -322,84 +396,7 @@ const setupMapDragHandlers = () => {
   }
 };
 
-// Selection context integration
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext || !polygon.value) return;
-
-  const featureRef: FeatureReference = {
-    id: polygonId.value,
-    type: 'polygon',
-    getBounds: () => {
-      if (!polygon.value) return null;
-      return polygon.value.getBounds();
-    },
-    getInitialData: () => {
-      if (!polygon.value) return null;
-      const latlngs = polygon.value.getLatLngs()[0] as L.LatLng[];
-      return latlngs.map((ll) => [ll.lat, ll.lng] as [number, number]);
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!polygon.value || !L.value) return;
-
-      const currentBounds = polygon.value.getBounds();
-      const currentCenter = currentBounds.getCenter();
-      const newCenter = bounds.getCenter();
-
-      const currentLatLngs = polygon.value.getLatLngs()[0] as L.LatLng[];
-      const scaleX =
-        (bounds.getEast() - bounds.getWest()) / (currentBounds.getEast() - currentBounds.getWest());
-      const scaleY =
-        (bounds.getNorth() - bounds.getSouth()) /
-        (currentBounds.getNorth() - currentBounds.getSouth());
-
-      const newLatLngs = currentLatLngs.map((latlng) => {
-        const relativeX = (latlng.lng - currentCenter.lng) * scaleX;
-        const relativeY = (latlng.lat - currentCenter.lat) * scaleY;
-        return L.value!.latLng(newCenter.lat + relativeY, newCenter.lng + relativeX);
-      });
-
-      polygon.value.setLatLngs([newLatLngs]);
-      emit('update:latlngs', newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>);
-    },
-    applyRotation: (
-      angle: number,
-      center: { lat: number; lng: number },
-      initialLatLngs: Array<[number, number]>
-    ) => {
-      if (!polygon.value || !L.value || !initialLatLngs) return;
-
-      const angleRad = (-angle * Math.PI) / 180; // Inverser l'angle pour corriger le sens
-
-      // Conversion en coordonnées métriques pour une rotation correcte
-      const metersPerDegreeLat = LatDegreesMeters;
-      const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
-
-      const newLatLngs = initialLatLngs.map((latlng) => {
-        const lat = latlng[0];
-        const lng = latlng[1];
-
-        // Convertir en mètres relatifs au centre
-        const relMetersY = (lat - center.lat) * metersPerDegreeLat;
-        const relMetersX = (lng - center.lng) * metersPerDegreeLng;
-
-        // Appliquer la rotation en coordonnées métriques
-        const newRelMetersY = relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
-        const newRelMetersX = relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
-
-        // Reconvertir en degrés
-        return L.value!.latLng(
-          center.lat + newRelMetersY / metersPerDegreeLat,
-          center.lng + newRelMetersX / metersPerDegreeLng
-        );
-      });
-
-      polygon.value.setLatLngs([newLatLngs]);
-      emit('update:latlngs', newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>);
-    },
-  };
-
-  selectionContext.registerFeature(featureRef);
-};
+// Selection handled by checkIn above
 
 watch(
   () => [
@@ -461,46 +458,6 @@ watch(
           } else {
             polygon.value.on('click', onPolygonClick);
           }
-
-          // Register with selection context if selectable
-          if (props.selectable && selectionContext) {
-            registerWithSelection();
-          }
-        }
-
-        // Check if selectable changed and we need to register/unregister
-        if (polygon.value) {
-          const selectableChanged = oldVal && Boolean(oldVal[5]) !== Boolean(newVal[5]);
-          if (selectableChanged) {
-            // Remove old event listeners
-            polygon.value.off('click');
-            polygon.value.off('mousedown');
-
-            const onPolygonClick = () => {
-              if (props.selectable && selectionContext) {
-                selectionContext.selectFeature('polygon', polygonId.value);
-              }
-              emit('click');
-            };
-
-            const onPolygonMouseDown = (e: any) => {
-              if (props.draggable && props.selectable && selectionContext) {
-                selectionContext.selectFeature('polygon', polygonId.value);
-              }
-            };
-
-            // Add new event listeners based on selectable state
-            if (props.selectable && selectionContext) {
-              polygon.value.on('click', onPolygonClick);
-              polygon.value.on('mousedown', onPolygonMouseDown);
-              registerWithSelection();
-            } else {
-              polygon.value.on('click', onPolygonClick);
-              if (selectionContext) {
-                selectionContext.unregisterFeature(polygonId.value);
-              }
-            }
-          }
         }
 
         // Gestion des modes : draggable OU editable, pas les deux
@@ -525,13 +482,6 @@ watch(
   },
   { immediate: true, flush: 'post' }
 );
-
-onBeforeUnmount(() => {
-  clearEditMarkers();
-  if (polygon.value) {
-    polygon.value.remove();
-  }
-});
 </script>
 
 <template><slot /></template>

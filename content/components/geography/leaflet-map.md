@@ -1405,6 +1405,9 @@ import {
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
+import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
+
+const { checkIn } = useCheckIn<FeatureReference>();
 import {
   LeafletMapKey,
   LeafletModuleKey,
@@ -1481,6 +1484,88 @@ const canvasId = ref<string | number>(
   props.id ?? `canvas-${Date.now()}-${Math.random()}`,
 );
 const isDragging = ref(false);
+
+const { desk } = selectionContext
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: canvasId.value,
+      data: () => ({
+        id: canvasId.value,
+        type: "polygon" as const,
+        getBounds: () => {
+          if (!L.value) return null;
+          const latlngs = props.corners.map((c) =>
+            L.value!.latLng(c.lat, c.lng),
+          );
+          return L.value!.latLngBounds(latlngs);
+        },
+        getInitialData: () => {
+          return props.corners.map((c) => [c.lat, c.lng] as [number, number]);
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!L.value) return;
+
+          const currentBounds = L.value.latLngBounds(
+            props.corners.map((c) => L.value!.latLng(c.lat, c.lng)),
+          );
+          const currentCenter = currentBounds.getCenter();
+          const newCenter = bounds.getCenter();
+
+          const scaleX =
+            (bounds.getEast() - bounds.getWest()) /
+            (currentBounds.getEast() - currentBounds.getWest());
+          const scaleY =
+            (bounds.getNorth() - bounds.getSouth()) /
+            (currentBounds.getNorth() - currentBounds.getSouth());
+
+          const newCorners = props.corners.map((corner) => {
+            const relativeX = (corner.lng - currentCenter.lng) * scaleX;
+            const relativeY = (corner.lat - currentCenter.lat) * scaleY;
+            return {
+              lat: newCenter.lat + relativeY,
+              lng: newCenter.lng + relativeX,
+            };
+          });
+
+          emit("update:corners", newCorners);
+        },
+        applyRotation: (
+          angle: number,
+          center: { lat: number; lng: number },
+          initialData: any,
+        ) => {
+          if (!L.value || !initialData) return;
+
+          const initialCorners = initialData as Array<[number, number]>;
+          const angleRad = (-angle * Math.PI) / 180;
+
+          const metersPerDegreeLat = LatDegreesMeters;
+          const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
+
+          const newCorners = initialCorners.map((corner) => {
+            const lat = corner[0];
+            const lng = corner[1];
+
+            const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+            const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+
+            const newRelMetersY =
+              relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+            const newRelMetersX =
+              relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+
+            return {
+              lat: center.lat + newRelMetersY / metersPerDegreeLat,
+              lng: center.lng + newRelMetersX / metersPerDegreeLng,
+            };
+          });
+
+          emit("update:corners", newCorners);
+        },
+      }),
+      watchData: [() => props.selectable],
+    })
+  : { desk: ref(null) };
 
 let dragStartCorners: Array<{ lat: number; lng: number }> = [];
 let dragStartMousePoint: L.Point | null = null;
@@ -1903,83 +1988,6 @@ const draw = () => {
   }
 };
 
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext) return;
-
-  const feature: FeatureReference = {
-    id: canvasId.value,
-    type: "polygon",
-    getBounds: () => {
-      if (!L.value) return null;
-      const latlngs = props.corners.map((c) => L.value!.latLng(c.lat, c.lng));
-      return L.value!.latLngBounds(latlngs);
-    },
-    getInitialData: () => {
-      return props.corners.map((c) => [c.lat, c.lng] as [number, number]);
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!L.value) return;
-
-      const currentBounds = L.value.latLngBounds(
-        props.corners.map((c) => L.value!.latLng(c.lat, c.lng)),
-      );
-      const currentCenter = currentBounds.getCenter();
-      const newCenter = bounds.getCenter();
-
-      const scaleX =
-        (bounds.getEast() - bounds.getWest()) /
-        (currentBounds.getEast() - currentBounds.getWest());
-      const scaleY =
-        (bounds.getNorth() - bounds.getSouth()) /
-        (currentBounds.getNorth() - currentBounds.getSouth());
-
-      const newCorners = props.corners.map((corner) => {
-        const relativeX = (corner.lng - currentCenter.lng) * scaleX;
-        const relativeY = (corner.lat - currentCenter.lat) * scaleY;
-        return {
-          lat: newCenter.lat + relativeY,
-          lng: newCenter.lng + relativeX,
-        };
-      });
-
-      emit("update:corners", newCorners);
-    },
-    applyRotation: (
-      angle: number,
-      center: { lat: number; lng: number },
-      initialCorners: Array<[number, number]>,
-    ) => {
-      if (!L.value || !initialCorners) return;
-
-      const angleRad = (-angle * Math.PI) / 180;
-
-      const metersPerDegreeLat = LatDegreesMeters;
-      const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
-
-      const newCorners = initialCorners.map((corner) => {
-        const lat = corner[0];
-        const lng = corner[1];
-
-        const relMetersY = (lat - center.lat) * metersPerDegreeLat;
-        const relMetersX = (lng - center.lng) * metersPerDegreeLng;
-
-        const newRelMetersY =
-          relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
-        const newRelMetersX =
-          relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
-
-        return {
-          lat: center.lat + newRelMetersY / metersPerDegreeLat,
-          lng: center.lng + newRelMetersX / metersPerDegreeLng,
-        };
-      });
-
-      emit("update:corners", newCorners);
-    },
-  };
-  selectionContext.registerFeature(feature);
-};
-
 let isUpdating = false;
 
 watch(
@@ -2028,23 +2036,7 @@ watch(
           newMap.on("zoom", reset);
           newMap.on("viewreset", reset);
 
-          if (newSelectable && selectionContext) {
-            registerWithSelection();
-          }
-
           reset();
-        }
-
-        if (canvasLayer.value) {
-          const selectableChanged =
-            oldVal && Boolean(oldVal[5]) !== Boolean(newSelectable);
-          if (selectableChanged) {
-            if (newSelectable && selectionContext) {
-              registerWithSelection();
-            } else if (selectionContext) {
-              selectionContext.unregisterFeature(canvasId.value);
-            }
-          }
         }
 
         if (
@@ -2089,10 +2081,6 @@ onBeforeUnmount(() => {
     map.value.off("zoom", reset);
     map.value.off("viewreset", reset);
   }
-
-  if (selectionContext) {
-    selectionContext.unregisterFeature(canvasId.value);
-  }
 });
 
 defineExpose({
@@ -2125,6 +2113,9 @@ import {
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useColors } from "~~/registry/new-york/composables/use-colors/useColors";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
+import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
+
+const { checkIn } = useCheckIn<FeatureReference>();
 import {
   LeafletMapKey,
   LeafletModuleKey,
@@ -2198,6 +2189,88 @@ const canvasId = ref<string | number>(
   props.id ?? `canvas-${Date.now()}-${Math.random()}`,
 );
 const isDragging = ref(false);
+
+const { desk } = selectionContext
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: canvasId.value,
+      data: () => ({
+        id: canvasId.value,
+        type: "polygon" as const,
+        getBounds: () => {
+          if (!L.value) return null;
+          const latlngs = props.corners.map((c) =>
+            L.value!.latLng(c.lat, c.lng),
+          );
+          return L.value!.latLngBounds(latlngs);
+        },
+        getInitialData: () => {
+          return props.corners.map((c) => [c.lat, c.lng] as [number, number]);
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!L.value) return;
+
+          const currentBounds = L.value.latLngBounds(
+            props.corners.map((c) => L.value!.latLng(c.lat, c.lng)),
+          );
+          const currentCenter = currentBounds.getCenter();
+          const newCenter = bounds.getCenter();
+
+          const scaleX =
+            (bounds.getEast() - bounds.getWest()) /
+            (currentBounds.getEast() - currentBounds.getWest());
+          const scaleY =
+            (bounds.getNorth() - bounds.getSouth()) /
+            (currentBounds.getNorth() - currentBounds.getSouth());
+
+          const newCorners = props.corners.map((corner) => {
+            const relativeX = (corner.lng - currentCenter.lng) * scaleX;
+            const relativeY = (corner.lat - currentCenter.lat) * scaleY;
+            return {
+              lat: newCenter.lat + relativeY,
+              lng: newCenter.lng + relativeX,
+            };
+          });
+
+          emit("update:corners", newCorners);
+        },
+        applyRotation: (
+          angle: number,
+          center: { lat: number; lng: number },
+          initialData: any,
+        ) => {
+          if (!L.value || !initialData) return;
+
+          const initialCorners = initialData as Array<[number, number]>;
+          const angleRad = (-angle * Math.PI) / 180;
+
+          const metersPerDegreeLat = LatDegreesMeters;
+          const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
+
+          const newCorners = initialCorners.map((corner) => {
+            const lat = corner[0];
+            const lng = corner[1];
+
+            const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+            const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+
+            const newRelMetersY =
+              relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+            const newRelMetersX =
+              relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+
+            return {
+              lat: center.lat + newRelMetersY / metersPerDegreeLat,
+              lng: center.lng + newRelMetersX / metersPerDegreeLng,
+            };
+          });
+
+          emit("update:corners", newCorners);
+        },
+      }),
+      watchData: [() => props.selectable],
+    })
+  : { desk: ref(null) };
 
 let dragStartCorners: Array<{ lat: number; lng: number }> = [];
 let dragStartMousePoint: L.Point | null = null;
@@ -2780,83 +2853,6 @@ const draw = () => {
   }
 };
 
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext) return;
-
-  const feature: FeatureReference = {
-    id: canvasId.value,
-    type: "polygon",
-    getBounds: () => {
-      if (!L.value) return null;
-      const latlngs = props.corners.map((c) => L.value!.latLng(c.lat, c.lng));
-      return L.value!.latLngBounds(latlngs);
-    },
-    getInitialData: () => {
-      return props.corners.map((c) => [c.lat, c.lng] as [number, number]);
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!L.value) return;
-
-      const currentBounds = L.value.latLngBounds(
-        props.corners.map((c) => L.value!.latLng(c.lat, c.lng)),
-      );
-      const currentCenter = currentBounds.getCenter();
-      const newCenter = bounds.getCenter();
-
-      const scaleX =
-        (bounds.getEast() - bounds.getWest()) /
-        (currentBounds.getEast() - currentBounds.getWest());
-      const scaleY =
-        (bounds.getNorth() - bounds.getSouth()) /
-        (currentBounds.getNorth() - currentBounds.getSouth());
-
-      const newCorners = props.corners.map((corner) => {
-        const relativeX = (corner.lng - currentCenter.lng) * scaleX;
-        const relativeY = (corner.lat - currentCenter.lat) * scaleY;
-        return {
-          lat: newCenter.lat + relativeY,
-          lng: newCenter.lng + relativeX,
-        };
-      });
-
-      emit("update:corners", newCorners);
-    },
-    applyRotation: (
-      angle: number,
-      center: { lat: number; lng: number },
-      initialCorners: Array<[number, number]>,
-    ) => {
-      if (!L.value || !initialCorners) return;
-
-      const angleRad = (-angle * Math.PI) / 180;
-
-      const metersPerDegreeLat = LatDegreesMeters;
-      const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
-
-      const newCorners = initialCorners.map((corner) => {
-        const lat = corner[0];
-        const lng = corner[1];
-
-        const relMetersY = (lat - center.lat) * metersPerDegreeLat;
-        const relMetersX = (lng - center.lng) * metersPerDegreeLng;
-
-        const newRelMetersY =
-          relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
-        const newRelMetersX =
-          relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
-
-        return {
-          lat: center.lat + newRelMetersY / metersPerDegreeLat,
-          lng: center.lng + newRelMetersX / metersPerDegreeLng,
-        };
-      });
-
-      emit("update:corners", newCorners);
-    },
-  };
-  selectionContext.registerFeature(feature);
-};
-
 let isUpdating = false;
 
 watch(
@@ -2908,23 +2904,7 @@ watch(
           newMap.on("zoom", reset);
           newMap.on("viewreset", reset);
 
-          if (newSelectable && selectionContext) {
-            registerWithSelection();
-          }
-
           reset();
-        }
-
-        if (canvasLayer.value) {
-          const selectableChanged =
-            oldVal && Boolean(oldVal[5]) !== Boolean(newSelectable);
-          if (selectableChanged) {
-            if (newSelectable && selectionContext) {
-              registerWithSelection();
-            } else if (selectionContext) {
-              selectionContext.unregisterFeature(canvasId.value);
-            }
-          }
         }
 
         if (
@@ -2988,10 +2968,6 @@ onBeforeUnmount(() => {
     map.value.off("zoom", reset);
     map.value.off("viewreset", reset);
   }
-
-  if (selectionContext) {
-    selectionContext.unregisterFeature(canvasId.value);
-  }
 });
 
 defineExpose({
@@ -3017,11 +2993,11 @@ import {
   ref,
   type Ref,
   nextTick,
-  onBeforeUnmount,
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
+import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
@@ -3081,6 +3057,44 @@ const circleId = ref<string | number>(
 const isDragging = ref(false);
 let dragStartLatLng: any = null;
 let dragStartMousePoint: any = null;
+
+const { checkIn } = useCheckIn<FeatureReference>();
+
+const { desk } = selectionContext
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: circleId.value,
+      data: () => ({
+        id: circleId.value,
+        type: "circle" as const,
+        getBounds: () => {
+          if (!circle.value || !L.value) return null;
+          const center = circle.value.getLatLng();
+          const radius = circle.value.getRadius();
+          const { southWest, northEast } = calculateCircleBounds(
+            center,
+            radius,
+          );
+          return L.value.latLngBounds(southWest, northEast);
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!circle.value) return;
+          const center = bounds.getCenter();
+          const latDiff = bounds.getNorth() - bounds.getSouth();
+          const lngDiff = bounds.getEast() - bounds.getWest();
+          const radiusLat = (latDiff / 2) * LatDegreesMeters;
+          const radiusLng = lngDegreesToRadius(lngDiff / 2, center.lat);
+          const radius = (radiusLat + radiusLng) / 2;
+          circle.value.setLatLng(center);
+          circle.value.setRadius(radius);
+          emit("update:lat", center.lat);
+          emit("update:lng", center.lng);
+          emit("update:radius", radius);
+        },
+      }),
+      watchData: true,
+    })
+  : { desk: ref(null) };
 
 const clearEditMarkers = () => {
   if (centerMarker.value) {
@@ -3210,44 +3224,6 @@ const enableEditing = () => {
   }
 };
 
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext || !circle.value) return;
-
-  const featureRef: FeatureReference = {
-    id: circleId.value,
-    type: "circle",
-    getBounds: () => {
-      if (!circle.value || !L.value) return null;
-
-      const center = circle.value.getLatLng();
-      const radius = circle.value.getRadius();
-
-      const { southWest, northEast } = calculateCircleBounds(center, radius);
-      return L.value.latLngBounds(southWest, northEast);
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!circle.value) return;
-      const center = bounds.getCenter();
-
-      const latDiff = bounds.getNorth() - bounds.getSouth();
-      const lngDiff = bounds.getEast() - bounds.getWest();
-
-      const radiusLat = (latDiff / 2) * LatDegreesMeters;
-      const radiusLng = lngDegreesToRadius(lngDiff / 2, center.lat);
-      const radius = (radiusLat + radiusLng) / 2;
-
-      circle.value.setLatLng(center);
-      circle.value.setRadius(radius);
-
-      emit("update:lat", center.lat);
-      emit("update:lng", center.lng);
-      emit("update:radius", radius);
-    },
-  };
-
-  selectionContext.registerFeature(featureRef);
-};
-
 watch(
   () => [
     map.value,
@@ -3314,10 +3290,6 @@ watch(
           }
 
           setupMapDragHandlers();
-
-          if (props.selectable && selectionContext) {
-            registerWithSelection();
-          }
         }
 
         if (circle.value) {
@@ -3343,9 +3315,6 @@ watch(
             circle.value.on("click", onCircleClick);
             if (props.selectable && selectionContext) {
               circle.value.on("mousedown", onCircleMouseDown);
-              registerWithSelection();
-            } else if (selectionContext) {
-              selectionContext.unregisterFeature(circleId.value);
             }
           }
         }
@@ -3380,17 +3349,6 @@ watch(
   },
   { immediate: true, flush: "post" },
 );
-
-onBeforeUnmount(() => {
-  if (props.selectable && selectionContext) {
-    selectionContext.unregisterFeature(circleId.value);
-  }
-
-  clearEditMarkers();
-  if (circle.value) {
-    circle.value.remove();
-  }
-});
 </script>
 
 <template><slot /></template>
@@ -4996,6 +4954,7 @@ import { ref, computed, provide, watch, nextTick, type Ref } from "vue";
 import LeafletBoundingBox from "./LeafletBoundingBox.vue";
 import type { FeatureShapeType } from "./LeafletFeaturesEditor.vue";
 import { LeafletSelectionKey } from ".";
+import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
 
 export type FeatureSelectMode = "select" | "direct-select";
 
@@ -5022,9 +4981,8 @@ export interface LeafletSelectionContext {
   featuresRegistry: Ref<Map<string | number, FeatureReference>>;
   selectFeature: (type: FeatureShapeType, id: string | number) => void;
   deselectAll: () => void;
-  registerFeature: (feature: FeatureReference) => void;
-  unregisterFeature: (id: string | number) => void;
   notifyFeatureUpdate: (id: string | number) => void;
+  deskSymbol?: symbol;
 }
 
 export interface LeafletFeaturesSelectorProps {
@@ -5043,11 +5001,12 @@ const emit = defineEmits<{
 }>();
 
 const selectedFeature = ref<SelectedFeature | null>(null);
-const featuresRegistry = ref<Map<string | number, FeatureReference>>(new Map());
 const boundingBoxTrigger = ref(0);
 
 const rotationStartPositions = ref<any>(null);
 const rotationCenter = ref<{ lat: number; lng: number } | null>(null);
+
+const { openDesk } = useCheckIn<FeatureReference>();
 
 const selectFeature = (type: FeatureShapeType, id: string | number) => {
   if (props.mode !== "select") {
@@ -5080,22 +5039,35 @@ const deselectAll = () => {
   emit("selection-changed", null);
 };
 
-const registerFeature = (feature: FeatureReference) => {
-  featuresRegistry.value.set(feature.id, feature);
-};
-
-const unregisterFeature = (id: string | number) => {
-  featuresRegistry.value.delete(id);
-  if (selectedFeature.value?.id === id) {
-    deselectAll();
-  }
-};
-
 const notifyFeatureUpdate = (id: string | number) => {
   if (selectedFeature.value?.id === id) {
     boundingBoxTrigger.value++;
   }
 };
+
+const { desk, deskSymbol } = openDesk({
+  onCheckIn: (id, featureRef) => {
+    console.log(
+      "[LeafletFeaturesSelector] Feature registered:",
+      id,
+      featureRef.type,
+    );
+  },
+  onCheckOut: (id) => {
+    console.log("[LeafletFeaturesSelector] Feature unregistered:", id);
+
+    if (selectedFeature.value?.id === id) {
+      deselectAll();
+    }
+  },
+});
+
+const featuresRegistry = computed(() =>
+  desk.getAll().reduce((map, item) => {
+    map.set(item.id, item.data);
+    return map;
+  }, new Map<string | number, FeatureReference>()),
+);
 
 watch(
   () => props.mode,
@@ -5200,12 +5172,11 @@ const context: LeafletSelectionContext = {
   featuresRegistry,
   selectFeature,
   deselectAll,
-  registerFeature,
-  unregisterFeature,
   notifyFeatureUpdate,
+  deskSymbol,
 };
 
-provide(LeafletSelectionKey, context);
+provide(LeafletSelectionKey, context as any);
 </script>
 
 <template>
@@ -5238,13 +5209,14 @@ provide(LeafletSelectionKey, context);
 
 ```vue [src/components/ui/leaflet-map/LeafletMarker.vue]
 <script setup lang="ts">
-import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount } from "vue";
+import { inject, watch, ref, type Ref, nextTick } from "vue";
 import {
   LeafletMapKey,
   LeafletModuleKey,
   LeafletSelectionKey,
   type FeatureReference,
 } from ".";
+import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
 
 export interface LeafletMarkerProps {
   id?: string | number;
@@ -5279,6 +5251,36 @@ const markerId = ref<string | number>(
   props.id ?? `marker-${Date.now()}-${Math.random()}`,
 );
 
+const { checkIn } = useCheckIn<FeatureReference>();
+
+const { desk: featureDesk } = selectionContext
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: markerId.value,
+      data: () => ({
+        id: markerId.value,
+        type: "marker" as const,
+        getBounds: () => {
+          if (!marker.value || !L.value) return null;
+          const latlng = marker.value.getLatLng();
+          const offset = 0.0001;
+          return L.value.latLngBounds(
+            [latlng.lat - offset, latlng.lng - offset],
+            [latlng.lat + offset, latlng.lng + offset],
+          );
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!marker.value) return;
+          const center = bounds.getCenter();
+          marker.value.setLatLng(center);
+          emit("update:lat", center.lat);
+          emit("update:lng", center.lng);
+        },
+      }),
+      watchData: true,
+    })
+  : { desk: ref(null) };
+
 let Icon: any;
 const iconOptions = {
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -5289,33 +5291,6 @@ const iconOptions = {
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
-};
-
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext || !marker.value) return;
-
-  const featureRef: FeatureReference = {
-    id: markerId.value,
-    type: "marker",
-    getBounds: () => {
-      if (!marker.value || !L.value) return null;
-      const latlng = marker.value.getLatLng();
-      const offset = 0.0001;
-      return L.value.latLngBounds(
-        [latlng.lat - offset, latlng.lng - offset],
-        [latlng.lat + offset, latlng.lng + offset],
-      );
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!marker.value) return;
-      const center = bounds.getCenter();
-      marker.value.setLatLng(center);
-      emit("update:lat", center.lat);
-      emit("update:lng", center.lng);
-    },
-  };
-
-  selectionContext.registerFeature(featureRef);
 };
 
 const setupMarker = () => {
@@ -5362,10 +5337,6 @@ const setupMarker = () => {
     }
 
     marker.value.addTo(map.value);
-
-    if (props.selectable && selectionContext) {
-      registerWithSelection();
-    }
   }
 };
 
@@ -5447,12 +5418,8 @@ watch(
             if (props.selectable && selectionContext) {
               marker.value.on("click", onMarkerClick);
               marker.value.on("dragstart", onDragStart);
-              registerWithSelection();
             } else {
               marker.value.on("click", onMarkerClick);
-              if (selectionContext) {
-                selectionContext.unregisterFeature(markerId.value);
-              }
             }
           }
         } else {
@@ -5476,16 +5443,6 @@ watch(
   },
   { immediate: true },
 );
-
-onBeforeUnmount(() => {
-  if (props.selectable && selectionContext) {
-    selectionContext.unregisterFeature(markerId.value);
-  }
-
-  if (marker.value) {
-    marker.value.remove();
-  }
-});
 </script>
 
 <template><slot /></template>
@@ -6063,11 +6020,11 @@ import {
   ref,
   type Ref,
   nextTick,
-  onBeforeUnmount,
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
+import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
@@ -6127,6 +6084,86 @@ const polygonId = ref<string | number>(
 
 let dragStartLatLngs: L.LatLng[] = [];
 let dragStartMousePoint: L.Point | null = null;
+
+const { checkIn } = useCheckIn<FeatureReference>();
+
+const { desk } = selectionContext
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: polygonId.value,
+      data: () => ({
+        id: polygonId.value,
+        type: "polygon" as const,
+        getBounds: () => {
+          if (!polygon.value || !L.value) return null;
+          return polygon.value.getBounds();
+        },
+        getInitialData: () => {
+          if (!polygon.value) return null;
+          return polygon.value.getLatLngs()[0] as L.LatLng[];
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!polygon.value) return;
+          const currentLatLngs = polygon.value.getLatLngs()[0] as L.LatLng[];
+          const currentBounds = polygon.value.getBounds();
+          const scaleX =
+            (bounds.getEast() - bounds.getWest()) /
+            (currentBounds.getEast() - currentBounds.getWest());
+          const scaleY =
+            (bounds.getNorth() - bounds.getSouth()) /
+            (currentBounds.getNorth() - currentBounds.getSouth());
+          const newCenter = bounds.getCenter();
+          const currentCenter = currentBounds.getCenter();
+          const offsetLat = newCenter.lat - currentCenter.lat;
+          const offsetLng = newCenter.lng - currentCenter.lng;
+          const newLatLngs = currentLatLngs.map((latlng) => {
+            const relLat = (latlng.lat - currentCenter.lat) * scaleY;
+            const relLng = (latlng.lng - currentCenter.lng) * scaleX;
+            return L.value!.latLng(
+              newCenter.lat + relLat,
+              newCenter.lng + relLng,
+            );
+          });
+          polygon.value.setLatLngs([newLatLngs]);
+          emit(
+            "update:latlngs",
+            newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
+          );
+        },
+        applyRotation: (
+          angle: number,
+          center: { lat: number; lng: number },
+          initialData: any,
+        ) => {
+          if (!polygon.value || !L.value) return;
+          const initialLatLngs = initialData as L.LatLng[];
+          const angleRad = (angle * Math.PI) / 180;
+          const metersPerDegreeLat = LatDegreesMeters;
+          const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
+          const newLatLngs = initialLatLngs.map((latlng) => {
+            const lat = latlng.lat;
+            const lng = latlng.lng;
+            const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+            const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+            const newRelMetersY =
+              relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+            const newRelMetersX =
+              relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+            return L.value!.latLng(
+              center.lat + newRelMetersY / metersPerDegreeLat,
+              center.lng + newRelMetersX / metersPerDegreeLng,
+            );
+          });
+          polygon.value.setLatLngs([newLatLngs]);
+          emit(
+            "update:latlngs",
+            newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
+          );
+        },
+      }),
+      watchData: true,
+    })
+  : { desk: ref(null) };
 
 const clearEditMarkers = () => {
   editMarkers.value.forEach((marker) => marker.remove());
@@ -6376,92 +6413,6 @@ const setupMapDragHandlers = () => {
   }
 };
 
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext || !polygon.value) return;
-
-  const featureRef: FeatureReference = {
-    id: polygonId.value,
-    type: "polygon",
-    getBounds: () => {
-      if (!polygon.value) return null;
-      return polygon.value.getBounds();
-    },
-    getInitialData: () => {
-      if (!polygon.value) return null;
-      const latlngs = polygon.value.getLatLngs()[0] as L.LatLng[];
-      return latlngs.map((ll) => [ll.lat, ll.lng] as [number, number]);
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!polygon.value || !L.value) return;
-
-      const currentBounds = polygon.value.getBounds();
-      const currentCenter = currentBounds.getCenter();
-      const newCenter = bounds.getCenter();
-
-      const currentLatLngs = polygon.value.getLatLngs()[0] as L.LatLng[];
-      const scaleX =
-        (bounds.getEast() - bounds.getWest()) /
-        (currentBounds.getEast() - currentBounds.getWest());
-      const scaleY =
-        (bounds.getNorth() - bounds.getSouth()) /
-        (currentBounds.getNorth() - currentBounds.getSouth());
-
-      const newLatLngs = currentLatLngs.map((latlng) => {
-        const relativeX = (latlng.lng - currentCenter.lng) * scaleX;
-        const relativeY = (latlng.lat - currentCenter.lat) * scaleY;
-        return L.value!.latLng(
-          newCenter.lat + relativeY,
-          newCenter.lng + relativeX,
-        );
-      });
-
-      polygon.value.setLatLngs([newLatLngs]);
-      emit(
-        "update:latlngs",
-        newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
-      );
-    },
-    applyRotation: (
-      angle: number,
-      center: { lat: number; lng: number },
-      initialLatLngs: Array<[number, number]>,
-    ) => {
-      if (!polygon.value || !L.value || !initialLatLngs) return;
-
-      const angleRad = (-angle * Math.PI) / 180;
-
-      const metersPerDegreeLat = LatDegreesMeters;
-      const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
-
-      const newLatLngs = initialLatLngs.map((latlng) => {
-        const lat = latlng[0];
-        const lng = latlng[1];
-
-        const relMetersY = (lat - center.lat) * metersPerDegreeLat;
-        const relMetersX = (lng - center.lng) * metersPerDegreeLng;
-
-        const newRelMetersY =
-          relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
-        const newRelMetersX =
-          relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
-
-        return L.value!.latLng(
-          center.lat + newRelMetersY / metersPerDegreeLat,
-          center.lng + newRelMetersX / metersPerDegreeLng,
-        );
-      });
-
-      polygon.value.setLatLngs([newLatLngs]);
-      emit(
-        "update:latlngs",
-        newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
-      );
-    },
-  };
-
-  selectionContext.registerFeature(featureRef);
-};
-
 watch(
   () => [
     map.value,
@@ -6521,43 +6472,6 @@ watch(
           } else {
             polygon.value.on("click", onPolygonClick);
           }
-
-          if (props.selectable && selectionContext) {
-            registerWithSelection();
-          }
-        }
-
-        if (polygon.value) {
-          const selectableChanged =
-            oldVal && Boolean(oldVal[5]) !== Boolean(newVal[5]);
-          if (selectableChanged) {
-            polygon.value.off("click");
-            polygon.value.off("mousedown");
-
-            const onPolygonClick = () => {
-              if (props.selectable && selectionContext) {
-                selectionContext.selectFeature("polygon", polygonId.value);
-              }
-              emit("click");
-            };
-
-            const onPolygonMouseDown = (e: any) => {
-              if (props.draggable && props.selectable && selectionContext) {
-                selectionContext.selectFeature("polygon", polygonId.value);
-              }
-            };
-
-            if (props.selectable && selectionContext) {
-              polygon.value.on("click", onPolygonClick);
-              polygon.value.on("mousedown", onPolygonMouseDown);
-              registerWithSelection();
-            } else {
-              polygon.value.on("click", onPolygonClick);
-              if (selectionContext) {
-                selectionContext.unregisterFeature(polygonId.value);
-              }
-            }
-          }
         }
 
         if (props.draggable && !props.editable) {
@@ -6581,13 +6495,6 @@ watch(
   },
   { immediate: true, flush: "post" },
 );
-
-onBeforeUnmount(() => {
-  clearEditMarkers();
-  if (polygon.value) {
-    polygon.value.remove();
-  }
-});
 </script>
 
 <template><slot /></template>
@@ -6601,11 +6508,13 @@ import {
   ref,
   type Ref,
   nextTick,
-  onBeforeUnmount,
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
+import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
+
+const { checkIn } = useCheckIn<FeatureReference>();
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
@@ -6658,6 +6567,94 @@ const isDragging = ref(false);
 const polylineId = ref<string | number>(
   props.id ?? `polyline-${Date.now()}-${Math.random()}`,
 );
+
+const { desk } = selectionContext
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: polylineId.value,
+      data: () => ({
+        id: polylineId.value,
+        type: "polyline" as const,
+        getBounds: () => {
+          if (!polyline.value) return null;
+          return polyline.value.getBounds();
+        },
+        getInitialData: () => {
+          if (!polyline.value) return null;
+          const latlngs = polyline.value.getLatLngs() as L.LatLng[];
+          return latlngs.map((ll) => [ll.lat, ll.lng] as [number, number]);
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!polyline.value || !L.value) return;
+
+          const currentBounds = polyline.value.getBounds();
+          const currentCenter = currentBounds.getCenter();
+          const newCenter = bounds.getCenter();
+
+          const currentLatLngs = polyline.value.getLatLngs() as L.LatLng[];
+          const scaleX =
+            (bounds.getEast() - bounds.getWest()) /
+            (currentBounds.getEast() - currentBounds.getWest());
+          const scaleY =
+            (bounds.getNorth() - bounds.getSouth()) /
+            (currentBounds.getNorth() - currentBounds.getSouth());
+
+          const newLatLngs = currentLatLngs.map((latlng) => {
+            const relativeX = (latlng.lng - currentCenter.lng) * scaleX;
+            const relativeY = (latlng.lat - currentCenter.lat) * scaleY;
+            return L.value!.latLng(
+              newCenter.lat + relativeY,
+              newCenter.lng + relativeX,
+            );
+          });
+
+          polyline.value.setLatLngs(newLatLngs);
+          emit(
+            "update:latlngs",
+            newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
+          );
+        },
+        applyRotation: (
+          angle: number,
+          center: { lat: number; lng: number },
+          initialData: any,
+        ) => {
+          if (!polyline.value || !L.value || !initialData) return;
+
+          const initialLatLngs = initialData as Array<[number, number]>;
+          const angleRad = (-angle * Math.PI) / 180;
+
+          const metersPerDegreeLat = LatDegreesMeters;
+          const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
+
+          const newLatLngs = initialLatLngs.map((latlng) => {
+            const lat = latlng[0];
+            const lng = latlng[1];
+
+            const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+            const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+
+            const newRelMetersY =
+              relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+            const newRelMetersX =
+              relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+
+            return L.value!.latLng(
+              center.lat + newRelMetersY / metersPerDegreeLat,
+              center.lng + newRelMetersX / metersPerDegreeLng,
+            );
+          });
+
+          polyline.value.setLatLngs(newLatLngs);
+          emit(
+            "update:latlngs",
+            newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
+          );
+        },
+      }),
+      watchData: [() => props.selectable],
+    })
+  : { desk: ref(null) };
 
 let dragStartLatLngs: L.LatLng[] = [];
 let dragStartMousePoint: L.Point | null = null;
@@ -6886,92 +6883,6 @@ const setupMapDragHandlers = () => {
   }
 };
 
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext || !polyline.value) return;
-
-  const featureRef: FeatureReference = {
-    id: polylineId.value,
-    type: "polyline",
-    getBounds: () => {
-      if (!polyline.value) return null;
-      return polyline.value.getBounds();
-    },
-    getInitialData: () => {
-      if (!polyline.value) return null;
-      const latlngs = polyline.value.getLatLngs() as L.LatLng[];
-      return latlngs.map((ll) => [ll.lat, ll.lng] as [number, number]);
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!polyline.value || !L.value) return;
-
-      const currentBounds = polyline.value.getBounds();
-      const currentCenter = currentBounds.getCenter();
-      const newCenter = bounds.getCenter();
-
-      const currentLatLngs = polyline.value.getLatLngs() as L.LatLng[];
-      const scaleX =
-        (bounds.getEast() - bounds.getWest()) /
-        (currentBounds.getEast() - currentBounds.getWest());
-      const scaleY =
-        (bounds.getNorth() - bounds.getSouth()) /
-        (currentBounds.getNorth() - currentBounds.getSouth());
-
-      const newLatLngs = currentLatLngs.map((latlng) => {
-        const relativeX = (latlng.lng - currentCenter.lng) * scaleX;
-        const relativeY = (latlng.lat - currentCenter.lat) * scaleY;
-        return L.value!.latLng(
-          newCenter.lat + relativeY,
-          newCenter.lng + relativeX,
-        );
-      });
-
-      polyline.value.setLatLngs(newLatLngs);
-      emit(
-        "update:latlngs",
-        newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
-      );
-    },
-    applyRotation: (
-      angle: number,
-      center: { lat: number; lng: number },
-      initialLatLngs: Array<[number, number]>,
-    ) => {
-      if (!polyline.value || !L.value || !initialLatLngs) return;
-
-      const angleRad = (-angle * Math.PI) / 180;
-
-      const metersPerDegreeLat = LatDegreesMeters;
-      const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
-
-      const newLatLngs = initialLatLngs.map((latlng) => {
-        const lat = latlng[0];
-        const lng = latlng[1];
-
-        const relMetersY = (lat - center.lat) * metersPerDegreeLat;
-        const relMetersX = (lng - center.lng) * metersPerDegreeLng;
-
-        const newRelMetersY =
-          relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
-        const newRelMetersX =
-          relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
-
-        return L.value!.latLng(
-          center.lat + newRelMetersY / metersPerDegreeLat,
-          center.lng + newRelMetersX / metersPerDegreeLng,
-        );
-      });
-
-      polyline.value.setLatLngs(newLatLngs);
-      emit(
-        "update:latlngs",
-        newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
-      );
-    },
-  };
-
-  selectionContext.registerFeature(featureRef);
-};
-
 watch(
   () => [
     map.value,
@@ -7030,43 +6941,6 @@ watch(
           } else {
             polyline.value.on("click", onPolylineClick);
           }
-
-          if (props.selectable && selectionContext) {
-            registerWithSelection();
-          }
-        }
-
-        if (polyline.value) {
-          const selectableChanged =
-            oldVal && Boolean(oldVal[5]) !== Boolean(newVal[5]);
-          if (selectableChanged) {
-            polyline.value.off("click");
-            polyline.value.off("mousedown");
-
-            const onPolylineClick = () => {
-              if (props.selectable && selectionContext) {
-                selectionContext.selectFeature("polyline", polylineId.value);
-              }
-              emit("click");
-            };
-
-            const onPolylineMouseDown = (e: any) => {
-              if (props.draggable && props.selectable && selectionContext) {
-                selectionContext.selectFeature("polyline", polylineId.value);
-              }
-            };
-
-            if (props.selectable && selectionContext) {
-              polyline.value.on("click", onPolylineClick);
-              polyline.value.on("mousedown", onPolylineMouseDown);
-              registerWithSelection();
-            } else {
-              polyline.value.on("click", onPolylineClick);
-              if (selectionContext) {
-                selectionContext.unregisterFeature(polylineId.value);
-              }
-            }
-          }
         }
 
         if (props.draggable && !props.editable) {
@@ -7090,17 +6964,6 @@ watch(
   },
   { immediate: true, flush: "post" },
 );
-
-onBeforeUnmount(() => {
-  if (props.selectable && selectionContext) {
-    selectionContext.unregisterFeature(polylineId.value);
-  }
-
-  clearEditMarkers();
-  if (polyline.value) {
-    polyline.value.remove();
-  }
-});
 </script>
 
 <template><slot /></template>
@@ -7114,11 +6977,13 @@ import {
   ref,
   type Ref,
   nextTick,
-  onBeforeUnmount,
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
+import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
+
+const { checkIn } = useCheckIn<FeatureReference>();
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
@@ -7168,6 +7033,31 @@ const isDragging = ref(false);
 const rectangleId = ref<string | number>(
   props.id ?? `rectangle-${Date.now()}-${Math.random()}`,
 );
+
+const { desk } = selectionContext
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: rectangleId.value,
+      data: () => ({
+        id: rectangleId.value,
+        type: "rectangle" as const,
+        getBounds: () => {
+          if (!rectangle.value) return null;
+          return rectangle.value.getBounds();
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!rectangle.value) return;
+
+          rectangle.value.setBounds(bounds);
+          emit("update:bounds", [
+            [bounds.getSouth(), bounds.getWest()],
+            [bounds.getNorth(), bounds.getEast()],
+          ] as [[number, number], [number, number]]);
+        },
+      }),
+      watchData: [() => props.selectable],
+    })
+  : { desk: ref(null) };
 
 let dragStartBounds: L.LatLngBounds | null = null;
 let dragStartMousePoint: L.Point | null = null;
@@ -7347,30 +7237,6 @@ const setupMapDragHandlers = () => {
   }
 };
 
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext || !rectangle.value) return;
-
-  const featureRef: FeatureReference = {
-    id: rectangleId.value,
-    type: "rectangle",
-    getBounds: () => {
-      if (!rectangle.value) return null;
-      return rectangle.value.getBounds();
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!rectangle.value) return;
-
-      rectangle.value.setBounds(bounds);
-      emit("update:bounds", [
-        [bounds.getSouth(), bounds.getWest()],
-        [bounds.getNorth(), bounds.getEast()],
-      ] as [[number, number], [number, number]]);
-    },
-  };
-
-  selectionContext.registerFeature(featureRef);
-};
-
 watch(
   () => [
     map.value,
@@ -7433,43 +7299,6 @@ watch(
           } else {
             rectangle.value.on("click", onRectangleClick);
           }
-
-          if (props.selectable && selectionContext) {
-            registerWithSelection();
-          }
-        }
-
-        if (rectangle.value) {
-          const selectableChanged =
-            oldVal && Boolean(oldVal[4]) !== Boolean(newVal[4]);
-          if (selectableChanged) {
-            rectangle.value.off("click");
-            rectangle.value.off("mousedown");
-
-            const onRectangleClick = () => {
-              if (props.selectable && selectionContext) {
-                selectionContext.selectFeature("rectangle", rectangleId.value);
-              }
-              emit("click");
-            };
-
-            const onRectangleMouseDown = (e: any) => {
-              if (props.draggable && props.selectable && selectionContext) {
-                selectionContext.selectFeature("rectangle", rectangleId.value);
-              }
-            };
-
-            if (props.selectable && selectionContext) {
-              rectangle.value.on("click", onRectangleClick);
-              rectangle.value.on("mousedown", onRectangleMouseDown);
-              registerWithSelection();
-            } else {
-              rectangle.value.on("click", onRectangleClick);
-              if (selectionContext) {
-                selectionContext.unregisterFeature(rectangleId.value);
-              }
-            }
-          }
         }
 
         if (props.draggable && !props.editable) {
@@ -7493,17 +7322,6 @@ watch(
   },
   { immediate: true, flush: "post" },
 );
-
-onBeforeUnmount(() => {
-  if (props.selectable && selectionContext) {
-    selectionContext.unregisterFeature(rectangleId.value);
-  }
-
-  clearEditMarkers();
-  if (rectangle.value) {
-    rectangle.value.remove();
-  }
-});
 </script>
 
 <template><slot /></template>
@@ -8740,6 +8558,211 @@ export const useCssParser = () => {
 };
 ```
 
+```ts [src/composables/use-check-in/useCheckIn.ts]
+import {
+  ref,
+  provide,
+  inject,
+  onMounted,
+  onBeforeUnmount,
+  watch,
+  type InjectionKey,
+  type Ref,
+} from "vue";
+
+export interface CheckInItem<T = any> {
+  id: string | number;
+  data: T;
+}
+
+export interface CheckInDesk<T = any> {
+  registry: Ref<Map<string | number, CheckInItem<T>>>;
+  checkIn: (id: string | number, data: T) => void;
+  checkOut: (id: string | number) => void;
+  get: (id: string | number) => CheckInItem<T> | undefined;
+  getAll: () => CheckInItem<T>[];
+  update: (id: string | number, data: Partial<T>) => void;
+  has: (id: string | number) => boolean;
+  clear: () => void;
+}
+
+export interface CheckInDeskOptions<T = any> {
+  extraContext?: Record<string, any>;
+
+  onCheckIn?: (id: string | number, data: T) => void;
+
+  onCheckOut?: (id: string | number) => void;
+}
+
+export interface CheckInOptions<T = any> {
+  required?: boolean;
+
+  autoCheckIn?: boolean;
+
+  id?: string | number;
+
+  data?: T | (() => T);
+
+  generateId?: () => string | number;
+
+  watchData?: boolean;
+}
+
+export const useCheckIn = <T = any,>() => {
+  const createDeskContext = <T = any,>(
+    options?: CheckInDeskOptions<T>,
+  ): CheckInDesk<T> => {
+    const registry = ref<Map<string | number, CheckInItem<T>>>(
+      new Map(),
+    ) as Ref<Map<string | number, CheckInItem<T>>>;
+
+    const checkIn = (id: string | number, data: T) => {
+      registry.value.set(id, { id, data: data as any });
+      registry.value = new Map(registry.value);
+      options?.onCheckIn?.(id, data);
+    };
+
+    const checkOut = (id: string | number) => {
+      const existed = registry.value.has(id);
+      registry.value.delete(id);
+      registry.value = new Map(registry.value);
+      if (existed) {
+        options?.onCheckOut?.(id);
+      }
+    };
+
+    const get = (id: string | number) => registry.value.get(id);
+
+    const getAll = () => Array.from(registry.value.values());
+
+    const update = (id: string | number, data: Partial<T>) => {
+      const existing = registry.value.get(id);
+      if (
+        existing &&
+        typeof existing.data === "object" &&
+        typeof data === "object"
+      ) {
+        checkIn(id, { ...existing.data, ...data } as T);
+      }
+    };
+
+    const has = (id: string | number) => registry.value.has(id);
+
+    const clear = () => {
+      registry.value.clear();
+      registry.value = new Map();
+    };
+
+    return { registry, checkIn, checkOut, get, getAll, update, has, clear };
+  };
+
+  const openDesk = (options?: CheckInDeskOptions<T>) => {
+    const deskSymbol = Symbol("CheckInDesk") as InjectionKey<CheckInDesk<T>>;
+    const deskContext = createDeskContext<T>(options);
+
+    const fullContext = {
+      ...deskContext,
+      ...(options?.extraContext || {}),
+    } as any;
+
+    provide(deskSymbol, fullContext);
+
+    return {
+      desk: fullContext as CheckInDesk<T> & Record<string, any>,
+      deskSymbol,
+    };
+  };
+
+  const checkIn = (
+    parentDesk: { deskSymbol: InjectionKey<CheckInDesk<T>> },
+    options?: CheckInOptions<T>,
+  ) => {
+    const desk = inject(
+      parentDesk.deskSymbol,
+      options?.required ? undefined : null,
+    );
+
+    if (options?.required && !desk) {
+      throw new Error(
+        `[useCheckIn] Check-in desk not found. ` +
+          `Make sure a desk is open (parent provides context).`,
+      );
+    }
+
+    if (options?.autoCheckIn && desk) {
+      const itemId = ref<string | number | undefined>(options.id);
+
+      if (!itemId.value && options.generateId) {
+        itemId.value = options.generateId();
+      }
+
+      if (!itemId.value) {
+        throw new Error(
+          '[useCheckIn] Auto check-in requires an "id" or "generateId" option',
+        );
+      }
+
+      const getData = () => {
+        return typeof options.data === "function"
+          ? (options.data as () => T)()
+          : options.data!;
+      };
+
+      onMounted(() => {
+        if (itemId.value) {
+          desk.checkIn(itemId.value, getData());
+        }
+      });
+
+      if (options.watchData && options.data) {
+        watch(
+          () => getData(),
+          (newData) => {
+            if (itemId.value && newData) {
+              desk.update(itemId.value, newData);
+            }
+          },
+          { deep: true },
+        );
+      }
+
+      onBeforeUnmount(() => {
+        if (itemId.value) {
+          desk.checkOut(itemId.value);
+        }
+      });
+
+      return {
+        desk,
+        itemId,
+        updateSelf: (data: Partial<T>) => {
+          if (itemId.value) {
+            desk.update(itemId.value, data);
+          }
+        },
+      };
+    }
+
+    return { desk, itemId: ref(undefined), updateSelf: () => {} };
+  };
+
+  const generateId = (prefix = "passenger"): string => {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  };
+
+  const standaloneDesk = <T = any,>(options?: CheckInDeskOptions<T>) => {
+    return createDeskContext<T>(options);
+  };
+
+  return {
+    openDesk,
+    checkIn,
+    generateId,
+    standaloneDesk,
+  };
+};
+```
+
 ```ts [src/composables/use-colors/useColors.ts]
 export const useColors = () => {
   const oklchToRgb = (
@@ -9548,7 +9571,7 @@ export type UseQuadtreeReturn<T extends Rect = Rect> = ReturnType<
   ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-| `LeafletSelectionKey`{.primary .text-primary} | `context` | `any` | — |
+| `LeafletSelectionKey`{.primary .text-primary} | `context as any` | `any` | — |
 
   ### Child Components
 
@@ -9820,1196 +9843,6 @@ Helps smooth transitions when toggling virtualization on/off
 | `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
 
 ---
-
-  ## Examples
-  ::hr-underline
-  ::
-
-::tabs
-  :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <leaflet-simple />
-  :::
-
-  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
-```vue
-<script setup lang="ts">
-import { ref, type ComponentPublicInstance } from "vue";
-import { ClientOnly } from "#components";
-import {
-  LeafletMap,
-  LeafletTileLayer,
-  LeafletZoomControl,
-  LeafletControls,
-  LeafletControlItem,
-  LeafletCircle,
-  type LeafletMapExposed,
-} from "@/components/ui/leaflet-map";
-import { Icon } from "@iconify/vue";
-
-type LeafletMapInstance = ComponentPublicInstance & LeafletMapExposed;
-
-const mapRef = ref<LeafletMapInstance | null>(null);
-const zoom = ref(13);
-const locationCoords = ref<{ lat: number; lng: number; accuracy: number }>({
-  lat: 43.3026,
-  lng: 5.3691,
-  accuracy: 500,
-});
-
-const onLocate = () => {
-  mapRef.value?.locate();
-};
-
-const onLocationFound = (event: any) => {
-  locationCoords.value = {
-    lat: event.latitude,
-    lng: event.longitude,
-    accuracy: event.accuracy,
-  };
-};
-</script>
-
-<template>
-  <ClientOnly>
-    <div class="h-128 min-h-128 mb-4">
-      <LeafletMap
-        ref="mapRef"
-        name="marseille"
-        tile-layer="openstreetmap"
-        :center-lat="locationCoords.lat"
-        :center-lng="locationCoords.lng"
-        :zoom="zoom"
-        class="rounded-lg"
-        @location:found="onLocationFound"
-      >
-        <LeafletTileLayer
-          name="openstreetmap"
-          url-template="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        />
-
-        <LeafletControls
-          position="topleft"
-          :enabled="true"
-          @item-clicked="onLocate"
-        >
-          <LeafletControlItem name="locate" type="push" title="Locate me">
-            <Icon icon="gis:location-arrow" class="w-4 h-4 text-black" />
-          </LeafletControlItem>
-        </LeafletControls>
-
-        <LeafletZoomControl position="topleft" />
-
-        <LeafletCircle
-          :key="`circle-${locationCoords.lat}-${locationCoords.lng}`"
-          :lat="locationCoords.lat"
-          :lng="locationCoords.lng"
-          :radius="locationCoords.accuracy"
-          class="bg-red-500/20 border border-red-500"
-        />
-      </LeafletMap>
-    </div>
-  </ClientOnly>
-</template>
-```
-  :::
-::
-
-::tabs
-  :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <leaflet-canvas-demo />
-  :::
-
-  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
-```vue
-<script setup lang="ts">
-import { ref, watch, type ComponentPublicInstance } from "vue";
-import { ClientOnly } from "#components";
-import {
-  LeafletMap,
-  LeafletTileLayer,
-  LeafletZoomControl,
-  LeafletControls,
-  LeafletControlItem,
-  LeafletCanvasGL,
-  type LeafletMapExposed,
-} from "@/components/ui/leaflet-map";
-import { Icon } from "@iconify/vue";
-
-type LeafletMapInstance = ComponentPublicInstance & LeafletMapExposed;
-type LeafletCanvasInstance = ComponentPublicInstance & {
-  sourceCanvas: HTMLCanvasElement | null;
-  redraw: () => void;
-};
-
-const mapRef = ref<LeafletMapInstance | null>(null);
-const canvasRef = ref<LeafletCanvasInstance | null>(null);
-const zoom = ref(15);
-
-const canvasCorners = ref([
-  { lat: 43.305, lng: 5.365 },
-  { lat: 43.305, lng: 5.375 },
-  { lat: 43.3, lng: 5.375 },
-  { lat: 43.3, lng: 5.365 },
-]);
-
-const isEditable = ref(false);
-const isDraggable = ref(false);
-const canvasOpacity = ref(0.85);
-
-const sourceCanvas = ref<HTMLCanvasElement | null>(null);
-const videoElement = ref<HTMLVideoElement | null>(null);
-const isVideoLoaded = ref(false);
-const isVideoPlaying = ref(false);
-let animationFrameId: number | null = null;
-
-const videoUrl =
-  "/api/proxy-video?url=" +
-  encodeURIComponent(
-    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-  );
-
-const onCanvasReady = (canvas: HTMLCanvasElement) => {
-  sourceCanvas.value = canvas;
-
-  if (!videoElement.value) {
-    videoElement.value = document.createElement("video");
-
-    videoElement.value.loop = true;
-    videoElement.value.muted = true;
-    videoElement.value.playsInline = true;
-
-    videoElement.value.src = videoUrl;
-
-    videoElement.value.addEventListener("loadeddata", () => {
-      isVideoLoaded.value = true;
-
-      drawVideoFrame();
-    });
-
-    videoElement.value.addEventListener("error", () => {
-      drawDefaultContent(canvas);
-    });
-
-    videoElement.value.load();
-  }
-};
-
-const drawDefaultContent = (canvas: HTMLCanvasElement) => {
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  gradient.addColorStop(0, "#667eea");
-  gradient.addColorStop(1, "#764ba2");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.fillStyle = "white";
-  ctx.font = "bold 24px Arial";
-  ctx.textAlign = "center";
-  ctx.fillText("NASA Earth Clouds Overlay", canvas.width / 2, 50);
-
-  ctx.font = "16px Arial";
-  ctx.fillText("Cliquez sur 'Lancer Vidéo' pour", canvas.width / 2, 120);
-  ctx.fillText("afficher les nuages de la NASA", canvas.width / 2, 145);
-};
-
-const drawVideoFrame = () => {
-  if (!sourceCanvas.value || !videoElement.value || !canvasRef.value) return;
-
-  const ctx = sourceCanvas.value.getContext("2d");
-  if (!ctx) return;
-
-  ctx.drawImage(
-    videoElement.value,
-    0,
-    0,
-    sourceCanvas.value.width,
-    sourceCanvas.value.height,
-  );
-
-  canvasRef.value.redraw();
-
-  if (isVideoPlaying.value && !videoElement.value.paused) {
-    animationFrameId = requestAnimationFrame(drawVideoFrame);
-  }
-};
-
-const toggleVideo = () => {
-  if (!videoElement.value || !isVideoLoaded.value) return;
-
-  if (isVideoPlaying.value) {
-    videoElement.value.pause();
-    isVideoPlaying.value = false;
-    if (animationFrameId) {
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
-    }
-  } else {
-    videoElement.value.play();
-    isVideoPlaying.value = true;
-    drawVideoFrame();
-  }
-};
-
-const toggleEdit = () => {
-  isEditable.value = !isEditable.value;
-};
-
-const toggleDrag = () => {
-  isDraggable.value = !isDraggable.value;
-};
-
-const resetCorners = () => {
-  canvasCorners.value = [
-    { lat: 43.305, lng: 5.365 },
-    { lat: 43.305, lng: 5.375 },
-    { lat: 43.3, lng: 5.375 },
-    { lat: 43.3, lng: 5.365 },
-  ];
-};
-
-const animateCanvas = () => {
-  if (!sourceCanvas.value || !canvasRef.value) return;
-
-  const ctx = sourceCanvas.value.getContext("2d");
-  if (!ctx) return;
-
-  let rotation = 0;
-  const animate = () => {
-    if (!sourceCanvas.value || !canvasRef.value) return;
-
-    ctx.clearRect(0, 0, sourceCanvas.value.width, sourceCanvas.value.height);
-
-    const gradient = ctx.createLinearGradient(
-      0,
-      0,
-      sourceCanvas.value.width,
-      sourceCanvas.value.height,
-    );
-    gradient.addColorStop(0, `hsl(${rotation}, 70%, 60%)`);
-    gradient.addColorStop(1, `hsl(${rotation + 60}, 70%, 60%)`);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, sourceCanvas.value.width, sourceCanvas.value.height);
-
-    ctx.fillStyle = "white";
-    ctx.font = "bold 24px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("Canvas Animé!", sourceCanvas.value.width / 2, 50);
-
-    ctx.save();
-    ctx.translate(sourceCanvas.value.width / 2, sourceCanvas.value.height / 2);
-    ctx.rotate((rotation * Math.PI) / 180);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-    ctx.fillRect(-30, -30, 60, 60);
-    ctx.restore();
-
-    canvasRef.value.redraw();
-
-    rotation += 2;
-    if (rotation < 360) {
-      requestAnimationFrame(animate);
-    } else {
-      onCanvasReady(sourceCanvas.value);
-      canvasRef.value.redraw();
-    }
-  };
-
-  animate();
-};
-
-watch(
-  () => canvasOpacity.value,
-  () => {
-    if (canvasRef.value) {
-      canvasRef.value.redraw();
-    }
-  },
-);
-</script>
-
-<template>
-  <ClientOnly>
-    <div class="space-y-4">
-      <div class="flex gap-2 flex-wrap">
-        <button
-          @click="toggleEdit"
-          class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
-          :class="
-            isEditable
-              ? 'bg-blue-500 text-white hover:bg-blue-600'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          "
-        >
-          {{ isEditable ? "Édition active" : "Activer édition" }}
-        </button>
-
-        <button
-          @click="toggleDrag"
-          class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
-          :class="
-            isDraggable
-              ? 'bg-green-500 text-white hover:bg-green-600'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          "
-        >
-          {{ isDraggable ? "Déplacement actif" : "Activer déplacement" }}
-        </button>
-
-        <button
-          @click="resetCorners"
-          class="px-4 py-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm font-medium transition-colors"
-        >
-          Réinitialiser
-        </button>
-
-        <button
-          @click="animateCanvas"
-          class="px-4 py-2 rounded-md bg-purple-500 text-white hover:bg-purple-600 text-sm font-medium transition-colors"
-        >
-          Animer
-        </button>
-
-        <button
-          @click="toggleVideo"
-          :disabled="!isVideoLoaded"
-          class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
-          :class="
-            isVideoPlaying
-              ? 'bg-red-500 text-white hover:bg-red-600'
-              : isVideoLoaded
-                ? 'bg-orange-500 text-white hover:bg-orange-600'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          "
-        >
-          {{
-            !isVideoLoaded
-              ? "Chargement..."
-              : isVideoPlaying
-                ? "Pause Vidéo"
-                : "Lancer Vidéo"
-          }}
-        </button>
-
-        <div class="flex items-center gap-2">
-          <label for="opacity-slider" class="text-sm font-medium text-gray-700">
-            Opacité:
-          </label>
-          <input
-            id="opacity-slider"
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            v-model.number="canvasOpacity"
-            class="w-32"
-          />
-          <span class="text-sm text-gray-600 w-12"
-            >{{ (canvasOpacity * 100).toFixed(0) }}%</span
-          >
-        </div>
-      </div>
-
-      <div class="h-128 min-h-128">
-        <LeafletMap
-          ref="mapRef"
-          name="canvas-demo"
-          tile-layer="openstreetmap"
-          :center-lat="43.3026"
-          :center-lng="5.3691"
-          :zoom="zoom"
-          class="rounded-lg"
-        >
-          <LeafletTileLayer
-            name="openstreetmap"
-            url-template="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          />
-
-          <LeafletZoomControl position="topleft" />
-
-          <LeafletCanvasGL
-            ref="canvasRef"
-            :corners="canvasCorners"
-            :width="400"
-            :height="300"
-            :editable="isEditable"
-            :draggable="isDraggable"
-            :subdivisions="20"
-            :opacity="canvasOpacity"
-            class="border border-purple-500 bg-purple-500/30"
-            @canvas-ready="onCanvasReady"
-            @update:corners="(corners) => (canvasCorners = corners)"
-          />
-        </LeafletMap>
-      </div>
-
-      <div class="text-sm text-gray-600 space-y-2">
-        <p>
-          <strong>Instructions:</strong>
-        </p>
-        <ul class="list-disc list-inside space-y-1">
-          <li>Activez l'édition pour déplacer les 4 coins du canvas</li>
-          <li>Activez le déplacement pour déplacer tout le canvas</li>
-          <li>Ajustez l'opacité avec le slider</li>
-          <li>Cliquez sur "Animer" pour voir une animation sur le canvas</li>
-          <li>
-            Le canvas est subdivisé en grille pour une meilleure déformation
-          </li>
-        </ul>
-
-        <div class="mt-4 p-3 bg-gray-100 rounded">
-          <p class="font-medium mb-2">Coins actuels:</p>
-          <div class="grid grid-cols-2 gap-2 text-xs font-mono">
-            <div>
-              TL: {{ canvasCorners[0]?.lat.toFixed(4) }},
-              {{ canvasCorners[0]?.lng.toFixed(4) }}
-            </div>
-            <div>
-              TR: {{ canvasCorners[1]?.lat.toFixed(4) }},
-              {{ canvasCorners[1]?.lng.toFixed(4) }}
-            </div>
-            <div>
-              BR: {{ canvasCorners[2]?.lat.toFixed(4) }},
-              {{ canvasCorners[2]?.lng.toFixed(4) }}
-            </div>
-            <div>
-              BL: {{ canvasCorners[3]?.lat.toFixed(4) }},
-              {{ canvasCorners[3]?.lng.toFixed(4) }}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </ClientOnly>
-</template>
-```
-  :::
-::
-
-::tabs
-  :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <leaflet-virtualization-demo />
-  :::
-
-  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
-```vue
-<script setup lang="ts">
-import { ref, computed, onMounted, shallowRef } from "vue";
-import { Button } from "@/components/ui/button";
-import {
-  LeafletMap,
-  LeafletTileLayer,
-  LeafletZoomControl,
-  LeafletVirtualize,
-  LeafletMarker,
-  LeafletCircle,
-  LeafletPolygon,
-  LeafletPolyline,
-  LeafletRectangle,
-  type LeafletMapExposed,
-} from "@/components/ui/leaflet-map";
-import { loadVirtualizationDemoData } from "./fixtures/fixtures.loader";
-import type {
-  DemoMarker,
-  DemoCircle,
-  DemoPolygon,
-  DemoPolyline,
-  DemoRectangle,
-} from "./fixtures/fixtures.loader";
-import type { UseQuadtreeReturn } from "~~/registry/new-york/composables/use-quadtree/useQuadtree";
-
-const mapRef = ref<LeafletMapExposed | null>(null);
-
-const virtualizationConfig = ref({
-  enabled: true,
-  isTransitioning: false,
-  autoMargin: true,
-  marginMeters: 1000,
-  marginZoomRatio: 1.0,
-});
-
-const zoomLevelsRaw = ref({
-  markers: { min: "12" as string | number, max: "" as string | number },
-  circles: { min: "" as string | number, max: "" as string | number },
-  polygons: { min: "" as string | number, max: "14" as string | number },
-  polylines: { min: "" as string | number, max: "" as string | number },
-  rectangles: { min: "" as string | number, max: "" as string | number },
-});
-
-const zoomLevels = computed(() => ({
-  markers: {
-    min:
-      zoomLevelsRaw.value.markers.min === ""
-        ? undefined
-        : Number(zoomLevelsRaw.value.markers.min),
-    max:
-      zoomLevelsRaw.value.markers.max === ""
-        ? undefined
-        : Number(zoomLevelsRaw.value.markers.max),
-  },
-  circles: {
-    min:
-      zoomLevelsRaw.value.circles.min === ""
-        ? undefined
-        : Number(zoomLevelsRaw.value.circles.min),
-    max:
-      zoomLevelsRaw.value.circles.max === ""
-        ? undefined
-        : Number(zoomLevelsRaw.value.circles.max),
-  },
-  polygons: {
-    min:
-      zoomLevelsRaw.value.polygons.min === ""
-        ? undefined
-        : Number(zoomLevelsRaw.value.polygons.min),
-    max:
-      zoomLevelsRaw.value.polygons.max === ""
-        ? undefined
-        : Number(zoomLevelsRaw.value.polygons.max),
-  },
-  polylines: {
-    min:
-      zoomLevelsRaw.value.polylines.min === ""
-        ? undefined
-        : Number(zoomLevelsRaw.value.polylines.min),
-    max:
-      zoomLevelsRaw.value.polylines.max === ""
-        ? undefined
-        : Number(zoomLevelsRaw.value.polylines.max),
-  },
-  rectangles: {
-    min:
-      zoomLevelsRaw.value.rectangles.min === ""
-        ? undefined
-        : Number(zoomLevelsRaw.value.rectangles.min),
-    max:
-      zoomLevelsRaw.value.rectangles.max === ""
-        ? undefined
-        : Number(zoomLevelsRaw.value.rectangles.max),
-  },
-}));
-
-const visibleCounts = ref({
-  markers: 0,
-  circles: 0,
-  polygons: 0,
-  polylines: 0,
-  rectangles: 0,
-});
-
-const visibleShapesCount = computed(
-  () =>
-    visibleCounts.value.markers +
-    visibleCounts.value.circles +
-    visibleCounts.value.polygons +
-    visibleCounts.value.polylines +
-    visibleCounts.value.rectangles,
-);
-
-const loadingState = ref({
-  isLoading: true,
-  progress: 0,
-  stage: "Starting...",
-});
-
-const features = ref({
-  markers: [] as DemoMarker[],
-  circles: [] as DemoCircle[],
-  polygons: [] as DemoPolygon[],
-  polylines: [] as DemoPolyline[],
-  rectangles: [] as DemoRectangle[],
-});
-
-const quadtrees = shallowRef({
-  markers: null as UseQuadtreeReturn<DemoMarker> | null,
-  circles: null as UseQuadtreeReturn<DemoCircle> | null,
-  polygons: null as UseQuadtreeReturn<DemoPolygon> | null,
-  polylines: null as UseQuadtreeReturn<DemoPolyline> | null,
-  rectangles: null as UseQuadtreeReturn<DemoRectangle> | null,
-});
-
-const totalShapes = computed(
-  () =>
-    features.value.markers.length +
-    features.value.circles.length +
-    features.value.polygons.length +
-    features.value.polylines.length +
-    features.value.rectangles.length,
-);
-
-onMounted(async () => {
-  const data = await loadVirtualizationDemoData(
-    (progress: number, stage: string) => {
-      loadingState.value.progress = progress;
-      loadingState.value.stage = stage;
-    },
-  );
-  features.value.markers = data.markers;
-  features.value.circles = data.circles;
-  features.value.polygons = data.polygons;
-  features.value.polylines = data.polylines;
-  features.value.rectangles = data.rectangles;
-  quadtrees.value.markers = data.quadtrees.markers;
-  quadtrees.value.circles = data.quadtrees.circles;
-  quadtrees.value.polygons = data.quadtrees.polygons;
-  quadtrees.value.polylines = data.quadtrees.polylines;
-  quadtrees.value.rectangles = data.quadtrees.rectangles;
-  loadingState.value.isLoading = false;
-});
-
-const stats = ref({
-  fps: 0,
-});
-
-const toggleVirtualization = () => {
-  virtualizationConfig.value.enabled = !virtualizationConfig.value.enabled;
-};
-
-let lastTime = performance.now();
-let frames = 0;
-const updateFPS = () => {
-  frames++;
-  const now = performance.now();
-  if (now >= lastTime + 1000) {
-    stats.value.fps = Math.round((frames * 1000) / (now - lastTime));
-    frames = 0;
-    lastTime = now;
-  }
-  requestAnimationFrame(updateFPS);
-};
-updateFPS();
-</script>
-
-<template>
-  <div class="w-full h-full flex flex-col gap-4">
-    <div
-      v-if="loadingState.isLoading"
-      class="flex flex-col items-center justify-center p-8 gap-4"
-    >
-      <div class="text-lg font-semibold">{{ loadingState.stage }}</div>
-      <div class="w-64 h-2 rounded-full overflow-hidden">
-        <div
-          class="h-full bg-blue-500 transition-all duration-300"
-          :style="{ width: `${loadingState.progress}%` }"
-        />
-      </div>
-      <div class="text-sm text-gray-600">{{ loadingState.progress }}%</div>
-    </div>
-
-    <template v-else>
-      <div class="rounded flex flex-col gap-4 p-4">
-        <div class="flex items-center gap-6">
-          <div class="text-sm">
-            <strong>Total:</strong>
-            {{ totalShapes }} shapes
-          </div>
-          <div
-            class="text-sm"
-            :class="
-              virtualizationConfig.enabled ? 'text-green-600' : 'text-red-600'
-            "
-          >
-            <strong>Rendered:</strong>
-            {{ visibleShapesCount }}
-            <span class="text-xs"
-              >({{
-                Math.round((visibleShapesCount / totalShapes) * 100)
-              }}%)</span
-            >
-          </div>
-          <div
-            class="text-sm"
-            :class="
-              stats.fps < 30
-                ? 'text-red-600'
-                : stats.fps < 50
-                  ? 'text-orange-600'
-                  : 'text-green-600'
-            "
-          >
-            <strong>FPS:</strong>
-            {{ stats.fps }}
-          </div>
-        </div>
-
-        <div class="flex items-center gap-6 text-xs text-gray-600">
-          <div>
-            <strong>Markers:</strong>
-            {{ visibleCounts.markers }} / {{ features.markers.length }}
-          </div>
-          <div>
-            <strong>Circles:</strong>
-            {{ visibleCounts.circles }} / {{ features.circles.length }}
-          </div>
-          <div>
-            <strong>Polygons:</strong>
-            {{ visibleCounts.polygons }} / {{ features.polygons.length }}
-          </div>
-          <div>
-            <strong>Polylines:</strong>
-            {{ visibleCounts.polylines }} / {{ features.polylines.length }}
-          </div>
-          <div>
-            <strong>Rectangles:</strong>
-            {{ visibleCounts.rectangles }} / {{ features.rectangles.length }}
-          </div>
-        </div>
-
-        <div class="flex items-center gap-4">
-          <Button
-            @click="toggleVirtualization"
-            :disabled="virtualizationConfig.isTransitioning"
-            :class="
-              virtualizationConfig.enabled
-                ? 'bg-green-500 text-white hover:bg-green-600'
-                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-            "
-          >
-            <span v-if="virtualizationConfig.isTransitioning"
-              >Switching...</span
-            >
-            <span v-else>{{
-              virtualizationConfig.enabled
-                ? "Virtualization ON"
-                : "Virtualization OFF"
-            }}</span>
-          </Button>
-
-          <div class="flex items-center gap-2">
-            <label class="text-sm">Auto Margin:</label>
-            <input
-              v-model="virtualizationConfig.autoMargin"
-              type="checkbox"
-              class="w-4 h-4"
-              :disabled="virtualizationConfig.isTransitioning"
-            />
-          </div>
-
-          <div
-            v-if="virtualizationConfig.autoMargin"
-            class="flex items-center gap-2"
-          >
-            <label class="text-sm">Zoom Ratio:</label>
-            <input
-              v-model.number="virtualizationConfig.marginZoomRatio"
-              type="range"
-              min="0.5"
-              max="2"
-              step="0.1"
-              class="w-32"
-              :disabled="virtualizationConfig.isTransitioning"
-            />
-            <span class="text-sm w-12"
-              >{{ virtualizationConfig.marginZoomRatio.toFixed(1) }}x</span
-            >
-          </div>
-
-          <div v-else class="flex items-center gap-2">
-            <label class="text-sm">Margin:</label>
-            <input
-              v-model.number="virtualizationConfig.marginMeters"
-              type="range"
-              min="0"
-              max="5000"
-              step="250"
-              class="w-32"
-              :disabled="virtualizationConfig.isTransitioning"
-            />
-            <span class="text-sm w-16"
-              >{{ virtualizationConfig.marginMeters }} m</span
-            >
-          </div>
-
-          <details class="border rounded p-3">
-            <summary class="cursor-pointer text-sm font-semibold mb-2">
-              🔍 Zoom Levels per Feature Type
-            </summary>
-
-            <div class="mt-3 space-y-2">
-              <div class="flex items-center gap-3 text-xs">
-                <span class="w-20 font-medium">Markers:</span>
-                <input
-                  v-model="zoomLevelsRaw.markers.min"
-                  type="number"
-                  min="0"
-                  max="20"
-                  placeholder="min"
-                  class="w-16 px-2 py-1 border rounded"
-                />
-                <span class="text-gray-400">→</span>
-                <input
-                  v-model="zoomLevelsRaw.markers.max"
-                  type="number"
-                  min="0"
-                  max="20"
-                  placeholder="max"
-                  class="w-16 px-2 py-1 border rounded"
-                />
-                <span class="text-gray-500">(zoom ≥12)</span>
-              </div>
-
-              <div class="flex items-center gap-3 text-xs">
-                <span class="w-20 font-medium">Circles:</span>
-                <input
-                  v-model="zoomLevelsRaw.circles.min"
-                  type="number"
-                  min="0"
-                  max="20"
-                  placeholder="min"
-                  class="w-16 px-2 py-1 border rounded"
-                />
-                <span class="text-gray-400">→</span>
-                <input
-                  v-model="zoomLevelsRaw.circles.max"
-                  type="number"
-                  min="0"
-                  max="20"
-                  placeholder="max"
-                  class="w-16 px-2 py-1 border rounded"
-                />
-                <span class="text-gray-500">(always)</span>
-              </div>
-
-              <div class="flex items-center gap-3 text-xs">
-                <span class="w-20 font-medium">Polygons:</span>
-                <input
-                  v-model="zoomLevelsRaw.polygons.min"
-                  type="number"
-                  min="0"
-                  max="20"
-                  placeholder="min"
-                  class="w-16 px-2 py-1 border rounded"
-                />
-                <span class="text-gray-400">→</span>
-                <input
-                  v-model="zoomLevelsRaw.polygons.max"
-                  type="number"
-                  min="0"
-                  max="20"
-                  placeholder="max"
-                  class="w-16 px-2 py-1 border rounded"
-                />
-                <span class="text-gray-500">(zoom ≤14)</span>
-              </div>
-
-              <div class="flex items-center gap-3 text-xs">
-                <span class="w-20 font-medium">Polylines:</span>
-                <input
-                  v-model="zoomLevelsRaw.polylines.min"
-                  type="number"
-                  min="0"
-                  max="20"
-                  placeholder="min"
-                  class="w-16 px-2 py-1 border rounded"
-                />
-                <span class="text-gray-400">→</span>
-                <input
-                  v-model="zoomLevelsRaw.polylines.max"
-                  type="number"
-                  min="0"
-                  max="20"
-                  placeholder="max"
-                  class="w-16 px-2 py-1 border rounded"
-                />
-                <span class="text-gray-500">(always)</span>
-              </div>
-
-              <div class="flex items-center gap-3 text-xs">
-                <span class="w-20 font-medium">Rectangles:</span>
-                <input
-                  v-model="zoomLevelsRaw.rectangles.min"
-                  type="number"
-                  min="0"
-                  max="20"
-                  placeholder="min"
-                  class="w-16 px-2 py-1 border rounded"
-                />
-                <span class="text-gray-400">→</span>
-                <input
-                  v-model="zoomLevelsRaw.rectangles.max"
-                  type="number"
-                  min="0"
-                  max="20"
-                  placeholder="max"
-                  class="w-16 px-2 py-1 border rounded"
-                />
-                <span class="text-gray-500">(always)</span>
-              </div>
-
-              <div class="text-xs text-gray-500 mt-2 pt-2 border-t">
-                💡 Leave empty for no limit. Example: Markers appear at zoom
-                12+, Polygons disappear after zoom 14.
-              </div>
-            </div>
-          </details>
-        </div>
-      </div>
-
-      <div class="flex-1 relative">
-        <div
-          v-if="virtualizationConfig.isTransitioning"
-          class="absolute inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-lg"
-        >
-          <div
-            class="bg-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3"
-          >
-            <div
-              class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
-            ></div>
-            <span class="text-sm font-medium">
-              {{
-                virtualizationConfig.enabled ? "Enabling" : "Disabling"
-              }}
-              virtualization...
-            </span>
-          </div>
-        </div>
-
-        <LeafletMap
-          ref="mapRef"
-          name="virtualization-demo"
-          class="w-full h-[600px] rounded-lg shadow-lg"
-          tile-layer="osm"
-          :center-lat="48.8566"
-          :center-lng="2.3522"
-          :zoom="15"
-        >
-          <LeafletTileLayer
-            name="osm"
-            url-template="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          />
-
-          <LeafletZoomControl position="topleft" />
-
-          <LeafletVirtualize
-            v-if="quadtrees.markers"
-            :enabled="virtualizationConfig.enabled"
-            :quadtree="quadtrees.markers"
-            :margin-meters="
-              virtualizationConfig.autoMargin
-                ? undefined
-                : virtualizationConfig.marginMeters
-            "
-            :margin-zoom-ratio="
-              virtualizationConfig.autoMargin
-                ? virtualizationConfig.marginZoomRatio
-                : undefined
-            "
-            :min-zoom="zoomLevels.markers.min"
-            :max-zoom="zoomLevels.markers.max"
-            @update:visible-count="visibleCounts.markers = $event"
-            @transition-start="virtualizationConfig.isTransitioning = true"
-            @transition-end="virtualizationConfig.isTransitioning = false"
-            v-slot="{ visibleIds }"
-          >
-            <template v-for="marker in features.markers" :key="marker.id">
-              <LeafletMarker
-                v-if="visibleIds.has(marker.id)"
-                :id="marker.id"
-                v-model:lat="marker.lat"
-                v-model:lng="marker.lng"
-              />
-            </template>
-          </LeafletVirtualize>
-
-          <LeafletVirtualize
-            v-if="quadtrees.circles"
-            :enabled="virtualizationConfig.enabled"
-            :margin-meters="
-              virtualizationConfig.autoMargin
-                ? undefined
-                : virtualizationConfig.marginMeters
-            "
-            :margin-zoom-ratio="
-              virtualizationConfig.autoMargin
-                ? virtualizationConfig.marginZoomRatio
-                : undefined
-            "
-            :quadtree="quadtrees.circles"
-            :min-zoom="zoomLevels.circles.min"
-            :max-zoom="zoomLevels.circles.max"
-            @update:visible-count="visibleCounts.circles = $event"
-            @transition-start="virtualizationConfig.isTransitioning = true"
-            @transition-end="virtualizationConfig.isTransitioning = false"
-            v-slot="{ visibleIds }"
-          >
-            <template v-for="circle in features.circles" :key="circle.id">
-              <LeafletCircle
-                v-if="visibleIds.has(circle.id)"
-                :id="circle.id"
-                v-model:lat="circle.lat"
-                v-model:lng="circle.lng"
-                v-model:radius="circle.radius"
-                :class="
-                  circle.colorIndex === 0
-                    ? 'bg-blue-500/30 border border-blue-700'
-                    : circle.colorIndex === 1
-                      ? 'bg-green-500/30 border border-green-700'
-                      : 'bg-red-500/30 border border-red-700'
-                "
-              />
-            </template>
-          </LeafletVirtualize>
-
-          <LeafletVirtualize
-            v-if="quadtrees.polygons"
-            :enabled="virtualizationConfig.enabled"
-            :margin-meters="
-              virtualizationConfig.autoMargin
-                ? undefined
-                : virtualizationConfig.marginMeters
-            "
-            :margin-zoom-ratio="
-              virtualizationConfig.autoMargin
-                ? virtualizationConfig.marginZoomRatio
-                : undefined
-            "
-            :quadtree="quadtrees.polygons"
-            :min-zoom="zoomLevels.polygons.min"
-            :max-zoom="zoomLevels.polygons.max"
-            @update:visible-count="visibleCounts.polygons = $event"
-            @transition-start="virtualizationConfig.isTransitioning = true"
-            @transition-end="virtualizationConfig.isTransitioning = false"
-            v-slot="{ visibleIds }"
-          >
-            <template v-for="polygon in features.polygons" :key="polygon.id">
-              <LeafletPolygon
-                v-if="visibleIds.has(polygon.id)"
-                :id="polygon.id"
-                v-model:latlngs="polygon.latlngs"
-                :class="
-                  polygon.colorIndex === 0
-                    ? 'bg-purple-500/30 border border-purple-700'
-                    : 'bg-orange-500/30 border border-orange-700'
-                "
-              />
-            </template>
-          </LeafletVirtualize>
-
-          <LeafletVirtualize
-            v-if="quadtrees.polylines"
-            :enabled="virtualizationConfig.enabled"
-            :margin-meters="
-              virtualizationConfig.autoMargin
-                ? undefined
-                : virtualizationConfig.marginMeters
-            "
-            :margin-zoom-ratio="
-              virtualizationConfig.autoMargin
-                ? virtualizationConfig.marginZoomRatio
-                : undefined
-            "
-            :quadtree="quadtrees.polylines"
-            :min-zoom="zoomLevels.polylines.min"
-            :max-zoom="zoomLevels.polylines.max"
-            @update:visible-count="visibleCounts.polylines = $event"
-            @transition-start="virtualizationConfig.isTransitioning = true"
-            @transition-end="virtualizationConfig.isTransitioning = false"
-            v-slot="{ visibleIds }"
-          >
-            <template v-for="polyline in features.polylines" :key="polyline.id">
-              <LeafletPolyline
-                v-if="visibleIds.has(polyline.id)"
-                :id="polyline.id"
-                v-model:latlngs="polyline.latlngs"
-                :class="
-                  polyline.colorIndex === 0
-                    ? 'border border-yellow-600'
-                    : polyline.colorIndex === 1
-                      ? 'border border-pink-600'
-                      : 'border border-cyan-600'
-                "
-              />
-            </template>
-          </LeafletVirtualize>
-
-          <LeafletVirtualize
-            v-if="quadtrees.rectangles"
-            :enabled="virtualizationConfig.enabled"
-            :margin-meters="
-              virtualizationConfig.autoMargin
-                ? undefined
-                : virtualizationConfig.marginMeters
-            "
-            :margin-zoom-ratio="
-              virtualizationConfig.autoMargin
-                ? virtualizationConfig.marginZoomRatio
-                : undefined
-            "
-            :quadtree="quadtrees.rectangles"
-            :min-zoom="zoomLevels.rectangles.min"
-            :max-zoom="zoomLevels.rectangles.max"
-            @update:visible-count="visibleCounts.rectangles = $event"
-            @transition-start="virtualizationConfig.isTransitioning = true"
-            @transition-end="virtualizationConfig.isTransitioning = false"
-            v-slot="{ visibleIds }"
-          >
-            <template
-              v-for="rectangle in features.rectangles"
-              :key="rectangle.id"
-            >
-              <LeafletRectangle
-                v-if="visibleIds.has(rectangle.id)"
-                :id="rectangle.id"
-                v-model:bounds="rectangle.bounds"
-                :class="
-                  rectangle.colorIndex === 0
-                    ? 'bg-indigo-500/30 border border-indigo-700'
-                    : 'bg-teal-500/30 border border-teal-700'
-                "
-              />
-            </template>
-          </LeafletVirtualize>
-        </LeafletMap>
-      </div>
-
-      <div class="text-sm text-gray-600 p-4 rounded border">
-        <p>
-          <strong>Note:</strong> Cette démo utilise {{ totalShapes }} shapes
-          pré-générées ({{ features.markers.length }} markers,
-          {{ features.circles.length }} circles,
-          {{ features.polygons.length }} polygons,
-          {{ features.polylines.length }} polylines,
-          {{ features.rectangles.length }} rectangles) autour de Paris.
-        </p>
-        <p class="mt-2">
-          Avec la virtualisation
-          <strong class="text-green-600">activée</strong>, seules les shapes
-          visibles dans la viewport (+ marge) sont rendues. Regardez le compteur
-          "Rendered" pour voir combien de shapes sont actuellement montées.
-        </p>
-        <p class="mt-2">
-          Avec la virtualisation
-          <strong class="text-red-600">désactivée</strong>, TOUTES les
-          {{ totalShapes }} shapes sont rendues en même temps, ce qui peut
-          causer des lags importants lors du zoom/déplacement.
-        </p>
-        <p class="mt-2 text-orange-600 font-semibold">
-          <strong>Pour tester:</strong>
-        </p>
-        <ol class="mt-1 ml-4 list-decimal text-orange-600">
-          <li>
-            Activez la virtualisation → Déplacez la carte → Notez le FPS et le %
-            de shapes rendues
-          </li>
-          <li>
-            Désactivez la virtualisation → Déplacez la carte → Comparez le FPS
-            (devrait chuter !)
-          </li>
-          <li>
-            Zoomez/dézoomez pour voir comment le nombre de shapes rendues change
-          </li>
-        </ol>
-      </div>
-    </template>
-  </div>
-</template>
-```
-  :::
-::
 
 ::tip
 You can copy and adapt this template for any component documentation.
