@@ -6,6 +6,7 @@ import {
   ObjectComposerTitle,
   ObjectComposerDescription,
   ObjectComposerItem,
+  ObjectComposerField,
 } from '~~/registry/new-york/components/object-composer';
 import { Separator } from '@/components/ui/separator';
 import CustomObjectComposerField from './CustomObjectComposerField.vue';
@@ -37,9 +38,10 @@ const userProfile = ref({
 <template>
   <div class="space-y-8">
     <div>
-      <h2 class="text-2xl font-bold mb-2">Custom ObjectComposerField</h2>
+      <h2 class="text-2xl font-bold mb-2">Custom ObjectComposerField (asChild Pattern)</h2>
       <p class="text-muted-foreground mb-6">
-        Create your own field renderer with desk access, custom styling, and interactive elements
+        Use the <code class="bg-muted px-1 rounded text-sm">asChild</code> pattern to replace
+        ObjectComposerField rendering. Data flows via useCheckIn (desk context) - no props needed!
       </p>
     </div>
 
@@ -57,7 +59,16 @@ const userProfile = ref({
             </ObjectComposerTitle>
           </ObjectComposerHeader>
           <Separator class="mb-4" />
-          <ObjectComposerItem :field-component="CustomObjectComposerField" />
+          <ObjectComposerItem>
+            <template #default="{ itemKey, value, valueType, displayValue }">
+              <CustomObjectComposerField
+                :item-key="itemKey"
+                :value="value"
+                :value-type="valueType"
+                :display-value="displayValue"
+              />
+            </template>
+          </ObjectComposerItem>
         </ObjectComposer>
       </div>
 
@@ -73,7 +84,16 @@ const userProfile = ref({
             </ObjectComposerTitle>
           </ObjectComposerHeader>
           <Separator class="mb-4" />
-          <ObjectComposerItem :field-component="CustomObjectComposerField" />
+          <ObjectComposerItem>
+            <template #default="{ itemKey, value, valueType, displayValue }">
+              <CustomObjectComposerField
+                :item-key="itemKey"
+                :value="value"
+                :value-type="valueType"
+                :display-value="displayValue"
+              />
+            </template>
+          </ObjectComposerItem>
         </ObjectComposer>
       </div>
     </div>
@@ -112,16 +132,21 @@ const userProfile = ref({
 
     <!-- Code example -->
     <div class="space-y-3">
-      <h3 class="font-semibold">Usage</h3>
+      <h3 class="font-semibold">Usage (asChild pattern)</h3>
       <div class="bg-muted/50 rounded-lg p-4 font-mono text-xs space-y-2">
-        <div>&lt;ObjectComposerItem</div>
-        <div class="ml-4">:field-component="CustomObjectComposerField"</div>
-        <div>/&gt;</div>
+        <div>&lt;ObjectComposerItem&gt;</div>
+        <div class="ml-4">&lt;template #field&gt;</div>
+        <div class="ml-8">&lt;ObjectComposerField as-child&gt;</div>
+        <div class="ml-12">&lt;CustomObjectComposerField /&gt;</div>
+        <div class="ml-8">&lt;/ObjectComposerField&gt;</div>
+        <div class="ml-4">&lt;/template&gt;</div>
+        <div class="ml-0">&lt;/ObjectComposerItem&gt;</div>
       </div>
       <p class="text-sm text-muted-foreground">
-        ObjectComposerField receives the custom component via the
-        <code class="bg-muted px-1 py-0.5 rounded">as</code> prop and distributes all props
-        (itemKey, value, valueType, displayValue, desk) to it.
+        Use the <code class="bg-muted px-1 py-0.5 rounded">asChild</code> pattern with the
+        <code class="bg-muted px-1 py-0.5 rounded">field</code> slot. ObjectComposerField provides
+        data via useCheckIn (desk), no props needed! Your custom component receives all data via
+        slot props (itemKey, value, valueType, displayValue, desk).
       </p>
     </div>
   </div>

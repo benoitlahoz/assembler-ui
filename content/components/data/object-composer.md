@@ -346,58 +346,60 @@ const props = defineProps<ObjectComposerDescriptionProps>();
 
 ```vue [src/components/ui/object-composer/ObjectComposerField.vue]
 <script setup lang="ts">
-import { inject, type Component } from "vue";
+import { inject, computed, useSlots } from "vue";
 import { cn } from "@/lib/utils";
 import type { CheckInDesk } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
 
 interface ObjectComposerFieldProps {
+  asChild?: boolean;
+}
+
+const props = defineProps<ObjectComposerFieldProps>();
+const slots = useSlots();
+
+const itemContext = inject<{
+  desk: CheckInDesk<any>;
   itemKey: string;
   value: any;
   valueType: string;
   displayValue: string;
   isExpandable: boolean;
   isEditing: boolean;
-  editKey: string;
-  editValue: string;
-  as?: Component | string;
-}
+}>("objectComposerItemContext");
 
-const props = defineProps<ObjectComposerFieldProps>();
-
-const itemDesk = inject<{ desk: CheckInDesk<any> }>("objectComposerItemDesk");
-
-const slotProps = {
-  itemKey: props.itemKey,
-  value: props.value,
-  valueType: props.valueType,
-  displayValue: props.displayValue,
-  isExpandable: props.isExpandable,
-  isEditing: props.isEditing,
-  editKey: props.editKey,
-  editValue: props.editValue,
-  desk: itemDesk?.desk,
-};
+const slotProps = computed(() => ({
+  itemKey: itemContext?.itemKey,
+  value: itemContext?.value,
+  valueType: itemContext?.valueType,
+  displayValue: itemContext?.displayValue,
+  isExpandable: itemContext?.isExpandable,
+  isEditing: itemContext?.isEditing,
+  desk: itemContext?.desk,
+}));
 </script>
 
 <template>
-  <component v-if="as" :is="as" v-bind="slotProps" />
+  <slot v-if="asChild" v-bind="slotProps" />
 
   <div v-else class="flex items-center gap-1.5">
-    <span class="font-medium text-foreground">{{ itemKey }}</span>
+    <span class="font-medium text-foreground">{{ itemContext?.itemKey }}</span>
     <span class="text-muted-foreground">:</span>
     <span
       :class="
         cn({
-          'text-red-600 dark:text-red-400': valueType === 'string',
-          'text-blue-600 dark:text-blue-400': valueType === 'number',
-          'text-purple-600 dark:text-purple-400': valueType === 'boolean',
-          'text-muted-foreground italic': valueType === 'null',
+          'text-red-600 dark:text-red-400': itemContext?.valueType === 'string',
+          'text-blue-600 dark:text-blue-400':
+            itemContext?.valueType === 'number',
+          'text-purple-600 dark:text-purple-400':
+            itemContext?.valueType === 'boolean',
+          'text-muted-foreground italic': itemContext?.valueType === 'null',
           'text-muted-foreground italic text-sm':
-            valueType === 'object' || valueType === 'array',
+            itemContext?.valueType === 'object' ||
+            itemContext?.valueType === 'array',
         })
       "
     >
-      {{ displayValue }}
+      {{ itemContext?.displayValue }}
     </span>
   </div>
 </template>
@@ -418,7 +420,6 @@ import {
   provide,
   type HTMLAttributes,
   type InjectionKey,
-  type Component,
   onMounted,
 } from "vue";
 import { cn } from "@/lib/utils";
@@ -452,7 +453,6 @@ interface ObjectComposerItemProps {
   path?: string[];
   isInArray?: boolean;
   class?: HTMLAttributes["class"];
-  fieldComponent?: Component | string;
 }
 
 interface SlotProps {
@@ -472,8 +472,9 @@ const props = withDefaults(defineProps<ObjectComposerItemProps>(), {
   isInArray: false,
 });
 
-defineSlots<{
-  default(props: SlotProps): any;
+const slots = defineSlots<{
+  field?: () => any;
+  default?: (props: SlotProps) => any;
 }>();
 
 const composerDesk = inject<{
@@ -527,7 +528,15 @@ const startEditInDesk = desk ? (desk as any).startEdit : () => {};
 const cancelEditInDesk = desk ? (desk as any).cancelEdit : () => {};
 
 if (desk) {
-  provide("objectComposerItemDesk", { desk });
+  provide("objectComposerItemContext", {
+    desk,
+    itemKey: computed(() => props.itemKey),
+    value: computed(() => props.value),
+    valueType: computed(() => valueType.value),
+    displayValue: computed(() => displayValue.value),
+    isExpandable: computed(() => isExpandable.value),
+    isEditing: computed(() => isEditing.value),
+  });
 }
 
 const accordionValue = ref<string>("item-1");
@@ -638,10 +647,9 @@ function addChild() {
       :depth="depth"
       :path="path"
       :is-in-array="Array.isArray(composerDesk.model.value)"
-      :field-component="fieldComponent"
     >
-      <template v-if="$slots.default" #default="slotProps">
-        <slot v-bind="slotProps" />
+      <template v-if="slots.field" #field>
+        <slot name="field" />
       </template>
     </ObjectComposerItem>
   </template>
@@ -661,21 +669,9 @@ function addChild() {
       <div class="w-8" />
 
       <div class="flex-1">
-        <ObjectComposerField
-          :item-key="itemKey || ''"
-          :value="value"
-          :value-type="valueType"
-          :display-value="displayValue"
-          :is-expandable="isExpandable"
-          :is-editing="isEditing"
-          :edit-key="editKey"
-          :edit-value="editValue"
-          :as="fieldComponent"
-        >
-          <template v-if="$slots.default" #default="slotProps">
-            <slot v-bind="slotProps" />
-          </template>
-        </ObjectComposerField>
+        <slot name="field">
+          <ObjectComposerField />
+        </slot>
       </div>
 
       <div
@@ -807,21 +803,9 @@ function addChild() {
         </AccordionTrigger>
 
         <div class="flex-1">
-          <ObjectComposerField
-            :item-key="itemKey || ''"
-            :value="value"
-            :value-type="valueType"
-            :display-value="displayValue"
-            :is-expandable="isExpandable"
-            :is-editing="isEditing"
-            :edit-key="editKey"
-            :edit-value="editValue"
-            :as="fieldComponent"
-          >
-            <template v-if="$slots.default" #default="slotProps">
-              <slot v-bind="slotProps" />
-            </template>
-          </ObjectComposerField>
+          <slot name="field">
+            <ObjectComposerField />
+          </slot>
         </div>
 
         <div
@@ -2259,20 +2243,17 @@ export const useCheckIn = <
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `itemKey`{.primary .text-primary} | `string` | - |  |
-| `value`{.primary .text-primary} | `any` | - |  |
-| `valueType`{.primary .text-primary} | `string` | - |  |
-| `displayValue`{.primary .text-primary} | `string` | - |  |
-| `isExpandable`{.primary .text-primary} | `boolean` | - |  |
-| `isEditing`{.primary .text-primary} | `boolean` | - |  |
-| `editKey`{.primary .text-primary} | `string` | - |  |
-| `editValue`{.primary .text-primary} | `string` | - |  |
-| `as`{.primary .text-primary} | `Component \| string` | - |  |
+| `asChild`{.primary .text-primary} | `boolean` | - |  |
+
+  ### Slots
+| Name | Description |
+|------|-------------|
+| `default`{.primary .text-primary} | Custom field via asChild pattern (Radix UI style) |
 
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
-| `objectComposerItemDesk`{.primary .text-primary} | — | — | Inject desk from parent ObjectComposerItem (like FormField pattern) |
+| `objectComposerItemContext`{.primary .text-primary} | — | — | Inject desk from parent ObjectComposerItem (useCheckIn pattern) |
 
 ---
 
@@ -2304,17 +2285,25 @@ export const useCheckIn = <
 | `path`{.primary .text-primary} | `string[]` |  |  |
 | `isInArray`{.primary .text-primary} | `boolean` | false |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
-| `fieldComponent`{.primary .text-primary} | `Component \| string` | - |  |
 
   ### Slots
 | Name | Description |
 |------|-------------|
+| `field`{.primary .text-primary} | — |
 | `default`{.primary .text-primary} | — |
 
   ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-| `objectComposerItemDesk`{.primary .text-primary} | `{ desk }` | `any` | — |
+| `objectComposerItemContext`{.primary .text-primary} | `{
+    desk,
+    itemKey: computed(() => props.itemKey),
+    value: computed(() => props.value),
+    valueType: computed(() => valueType.value),
+    displayValue: computed(() => displayValue.value),
+    isExpandable: computed(() => isExpandable.value),
+    isEditing: computed(() => isEditing.value),
+  }` | `any` | — |
 
   ### Inject
 | Key | Default | Type | Description |
@@ -2431,6 +2420,7 @@ import {
   ObjectComposerTitle,
   ObjectComposerDescription,
   ObjectComposerItem,
+  ObjectComposerField,
 } from '@/components/ui/object-composer';
 import { Separator } from '@/components/ui/separator';
 import CustomObjectComposerField from './CustomObjectComposerField.vue';
@@ -2462,9 +2452,10 @@ const userProfile = ref({
 <template>
   <div class="space-y-8">
     <div>
-      <h2 class="text-2xl font-bold mb-2">Custom ObjectComposerField</h2>
+      <h2 class="text-2xl font-bold mb-2">Custom ObjectComposerField (asChild Pattern)</h2>
       <p class="text-muted-foreground mb-6">
-        Create your own field renderer with desk access, custom styling, and interactive elements
+        Use the <code class="bg-muted px-1 rounded text-sm">asChild</code> pattern to replace ObjectComposerField rendering.
+        Data flows via useCheckIn (desk context) - no props needed!
       </p>
     </div>
 
@@ -2482,7 +2473,16 @@ const userProfile = ref({
             </ObjectComposerTitle>
           </ObjectComposerHeader>
           <Separator class="mb-4" />
-          <ObjectComposerItem :field-component="CustomObjectComposerField" />
+          <ObjectComposerItem>
+            <template #default="{ itemKey, value, valueType, displayValue }">
+              <CustomObjectComposerField
+                :item-key="itemKey"
+                :value="value"
+                :value-type="valueType"
+                :display-value="displayValue"
+              />
+            </template>
+          </ObjectComposerItem>
         </ObjectComposer>
       </div>
 
@@ -2498,7 +2498,16 @@ const userProfile = ref({
             </ObjectComposerTitle>
           </ObjectComposerHeader>
           <Separator class="mb-4" />
-          <ObjectComposerItem :field-component="CustomObjectComposerField" />
+          <ObjectComposerItem>
+            <template #default="{ itemKey, value, valueType, displayValue }">
+              <CustomObjectComposerField
+                :item-key="itemKey"
+                :value="value"
+                :value-type="valueType"
+                :display-value="displayValue"
+              />
+            </template>
+          </ObjectComposerItem>
         </ObjectComposer>
       </div>
     </div>
@@ -2537,14 +2546,20 @@ const userProfile = ref({
 
     
     <div class="space-y-3">
-      <h3 class="font-semibold">Usage</h3>
+      <h3 class="font-semibold">Usage (asChild pattern)</h3>
       <div class="bg-muted/50 rounded-lg p-4 font-mono text-xs space-y-2">
-        <div><ObjectComposerItem</div>
-        <div class="ml-4">:field-component="CustomObjectComposerField"</div>
-        <div>/></div>
+        <div><ObjectComposerItem></div>
+        <div class="ml-4"><template #field></div>
+        <div class="ml-8"><ObjectComposerField as-child></div>
+        <div class="ml-12"><CustomObjectComposerField /></div>
+        <div class="ml-8"></ObjectComposerField></div>
+        <div class="ml-4"></template></div>
+        <div class="ml-0"></ObjectComposerItem></div>
       </div>
       <p class="text-sm text-muted-foreground">
-        ObjectComposerField receives the custom component via the <code class="bg-muted px-1 py-0.5 rounded">as</code> prop and distributes all props (itemKey, value, valueType, displayValue, desk) to it.
+        Use the <code class="bg-muted px-1 py-0.5 rounded">asChild</code> pattern with the <code class="bg-muted px-1 py-0.5 rounded">field</code> slot.
+        ObjectComposerField provides data via useCheckIn (desk), no props needed!
+        Your custom component receives all data via slot props (itemKey, value, valueType, displayValue, desk).
       </p>
     </div>
   </div>

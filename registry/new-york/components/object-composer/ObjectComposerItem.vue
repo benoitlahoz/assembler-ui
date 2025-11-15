@@ -6,7 +6,6 @@ import {
   provide,
   type HTMLAttributes,
   type InjectionKey,
-  type Component,
   onMounted,
 } from 'vue';
 import { cn } from '@/lib/utils';
@@ -40,7 +39,6 @@ interface ObjectComposerItemProps {
   path?: string[];
   isInArray?: boolean;
   class?: HTMLAttributes['class'];
-  fieldComponent?: Component | string;
 }
 
 interface SlotProps {
@@ -60,8 +58,9 @@ const props = withDefaults(defineProps<ObjectComposerItemProps>(), {
   isInArray: false,
 });
 
-defineSlots<{
-  default(props: SlotProps): any;
+const slots = defineSlots<{
+  field?: () => any;
+  default?: (props: SlotProps) => any;
 }>();
 
 // Inject desk from parent ObjectComposer
@@ -118,9 +117,17 @@ const addValueInDesk = desk ? (desk as any).addValue : () => {};
 const startEditInDesk = desk ? (desk as any).startEdit : () => {};
 const cancelEditInDesk = desk ? (desk as any).cancelEdit : () => {};
 
-// Provide desk to ObjectComposerField (like FormDemo pattern)
+// Provide context to ObjectComposerField (useCheckIn pattern - no props!)
 if (desk) {
-  provide('objectComposerItemDesk', { desk });
+  provide('objectComposerItemContext', {
+    desk,
+    itemKey: computed(() => props.itemKey),
+    value: computed(() => props.value),
+    valueType: computed(() => valueType.value),
+    displayValue: computed(() => displayValue.value),
+    isExpandable: computed(() => isExpandable.value),
+    isEditing: computed(() => isEditing.value),
+  });
 }
 
 const accordionValue = ref<string>('item-1');
@@ -230,10 +237,9 @@ function addChild() {
       :depth="depth"
       :path="path"
       :is-in-array="Array.isArray(composerDesk.model.value)"
-      :field-component="fieldComponent"
     >
-      <template v-if="$slots.default" #default="slotProps">
-        <slot v-bind="slotProps" />
+      <template v-if="slots.field" #field>
+        <slot name="field" />
       </template>
     </ObjectComposerItem>
   </template>
@@ -253,23 +259,11 @@ function addChild() {
     <div v-if="!isEditing" class="flex items-center w-full">
       <div class="w-8" />
 
-      <!-- Slot for custom content -->
+      <!-- Slot for field customization (asChild pattern) -->
       <div class="flex-1">
-        <ObjectComposerField
-          :item-key="itemKey || ''"
-          :value="value"
-          :value-type="valueType"
-          :display-value="displayValue"
-          :is-expandable="isExpandable"
-          :is-editing="isEditing"
-          :edit-key="editKey"
-          :edit-value="editValue"
-          :as="fieldComponent"
-        >
-          <template v-if="$slots.default" #default="slotProps">
-            <slot v-bind="slotProps" />
-          </template>
-        </ObjectComposerField>
+        <slot name="field">
+          <ObjectComposerField />
+        </slot>
       </div>
 
       <!-- Actions -->
@@ -363,23 +357,11 @@ function addChild() {
           </template>
         </AccordionTrigger>
 
-        <!-- Slot for custom content -->
+        <!-- Slot for field customization (asChild pattern) -->
         <div class="flex-1">
-          <ObjectComposerField
-            :item-key="itemKey || ''"
-            :value="value"
-            :value-type="valueType"
-            :display-value="displayValue"
-            :is-expandable="isExpandable"
-            :is-editing="isEditing"
-            :edit-key="editKey"
-            :edit-value="editValue"
-            :as="fieldComponent"
-          >
-            <template v-if="$slots.default" #default="slotProps">
-              <slot v-bind="slotProps" />
-            </template>
-          </ObjectComposerField>
+          <slot name="field">
+            <ObjectComposerField />
+          </slot>
         </div>
 
         <!-- Actions -->
