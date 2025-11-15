@@ -1,6 +1,16 @@
 <script setup lang="ts">
-import { inject, unref, useTemplateRef, watch, nextTick, onBeforeUnmount } from 'vue';
-import { LeafletControlsKey } from '.';
+import {
+  inject,
+  unref,
+  useTemplateRef,
+  watch,
+  nextTick,
+  ref,
+  onBeforeUnmount,
+  computed,
+} from 'vue';
+import { useCheckIn } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
+import { LeafletControlsKey, type ControlItemReference } from '.';
 
 export interface LeafletControlItemProps {
   name: string;
@@ -23,7 +33,12 @@ const wrapperRef = useTemplateRef('wrapperRef');
 
 const controlsContext = inject(LeafletControlsKey);
 
+// Use checkIn for automatic registration/cleanup
+const { checkIn } = useCheckIn<ControlItemReference>();
+
 let observer: MutationObserver | null = null;
+// Trigger to force data function re-evaluation when content changes
+const contentVersion = ref(0);
 
 const getContentHtml = () => {
   const wrapper = unref(wrapperRef);
@@ -68,6 +83,39 @@ const getContentHtml = () => {
   return '';
 };
 
+// Check in with controls desk
+const { desk } = controlsContext
+  ? checkIn(controlsContext, {
+      autoCheckIn: true,
+      id: props.name,
+      data: () => {
+        // Access contentVersion to create reactive dependency
+        contentVersion.value;
+        const html = getContentHtml();
+        return {
+          name: props.name,
+          title: props.title || 'A control button',
+          html: html || '',
+          type: props.type,
+          active: props.active,
+        };
+      },
+      watchData: true,
+    })
+  : { desk: ref(null) };
+
+// Computed helper using desk to access shared context
+// The desk provides access to:
+// - desk.activeItem(): currently active control item name
+// - desk.getAll(): all registered control items
+const isActive = computed(() => {
+  if (!desk || props.type === 'push') return false;
+  // Access activeItem from desk's extraContext
+  const activeItemName = (desk as any).activeItem?.();
+  return activeItemName === props.name || props.active;
+});
+
+// Legacy function kept for backward compatibility (no longer used internally)
 const registerContent = () => {
   if (!controlsContext) return;
 
@@ -89,18 +137,20 @@ watch(
     if (!wrapper) return;
 
     nextTick(() => {
-      // Try to register immediately
-      registerContent();
+      // Note: checkIn with watchData: true handles automatic registration
+      // No need to call registerContent manually anymore
 
-      // Set up MutationObserver to detect when async content loads
+      // Set up MutationObserver to detect when async content loads (for SVG icons)
       observer = new MutationObserver((mutations) => {
-        // Check if SVG content was added
+        // The watchData: true option automatically picks up content changes
+        // This observer is just for triggering reactivity when SVG icons load
         const hasContent = mutations.some((mutation) => {
           return mutation.addedNodes.length > 0 || mutation.type === 'attributes';
         });
 
-        if (hasContent) {
-          registerContent();
+        if (hasContent && controlsContext) {
+          // Increment version to trigger data function re-evaluation
+          contentVersion.value++;
         }
       });
 
@@ -119,6 +169,7 @@ watch(
   { immediate: true }
 );
 
+// Note: onBeforeUnmount still needed for MutationObserver cleanup
 onBeforeUnmount(() => {
   if (observer) {
     observer.disconnect();

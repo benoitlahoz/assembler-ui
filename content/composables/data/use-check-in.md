@@ -442,7 +442,7 @@ Return both the desk and its symbol for children to inject
 <script setup lang="ts">
 import { ref, computed, provide } from "vue";
 import { useCheckIn } from "../useCheckIn";
-import AccordionItem from "./AccordionItem.vue";
+import AccordionItem from "./AccordionDemoItem.vue";
 
 interface AccordionItemData {
   title: string;

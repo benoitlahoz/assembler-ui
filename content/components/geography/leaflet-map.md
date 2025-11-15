@@ -599,7 +599,6 @@ type L = typeof L;
 
 export { default as LeafletMap } from "./LeafletMap.vue";
 export { default as LeafletZoomControl } from "./LeafletZoomControl.vue";
-export { default as LeafletDrawControl } from "./LeafletDrawControl.vue";
 export { default as LeafletControls } from "./LeafletControls.vue";
 export { default as LeafletControlItem } from "./LeafletControlItem.vue";
 export { default as LeafletFeaturesEditor } from "./LeafletFeaturesEditor.vue";
@@ -639,7 +638,11 @@ export const LeafletControlsKey: InjectionKey<
 export type { LeafletMapProps } from "./LeafletMap.vue";
 export type { LeafletMapExposed } from "./LeafletMap.vue";
 export type { LeafletZoomControlProps } from "./LeafletZoomControl.vue";
-export type { LeafletDrawControlProps } from "./LeafletDrawControl.vue";
+export type {
+  LeafletControlsProps,
+  LeafletControlsContext,
+  ControlItemReference,
+} from "./LeafletControls.vue";
 export type {
   LeafletFeaturesEditorProps,
   FeatureDrawEvent,
@@ -693,9 +696,9 @@ import {
   type Ref,
   onBeforeUnmount,
 } from "vue";
-import { cn } from "@/lib/utils";
 import type Leaflet from "leaflet";
 import type { LeafletMouseEvent } from "leaflet";
+import { cn } from "@/lib/utils";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import {
   LeafletErrorsKey,
@@ -1406,18 +1409,18 @@ import {
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
-
-const { checkIn } = useCheckIn<FeatureReference>();
 import {
   LeafletMapKey,
   LeafletModuleKey,
   LeafletSelectionKey,
   LeafletStylesKey,
   type LeafletFeatureHandleStyle,
+  type FeatureReference,
 } from ".";
-import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
+
 import "./leaflet-editing.css";
 
+const { checkIn } = useCheckIn<FeatureReference>();
 const { LatDegreesMeters, lngDegreesToRadius } = await useLeaflet();
 
 export interface LeafletCanvasStyles {
@@ -1563,7 +1566,7 @@ const { desk } = selectionContext
           emit("update:corners", newCorners);
         },
       }),
-      watchData: [() => props.selectable],
+      watchData: true,
     })
   : { desk: ref(null) };
 
@@ -2114,17 +2117,18 @@ import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/us
 import { useColors } from "~~/registry/new-york/composables/use-colors/useColors";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
-
-const { checkIn } = useCheckIn<FeatureReference>();
 import {
   LeafletMapKey,
   LeafletModuleKey,
   LeafletSelectionKey,
   LeafletStylesKey,
   type LeafletCanvasStyles,
+  type FeatureReference,
 } from ".";
-import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
+
 import "./leaflet-editing.css";
+
+const { checkIn } = useCheckIn<FeatureReference>();
 
 const { LatDegreesMeters, lngDegreesToRadius } = await useLeaflet();
 
@@ -2268,7 +2272,7 @@ const { desk } = selectionContext
           emit("update:corners", newCorners);
         },
       }),
-      watchData: [() => props.selectable],
+      watchData: true,
     })
   : { desk: ref(null) };
 
@@ -2998,8 +3002,13 @@ import {
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
-import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
-import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
+import {
+  LeafletMapKey,
+  LeafletModuleKey,
+  LeafletSelectionKey,
+  type FeatureReference,
+} from ".";
+
 import "./leaflet-editing.css";
 
 const {
@@ -3362,9 +3371,12 @@ import {
   useTemplateRef,
   watch,
   nextTick,
+  ref,
   onBeforeUnmount,
+  computed,
 } from "vue";
-import { LeafletControlsKey } from ".";
+import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
+import { LeafletControlsKey, type ControlItemReference } from ".";
 
 export interface LeafletControlItemProps {
   name: string;
@@ -3387,7 +3399,11 @@ const wrapperRef = useTemplateRef("wrapperRef");
 
 const controlsContext = inject(LeafletControlsKey);
 
+const { checkIn } = useCheckIn<ControlItemReference>();
+
 let observer: MutationObserver | null = null;
+
+const contentVersion = ref(0);
 
 const getContentHtml = () => {
   const wrapper = unref(wrapperRef);
@@ -3440,6 +3456,32 @@ const getContentHtml = () => {
   return "";
 };
 
+const { desk } = controlsContext
+  ? checkIn(controlsContext, {
+      autoCheckIn: true,
+      id: props.name,
+      data: () => {
+        contentVersion.value;
+        const html = getContentHtml();
+        return {
+          name: props.name,
+          title: props.title || "A control button",
+          html: html || "",
+          type: props.type,
+          active: props.active,
+        };
+      },
+      watchData: true,
+    })
+  : { desk: ref(null) };
+
+const isActive = computed(() => {
+  if (!desk || props.type === "push") return false;
+
+  const activeItemName = (desk as any).activeItem?.();
+  return activeItemName === props.name || props.active;
+});
+
 const registerContent = () => {
   if (!controlsContext) return;
 
@@ -3461,8 +3503,6 @@ watch(
     if (!wrapper) return;
 
     nextTick(() => {
-      registerContent();
-
       observer = new MutationObserver((mutations) => {
         const hasContent = mutations.some((mutation) => {
           return (
@@ -3470,8 +3510,8 @@ watch(
           );
         });
 
-        if (hasContent) {
-          registerContent();
+        if (hasContent && controlsContext) {
+          contentVersion.value++;
         }
       });
 
@@ -3531,9 +3571,15 @@ import {
   inject,
   watch,
   nextTick,
+  type InjectionKey,
+  computed,
 } from "vue";
-import { cn } from "@/lib/utils";
 import type { ControlOptions } from "leaflet";
+import {
+  useCheckIn,
+  type CheckInDesk,
+} from "~~/registry/new-york/composables/use-check-in/useCheckIn";
+import { cn } from "@/lib/utils";
 import { LeafletControlsKey, LeafletMapKey, LeafletModuleKey } from ".";
 
 export interface ControlItemReference {
@@ -3548,6 +3594,7 @@ export interface LeafletControlsContext {
   controlsRegistry: Ref<Map<string, ControlItemReference>>;
   registerItem: (item: ControlItemReference) => void;
   unregisterItem: (name: string) => void;
+  deskSymbol: InjectionKey<CheckInDesk<ControlItemReference>>;
 }
 
 export interface LeafletControlsProps {
@@ -3575,20 +3622,42 @@ const map = inject(LeafletMapKey, ref(null));
 
 const control = ref<any>(null);
 
-const controlsRegistry = ref<Map<string, ControlItemReference>>(new Map());
+const { openDesk } = useCheckIn<ControlItemReference>();
+const { desk, deskSymbol } = openDesk({
+  extraContext: {
+    activeItem: () => props.activeItem,
+  },
+  onCheckIn: (id, itemRef) => {
+    console.log("[LeafletControls] Control item registered:", id, itemRef.name);
+  },
+  onCheckOut: (id) => {
+    console.log("[LeafletControls] Control item unregistered:", id);
+  },
+});
+
+const controlsRegistry = computed(() => {
+  const registry = new Map<string, ControlItemReference>();
+
+  desk.registry.value.forEach((item) => {
+    registry.set(item.data.name, item.data);
+  });
+  return registry;
+});
 
 const registerItem = (item: ControlItemReference) => {
+  console.warn(
+    "LeafletControls: registerItem is deprecated. Use useCheckIn with checkIn() instead.",
+  );
   const existing = controlsRegistry.value.get(item.name);
 
   if (!existing || existing.html !== item.html) {
-    controlsRegistry.value.set(item.name, item);
-
-    controlsRegistry.value = new Map(controlsRegistry.value);
   }
 };
 
 const unregisterItem = (name: string) => {
-  controlsRegistry.value.delete(name);
+  console.warn(
+    "LeafletControls: unregisterItem is deprecated. Use useCheckIn with automatic cleanup instead.",
+  );
 };
 
 const createButton = (container: HTMLElement, name: string, title: string) => {
@@ -3632,6 +3701,25 @@ const handleButtonClick = (name: string, type: "push" | "toggle") => {
   } else {
     emit("item-clicked", name);
   }
+};
+
+const updateButtonContent = () => {
+  if (!control.value) return;
+
+  const container = control.value.getContainer();
+  if (!container) return;
+
+  const buttons = container.querySelectorAll(".leaflet-draw-button");
+  buttons.forEach((button: Element) => {
+    const htmlButton = button as HTMLElement;
+    const toolType = htmlButton.dataset.toolType;
+    if (toolType) {
+      const controlItem = controlsRegistry.value.get(toolType);
+      if (controlItem && htmlButton.innerHTML !== controlItem.html) {
+        htmlButton.innerHTML = controlItem.html;
+      }
+    }
+  });
 };
 
 const updateActiveButton = () => {
@@ -3692,7 +3780,17 @@ const createControl = () => {
 const tryCreateControl = () => {
   const itemsCount = controlsRegistry.value.size;
 
-  if (map.value && props.enabled && itemsCount > 0 && !control.value) {
+  const allItemsHaveContent = Array.from(controlsRegistry.value.values()).every(
+    (item) => item.html && item.html.trim().length > 0,
+  );
+
+  if (
+    map.value &&
+    props.enabled &&
+    itemsCount > 0 &&
+    !control.value &&
+    allItemsHaveContent
+  ) {
     nextTick(() => {
       createControl();
     });
@@ -3724,16 +3822,27 @@ watch(
   },
 );
 
+let previousItemCount = 0;
 watch(
   controlsRegistry,
-  () => {
-    if (control.value && control.value._map) {
-      control.value.remove();
-      control.value = null;
-    }
+  (newRegistry) => {
+    const currentItemCount = newRegistry.size;
 
     if (!control.value) {
       tryCreateControl();
+      previousItemCount = currentItemCount;
+      return;
+    }
+
+    if (currentItemCount !== previousItemCount) {
+      if (control.value._map) {
+        control.value.remove();
+      }
+      control.value = null;
+      tryCreateControl();
+      previousItemCount = currentItemCount;
+    } else {
+      updateButtonContent();
     }
   },
   { deep: true },
@@ -3743,6 +3852,7 @@ const context: LeafletControlsContext = {
   controlsRegistry,
   registerItem,
   unregisterItem,
+  deskSymbol,
 };
 
 provide(LeafletControlsKey, context);
@@ -3756,279 +3866,6 @@ provide(LeafletControlsKey, context);
 <style>
 :root {
   --leaflet-control-bar-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
-}
-</style>
-```
-
-```vue [src/components/ui/leaflet-map/LeafletDrawControl.vue]
-<script setup lang="ts">
-import { ref, inject, watch, onBeforeUnmount, nextTick } from "vue";
-import type { ControlOptions } from "leaflet";
-import {
-  LeafletMapKey,
-  LeafletModuleKey,
-  type FeatureSelectMode,
-  type FeatureShapeType,
-} from ".";
-
-export interface DrawButton {
-  enabled?: boolean;
-}
-
-export interface LeafletDrawControlProps {
-  position?: ControlOptions["position"];
-  editMode?: boolean;
-  activeMode?: string | null;
-  modes?: {
-    select?: DrawButton | boolean;
-    directSelect?: DrawButton | boolean;
-    marker?: DrawButton | boolean;
-    circle?: DrawButton | boolean;
-    polyline?: DrawButton | boolean;
-    polygon?: DrawButton | boolean;
-    rectangle?: DrawButton | boolean;
-  };
-}
-
-const props = withDefaults(defineProps<LeafletDrawControlProps>(), {
-  position: "topright",
-  editMode: false,
-  activeMode: null,
-});
-
-const emit = defineEmits<{
-  (
-    e: "mode-selected",
-    mode:
-      | "marker"
-      | "circle"
-      | "polyline"
-      | "polygon"
-      | "rectangle"
-      | "select"
-      | "direct-select"
-      | null,
-  ): void;
-}>();
-
-const L = inject(LeafletModuleKey, ref());
-const map = inject(LeafletMapKey, ref(null));
-
-const control = ref<any>(null);
-
-const shouldEnableButton = (type: string): boolean => {
-  if (!props.modes) return false;
-  const config =
-    type === "direct-select"
-      ? props.modes["directSelect"]
-      : props.modes[type as keyof typeof props.modes];
-  if (config === undefined) return false;
-  if (typeof config === "boolean") return config;
-  return config.enabled !== false;
-};
-
-const getIconSvg = (type: FeatureShapeType | FeatureSelectMode): string => {
-  const color = "#333";
-  const svgs: Record<string, string> = {
-    marker: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="${color}"/></svg>`,
-    circle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="${color}" stroke-width="2.5" fill="none"/></svg>`,
-    polyline: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 17 L8 12 L13 15 L21 7" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="3" cy="17" r="2.5" fill="${color}"/><circle cx="8" cy="12" r="2.5" fill="${color}"/><circle cx="13" cy="15" r="2.5" fill="${color}"/><circle cx="21" cy="7" r="2.5" fill="${color}"/></svg>`,
-    polygon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3 L21 8 L18 17 L6 17 L3 8 Z" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="12" cy="3" r="2.5" fill="${color}"/><circle cx="21" cy="8" r="2.5" fill="${color}"/><circle cx="18" cy="17" r="2.5" fill="${color}"/><circle cx="6" cy="17" r="2.5" fill="${color}"/><circle cx="3" cy="8" r="2.5" fill="${color}"/></svg>`,
-    rectangle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="6" width="16" height="12" stroke="${color}" stroke-width="2.5" rx="1" fill="none"/></svg>`,
-    select: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 4 L5 17 L10 12.5 L13 18 L15 17 L12 11.5 L18 11.5 Z" fill="${color}" stroke="${color}" stroke-width="1" stroke-linejoin="round"/></svg>`,
-    "direct-select": `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 4 L5 17 L10 12.5 L13 18 L15 17 L12 11.5 L18 11.5 Z" fill="white" stroke="${color}" stroke-width="2" stroke-linejoin="round"/></svg>`,
-  };
-  return svgs[type] || "";
-};
-
-const createButton = (
-  container: HTMLElement,
-  type: FeatureShapeType | FeatureSelectMode,
-  title: string,
-) => {
-  const button = L.value!.DomUtil.create(
-    "div",
-    "leaflet-draw-button",
-    container,
-  );
-  button.title = title;
-  button.innerHTML = getIconSvg(type);
-  button.setAttribute("role", "button");
-  button.setAttribute("aria-label", title);
-  button.setAttribute("tabindex", "0");
-  button.dataset.toolType = type;
-
-  const onButtonClick = (e: Event) => {
-    L.value!.DomEvent.preventDefault(e);
-    toggleDrawMode(type);
-  };
-
-  L.value!.DomEvent.on(button, "click", onButtonClick);
-
-  return button;
-};
-
-const toggleDrawMode = (type: FeatureShapeType | FeatureSelectMode) => {
-  if (props.activeMode === type) {
-    emit("mode-selected", null);
-  } else {
-    emit("mode-selected", type);
-  }
-};
-
-const updateActiveButton = () => {
-  if (!control.value) return;
-
-  const container = control.value.getContainer();
-  if (!container) return;
-
-  const buttons = container.querySelectorAll(".leaflet-draw-button");
-  buttons.forEach((button: Element) => {
-    const htmlButton = button as HTMLElement;
-    const toolType = htmlButton.dataset.toolType;
-    if (toolType === props.activeMode) {
-      htmlButton.classList.add("leaflet-draw-toolbar-button-enabled");
-    } else {
-      htmlButton.classList.remove("leaflet-draw-toolbar-button-enabled");
-    }
-  });
-};
-
-const createDrawControl = () => {
-  if (!L.value || !map.value) return;
-
-  const DrawControl = L.value.Control.extend({
-    options: {
-      position: props.position,
-    },
-
-    onAdd: function () {
-      const container = L.value!.DomUtil.create(
-        "div",
-        "leaflet-draw leaflet-control leaflet-bar",
-      );
-
-      L.value!.DomEvent.disableClickPropagation(container);
-      L.value!.DomEvent.disableScrollPropagation(container);
-
-      if (props.modes) {
-        if (shouldEnableButton("select")) {
-          createButton(container, "select", "Selection Tool (V)");
-        }
-        if (shouldEnableButton("direct-select")) {
-          createButton(container, "direct-select", "Direct Selection Tool (A)");
-        }
-        if (shouldEnableButton("marker")) {
-          createButton(container, "marker", "Draw a marker");
-        }
-        if (shouldEnableButton("circle")) {
-          createButton(container, "circle", "Draw a circle");
-        }
-        if (shouldEnableButton("polyline")) {
-          createButton(container, "polyline", "Draw a polyline");
-        }
-        if (shouldEnableButton("polygon")) {
-          createButton(container, "polygon", "Draw a polygon");
-        }
-        if (shouldEnableButton("rectangle")) {
-          createButton(container, "rectangle", "Draw a rectangle");
-        }
-      }
-
-      return container;
-    },
-
-    onRemove: function () {},
-  });
-
-  control.value = new DrawControl();
-  control.value.addTo(map.value);
-};
-
-watch(
-  () => props.activeMode,
-  () => {
-    nextTick(() => {
-      updateActiveButton();
-    });
-  },
-);
-
-watch(
-  [map, () => props.editMode],
-  ([newMap, newEditMode]) => {
-    if (newMap && newEditMode) {
-      if (!control.value) {
-        nextTick(() => {
-          createDrawControl();
-        });
-      } else if (!control.value._map) {
-        control.value.addTo(newMap);
-      }
-    } else if (control.value && control.value._map) {
-      control.value.remove();
-    }
-  },
-  { immediate: true },
-);
-
-onBeforeUnmount(() => {
-  if (control.value && map.value) {
-    try {
-      control.value.remove();
-    } catch (e) {}
-  }
-});
-</script>
-
-<template></template>
-
-<style>
-.leaflet-draw-button {
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  background: white;
-  border: none;
-  transition: background-color 0.2s;
-}
-
-.leaflet-draw-button:hover {
-  background-color: #f4f4f4;
-}
-
-.leaflet-draw-button:active {
-  background-color: #e0e0e0;
-}
-
-.leaflet-draw-toolbar-button-enabled {
-  background-color: #e8f4f8;
-}
-
-.leaflet-draw-toolbar-button-enabled:hover {
-  background-color: #d4e9f2;
-}
-
-.leaflet-bar {
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
-  border-radius: 4px;
-}
-
-.leaflet-bar .leaflet-draw-button:first-child {
-  border-top-left-radius: 4px;
-  border-top-right-radius: 4px;
-}
-
-.leaflet-bar .leaflet-draw-button:last-child {
-  border-bottom-left-radius: 4px;
-  border-bottom-right-radius: 4px;
-}
-
-.leaflet-bar .leaflet-draw-button:not(:last-child) {
-  border-bottom: 1px solid #ccc;
 }
 </style>
 ```
@@ -4950,11 +4787,22 @@ onBeforeUnmount(() => {
 
 ```vue [src/components/ui/leaflet-map/LeafletFeaturesSelector.vue]
 <script setup lang="ts">
-import { ref, computed, provide, watch, nextTick, type Ref } from "vue";
+import {
+  ref,
+  computed,
+  provide,
+  watch,
+  nextTick,
+  type Ref,
+  type InjectionKey,
+} from "vue";
+import {
+  useCheckIn,
+  type CheckInDesk,
+} from "~~/registry/new-york/composables/use-check-in/useCheckIn";
 import LeafletBoundingBox from "./LeafletBoundingBox.vue";
 import type { FeatureShapeType } from "./LeafletFeaturesEditor.vue";
 import { LeafletSelectionKey } from ".";
-import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
 
 export type FeatureSelectMode = "select" | "direct-select";
 
@@ -4982,7 +4830,7 @@ export interface LeafletSelectionContext {
   selectFeature: (type: FeatureShapeType, id: string | number) => void;
   deselectAll: () => void;
   notifyFeatureUpdate: (id: string | number) => void;
-  deskSymbol?: symbol;
+  deskSymbol: InjectionKey<CheckInDesk<FeatureReference>>;
 }
 
 export interface LeafletFeaturesSelectorProps {
@@ -5046,6 +4894,13 @@ const notifyFeatureUpdate = (id: string | number) => {
 };
 
 const { desk, deskSymbol } = openDesk({
+  extraContext: {
+    selectedFeature,
+    selectFeature,
+    deselectAll,
+    notifyFeatureUpdate,
+    mode: () => props.mode,
+  },
   onCheckIn: (id, featureRef) => {
     console.log(
       "[LeafletFeaturesSelector] Feature registered:",
@@ -5063,7 +4918,7 @@ const { desk, deskSymbol } = openDesk({
 });
 
 const featuresRegistry = computed(() =>
-  desk.getAll().reduce((map, item) => {
+  Array.from(desk.registry.value.values()).reduce((map, item) => {
     map.set(item.id, item.data);
     return map;
   }, new Map<string | number, FeatureReference>()),
@@ -5209,14 +5064,14 @@ provide(LeafletSelectionKey, context as any);
 
 ```vue [src/components/ui/leaflet-map/LeafletMarker.vue]
 <script setup lang="ts">
-import { inject, watch, ref, type Ref, nextTick } from "vue";
+import { inject, watch, ref, type Ref, nextTick, computed } from "vue";
+import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
 import {
   LeafletMapKey,
   LeafletModuleKey,
   LeafletSelectionKey,
   type FeatureReference,
 } from ".";
-import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
 
 export interface LeafletMarkerProps {
   id?: string | number;
@@ -5280,6 +5135,14 @@ const { desk: featureDesk } = selectionContext
       watchData: true,
     })
   : { desk: ref(null) };
+
+const isSelected = computed(() => {
+  if (!featureDesk || !props.selectable) return false;
+  return (
+    (featureDesk as any).selectedFeature?.value?.type === "marker" &&
+    (featureDesk as any).selectedFeature?.value?.id === markerId.value
+  );
+});
 
 let Icon: any;
 const iconOptions = {
@@ -6025,8 +5888,12 @@ import {
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
-import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
-import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
+import {
+  LeafletMapKey,
+  LeafletModuleKey,
+  LeafletSelectionKey,
+  type FeatureReference,
+} from ".";
 import "./leaflet-editing.css";
 
 const {
@@ -6137,7 +6004,7 @@ const { desk } = selectionContext
         ) => {
           if (!polygon.value || !L.value) return;
           const initialLatLngs = initialData as L.LatLng[];
-          const angleRad = (angle * Math.PI) / 180;
+          const angleRad = (-angle * Math.PI) / 180;
           const metersPerDegreeLat = LatDegreesMeters;
           const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
           const newLatLngs = initialLatLngs.map((latlng) => {
@@ -6513,11 +6380,16 @@ import {
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
+import {
+  LeafletMapKey,
+  LeafletModuleKey,
+  LeafletSelectionKey,
+  type FeatureReference,
+} from ".";
+
+import "./leaflet-editing.css";
 
 const { checkIn } = useCheckIn<FeatureReference>();
-import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
-import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
-import "./leaflet-editing.css";
 
 const {
   calculateMidpoint,
@@ -6652,7 +6524,7 @@ const { desk } = selectionContext
           );
         },
       }),
-      watchData: [() => props.selectable],
+      watchData: true,
     })
   : { desk: ref(null) };
 
@@ -6982,11 +6854,16 @@ import {
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
 import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
+import {
+  LeafletMapKey,
+  LeafletModuleKey,
+  LeafletSelectionKey,
+  type FeatureReference,
+} from ".";
+
+import "./leaflet-editing.css";
 
 const { checkIn } = useCheckIn<FeatureReference>();
-import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
-import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
-import "./leaflet-editing.css";
 
 const {
   calculateBoundsFromHandle,
@@ -7055,7 +6932,7 @@ const { desk } = selectionContext
           ] as [[number, number], [number, number]]);
         },
       }),
-      watchData: [() => props.selectable],
+      watchData: true,
     })
   : { desk: ref(null) };
 
@@ -9437,41 +9314,6 @@ export type UseQuadtreeReturn<T extends Rect = Rect> = ReturnType<
 | Name | Value | Description |
 |------|-------|-------------|
 | `--leaflet-control-bar-shadow`{.primary .text-primary} | `0 1px 5px rgba(0, 0, 0, 0.65)` | — |
-
----
-
-## LeafletDrawControl
-::hr-underline
-::
-
-**API**: composition
-
-  ### Props
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `position`{.primary .text-primary} | `ControlOptions['position']` | topright |  |
-| `editMode`{.primary .text-primary} | `boolean` | false |  |
-| `activeMode`{.primary .text-primary} | `string \| null` |  |  |
-| `modes`{.primary .text-primary} | `{
-    select?: DrawButton \| boolean;
-    directSelect?: DrawButton \| boolean;
-    marker?: DrawButton \| boolean;
-    circle?: DrawButton \| boolean;
-    polyline?: DrawButton \| boolean;
-    polygon?: DrawButton \| boolean;
-    rectangle?: DrawButton \| boolean;
-  }` | - |  |
-
-  ### Events
-| Name | Description |
-|------|-------------|
-| `mode-selected`{.primary .text-primary} | — |
-
-  ### Inject
-| Key | Default | Type | Description |
-|-----|--------|------|-------------|
-| `LeafletModuleKey`{.primary .text-primary} | `ref()` | `any` | — |
-| `LeafletMapKey`{.primary .text-primary} | `ref(null)` | `any` | — |
 
 ---
 

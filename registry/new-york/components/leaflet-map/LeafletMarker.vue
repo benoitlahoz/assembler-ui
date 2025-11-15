@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { inject, watch, ref, type Ref, nextTick } from 'vue';
-import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey, type FeatureReference } from '.';
+import { inject, watch, ref, type Ref, nextTick, computed } from 'vue';
 import { useCheckIn } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
+import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey, type FeatureReference } from '.';
 
 export interface LeafletMarkerProps {
   id?: string | number;
@@ -65,6 +65,20 @@ const { desk: featureDesk } = selectionContext
       watchData: true,
     })
   : { desk: ref(null) };
+
+// Computed helpers using desk to access shared context
+// The desk provides access to:
+// - desk.selectedFeature: currently selected feature
+// - desk.selectFeature(): select this marker
+// - desk.deselectAll(): deselect all features
+// - desk.mode(): current selection mode
+const isSelected = computed(() => {
+  if (!featureDesk || !props.selectable) return false;
+  return (
+    (featureDesk as any).selectedFeature?.value?.type === 'marker' &&
+    (featureDesk as any).selectedFeature?.value?.id === markerId.value
+  );
+});
 
 let Icon: any;
 const iconOptions = {

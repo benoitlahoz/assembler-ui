@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, provide } from 'vue';
 import { useCheckIn } from '../useCheckIn';
-import AccordionItem from './AccordionItem.vue';
+import AccordionItem from './AccordionDemoItem.vue';
 
 // ==========================================
 // Accordion Check-In Setup

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, provide, watch, nextTick, type Ref, type InjectionKey } from 'vue';
-import LeafletBoundingBox from './LeafletBoundingBox.vue';
-import type { FeatureShapeType } from './LeafletFeaturesEditor.vue';
-import { LeafletSelectionKey } from '.';
 import {
   useCheckIn,
   type CheckInDesk,
 } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
+import LeafletBoundingBox from './LeafletBoundingBox.vue';
+import type { FeatureShapeType } from './LeafletFeaturesEditor.vue';
+import { LeafletSelectionKey } from '.';
 
 export type FeatureSelectMode = 'select' | 'direct-select';
 
@@ -102,6 +102,14 @@ const notifyFeatureUpdate = (id: string | number) => {
 
 // Open desk for feature registration
 const { desk, deskSymbol } = openDesk({
+  extraContext: {
+    // Expose selection state and methods to child features
+    selectedFeature,
+    selectFeature,
+    deselectAll,
+    notifyFeatureUpdate,
+    mode: () => props.mode,
+  },
   onCheckIn: (id, featureRef) => {
     // Feature automatically added to desk registry
     console.log('[LeafletFeaturesSelector] Feature registered:', id, featureRef.type);
@@ -117,7 +125,8 @@ const { desk, deskSymbol } = openDesk({
 
 // Legacy API compatibility - featuresRegistry now uses the desk
 const featuresRegistry = computed(() =>
-  desk.getAll().reduce((map, item) => {
+  // Use desk.registry.value to establish reactive dependency
+  Array.from(desk.registry.value.values()).reduce((map, item) => {
     map.set(item.id, item.data);
     return map;
   }, new Map<string | number, FeatureReference>())
