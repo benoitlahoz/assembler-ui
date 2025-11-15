@@ -28,12 +28,7 @@ export interface ControlItemReference {
 }
 
 export interface LeafletControlsContext {
-  controlsRegistry:
-    | Ref<Map<string, ControlItemReference>>
-    | ComputedRef<Map<string, ControlItemReference>>;
-  registerItem: (item: ControlItemReference) => void;
-  unregisterItem: (name: string) => void;
-  deskSymbol: InjectionKey<CheckInDesk<ControlItemReference>>; // For useCheckIn integration
+  DeskInjectionKey: InjectionKey<CheckInDesk<ControlItemReference>>;
 }
 
 export interface LeafletControlsProps {
@@ -86,25 +81,6 @@ const controlsRegistry = computed(() => {
   });
   return registry;
 });
-
-// Deprecated: kept for backward compatibility
-const registerItem = (item: ControlItemReference) => {
-  console.warn(
-    'LeafletControls: registerItem is deprecated. Use useCheckIn with checkIn() instead.'
-  );
-  const existing = controlsRegistry.value.get(item.name);
-  // Only update if content changed
-  if (!existing || existing.html !== item.html) {
-    // Manual registration fallback (not recommended)
-  }
-};
-
-// Deprecated: kept for backward compatibility
-const unregisterItem = (name: string) => {
-  console.warn(
-    'LeafletControls: unregisterItem is deprecated. Use useCheckIn with automatic cleanup instead.'
-  );
-};
 
 const createButton = (container: HTMLElement, name: string, title: string) => {
   if (!L.value) return;
@@ -301,10 +277,7 @@ watch(
 );
 
 const context: LeafletControlsContext = {
-  controlsRegistry,
-  registerItem,
-  unregisterItem,
-  deskSymbol: DeskInjectionKey,
+  DeskInjectionKey,
 };
 
 provide(LeafletControlsKey, context);
