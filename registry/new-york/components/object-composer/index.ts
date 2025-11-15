@@ -3,6 +3,7 @@
  * @category data
  *
  * @demo ObjectComposerDemo
+ * @demo CustomFieldDemo
  */
 
 export { default as ObjectComposer } from './ObjectComposer.vue';

@@ -2393,6 +2393,171 @@ export const useCheckIn = <
 
 ---
 
+  ## Examples
+  ::hr-underline
+  ::
+
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <custom-field-demo />
+  :::
+
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import {
+  ObjectComposer,
+  ObjectComposerHeader,
+  ObjectComposerTitle,
+  ObjectComposerDescription,
+  ObjectComposerItem,
+} from '@/components/ui/object-composer';
+import { Separator } from '@/components/ui/separator';
+import CustomObjectComposerField from './CustomObjectComposerField.vue';
+
+const serverMetrics = ref({
+  cpu: 78,
+  memory: 4096,
+  disk: 512000,
+  uptime: 86400,
+  requests: 15234,
+  errors: 12,
+  latency: 45.6,
+  healthy: true,
+  region: 'us-east-1',
+  environment: 'production',
+});
+
+const userProfile = ref({
+  username: 'john.doe',
+  email: 'john@example.com',
+  role: 'admin',
+  active: true,
+  loginCount: 342,
+  lastLogin: '2025-11-15',
+  permissions: ['read', 'write', 'delete'],
+});
+</script>
+
+<template>
+  <div class="space-y-8">
+    <div>
+      <h2 class="text-2xl font-bold mb-2">Custom ObjectComposerField</h2>
+      <p class="text-muted-foreground mb-6">
+        Create your own field renderer with desk access, custom styling, and interactive elements
+      </p>
+    </div>
+
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      
+      <div class="border rounded-lg p-4 bg-card">
+        <ObjectComposer v-model="serverMetrics">
+          <ObjectComposerHeader>
+            <ObjectComposerTitle>
+              <span class="flex items-center gap-2">
+                <span class="text-green-600">●</span>
+                Server Metrics
+              </span>
+            </ObjectComposerTitle>
+          </ObjectComposerHeader>
+          <Separator class="my-3" />
+          <ObjectComposerItem>
+            <template #default="{ itemKey, value, valueType, displayValue }">
+              <CustomObjectComposerField
+                :item-key="itemKey"
+                :value="value"
+                :value-type="valueType"
+                :display-value="displayValue"
+              />
+            </template>
+          </ObjectComposerItem>
+        </ObjectComposer>
+      </div>
+
+      
+      <div class="border rounded-lg p-4 bg-card">
+        <ObjectComposer v-model="userProfile">
+          <ObjectComposerHeader>
+            <ObjectComposerTitle>
+              <span class="flex items-center gap-2">
+                <span class="text-blue-600">●</span>
+                User Profile
+              </span>
+            </ObjectComposerTitle>
+          </ObjectComposerHeader>
+          <Separator class="my-3" />
+          <ObjectComposerItem>
+            <template #default="{ itemKey, value, valueType, displayValue }">
+              <CustomObjectComposerField
+                :item-key="itemKey"
+                :value="value"
+                :value-type="valueType"
+                :display-value="displayValue"
+              />
+            </template>
+          </ObjectComposerItem>
+        </ObjectComposer>
+      </div>
+    </div>
+
+    <Separator />
+
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="border rounded-lg p-4">
+        <h4 class="font-semibold mb-2 text-sm">🎨 Custom Styling</h4>
+        <p class="text-xs text-muted-foreground">
+          Badge components with color-coded types, hover effects, and visual indicators
+        </p>
+      </div>
+      <div class="border rounded-lg p-4">
+        <h4 class="font-semibold mb-2 text-sm">🔌 Desk Access</h4>
+        <p class="text-xs text-muted-foreground">
+          Injects desk from parent item for advanced features like live updates and validation
+        </p>
+      </div>
+      <div class="border rounded-lg p-4">
+        <h4 class="font-semibold mb-2 text-sm">⚡ Type Indicators</h4>
+        <p class="text-xs text-muted-foreground">
+          Visual dots showing string (red), number (blue), boolean (purple), null (gray)
+        </p>
+      </div>
+      <div class="border rounded-lg p-4">
+        <h4 class="font-semibold mb-2 text-sm">🔄 Reusable</h4>
+        <p class="text-xs text-muted-foreground">
+          Single component works across all data types with automatic type detection
+        </p>
+      </div>
+    </div>
+
+    <Separator />
+
+    
+    <div class="space-y-3">
+      <h3 class="font-semibold">Usage</h3>
+      <div class="bg-muted/50 rounded-lg p-4 font-mono text-xs space-y-2">
+        <div><ObjectComposerItem></div>
+        <div class="ml-4">
+          <template #default="{{ '{' }} itemKey, value, valueType, displayValue {{ '}' }}">
+        </div>
+        <div class="ml-8"><CustomObjectComposerField</div>
+        <div class="ml-12">:item-key="itemKey"</div>
+        <div class="ml-12">:value="value"</div>
+        <div class="ml-12">:value-type="valueType"</div>
+        <div class="ml-12">:display-value="displayValue"</div>
+        <div class="ml-8">/></div>
+        <div class="ml-4"></template></div>
+        <div></ObjectComposerItem></div>
+      </div>
+    </div>
+  </div>
+</template>
+```
+  :::
+::
+
 ::tip
 You can copy and adapt this template for any component documentation.
 ::
