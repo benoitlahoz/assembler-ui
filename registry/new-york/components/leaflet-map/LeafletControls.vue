@@ -315,4 +315,10 @@ provide(LeafletControlsKey, context);
 :root {
   --leaflet-control-bar-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
 }
+
+/* Active/enabled state for toggle buttons */
+.leaflet-draw-toolbar-button-enabled {
+  background-color: #e0e0e0 !important;
+  background-image: linear-gradient(to bottom, #e0e0e0, #c0c0c0) !important;
+}
 </style>
