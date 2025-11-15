@@ -1563,7 +1563,7 @@ const { desk } = selectionContext
           emit("update:corners", newCorners);
         },
       }),
-      watchData: [() => props.selectable],
+      watchData: true,
     })
   : { desk: ref(null) };
 
@@ -2268,7 +2268,7 @@ const { desk } = selectionContext
           emit("update:corners", newCorners);
         },
       }),
-      watchData: [() => props.selectable],
+      watchData: true,
     })
   : { desk: ref(null) };
 
@@ -3362,9 +3362,12 @@ import {
   useTemplateRef,
   watch,
   nextTick,
+  ref,
   onBeforeUnmount,
 } from "vue";
 import { LeafletControlsKey } from ".";
+import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
+import type { ControlItemReference } from "./LeafletControls.vue";
 
 export interface LeafletControlItemProps {
   name: string;
@@ -3387,7 +3390,11 @@ const wrapperRef = useTemplateRef("wrapperRef");
 
 const controlsContext = inject(LeafletControlsKey);
 
+const { checkIn } = useCheckIn<ControlItemReference>();
+
 let observer: MutationObserver | null = null;
+
+const contentVersion = ref(0);
 
 const getContentHtml = () => {
   const wrapper = unref(wrapperRef);
@@ -3440,6 +3447,25 @@ const getContentHtml = () => {
   return "";
 };
 
+const { desk } = controlsContext
+  ? checkIn(controlsContext, {
+      autoCheckIn: true,
+      id: props.name,
+      data: () => {
+        contentVersion.value;
+        const html = getContentHtml();
+        return {
+          name: props.name,
+          title: props.title || "A control button",
+          html: html || "",
+          type: props.type,
+          active: props.active,
+        };
+      },
+      watchData: true,
+    })
+  : { desk: ref(null) };
+
 const registerContent = () => {
   if (!controlsContext) return;
 
@@ -3461,8 +3487,6 @@ watch(
     if (!wrapper) return;
 
     nextTick(() => {
-      registerContent();
-
       observer = new MutationObserver((mutations) => {
         const hasContent = mutations.some((mutation) => {
           return (
@@ -3470,8 +3494,8 @@ watch(
           );
         });
 
-        if (hasContent) {
-          registerContent();
+        if (hasContent && controlsContext) {
+          contentVersion.value++;
         }
       });
 
@@ -3531,10 +3555,16 @@ import {
   inject,
   watch,
   nextTick,
+  type InjectionKey,
+  computed,
 } from "vue";
 import { cn } from "@/lib/utils";
 import type { ControlOptions } from "leaflet";
 import { LeafletControlsKey, LeafletMapKey, LeafletModuleKey } from ".";
+import {
+  useCheckIn,
+  type CheckInDesk,
+} from "~~/registry/new-york/composables/use-check-in/useCheckIn";
 
 export interface ControlItemReference {
   name: string;
@@ -3548,6 +3578,7 @@ export interface LeafletControlsContext {
   controlsRegistry: Ref<Map<string, ControlItemReference>>;
   registerItem: (item: ControlItemReference) => void;
   unregisterItem: (name: string) => void;
+  deskSymbol: InjectionKey<CheckInDesk<ControlItemReference>>;
 }
 
 export interface LeafletControlsProps {
@@ -3575,20 +3606,39 @@ const map = inject(LeafletMapKey, ref(null));
 
 const control = ref<any>(null);
 
-const controlsRegistry = ref<Map<string, ControlItemReference>>(new Map());
+const { openDesk } = useCheckIn<ControlItemReference>();
+const { desk, deskSymbol } = openDesk({
+  onCheckIn: (id, itemRef) => {
+    console.log("[LeafletControls] Control item registered:", id, itemRef.name);
+  },
+  onCheckOut: (id) => {
+    console.log("[LeafletControls] Control item unregistered:", id);
+  },
+});
+
+const controlsRegistry = computed(() => {
+  const registry = new Map<string, ControlItemReference>();
+
+  desk.registry.value.forEach((item) => {
+    registry.set(item.data.name, item.data);
+  });
+  return registry;
+});
 
 const registerItem = (item: ControlItemReference) => {
+  console.warn(
+    "LeafletControls: registerItem is deprecated. Use useCheckIn with checkIn() instead.",
+  );
   const existing = controlsRegistry.value.get(item.name);
 
   if (!existing || existing.html !== item.html) {
-    controlsRegistry.value.set(item.name, item);
-
-    controlsRegistry.value = new Map(controlsRegistry.value);
   }
 };
 
 const unregisterItem = (name: string) => {
-  controlsRegistry.value.delete(name);
+  console.warn(
+    "LeafletControls: unregisterItem is deprecated. Use useCheckIn with automatic cleanup instead.",
+  );
 };
 
 const createButton = (container: HTMLElement, name: string, title: string) => {
@@ -3632,6 +3682,25 @@ const handleButtonClick = (name: string, type: "push" | "toggle") => {
   } else {
     emit("item-clicked", name);
   }
+};
+
+const updateButtonContent = () => {
+  if (!control.value) return;
+
+  const container = control.value.getContainer();
+  if (!container) return;
+
+  const buttons = container.querySelectorAll(".leaflet-draw-button");
+  buttons.forEach((button: Element) => {
+    const htmlButton = button as HTMLElement;
+    const toolType = htmlButton.dataset.toolType;
+    if (toolType) {
+      const controlItem = controlsRegistry.value.get(toolType);
+      if (controlItem && htmlButton.innerHTML !== controlItem.html) {
+        htmlButton.innerHTML = controlItem.html;
+      }
+    }
+  });
 };
 
 const updateActiveButton = () => {
@@ -3724,16 +3793,27 @@ watch(
   },
 );
 
+let previousItemCount = 0;
 watch(
   controlsRegistry,
-  () => {
-    if (control.value && control.value._map) {
-      control.value.remove();
-      control.value = null;
-    }
+  (newRegistry) => {
+    const currentItemCount = newRegistry.size;
 
     if (!control.value) {
       tryCreateControl();
+      previousItemCount = currentItemCount;
+      return;
+    }
+
+    if (currentItemCount !== previousItemCount) {
+      if (control.value._map) {
+        control.value.remove();
+      }
+      control.value = null;
+      tryCreateControl();
+      previousItemCount = currentItemCount;
+    } else {
+      updateButtonContent();
     }
   },
   { deep: true },
@@ -3743,6 +3823,7 @@ const context: LeafletControlsContext = {
   controlsRegistry,
   registerItem,
   unregisterItem,
+  deskSymbol,
 };
 
 provide(LeafletControlsKey, context);
@@ -4950,11 +5031,22 @@ onBeforeUnmount(() => {
 
 ```vue [src/components/ui/leaflet-map/LeafletFeaturesSelector.vue]
 <script setup lang="ts">
-import { ref, computed, provide, watch, nextTick, type Ref } from "vue";
+import {
+  ref,
+  computed,
+  provide,
+  watch,
+  nextTick,
+  type Ref,
+  type InjectionKey,
+} from "vue";
 import LeafletBoundingBox from "./LeafletBoundingBox.vue";
 import type { FeatureShapeType } from "./LeafletFeaturesEditor.vue";
 import { LeafletSelectionKey } from ".";
-import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
+import {
+  useCheckIn,
+  type CheckInDesk,
+} from "~~/registry/new-york/composables/use-check-in/useCheckIn";
 
 export type FeatureSelectMode = "select" | "direct-select";
 
@@ -4982,7 +5074,7 @@ export interface LeafletSelectionContext {
   selectFeature: (type: FeatureShapeType, id: string | number) => void;
   deselectAll: () => void;
   notifyFeatureUpdate: (id: string | number) => void;
-  deskSymbol?: symbol;
+  deskSymbol: InjectionKey<CheckInDesk<FeatureReference>>;
 }
 
 export interface LeafletFeaturesSelectorProps {
@@ -5063,7 +5155,7 @@ const { desk, deskSymbol } = openDesk({
 });
 
 const featuresRegistry = computed(() =>
-  desk.getAll().reduce((map, item) => {
+  Array.from(desk.registry.value.values()).reduce((map, item) => {
     map.set(item.id, item.data);
     return map;
   }, new Map<string | number, FeatureReference>()),
@@ -6137,7 +6229,7 @@ const { desk } = selectionContext
         ) => {
           if (!polygon.value || !L.value) return;
           const initialLatLngs = initialData as L.LatLng[];
-          const angleRad = (angle * Math.PI) / 180;
+          const angleRad = (-angle * Math.PI) / 180;
           const metersPerDegreeLat = LatDegreesMeters;
           const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
           const newLatLngs = initialLatLngs.map((latlng) => {
@@ -6652,7 +6744,7 @@ const { desk } = selectionContext
           );
         },
       }),
-      watchData: [() => props.selectable],
+      watchData: true,
     })
   : { desk: ref(null) };
 
@@ -7055,7 +7147,7 @@ const { desk } = selectionContext
           ] as [[number, number], [number, number]]);
         },
       }),
-      watchData: [() => props.selectable],
+      watchData: true,
     })
   : { desk: ref(null) };
 

@@ -117,7 +117,8 @@ const { desk, deskSymbol } = openDesk({
 
 // Legacy API compatibility - featuresRegistry now uses the desk
 const featuresRegistry = computed(() =>
-  desk.getAll().reduce((map, item) => {
+  // Use desk.registry.value to establish reactive dependency
+  Array.from(desk.registry.value.values()).reduce((map, item) => {
     map.set(item.id, item.data);
     return map;
   }, new Map<string | number, FeatureReference>())

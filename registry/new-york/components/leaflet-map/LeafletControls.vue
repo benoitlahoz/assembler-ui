@@ -1,8 +1,22 @@
 <script setup lang="ts">
-import { ref, provide, type Ref, type HTMLAttributes, inject, watch, nextTick } from 'vue';
+import {
+  ref,
+  provide,
+  type Ref,
+  type HTMLAttributes,
+  inject,
+  watch,
+  nextTick,
+  type InjectionKey,
+  computed,
+} from 'vue';
 import { cn } from '@/lib/utils';
 import type { ControlOptions } from 'leaflet';
 import { LeafletControlsKey, LeafletMapKey, LeafletModuleKey } from '.';
+import {
+  useCheckIn,
+  type CheckInDesk,
+} from '~~/registry/new-york/composables/use-check-in/useCheckIn';
 
 export interface ControlItemReference {
   name: string;
@@ -16,6 +30,7 @@ export interface LeafletControlsContext {
   controlsRegistry: Ref<Map<string, ControlItemReference>>;
   registerItem: (item: ControlItemReference) => void;
   unregisterItem: (name: string) => void;
+  deskSymbol: InjectionKey<CheckInDesk<ControlItemReference>>; // For useCheckIn integration
 }
 
 export interface LeafletControlsProps {
@@ -43,20 +58,44 @@ const map = inject(LeafletMapKey, ref(null));
 
 const control = ref<any>(null);
 
-const controlsRegistry = ref<Map<string, ControlItemReference>>(new Map());
+// Initialize useCheckIn for control items management
+const { openDesk } = useCheckIn<ControlItemReference>();
+const { desk, deskSymbol } = openDesk({
+  onCheckIn: (id, itemRef) => {
+    console.log('[LeafletControls] Control item registered:', id, itemRef.name);
+  },
+  onCheckOut: (id) => {
+    console.log('[LeafletControls] Control item unregistered:', id);
+  },
+});
 
+// Use desk items as registry
+const controlsRegistry = computed(() => {
+  const registry = new Map<string, ControlItemReference>();
+  // Use desk.registry.value to establish reactive dependency
+  desk.registry.value.forEach((item) => {
+    registry.set(item.data.name, item.data);
+  });
+  return registry;
+});
+
+// Deprecated: kept for backward compatibility
 const registerItem = (item: ControlItemReference) => {
+  console.warn(
+    'LeafletControls: registerItem is deprecated. Use useCheckIn with checkIn() instead.'
+  );
   const existing = controlsRegistry.value.get(item.name);
   // Only update if content changed
   if (!existing || existing.html !== item.html) {
-    controlsRegistry.value.set(item.name, item);
-    // Trigger reactivity
-    controlsRegistry.value = new Map(controlsRegistry.value);
+    // Manual registration fallback (not recommended)
   }
 };
 
+// Deprecated: kept for backward compatibility
 const unregisterItem = (name: string) => {
-  controlsRegistry.value.delete(name);
+  console.warn(
+    'LeafletControls: unregisterItem is deprecated. Use useCheckIn with automatic cleanup instead.'
+  );
 };
 
 const createButton = (container: HTMLElement, name: string, title: string) => {
@@ -96,6 +135,25 @@ const handleButtonClick = (name: string, type: 'push' | 'toggle') => {
     // For push buttons, just emit the click
     emit('item-clicked', name);
   }
+};
+
+const updateButtonContent = () => {
+  if (!control.value) return;
+
+  const container = control.value.getContainer();
+  if (!container) return;
+
+  const buttons = container.querySelectorAll('.leaflet-draw-button');
+  buttons.forEach((button: Element) => {
+    const htmlButton = button as HTMLElement;
+    const toolType = htmlButton.dataset.toolType;
+    if (toolType) {
+      const controlItem = controlsRegistry.value.get(toolType);
+      if (controlItem && htmlButton.innerHTML !== controlItem.html) {
+        htmlButton.innerHTML = controlItem.html;
+      }
+    }
+  });
 };
 
 const updateActiveButton = () => {
@@ -194,17 +252,30 @@ watch(
 );
 
 // Watch the registry to create control when items arrive
+let previousItemCount = 0;
 watch(
   controlsRegistry,
-  () => {
-    // Si le contrôle existe déjà, le retirer et le recréer avec les nouveaux items
-    if (control.value && control.value._map) {
-      control.value.remove();
-      control.value = null;
-    }
-    // Créer ou recréer le contrôle
+  (newRegistry) => {
+    const currentItemCount = newRegistry.size;
+
+    // If control doesn't exist yet, try to create it
     if (!control.value) {
       tryCreateControl();
+      previousItemCount = currentItemCount;
+      return;
+    }
+
+    // If number of items changed, recreate the control
+    if (currentItemCount !== previousItemCount) {
+      if (control.value._map) {
+        control.value.remove();
+      }
+      control.value = null;
+      tryCreateControl();
+      previousItemCount = currentItemCount;
+    } else {
+      // Same number of items, just update button content (for async icon loading)
+      updateButtonContent();
     }
   },
   { deep: true }
@@ -214,6 +285,7 @@ const context: LeafletControlsContext = {
   controlsRegistry,
   registerItem,
   unregisterItem,
+  deskSymbol,
 };
 
 provide(LeafletControlsKey, context);
