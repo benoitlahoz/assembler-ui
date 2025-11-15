@@ -3389,7 +3389,10 @@ console.log(
   controlsContext ? "FOUND" : "NOT FOUND",
 );
 if (controlsContext) {
-  console.log("[LeafletControlItem] deskSymbol:", controlsContext.deskSymbol);
+  console.log(
+    "[LeafletControlItem] DeskInjectionKey:",
+    controlsContext.DeskInjectionKey,
+  );
 }
 
 const { checkIn } = useCheckIn<ControlItemReference>();
@@ -3449,8 +3452,8 @@ const getContentHtml = () => {
   return "";
 };
 
-const { desk } = controlsContext?.deskSymbol
-  ? checkIn(controlsContext.deskSymbol, {
+const { desk } = controlsContext?.DeskInjectionKey
+  ? checkIn(controlsContext.DeskInjectionKey, {
       autoCheckIn: true,
       id: props.name,
       data: () => {
@@ -3575,12 +3578,7 @@ export interface ControlItemReference {
 }
 
 export interface LeafletControlsContext {
-  controlsRegistry:
-    | Ref<Map<string, ControlItemReference>>
-    | ComputedRef<Map<string, ControlItemReference>>;
-  registerItem: (item: ControlItemReference) => void;
-  unregisterItem: (name: string) => void;
-  deskSymbol: InjectionKey<CheckInDesk<ControlItemReference>>;
+  DeskInjectionKey: InjectionKey<CheckInDesk<ControlItemReference>>;
 }
 
 export interface LeafletControlsProps {
@@ -3609,7 +3607,7 @@ const map = inject(LeafletMapKey, ref(null));
 const control = ref<any>(null);
 
 const { openDesk } = useCheckIn<ControlItemReference>();
-const { desk, deskSymbol } = openDesk({
+const { desk, DeskInjectionKey } = openDesk({
   context: {
     activeItem: () => props.activeItem,
   },
@@ -3630,22 +3628,6 @@ const controlsRegistry = computed(() => {
   });
   return registry;
 });
-
-const registerItem = (item: ControlItemReference) => {
-  console.warn(
-    "LeafletControls: registerItem is deprecated. Use useCheckIn with checkIn() instead.",
-  );
-  const existing = controlsRegistry.value.get(item.name);
-
-  if (!existing || existing.html !== item.html) {
-  }
-};
-
-const unregisterItem = (name: string) => {
-  console.warn(
-    "LeafletControls: unregisterItem is deprecated. Use useCheckIn with automatic cleanup instead.",
-  );
-};
 
 const createButton = (container: HTMLElement, name: string, title: string) => {
   if (!L.value) return;
@@ -3838,10 +3820,7 @@ watch(
 );
 
 const context: LeafletControlsContext = {
-  controlsRegistry,
-  registerItem,
-  unregisterItem,
-  deskSymbol,
+  DeskInjectionKey,
 };
 
 provide(LeafletControlsKey, context);
@@ -4887,7 +4866,7 @@ const notifyFeatureUpdate = (id: string | number) => {
   }
 };
 
-const { desk, deskSymbol } = openDesk({
+const { desk, DeskInjectionKey } = openDesk({
   context: {
     selectedFeature,
     selectFeature,
@@ -5022,7 +5001,7 @@ const context: LeafletSelectionContext = {
   selectFeature,
   deselectAll,
   notifyFeatureUpdate,
-  deskSymbol,
+  deskSymbol: DeskInjectionKey,
 };
 
 provide(LeafletSelectionKey, context as any);
@@ -8669,7 +8648,7 @@ export const useCheckIn = <
   };
 
   const openDesk = (options?: CheckInDeskOptions<T, TContext>) => {
-    const deskSymbol = Symbol("CheckInDesk") as InjectionKey<
+    const DeskInjectionKey = Symbol("CheckInDesk") as InjectionKey<
       CheckInDesk<T, TContext> & TContext
     >;
     const deskContext = createDeskContext<T, TContext>(options);
@@ -8679,11 +8658,11 @@ export const useCheckIn = <
       ...(options?.context || {}),
     } as CheckInDesk<T, TContext> & TContext;
 
-    provide(deskSymbol, fullContext);
+    provide(DeskInjectionKey, fullContext);
 
     return {
       desk: fullContext,
-      deskSymbol,
+      DeskInjectionKey,
     };
   };
 

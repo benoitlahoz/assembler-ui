@@ -166,9 +166,6 @@ const assignSeat = (
     }
 
     occupiedSeats.value.add(newSeat);
-
-    passenger.data.seat = newSeat;
-
     airportDesk.desk.update(passengerId, { seat: newSeat });
   }
 
@@ -224,7 +221,7 @@ const airportDesk = openDesk({
   },
 });
 
-provide("airportDesk", { deskSymbol: airportDesk.deskSymbol });
+provide("airportDesk", { deskSymbol: airportDesk.DeskInjectionKey });
 
 const passengers = computed(() => {
   const all = airportDesk.desk.getAll();
@@ -718,7 +715,7 @@ export const useCheckIn = <
   };
 
   const openDesk = (options?: CheckInDeskOptions<T, TContext>) => {
-    const deskSymbol = Symbol("CheckInDesk") as InjectionKey<
+    const DeskInjectionKey = Symbol("CheckInDesk") as InjectionKey<
       CheckInDesk<T, TContext> & TContext
     >;
     const deskContext = createDeskContext<T, TContext>(options);
@@ -728,11 +725,11 @@ export const useCheckIn = <
       ...(options?.context || {}),
     } as CheckInDesk<T, TContext> & TContext;
 
-    provide(deskSymbol, fullContext);
+    provide(DeskInjectionKey, fullContext);
 
     return {
       desk: fullContext,
-      deskSymbol,
+      DeskInjectionKey,
     };
   };
 
@@ -980,7 +977,7 @@ const { openDesk } = useCheckIn<FormFieldData>();
 const formData = ref<Record<string, any>>({});
 const errors = ref<Record<string, string>>({});
 
-const { desk, deskSymbol: formDesk } = openDesk({
+const { desk, DeskInjectionKey: formDesk } = openDesk({
   context: {
     updateValue: (name: string, value: any) => {
       formData.value[name] = value;
@@ -1135,7 +1132,7 @@ const { openDesk } = useCheckIn<AccordionItemData>();
 const openItems = ref<Set<string | number>>(new Set());
 const allowMultiple = ref(false);
 
-const { desk, deskSymbol: accordionDesk } = openDesk({
+const { desk, DeskInjectionKey: accordionDesk } = openDesk({
   context: {
     openItems,
     toggle: (id: string | number) => {
@@ -1295,7 +1292,7 @@ const { openDesk } = useCheckIn<
   }
 >();
 
-const { desk, deskSymbol: tabsDesk } = openDesk({
+const { desk, DeskInjectionKey: tabsDesk } = openDesk({
   context: {
     activeTab,
     setActive: (id: string) => {
@@ -1415,7 +1412,7 @@ const { openDesk } = useCheckIn<ToolItemData>();
 const activeTool = ref<string | number | null>(null);
 const clickHistory = ref<Array<{ id: string | number; time: number }>>([]);
 
-const { desk, deskSymbol: toolbarDesk } = openDesk({
+const { desk, DeskInjectionKey: toolbarDesk } = openDesk({
   context: {
     activeTool,
     handleClick: (id: string | number, type: "button" | "toggle") => {

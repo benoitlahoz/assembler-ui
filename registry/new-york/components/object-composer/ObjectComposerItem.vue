@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, inject, type HTMLAttributes, type InjectionKey, onMounted } from 'vue';
+import {
+  ref,
+  computed,
+  inject,
+  provide,
+  type HTMLAttributes,
+  type InjectionKey,
+  onMounted,
+} from 'vue';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/Input';
@@ -14,6 +22,7 @@ import {
   useCheckIn,
   type CheckInDesk,
 } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
+import ObjectComposerField from './ObjectComposerField.vue';
 
 interface ComposerItemData {
   key: string;
@@ -24,8 +33,8 @@ interface ComposerItemData {
 }
 
 interface ObjectComposerItemProps {
-  itemKey: string;
-  value: any;
+  itemKey?: string;
+  value?: any;
   depth?: number;
   path?: string[];
   isInArray?: boolean;
@@ -54,41 +63,64 @@ defineSlots<{
 }>();
 
 // Inject desk from parent ObjectComposer
-const composerDesk = inject<{ deskSymbol: InjectionKey<CheckInDesk<ComposerItemData>> }>(
-  'objectComposerDesk'
-)!;
+const composerDesk = inject<{ 
+  deskSymbol: InjectionKey<CheckInDesk<ComposerItemData>>;
+  model: any;
+}>('objectComposerDesk')!;
 
 if (!composerDesk) {
   throw new Error('ObjectComposerItem must be used within ObjectComposer');
 }
 
+// Si pas de props, on itère sur le model
+const rootEntries = computed(() => {
+  if (!props.itemKey && composerDesk.model) {
+    const modelValue = composerDesk.model.value;
+    if (Array.isArray(modelValue)) {
+      return modelValue.map((item, index) => [String(index), item]);
+    }
+    return Object.entries(modelValue);
+  }
+  return null;
+});
+
 const { checkIn } = useCheckIn<ComposerItemData>();
 
-const currentPath = computed(() => [...props.path, props.itemKey]);
+const currentPath = computed(() => {
+  if (!props.itemKey) return [];
+  return [...props.path, props.itemKey];
+});
 
-// Register this item with the desk
-const { desk } = checkIn(composerDesk.deskSymbol, {
+// Register this item with the desk (only if we have itemKey)
+const deskResult = props.itemKey ? checkIn(composerDesk.deskSymbol, {
   autoCheckIn: true,
   id: currentPath.value.join('.'),
   data: {
-    key: props.itemKey,
+    key: props.itemKey!,
     value: props.value,
     path: currentPath.value,
     depth: props.depth,
     isInArray: props.isInArray,
   },
-});
+}) : null;
+
+const desk = deskResult?.desk;
 
 // Access context from desk
-const editingPath = (desk as any).editingPath;
-const updateValueInDesk = (desk as any).updateValue;
-const deleteValueInDesk = (desk as any).deleteValue;
-const addValueInDesk = (desk as any).addValue;
-const startEditInDesk = (desk as any).startEdit;
-const cancelEditInDesk = (desk as any).cancelEdit;
+const editingPath = desk ? (desk as any).editingPath : ref(null);
+const updateValueInDesk = desk ? (desk as any).updateValue : () => {};
+const deleteValueInDesk = desk ? (desk as any).deleteValue : () => {};
+const addValueInDesk = desk ? (desk as any).addValue : () => {};
+const startEditInDesk = desk ? (desk as any).startEdit : () => {};
+const cancelEditInDesk = desk ? (desk as any).cancelEdit : () => {};
+
+// Provide desk to ObjectComposerField (like FormDemo pattern)
+if (desk) {
+  provide('objectComposerItemDesk', { desk });
+}
 
 const accordionValue = ref<string>('item-1');
-const editKey = ref(props.itemKey);
+const editKey = ref(props.itemKey || '');
 const editValue = ref<string>('');
 
 // Check if this item is currently being edited
@@ -137,12 +169,14 @@ const displayValue = computed(() => {
 });
 
 function handleStartEdit() {
+  if (!props.itemKey) return;
   editKey.value = props.itemKey;
   editValue.value = valueType.value === 'string' ? props.value : JSON.stringify(props.value);
   startEditInDesk(currentPath.value);
 }
 
 function handleCancelEdit() {
+  if (!props.itemKey) return;
   editKey.value = props.itemKey;
   cancelEditInDesk();
 }
@@ -182,8 +216,26 @@ function addChild() {
 </script>
 
 <template>
+  <!-- Mode: Auto-iterate over model (no props) -->
+  <template v-if="rootEntries">
+    <ObjectComposerItem
+      v-for="[key, value] in rootEntries"
+      :key="key"
+      :item-key="key"
+      :value="value"
+      :depth="depth"
+      :path="path"
+      :is-in-array="Array.isArray(composerDesk.model.value)"
+    >
+      <template v-if="$slots.default" #default="slotProps">
+        <slot v-bind="slotProps" />
+      </template>
+    </ObjectComposerItem>
+  </template>
+
+  <!-- Mode: Single item (with props) -->
   <div
-    v-if="!isExpandable"
+    v-else-if="!isExpandable"
     data-slot="object-composer-item"
     :class="
       cn(
@@ -196,10 +248,10 @@ function addChild() {
     <div v-if="!isEditing" class="flex items-center w-full">
       <div class="w-8" />
 
-      <!-- Slot pour contenu personnalisé -->
+      <!-- Slot for custom content -->
       <div class="flex-1">
-        <slot
-          :item-key="itemKey"
+        <ObjectComposerField
+          :item-key="itemKey || ''"
           :value="value"
           :value-type="valueType"
           :display-value="displayValue"
@@ -208,26 +260,10 @@ function addChild() {
           :edit-key="editKey"
           :edit-value="editValue"
         >
-          <!-- Rendu par défaut si aucun slot n'est fourni -->
-          <div class="flex items-center gap-1.5">
-            <span class="font-medium text-foreground">{{ itemKey }}</span>
-            <span class="text-muted-foreground">:</span>
-            <span
-              :class="
-                cn({
-                  'text-red-600 dark:text-red-400': valueType === 'string',
-                  'text-blue-600 dark:text-blue-400': valueType === 'number',
-                  'text-purple-600 dark:text-purple-400': valueType === 'boolean',
-                  'text-muted-foreground italic': valueType === 'null',
-                  'text-muted-foreground italic text-sm':
-                    valueType === 'object' || valueType === 'array',
-                })
-              "
-            >
-              {{ displayValue }}
-            </span>
-          </div>
-        </slot>
+          <template v-if="$slots.default" #default="slotProps">
+            <slot v-bind="slotProps" />
+          </template>
+        </ObjectComposerField>
       </div>
 
       <!-- Actions -->
@@ -321,10 +357,10 @@ function addChild() {
           </template>
         </AccordionTrigger>
 
-        <!-- Slot pour contenu personnalisé -->
+        <!-- Slot for custom content -->
         <div class="flex-1">
-          <slot
-            :item-key="itemKey"
+          <ObjectComposerField
+            :item-key="itemKey || ''"
             :value="value"
             :value-type="valueType"
             :display-value="displayValue"
@@ -333,26 +369,10 @@ function addChild() {
             :edit-key="editKey"
             :edit-value="editValue"
           >
-            <!-- Rendu par défaut si aucun slot n'est fourni -->
-            <div class="flex items-center gap-1.5">
-              <span class="font-medium text-foreground">{{ itemKey }}</span>
-              <span class="text-muted-foreground">:</span>
-              <span
-                :class="
-                  cn({
-                    'text-red-600 dark:text-red-400': valueType === 'string',
-                    'text-blue-600 dark:text-blue-400': valueType === 'number',
-                    'text-purple-600 dark:text-purple-400': valueType === 'boolean',
-                    'text-muted-foreground italic': valueType === 'null',
-                    'text-muted-foreground italic text-sm':
-                      valueType === 'object' || valueType === 'array',
-                  })
-                "
-              >
-                {{ displayValue }}
-              </span>
-            </div>
-          </slot>
+            <template v-if="$slots.default" #default="slotProps">
+              <slot v-bind="slotProps" />
+            </template>
+          </ObjectComposerField>
         </div>
 
         <!-- Actions -->

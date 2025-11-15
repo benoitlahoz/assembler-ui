@@ -6,6 +6,7 @@ import {
   ObjectComposerTitle,
   ObjectComposerDescription,
   ObjectComposerItem,
+  ObjectComposerField,
 } from '~~/registry/new-york/components/object-composer';
 import { Separator } from '@/components/ui/separator';
 
@@ -52,16 +53,75 @@ const readonlyData = ref({
 <template>
   <div class="h-128 max-h-128 overflow-auto">
     <div class="mb-4">
+      <h3 class="text-lg font-semibold mb-2">Basic Usage</h3>
+      <p class="text-sm text-muted-foreground mb-4">
+        ObjectComposer with header and auto-instantiated items
+      </p>
       <ObjectComposer v-model="userData">
         <ObjectComposerHeader>
-          <ObjectComposerTitle>User Data (Default)</ObjectComposerTitle>
+          <ObjectComposerTitle>User Data</ObjectComposerTitle>
           <ObjectComposerDescription>
-            Edit this user data with ease using the intuitive Object Composer.
+            Editable JSON object with auto-generated fields
           </ObjectComposerDescription>
         </ObjectComposerHeader>
         <Separator class="my-4" />
+        
+        <!-- ObjectComposerItem auto-iterates over model -->
+        <ObjectComposerItem />
       </ObjectComposer>
     </div>
+
+    <Separator class="my-8" />
+
+    <div class="mb-4">
+      <h3 class="text-lg font-semibold mb-2">Custom Field Rendering</h3>
+      <p class="text-sm text-muted-foreground mb-4">
+        ObjectComposerItem with custom ObjectComposerField template
+      </p>
+      <ObjectComposer v-model="readonlyData">
+        <ObjectComposerHeader>
+          <ObjectComposerTitle>System Config</ObjectComposerTitle>
+          <ObjectComposerDescription>
+            Custom badge-style rendering for each field
+          </ObjectComposerDescription>
+        </ObjectComposerHeader>
+        <Separator class="my-4" />
+        
+        <!-- Custom rendering: slot propagates to ObjectComposerField -->
+        <ObjectComposerItem>
+          <template #default="{ itemKey, value, valueType }">
+            <div class="flex items-center gap-2">
+              <!-- Icon based on type -->
+              <span class="flex items-center gap-1.5">
+                <span v-if="valueType === 'string'" class="text-red-500">📝</span>
+                <span v-else-if="valueType === 'number'" class="text-blue-500">🔢</span>
+                <span v-else-if="valueType === 'boolean'" class="text-purple-500">✓</span>
+                <span v-else class="text-gray-500">📦</span>
+                <span class="font-mono text-sm">{{ itemKey }}</span>
+              </span>
+              <span class="text-muted-foreground">=</span>
+              <!-- Badge value -->
+              <span
+                class="px-2 py-0.5 rounded-md text-xs font-medium"
+                :class="{
+                  'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300':
+                    valueType === 'string',
+                  'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300':
+                    valueType === 'number',
+                  'bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300':
+                    valueType === 'boolean',
+                }"
+              >
+                {{ typeof value === 'string' ? `"${value}"` : String(value) }}
+              </span>
+            </div>
+          </template>
+        </ObjectComposerItem>
+      </ObjectComposer>
+    </div>
+
+
+    <Separator class="my-8" />
 
     <div>
       <h2 class="demo-title">Données JSON</h2>

@@ -21,6 +21,17 @@ interface ObjectComposerProps {
   class?: HTMLAttributes['class'];
 }
 
+interface SlotProps {
+  itemKey: string;
+  value: any;
+  valueType: string;
+  displayValue: string;
+  isExpandable: boolean;
+  isEditing: boolean;
+  editKey: string;
+  editValue: string;
+}
+
 const props = withDefaults(defineProps<ObjectComposerProps>(), {
   readonly: false,
 });
@@ -89,27 +100,11 @@ const { desk, DeskInjectionKey } = openDesk({
 });
 
 // Provide DeskInjectionKey for child items
-provide('objectComposerDesk', { deskSymbol: DeskInjectionKey });
-
-const rootEntries = computed(() => {
-  if (Array.isArray(model.value)) {
-    return model.value.map((item, index) => [String(index), item]);
-  }
-  return Object.entries(model.value);
-});
+provide('objectComposerDesk', { deskSymbol: DeskInjectionKey, model });
 </script>
 
 <template>
   <div data-slot="object-composer" :class="cn('flex flex-col text-sm', props.class)">
-    <ObjectComposerItem
-      v-for="[key, value] in rootEntries"
-      :key="key"
-      :item-key="key"
-      :value="value"
-      :depth="0"
-      :path="[]"
-      :is-in-array="Array.isArray(model)"
-    />
     <slot />
   </div>
 </template>
