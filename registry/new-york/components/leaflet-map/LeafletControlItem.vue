@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { inject, unref, useTemplateRef, watch, nextTick, ref, onBeforeUnmount } from 'vue';
+import {
+  inject,
+  unref,
+  useTemplateRef,
+  watch,
+  nextTick,
+  ref,
+  onBeforeUnmount,
+  computed,
+} from 'vue';
 import { LeafletControlsKey } from '.';
 import { useCheckIn } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
 import type { ControlItemReference } from './LeafletControls.vue';
@@ -95,6 +104,17 @@ const { desk } = controlsContext
       watchData: true,
     })
   : { desk: ref(null) };
+
+// Computed helper using desk to access shared context
+// The desk provides access to:
+// - desk.activeItem(): currently active control item name
+// - desk.getAll(): all registered control items
+const isActive = computed(() => {
+  if (!desk || props.type === 'push') return false;
+  // Access activeItem from desk's extraContext
+  const activeItemName = (desk as any).activeItem?.();
+  return activeItemName === props.name || props.active;
+});
 
 // Legacy function kept for backward compatibility (no longer used internally)
 const registerContent = () => {

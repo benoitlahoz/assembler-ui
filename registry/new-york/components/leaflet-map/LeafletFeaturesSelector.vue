@@ -102,6 +102,14 @@ const notifyFeatureUpdate = (id: string | number) => {
 
 // Open desk for feature registration
 const { desk, deskSymbol } = openDesk({
+  extraContext: {
+    // Expose selection state and methods to child features
+    selectedFeature,
+    selectFeature,
+    deselectAll,
+    notifyFeatureUpdate,
+    mode: () => props.mode,
+  },
   onCheckIn: (id, featureRef) => {
     // Feature automatically added to desk registry
     console.log('[LeafletFeaturesSelector] Feature registered:', id, featureRef.type);

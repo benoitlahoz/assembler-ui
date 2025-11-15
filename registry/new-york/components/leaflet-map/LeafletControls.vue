@@ -61,6 +61,10 @@ const control = ref<any>(null);
 // Initialize useCheckIn for control items management
 const { openDesk } = useCheckIn<ControlItemReference>();
 const { desk, deskSymbol } = openDesk({
+  extraContext: {
+    // Expose activeItem to child controls
+    activeItem: () => props.activeItem,
+  },
   onCheckIn: (id, itemRef) => {
     console.log('[LeafletControls] Control item registered:', id, itemRef.name);
   },
