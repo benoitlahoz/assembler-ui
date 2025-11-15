@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, inject, type InjectionKey } from 'vue';
-import { useCheckIn, type CheckInDesk } from '../useCheckIn';
+import {
+  useCheckIn,
+  type CheckInDesk,
+} from '~~/registry/new-york/composables/use-check-in/useCheckIn';
 
 interface PassengerData {
   name: string;
@@ -10,7 +13,7 @@ interface PassengerData {
   checkedInAt?: Date;
 }
 
-// Récupère le Symbol du desk fourni par le parent
+// Retrieve the desk Symbol provided by the parent
 const airportDesk = inject<{ deskSymbol: InjectionKey<CheckInDesk<PassengerData>> }>(
   'airportDesk'
 )!;
@@ -26,26 +29,26 @@ const checkInTime = ref<Date>(new Date());
 
 const { checkIn } = useCheckIn<PassengerData>();
 
-// Le passager s'enregistre au comptoir en utilisant le deskSymbol injecté
+// The passenger checks in at the desk using the injected deskSymbol
 const { desk } = checkIn(airportDesk?.deskSymbol, {
   required: true,
   autoCheckIn: true,
   id: props.id,
   data: {
     name: props.name,
-    seat: '', // Le siège sera assigné par le desk via onCheckIn
-    baggage: 0, // Le passager commence sans bagages
+    seat: '', // The seat will be assigned by the desk via onCheckIn
+    baggage: 0, // The passenger starts without baggage
     fareClass: props.fareClass,
     checkedInAt: checkInTime.value,
   },
 });
 
 if (!desk) {
-  throw new Error('AirportPassenger doit être utilisé dans un contexte de desk');
+  throw new Error('AirportPassenger must be used within a desk context');
 }
 
-// Accéder à extraContext via le desk (mergé dans openDesk)
-const extraContext = {
+// Access context via the desk (merged in openDesk)
+const context = {
   flightNumber: (desk as any).flightNumber,
   gate: (desk as any).gate,
   departureTime: (desk as any).departureTime,
@@ -53,43 +56,42 @@ const extraContext = {
 };
 
 console.log(
-  `🚶 ${props.name} se présente au comptoir... Classe ${props.fareClass} (Groupe ${extraContext.boardingGroups.value[props.fareClass]})`
+  `🚶 ${props.name} arrives at the desk... Class ${props.fareClass} (Group ${context.boardingGroups.value[props.fareClass]})`
 );
 
-// Le siège est géré uniquement par le desk - on le lit directement
+// The seat is managed only by the desk - we read it directly
 const currentSeat = computed(() => desk.get(props.id)?.data.seat || '');
 
-// Le poids des bagages est géré par le desk
+// Baggage weight is managed by the desk
 const currentBaggageWeight = computed(() => desk.get(props.id)?.data.baggage || 0);
 
-// Poids maximum pour cette classe
+// Maximum weight for this class
 const maxWeight = computed(() => (desk as any).maxBaggageWeight[props.fareClass]);
 
-// Vérifier si on peut ajouter des bagages
+// Check if we can add baggage
 const canAddBaggage = computed(() => currentBaggageWeight.value < maxWeight.value);
 
-// Ajouter un bagage
+// Add baggage
 const handleAddBaggage = () => {
   (desk as any).addBaggage(props.id, 10);
 };
 
-// Retirer un bagage
+// Remove baggage
 const handleRemoveBaggage = () => {
   (desk as any).removeBaggage(props.id, 10);
 };
 
-// Accès aux infos du vol partagées via extraContext injecté
+// Access flight information shared via injected extraContext
 const flightInfo = computed(() => ({
-  flightNumber: extraContext.flightNumber,
-  gate: extraContext.gate,
-  departureTime: extraContext.departureTime,
+  flightNumber: context.flightNumber,
+  gate: context.gate,
+  departureTime: context.departureTime,
 }));
 
-// Calculer le boarding group à partir de la classe tarifaire
-const boardingGroup = computed(() => extraContext.boardingGroups.value[props.fareClass]);
+// Calculate the boarding group from the fare class
+const boardingGroup = computed(() => context.boardingGroups.value[props.fareClass]);
 
-// Badge de couleur selon la classe tarifaire
-// Badge de couleur selon la classe tarifaire
+// Color badge according to fare class
 const groupColor = computed(() => {
   switch (props.fareClass) {
     case 'Business':
@@ -101,7 +103,7 @@ const groupColor = computed(() => {
   }
 });
 
-// Se désinscrire temporairement
+// Temporarily unregister
 const toggleCheckIn = () => {
   if (!desk) return;
 
@@ -109,19 +111,19 @@ const toggleCheckIn = () => {
     const previousSeat = currentSeat.value;
     desk.checkOut(props.id);
     isCheckedIn.value = false;
-    console.log(`❌ ${props.name} a annulé son enregistrement et libéré le siège ${previousSeat}`);
+    console.log(`❌ ${props.name} cancelled their check-in and released seat ${previousSeat}`);
   } else {
-    // Le siège sera assigné automatiquement par onCheckIn du desk
+    // The seat will be automatically assigned by the desk's onCheckIn
     desk.checkIn(props.id, {
       name: props.name,
-      seat: '', // Sera assigné par le desk via onCheckIn
-      baggage: 0, // Le passager recommence sans bagages
+      seat: '', // Will be assigned by the desk via onCheckIn
+      baggage: 0, // The passenger starts again without baggage
       fareClass: props.fareClass,
       checkedInAt: new Date(),
     });
     isCheckedIn.value = true;
     checkInTime.value = new Date();
-    console.log(`✅ ${props.name} se ré-enregistre au comptoir`);
+    console.log(`✅ ${props.name} re-checks in at the desk`);
   }
 };
 </script>
@@ -135,12 +137,12 @@ const toggleCheckIn = () => {
         : 'bg-muted/50 border-dashed border-muted-foreground/30 opacity-60'
     "
   >
-    <!-- Statut d'enregistrement -->
+    <!-- Check-in status -->
     <div class="text-2xl">
       {{ isCheckedIn ? '✅' : '⏳' }}
     </div>
 
-    <!-- Infos passager -->
+    <!-- Passenger info -->
     <div class="flex-1 space-y-1">
       <div class="flex items-center gap-2">
         <span class="font-semibold">{{ name }}</span>
@@ -148,7 +150,7 @@ const toggleCheckIn = () => {
           {{ fareClass }} (Groupe {{ boardingGroup }})
         </span>
       </div>
-      <div class="text-sm text-muted-foreground">💺 Siège {{ currentSeat || '—' }}</div>
+      <div class="text-sm text-muted-foreground">💺 Seat {{ currentSeat || '—' }}</div>
       <div class="text-sm flex items-center gap-2">
         <span class="text-muted-foreground"
           >🧳 {{ currentBaggageWeight }}kg / {{ maxWeight }}kg</span
@@ -157,28 +159,28 @@ const toggleCheckIn = () => {
           v-if="currentBaggageWeight >= maxWeight"
           class="text-xs px-1.5 py-0.5 rounded bg-destructive/10 text-destructive font-medium"
         >
-          Max atteint
+          Max reached
         </span>
       </div>
       <div v-if="isCheckedIn && checkInTime" class="text-xs text-muted-foreground">
-        ⏰ Enregistré à
-        {{ checkInTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }}
+        ⏰ Checked in at
+        {{ checkInTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) }}
       </div>
       <div class="text-xs text-muted-foreground">
-        ✈️ Vol {{ flightInfo.flightNumber.value }} • 🚪 Porte {{ flightInfo.gate.value }} • 🕐
+        ✈️ Flight {{ flightInfo.flightNumber.value }} • 🚪 Gate {{ flightInfo.gate.value }} • 🕐
         {{ flightInfo.departureTime.value }}
       </div>
     </div>
 
     <!-- Actions -->
     <div class="flex flex-col gap-1">
-      <!-- Gestion des bagages -->
+      <!-- Baggage management -->
       <div v-if="isCheckedIn" class="flex gap-1">
         <button
           @click="handleRemoveBaggage"
           :disabled="currentBaggageWeight === 0"
           class="px-2 py-1 rounded text-xs font-medium bg-muted hover:bg-muted/80 disabled:opacity-30 disabled:cursor-not-allowed"
-          title="Retirer 10kg"
+          title="Remove 10kg"
         >
           ➖
         </button>
@@ -186,7 +188,7 @@ const toggleCheckIn = () => {
           @click="handleAddBaggage"
           :disabled="!canAddBaggage"
           class="px-2 py-1 rounded text-xs font-medium bg-muted hover:bg-muted/80 disabled:opacity-30 disabled:cursor-not-allowed"
-          :title="canAddBaggage ? 'Ajouter 10kg' : 'Poids maximum atteint'"
+          :title="canAddBaggage ? 'Add 10kg' : 'Maximum weight reached'"
         >
           ➕
         </button>
@@ -202,7 +204,7 @@ const toggleCheckIn = () => {
             : 'bg-primary text-primary-foreground hover:bg-primary/90'
         "
       >
-        {{ isCheckedIn ? '❌ Annuler' : "✅ S'enregistrer" }}
+        {{ isCheckedIn ? '❌ Cancel' : '✅ Check In' }}
       </button>
     </div>
   </div>

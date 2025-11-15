@@ -63,7 +63,7 @@ const control = ref<any>(null);
 
 // Initialize useCheckIn for control items management
 const { openDesk } = useCheckIn<ControlItemReference>();
-const { desk, deskSymbol } = openDesk({
+const { desk, DeskInjectionKey } = openDesk({
   context: {
     // Expose activeItem to child controls
     activeItem: () => props.activeItem,
@@ -304,7 +304,7 @@ const context: LeafletControlsContext = {
   controlsRegistry,
   registerItem,
   unregisterItem,
-  deskSymbol,
+  deskSymbol: DeskInjectionKey,
 };
 
 provide(LeafletControlsKey, context);

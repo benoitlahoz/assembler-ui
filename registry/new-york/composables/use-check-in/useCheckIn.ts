@@ -260,7 +260,9 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
    * Opens a check-in desk (parent component provides the desk)
    */
   const openDesk = (options?: CheckInDeskOptions<T, TContext>) => {
-    const deskSymbol = Symbol('CheckInDesk') as InjectionKey<CheckInDesk<T, TContext> & TContext>;
+    const DeskInjectionKey = Symbol('CheckInDesk') as InjectionKey<
+      CheckInDesk<T, TContext> & TContext
+    >;
     const deskContext = createDeskContext<T, TContext>(options);
 
     const fullContext = {
@@ -268,12 +270,12 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       ...(options?.context || {}),
     } as CheckInDesk<T, TContext> & TContext;
 
-    provide(deskSymbol, fullContext);
+    provide(DeskInjectionKey, fullContext);
 
     // Return both the desk and its symbol for children to inject
     return {
       desk: fullContext,
-      deskSymbol,
+      DeskInjectionKey,
     };
   };
 

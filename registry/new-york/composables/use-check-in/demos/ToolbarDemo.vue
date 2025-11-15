@@ -20,7 +20,7 @@ const activeTool = ref<string | number | null>(null);
 const clickHistory = ref<Array<{ id: string | number; time: number }>>([]);
 
 // Le parent ouvre un desk et le fournit à ses enfants
-const { desk, deskSymbol: toolbarDesk } = openDesk({
+const { desk, DeskInjectionKey: toolbarDesk } = openDesk({
   context: {
     activeTool,
     handleClick: (id: string | number, type: 'button' | 'toggle') => {

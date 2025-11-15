@@ -23,7 +23,7 @@ const { openDesk } = useCheckIn<
 >();
 
 // Le parent ouvre un desk et le fournit à ses enfants
-const { desk, deskSymbol: tabsDesk } = openDesk({
+const { desk, DeskInjectionKey: tabsDesk } = openDesk({
   context: {
     activeTab,
     setActive: (id: string) => {

@@ -18,7 +18,7 @@ const formData = ref<Record<string, any>>({});
 const errors = ref<Record<string, string>>({});
 
 // Le parent ouvre un desk et le fournit à ses enfants
-const { desk, deskSymbol: formDesk } = openDesk({
+const { desk, DeskInjectionKey: formDesk } = openDesk({
   context: {
     updateValue: (name: string, value: any) => {
       formData.value[name] = value;
