@@ -11,7 +11,13 @@ interface TabItemData {
 }
 
 // Parent: Tabs Container
-const { openDesk } = useCheckIn<TabItemData>();
+const { openDesk } = useCheckIn<
+  TabItemData,
+  {
+    activeTab: typeof activeTab;
+    setActive: (id: string) => void;
+  }
+>();
 
 const activeTab = ref<string>('tab1');
 const tabCount = ref(0);

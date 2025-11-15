@@ -90,7 +90,7 @@ const isDragging = ref(false);
 
 // Check in with selection desk
 const { desk } = selectionContext
-  ? checkIn(selectionContext, {
+  ? checkIn(selectionContext.deskSymbol, {
       autoCheckIn: props.selectable,
       id: canvasId.value,
       data: () => ({

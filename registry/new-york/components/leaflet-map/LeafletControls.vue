@@ -3,6 +3,7 @@ import {
   ref,
   provide,
   type Ref,
+  type ComputedRef,
   type HTMLAttributes,
   inject,
   watch,
@@ -27,7 +28,9 @@ export interface ControlItemReference {
 }
 
 export interface LeafletControlsContext {
-  controlsRegistry: Ref<Map<string, ControlItemReference>>;
+  controlsRegistry:
+    | Ref<Map<string, ControlItemReference>>
+    | ComputedRef<Map<string, ControlItemReference>>;
   registerItem: (item: ControlItemReference) => void;
   unregisterItem: (name: string) => void;
   deskSymbol: InjectionKey<CheckInDesk<ControlItemReference>>; // For useCheckIn integration
@@ -71,6 +74,7 @@ const { desk, deskSymbol } = openDesk({
   onCheckOut: (id) => {
     console.log('[LeafletControls] Control item unregistered:', id);
   },
+  debug: false, // Enable debug mode
 });
 
 // Use desk items as registry

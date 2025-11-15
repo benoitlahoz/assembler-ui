@@ -25,7 +25,7 @@ const props = withDefaults(
 
 const { checkIn } = useCheckIn<TabItemData>();
 
-const { desk } = checkIn(tabsDesk, {
+const { desk } = checkIn(tabsDesk?.deskSymbol, {
   required: true,
   autoCheckIn: true,
   id: props.id,
