@@ -26,8 +26,6 @@ export interface LeafletSelectionContext {
   featuresRegistry: Ref<Map<string | number, FeatureReference>>;
   selectFeature: (type: FeatureShapeType, id: string | number) => void;
   deselectAll: () => void;
-  registerFeature: (feature: FeatureReference) => void;
-  unregisterFeature: (id: string | number) => void;
   notifyFeatureUpdate: (id: string | number) => void;
   deskSymbol?: symbol; // For useCheckIn integration
 }
@@ -114,25 +112,13 @@ const { desk, deskSymbol } = openDesk({
   },
 });
 
-// Legacy API compatibility - these now use the desk
+// Legacy API compatibility - featuresRegistry now uses the desk
 const featuresRegistry = computed(() =>
   desk.getAll().reduce((map, item) => {
     map.set(item.id, item.data);
     return map;
   }, new Map<string | number, FeatureReference>())
 );
-
-const registerFeature = (feature: FeatureReference) => {
-  // For backwards compatibility, but features should use checkIn directly
-  console.warn('[LeafletFeaturesSelector] registerFeature is deprecated, use checkIn instead');
-};
-
-const unregisterFeature = (id: string | number) => {
-  // For backwards compatibility
-  console.warn(
-    '[LeafletFeaturesSelector] unregisterFeature is deprecated, features auto-unregister'
-  );
-};
 
 // Watch mode changes
 watch(
@@ -240,16 +226,13 @@ const handleBoundingBoxRotateEnd = () => {
   rotationCenter.value = null;
 };
 
-// Provide selection context to child components (with legacy compatibility)
+// Provide selection context to child components
 const context: LeafletSelectionContext = {
   selectedFeature,
   featuresRegistry,
   selectFeature,
   deselectAll,
-  registerFeature,
-  unregisterFeature,
   notifyFeatureUpdate,
-  // Add deskSymbol for child components using useCheckIn
   deskSymbol,
 };
 

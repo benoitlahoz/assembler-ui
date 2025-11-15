@@ -1405,6 +1405,9 @@ import {
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
+import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
+
+const { checkIn } = useCheckIn<FeatureReference>();
 import {
   LeafletMapKey,
   LeafletModuleKey,
@@ -1481,6 +1484,88 @@ const canvasId = ref<string | number>(
   props.id ?? `canvas-${Date.now()}-${Math.random()}`,
 );
 const isDragging = ref(false);
+
+const { desk } = selectionContext
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: canvasId.value,
+      data: () => ({
+        id: canvasId.value,
+        type: "polygon" as const,
+        getBounds: () => {
+          if (!L.value) return null;
+          const latlngs = props.corners.map((c) =>
+            L.value!.latLng(c.lat, c.lng),
+          );
+          return L.value!.latLngBounds(latlngs);
+        },
+        getInitialData: () => {
+          return props.corners.map((c) => [c.lat, c.lng] as [number, number]);
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!L.value) return;
+
+          const currentBounds = L.value.latLngBounds(
+            props.corners.map((c) => L.value!.latLng(c.lat, c.lng)),
+          );
+          const currentCenter = currentBounds.getCenter();
+          const newCenter = bounds.getCenter();
+
+          const scaleX =
+            (bounds.getEast() - bounds.getWest()) /
+            (currentBounds.getEast() - currentBounds.getWest());
+          const scaleY =
+            (bounds.getNorth() - bounds.getSouth()) /
+            (currentBounds.getNorth() - currentBounds.getSouth());
+
+          const newCorners = props.corners.map((corner) => {
+            const relativeX = (corner.lng - currentCenter.lng) * scaleX;
+            const relativeY = (corner.lat - currentCenter.lat) * scaleY;
+            return {
+              lat: newCenter.lat + relativeY,
+              lng: newCenter.lng + relativeX,
+            };
+          });
+
+          emit("update:corners", newCorners);
+        },
+        applyRotation: (
+          angle: number,
+          center: { lat: number; lng: number },
+          initialData: any,
+        ) => {
+          if (!L.value || !initialData) return;
+
+          const initialCorners = initialData as Array<[number, number]>;
+          const angleRad = (-angle * Math.PI) / 180;
+
+          const metersPerDegreeLat = LatDegreesMeters;
+          const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
+
+          const newCorners = initialCorners.map((corner) => {
+            const lat = corner[0];
+            const lng = corner[1];
+
+            const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+            const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+
+            const newRelMetersY =
+              relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+            const newRelMetersX =
+              relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+
+            return {
+              lat: center.lat + newRelMetersY / metersPerDegreeLat,
+              lng: center.lng + newRelMetersX / metersPerDegreeLng,
+            };
+          });
+
+          emit("update:corners", newCorners);
+        },
+      }),
+      watchData: [() => props.selectable],
+    })
+  : { desk: ref(null) };
 
 let dragStartCorners: Array<{ lat: number; lng: number }> = [];
 let dragStartMousePoint: L.Point | null = null;
@@ -1903,83 +1988,6 @@ const draw = () => {
   }
 };
 
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext) return;
-
-  const feature: FeatureReference = {
-    id: canvasId.value,
-    type: "polygon",
-    getBounds: () => {
-      if (!L.value) return null;
-      const latlngs = props.corners.map((c) => L.value!.latLng(c.lat, c.lng));
-      return L.value!.latLngBounds(latlngs);
-    },
-    getInitialData: () => {
-      return props.corners.map((c) => [c.lat, c.lng] as [number, number]);
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!L.value) return;
-
-      const currentBounds = L.value.latLngBounds(
-        props.corners.map((c) => L.value!.latLng(c.lat, c.lng)),
-      );
-      const currentCenter = currentBounds.getCenter();
-      const newCenter = bounds.getCenter();
-
-      const scaleX =
-        (bounds.getEast() - bounds.getWest()) /
-        (currentBounds.getEast() - currentBounds.getWest());
-      const scaleY =
-        (bounds.getNorth() - bounds.getSouth()) /
-        (currentBounds.getNorth() - currentBounds.getSouth());
-
-      const newCorners = props.corners.map((corner) => {
-        const relativeX = (corner.lng - currentCenter.lng) * scaleX;
-        const relativeY = (corner.lat - currentCenter.lat) * scaleY;
-        return {
-          lat: newCenter.lat + relativeY,
-          lng: newCenter.lng + relativeX,
-        };
-      });
-
-      emit("update:corners", newCorners);
-    },
-    applyRotation: (
-      angle: number,
-      center: { lat: number; lng: number },
-      initialCorners: Array<[number, number]>,
-    ) => {
-      if (!L.value || !initialCorners) return;
-
-      const angleRad = (-angle * Math.PI) / 180;
-
-      const metersPerDegreeLat = LatDegreesMeters;
-      const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
-
-      const newCorners = initialCorners.map((corner) => {
-        const lat = corner[0];
-        const lng = corner[1];
-
-        const relMetersY = (lat - center.lat) * metersPerDegreeLat;
-        const relMetersX = (lng - center.lng) * metersPerDegreeLng;
-
-        const newRelMetersY =
-          relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
-        const newRelMetersX =
-          relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
-
-        return {
-          lat: center.lat + newRelMetersY / metersPerDegreeLat,
-          lng: center.lng + newRelMetersX / metersPerDegreeLng,
-        };
-      });
-
-      emit("update:corners", newCorners);
-    },
-  };
-  selectionContext.registerFeature(feature);
-};
-
 let isUpdating = false;
 
 watch(
@@ -2028,23 +2036,7 @@ watch(
           newMap.on("zoom", reset);
           newMap.on("viewreset", reset);
 
-          if (newSelectable && selectionContext) {
-            registerWithSelection();
-          }
-
           reset();
-        }
-
-        if (canvasLayer.value) {
-          const selectableChanged =
-            oldVal && Boolean(oldVal[5]) !== Boolean(newSelectable);
-          if (selectableChanged) {
-            if (newSelectable && selectionContext) {
-              registerWithSelection();
-            } else if (selectionContext) {
-              selectionContext.unregisterFeature(canvasId.value);
-            }
-          }
         }
 
         if (
@@ -2089,10 +2081,6 @@ onBeforeUnmount(() => {
     map.value.off("zoom", reset);
     map.value.off("viewreset", reset);
   }
-
-  if (selectionContext) {
-    selectionContext.unregisterFeature(canvasId.value);
-  }
 });
 
 defineExpose({
@@ -2125,6 +2113,9 @@ import {
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useColors } from "~~/registry/new-york/composables/use-colors/useColors";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
+import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
+
+const { checkIn } = useCheckIn<FeatureReference>();
 import {
   LeafletMapKey,
   LeafletModuleKey,
@@ -2198,6 +2189,88 @@ const canvasId = ref<string | number>(
   props.id ?? `canvas-${Date.now()}-${Math.random()}`,
 );
 const isDragging = ref(false);
+
+const { desk } = selectionContext
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: canvasId.value,
+      data: () => ({
+        id: canvasId.value,
+        type: "polygon" as const,
+        getBounds: () => {
+          if (!L.value) return null;
+          const latlngs = props.corners.map((c) =>
+            L.value!.latLng(c.lat, c.lng),
+          );
+          return L.value!.latLngBounds(latlngs);
+        },
+        getInitialData: () => {
+          return props.corners.map((c) => [c.lat, c.lng] as [number, number]);
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!L.value) return;
+
+          const currentBounds = L.value.latLngBounds(
+            props.corners.map((c) => L.value!.latLng(c.lat, c.lng)),
+          );
+          const currentCenter = currentBounds.getCenter();
+          const newCenter = bounds.getCenter();
+
+          const scaleX =
+            (bounds.getEast() - bounds.getWest()) /
+            (currentBounds.getEast() - currentBounds.getWest());
+          const scaleY =
+            (bounds.getNorth() - bounds.getSouth()) /
+            (currentBounds.getNorth() - currentBounds.getSouth());
+
+          const newCorners = props.corners.map((corner) => {
+            const relativeX = (corner.lng - currentCenter.lng) * scaleX;
+            const relativeY = (corner.lat - currentCenter.lat) * scaleY;
+            return {
+              lat: newCenter.lat + relativeY,
+              lng: newCenter.lng + relativeX,
+            };
+          });
+
+          emit("update:corners", newCorners);
+        },
+        applyRotation: (
+          angle: number,
+          center: { lat: number; lng: number },
+          initialData: any,
+        ) => {
+          if (!L.value || !initialData) return;
+
+          const initialCorners = initialData as Array<[number, number]>;
+          const angleRad = (-angle * Math.PI) / 180;
+
+          const metersPerDegreeLat = LatDegreesMeters;
+          const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
+
+          const newCorners = initialCorners.map((corner) => {
+            const lat = corner[0];
+            const lng = corner[1];
+
+            const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+            const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+
+            const newRelMetersY =
+              relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+            const newRelMetersX =
+              relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+
+            return {
+              lat: center.lat + newRelMetersY / metersPerDegreeLat,
+              lng: center.lng + newRelMetersX / metersPerDegreeLng,
+            };
+          });
+
+          emit("update:corners", newCorners);
+        },
+      }),
+      watchData: [() => props.selectable],
+    })
+  : { desk: ref(null) };
 
 let dragStartCorners: Array<{ lat: number; lng: number }> = [];
 let dragStartMousePoint: L.Point | null = null;
@@ -2780,83 +2853,6 @@ const draw = () => {
   }
 };
 
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext) return;
-
-  const feature: FeatureReference = {
-    id: canvasId.value,
-    type: "polygon",
-    getBounds: () => {
-      if (!L.value) return null;
-      const latlngs = props.corners.map((c) => L.value!.latLng(c.lat, c.lng));
-      return L.value!.latLngBounds(latlngs);
-    },
-    getInitialData: () => {
-      return props.corners.map((c) => [c.lat, c.lng] as [number, number]);
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!L.value) return;
-
-      const currentBounds = L.value.latLngBounds(
-        props.corners.map((c) => L.value!.latLng(c.lat, c.lng)),
-      );
-      const currentCenter = currentBounds.getCenter();
-      const newCenter = bounds.getCenter();
-
-      const scaleX =
-        (bounds.getEast() - bounds.getWest()) /
-        (currentBounds.getEast() - currentBounds.getWest());
-      const scaleY =
-        (bounds.getNorth() - bounds.getSouth()) /
-        (currentBounds.getNorth() - currentBounds.getSouth());
-
-      const newCorners = props.corners.map((corner) => {
-        const relativeX = (corner.lng - currentCenter.lng) * scaleX;
-        const relativeY = (corner.lat - currentCenter.lat) * scaleY;
-        return {
-          lat: newCenter.lat + relativeY,
-          lng: newCenter.lng + relativeX,
-        };
-      });
-
-      emit("update:corners", newCorners);
-    },
-    applyRotation: (
-      angle: number,
-      center: { lat: number; lng: number },
-      initialCorners: Array<[number, number]>,
-    ) => {
-      if (!L.value || !initialCorners) return;
-
-      const angleRad = (-angle * Math.PI) / 180;
-
-      const metersPerDegreeLat = LatDegreesMeters;
-      const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
-
-      const newCorners = initialCorners.map((corner) => {
-        const lat = corner[0];
-        const lng = corner[1];
-
-        const relMetersY = (lat - center.lat) * metersPerDegreeLat;
-        const relMetersX = (lng - center.lng) * metersPerDegreeLng;
-
-        const newRelMetersY =
-          relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
-        const newRelMetersX =
-          relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
-
-        return {
-          lat: center.lat + newRelMetersY / metersPerDegreeLat,
-          lng: center.lng + newRelMetersX / metersPerDegreeLng,
-        };
-      });
-
-      emit("update:corners", newCorners);
-    },
-  };
-  selectionContext.registerFeature(feature);
-};
-
 let isUpdating = false;
 
 watch(
@@ -2908,23 +2904,7 @@ watch(
           newMap.on("zoom", reset);
           newMap.on("viewreset", reset);
 
-          if (newSelectable && selectionContext) {
-            registerWithSelection();
-          }
-
           reset();
-        }
-
-        if (canvasLayer.value) {
-          const selectableChanged =
-            oldVal && Boolean(oldVal[5]) !== Boolean(newSelectable);
-          if (selectableChanged) {
-            if (newSelectable && selectionContext) {
-              registerWithSelection();
-            } else if (selectionContext) {
-              selectionContext.unregisterFeature(canvasId.value);
-            }
-          }
         }
 
         if (
@@ -2988,10 +2968,6 @@ onBeforeUnmount(() => {
     map.value.off("zoom", reset);
     map.value.off("viewreset", reset);
   }
-
-  if (selectionContext) {
-    selectionContext.unregisterFeature(canvasId.value);
-  }
 });
 
 defineExpose({
@@ -3017,11 +2993,11 @@ import {
   ref,
   type Ref,
   nextTick,
-  onBeforeUnmount,
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
+import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
@@ -3081,6 +3057,44 @@ const circleId = ref<string | number>(
 const isDragging = ref(false);
 let dragStartLatLng: any = null;
 let dragStartMousePoint: any = null;
+
+const { checkIn } = useCheckIn<FeatureReference>();
+
+const { desk } = selectionContext
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: circleId.value,
+      data: () => ({
+        id: circleId.value,
+        type: "circle" as const,
+        getBounds: () => {
+          if (!circle.value || !L.value) return null;
+          const center = circle.value.getLatLng();
+          const radius = circle.value.getRadius();
+          const { southWest, northEast } = calculateCircleBounds(
+            center,
+            radius,
+          );
+          return L.value.latLngBounds(southWest, northEast);
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!circle.value) return;
+          const center = bounds.getCenter();
+          const latDiff = bounds.getNorth() - bounds.getSouth();
+          const lngDiff = bounds.getEast() - bounds.getWest();
+          const radiusLat = (latDiff / 2) * LatDegreesMeters;
+          const radiusLng = lngDegreesToRadius(lngDiff / 2, center.lat);
+          const radius = (radiusLat + radiusLng) / 2;
+          circle.value.setLatLng(center);
+          circle.value.setRadius(radius);
+          emit("update:lat", center.lat);
+          emit("update:lng", center.lng);
+          emit("update:radius", radius);
+        },
+      }),
+      watchData: true,
+    })
+  : { desk: ref(null) };
 
 const clearEditMarkers = () => {
   if (centerMarker.value) {
@@ -3210,44 +3224,6 @@ const enableEditing = () => {
   }
 };
 
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext || !circle.value) return;
-
-  const featureRef: FeatureReference = {
-    id: circleId.value,
-    type: "circle",
-    getBounds: () => {
-      if (!circle.value || !L.value) return null;
-
-      const center = circle.value.getLatLng();
-      const radius = circle.value.getRadius();
-
-      const { southWest, northEast } = calculateCircleBounds(center, radius);
-      return L.value.latLngBounds(southWest, northEast);
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!circle.value) return;
-      const center = bounds.getCenter();
-
-      const latDiff = bounds.getNorth() - bounds.getSouth();
-      const lngDiff = bounds.getEast() - bounds.getWest();
-
-      const radiusLat = (latDiff / 2) * LatDegreesMeters;
-      const radiusLng = lngDegreesToRadius(lngDiff / 2, center.lat);
-      const radius = (radiusLat + radiusLng) / 2;
-
-      circle.value.setLatLng(center);
-      circle.value.setRadius(radius);
-
-      emit("update:lat", center.lat);
-      emit("update:lng", center.lng);
-      emit("update:radius", radius);
-    },
-  };
-
-  selectionContext.registerFeature(featureRef);
-};
-
 watch(
   () => [
     map.value,
@@ -3314,10 +3290,6 @@ watch(
           }
 
           setupMapDragHandlers();
-
-          if (props.selectable && selectionContext) {
-            registerWithSelection();
-          }
         }
 
         if (circle.value) {
@@ -3343,9 +3315,6 @@ watch(
             circle.value.on("click", onCircleClick);
             if (props.selectable && selectionContext) {
               circle.value.on("mousedown", onCircleMouseDown);
-              registerWithSelection();
-            } else if (selectionContext) {
-              selectionContext.unregisterFeature(circleId.value);
             }
           }
         }
@@ -3380,17 +3349,6 @@ watch(
   },
   { immediate: true, flush: "post" },
 );
-
-onBeforeUnmount(() => {
-  if (props.selectable && selectionContext) {
-    selectionContext.unregisterFeature(circleId.value);
-  }
-
-  clearEditMarkers();
-  if (circle.value) {
-    circle.value.remove();
-  }
-});
 </script>
 
 <template><slot /></template>
@@ -5023,9 +4981,8 @@ export interface LeafletSelectionContext {
   featuresRegistry: Ref<Map<string | number, FeatureReference>>;
   selectFeature: (type: FeatureShapeType, id: string | number) => void;
   deselectAll: () => void;
-  registerFeature: (feature: FeatureReference) => void;
-  unregisterFeature: (id: string | number) => void;
   notifyFeatureUpdate: (id: string | number) => void;
+  deskSymbol?: symbol;
 }
 
 export interface LeafletFeaturesSelectorProps {
@@ -5111,18 +5068,6 @@ const featuresRegistry = computed(() =>
     return map;
   }, new Map<string | number, FeatureReference>()),
 );
-
-const registerFeature = (feature: FeatureReference) => {
-  console.warn(
-    "[LeafletFeaturesSelector] registerFeature is deprecated, use checkIn instead",
-  );
-};
-
-const unregisterFeature = (id: string | number) => {
-  console.warn(
-    "[LeafletFeaturesSelector] unregisterFeature is deprecated, features auto-unregister",
-  );
-};
 
 watch(
   () => props.mode,
@@ -5227,10 +5172,7 @@ const context: LeafletSelectionContext = {
   featuresRegistry,
   selectFeature,
   deselectAll,
-  registerFeature,
-  unregisterFeature,
   notifyFeatureUpdate,
-
   deskSymbol,
 };
 
@@ -5311,31 +5253,33 @@ const markerId = ref<string | number>(
 
 const { checkIn } = useCheckIn<FeatureReference>();
 
-const { desk: featureDesk } = checkIn(selectionContext, {
-  autoCheckIn: props.selectable,
-  id: markerId.value,
-  data: () => ({
-    id: markerId.value,
-    type: "marker" as const,
-    getBounds: () => {
-      if (!marker.value || !L.value) return null;
-      const latlng = marker.value.getLatLng();
-      const offset = 0.0001;
-      return L.value.latLngBounds(
-        [latlng.lat - offset, latlng.lng - offset],
-        [latlng.lat + offset, latlng.lng + offset],
-      );
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!marker.value) return;
-      const center = bounds.getCenter();
-      marker.value.setLatLng(center);
-      emit("update:lat", center.lat);
-      emit("update:lng", center.lng);
-    },
-  }),
-  watchData: true,
-});
+const { desk: featureDesk } = selectionContext
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: markerId.value,
+      data: () => ({
+        id: markerId.value,
+        type: "marker" as const,
+        getBounds: () => {
+          if (!marker.value || !L.value) return null;
+          const latlng = marker.value.getLatLng();
+          const offset = 0.0001;
+          return L.value.latLngBounds(
+            [latlng.lat - offset, latlng.lng - offset],
+            [latlng.lat + offset, latlng.lng + offset],
+          );
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!marker.value) return;
+          const center = bounds.getCenter();
+          marker.value.setLatLng(center);
+          emit("update:lat", center.lat);
+          emit("update:lng", center.lng);
+        },
+      }),
+      watchData: true,
+    })
+  : { desk: ref(null) };
 
 let Icon: any;
 const iconOptions = {
@@ -6076,11 +6020,11 @@ import {
   ref,
   type Ref,
   nextTick,
-  onBeforeUnmount,
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
+import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
@@ -6140,6 +6084,86 @@ const polygonId = ref<string | number>(
 
 let dragStartLatLngs: L.LatLng[] = [];
 let dragStartMousePoint: L.Point | null = null;
+
+const { checkIn } = useCheckIn<FeatureReference>();
+
+const { desk } = selectionContext
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: polygonId.value,
+      data: () => ({
+        id: polygonId.value,
+        type: "polygon" as const,
+        getBounds: () => {
+          if (!polygon.value || !L.value) return null;
+          return polygon.value.getBounds();
+        },
+        getInitialData: () => {
+          if (!polygon.value) return null;
+          return polygon.value.getLatLngs()[0] as L.LatLng[];
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!polygon.value) return;
+          const currentLatLngs = polygon.value.getLatLngs()[0] as L.LatLng[];
+          const currentBounds = polygon.value.getBounds();
+          const scaleX =
+            (bounds.getEast() - bounds.getWest()) /
+            (currentBounds.getEast() - currentBounds.getWest());
+          const scaleY =
+            (bounds.getNorth() - bounds.getSouth()) /
+            (currentBounds.getNorth() - currentBounds.getSouth());
+          const newCenter = bounds.getCenter();
+          const currentCenter = currentBounds.getCenter();
+          const offsetLat = newCenter.lat - currentCenter.lat;
+          const offsetLng = newCenter.lng - currentCenter.lng;
+          const newLatLngs = currentLatLngs.map((latlng) => {
+            const relLat = (latlng.lat - currentCenter.lat) * scaleY;
+            const relLng = (latlng.lng - currentCenter.lng) * scaleX;
+            return L.value!.latLng(
+              newCenter.lat + relLat,
+              newCenter.lng + relLng,
+            );
+          });
+          polygon.value.setLatLngs([newLatLngs]);
+          emit(
+            "update:latlngs",
+            newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
+          );
+        },
+        applyRotation: (
+          angle: number,
+          center: { lat: number; lng: number },
+          initialData: any,
+        ) => {
+          if (!polygon.value || !L.value) return;
+          const initialLatLngs = initialData as L.LatLng[];
+          const angleRad = (angle * Math.PI) / 180;
+          const metersPerDegreeLat = LatDegreesMeters;
+          const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
+          const newLatLngs = initialLatLngs.map((latlng) => {
+            const lat = latlng.lat;
+            const lng = latlng.lng;
+            const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+            const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+            const newRelMetersY =
+              relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+            const newRelMetersX =
+              relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+            return L.value!.latLng(
+              center.lat + newRelMetersY / metersPerDegreeLat,
+              center.lng + newRelMetersX / metersPerDegreeLng,
+            );
+          });
+          polygon.value.setLatLngs([newLatLngs]);
+          emit(
+            "update:latlngs",
+            newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
+          );
+        },
+      }),
+      watchData: true,
+    })
+  : { desk: ref(null) };
 
 const clearEditMarkers = () => {
   editMarkers.value.forEach((marker) => marker.remove());
@@ -6389,92 +6413,6 @@ const setupMapDragHandlers = () => {
   }
 };
 
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext || !polygon.value) return;
-
-  const featureRef: FeatureReference = {
-    id: polygonId.value,
-    type: "polygon",
-    getBounds: () => {
-      if (!polygon.value) return null;
-      return polygon.value.getBounds();
-    },
-    getInitialData: () => {
-      if (!polygon.value) return null;
-      const latlngs = polygon.value.getLatLngs()[0] as L.LatLng[];
-      return latlngs.map((ll) => [ll.lat, ll.lng] as [number, number]);
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!polygon.value || !L.value) return;
-
-      const currentBounds = polygon.value.getBounds();
-      const currentCenter = currentBounds.getCenter();
-      const newCenter = bounds.getCenter();
-
-      const currentLatLngs = polygon.value.getLatLngs()[0] as L.LatLng[];
-      const scaleX =
-        (bounds.getEast() - bounds.getWest()) /
-        (currentBounds.getEast() - currentBounds.getWest());
-      const scaleY =
-        (bounds.getNorth() - bounds.getSouth()) /
-        (currentBounds.getNorth() - currentBounds.getSouth());
-
-      const newLatLngs = currentLatLngs.map((latlng) => {
-        const relativeX = (latlng.lng - currentCenter.lng) * scaleX;
-        const relativeY = (latlng.lat - currentCenter.lat) * scaleY;
-        return L.value!.latLng(
-          newCenter.lat + relativeY,
-          newCenter.lng + relativeX,
-        );
-      });
-
-      polygon.value.setLatLngs([newLatLngs]);
-      emit(
-        "update:latlngs",
-        newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
-      );
-    },
-    applyRotation: (
-      angle: number,
-      center: { lat: number; lng: number },
-      initialLatLngs: Array<[number, number]>,
-    ) => {
-      if (!polygon.value || !L.value || !initialLatLngs) return;
-
-      const angleRad = (-angle * Math.PI) / 180;
-
-      const metersPerDegreeLat = LatDegreesMeters;
-      const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
-
-      const newLatLngs = initialLatLngs.map((latlng) => {
-        const lat = latlng[0];
-        const lng = latlng[1];
-
-        const relMetersY = (lat - center.lat) * metersPerDegreeLat;
-        const relMetersX = (lng - center.lng) * metersPerDegreeLng;
-
-        const newRelMetersY =
-          relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
-        const newRelMetersX =
-          relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
-
-        return L.value!.latLng(
-          center.lat + newRelMetersY / metersPerDegreeLat,
-          center.lng + newRelMetersX / metersPerDegreeLng,
-        );
-      });
-
-      polygon.value.setLatLngs([newLatLngs]);
-      emit(
-        "update:latlngs",
-        newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
-      );
-    },
-  };
-
-  selectionContext.registerFeature(featureRef);
-};
-
 watch(
   () => [
     map.value,
@@ -6534,43 +6472,6 @@ watch(
           } else {
             polygon.value.on("click", onPolygonClick);
           }
-
-          if (props.selectable && selectionContext) {
-            registerWithSelection();
-          }
-        }
-
-        if (polygon.value) {
-          const selectableChanged =
-            oldVal && Boolean(oldVal[5]) !== Boolean(newVal[5]);
-          if (selectableChanged) {
-            polygon.value.off("click");
-            polygon.value.off("mousedown");
-
-            const onPolygonClick = () => {
-              if (props.selectable && selectionContext) {
-                selectionContext.selectFeature("polygon", polygonId.value);
-              }
-              emit("click");
-            };
-
-            const onPolygonMouseDown = (e: any) => {
-              if (props.draggable && props.selectable && selectionContext) {
-                selectionContext.selectFeature("polygon", polygonId.value);
-              }
-            };
-
-            if (props.selectable && selectionContext) {
-              polygon.value.on("click", onPolygonClick);
-              polygon.value.on("mousedown", onPolygonMouseDown);
-              registerWithSelection();
-            } else {
-              polygon.value.on("click", onPolygonClick);
-              if (selectionContext) {
-                selectionContext.unregisterFeature(polygonId.value);
-              }
-            }
-          }
         }
 
         if (props.draggable && !props.editable) {
@@ -6594,13 +6495,6 @@ watch(
   },
   { immediate: true, flush: "post" },
 );
-
-onBeforeUnmount(() => {
-  clearEditMarkers();
-  if (polygon.value) {
-    polygon.value.remove();
-  }
-});
 </script>
 
 <template><slot /></template>
@@ -6614,11 +6508,13 @@ import {
   ref,
   type Ref,
   nextTick,
-  onBeforeUnmount,
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
+import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
+
+const { checkIn } = useCheckIn<FeatureReference>();
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
@@ -6671,6 +6567,94 @@ const isDragging = ref(false);
 const polylineId = ref<string | number>(
   props.id ?? `polyline-${Date.now()}-${Math.random()}`,
 );
+
+const { desk } = selectionContext
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: polylineId.value,
+      data: () => ({
+        id: polylineId.value,
+        type: "polyline" as const,
+        getBounds: () => {
+          if (!polyline.value) return null;
+          return polyline.value.getBounds();
+        },
+        getInitialData: () => {
+          if (!polyline.value) return null;
+          const latlngs = polyline.value.getLatLngs() as L.LatLng[];
+          return latlngs.map((ll) => [ll.lat, ll.lng] as [number, number]);
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!polyline.value || !L.value) return;
+
+          const currentBounds = polyline.value.getBounds();
+          const currentCenter = currentBounds.getCenter();
+          const newCenter = bounds.getCenter();
+
+          const currentLatLngs = polyline.value.getLatLngs() as L.LatLng[];
+          const scaleX =
+            (bounds.getEast() - bounds.getWest()) /
+            (currentBounds.getEast() - currentBounds.getWest());
+          const scaleY =
+            (bounds.getNorth() - bounds.getSouth()) /
+            (currentBounds.getNorth() - currentBounds.getSouth());
+
+          const newLatLngs = currentLatLngs.map((latlng) => {
+            const relativeX = (latlng.lng - currentCenter.lng) * scaleX;
+            const relativeY = (latlng.lat - currentCenter.lat) * scaleY;
+            return L.value!.latLng(
+              newCenter.lat + relativeY,
+              newCenter.lng + relativeX,
+            );
+          });
+
+          polyline.value.setLatLngs(newLatLngs);
+          emit(
+            "update:latlngs",
+            newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
+          );
+        },
+        applyRotation: (
+          angle: number,
+          center: { lat: number; lng: number },
+          initialData: any,
+        ) => {
+          if (!polyline.value || !L.value || !initialData) return;
+
+          const initialLatLngs = initialData as Array<[number, number]>;
+          const angleRad = (-angle * Math.PI) / 180;
+
+          const metersPerDegreeLat = LatDegreesMeters;
+          const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
+
+          const newLatLngs = initialLatLngs.map((latlng) => {
+            const lat = latlng[0];
+            const lng = latlng[1];
+
+            const relMetersY = (lat - center.lat) * metersPerDegreeLat;
+            const relMetersX = (lng - center.lng) * metersPerDegreeLng;
+
+            const newRelMetersY =
+              relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
+            const newRelMetersX =
+              relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
+
+            return L.value!.latLng(
+              center.lat + newRelMetersY / metersPerDegreeLat,
+              center.lng + newRelMetersX / metersPerDegreeLng,
+            );
+          });
+
+          polyline.value.setLatLngs(newLatLngs);
+          emit(
+            "update:latlngs",
+            newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
+          );
+        },
+      }),
+      watchData: [() => props.selectable],
+    })
+  : { desk: ref(null) };
 
 let dragStartLatLngs: L.LatLng[] = [];
 let dragStartMousePoint: L.Point | null = null;
@@ -6899,92 +6883,6 @@ const setupMapDragHandlers = () => {
   }
 };
 
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext || !polyline.value) return;
-
-  const featureRef: FeatureReference = {
-    id: polylineId.value,
-    type: "polyline",
-    getBounds: () => {
-      if (!polyline.value) return null;
-      return polyline.value.getBounds();
-    },
-    getInitialData: () => {
-      if (!polyline.value) return null;
-      const latlngs = polyline.value.getLatLngs() as L.LatLng[];
-      return latlngs.map((ll) => [ll.lat, ll.lng] as [number, number]);
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!polyline.value || !L.value) return;
-
-      const currentBounds = polyline.value.getBounds();
-      const currentCenter = currentBounds.getCenter();
-      const newCenter = bounds.getCenter();
-
-      const currentLatLngs = polyline.value.getLatLngs() as L.LatLng[];
-      const scaleX =
-        (bounds.getEast() - bounds.getWest()) /
-        (currentBounds.getEast() - currentBounds.getWest());
-      const scaleY =
-        (bounds.getNorth() - bounds.getSouth()) /
-        (currentBounds.getNorth() - currentBounds.getSouth());
-
-      const newLatLngs = currentLatLngs.map((latlng) => {
-        const relativeX = (latlng.lng - currentCenter.lng) * scaleX;
-        const relativeY = (latlng.lat - currentCenter.lat) * scaleY;
-        return L.value!.latLng(
-          newCenter.lat + relativeY,
-          newCenter.lng + relativeX,
-        );
-      });
-
-      polyline.value.setLatLngs(newLatLngs);
-      emit(
-        "update:latlngs",
-        newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
-      );
-    },
-    applyRotation: (
-      angle: number,
-      center: { lat: number; lng: number },
-      initialLatLngs: Array<[number, number]>,
-    ) => {
-      if (!polyline.value || !L.value || !initialLatLngs) return;
-
-      const angleRad = (-angle * Math.PI) / 180;
-
-      const metersPerDegreeLat = LatDegreesMeters;
-      const metersPerDegreeLng = lngDegreesToRadius(1, center.lat);
-
-      const newLatLngs = initialLatLngs.map((latlng) => {
-        const lat = latlng[0];
-        const lng = latlng[1];
-
-        const relMetersY = (lat - center.lat) * metersPerDegreeLat;
-        const relMetersX = (lng - center.lng) * metersPerDegreeLng;
-
-        const newRelMetersY =
-          relMetersY * Math.cos(angleRad) - relMetersX * Math.sin(angleRad);
-        const newRelMetersX =
-          relMetersY * Math.sin(angleRad) + relMetersX * Math.cos(angleRad);
-
-        return L.value!.latLng(
-          center.lat + newRelMetersY / metersPerDegreeLat,
-          center.lng + newRelMetersX / metersPerDegreeLng,
-        );
-      });
-
-      polyline.value.setLatLngs(newLatLngs);
-      emit(
-        "update:latlngs",
-        newLatLngs.map((ll) => [ll.lat, ll.lng]) as Array<[number, number]>,
-      );
-    },
-  };
-
-  selectionContext.registerFeature(featureRef);
-};
-
 watch(
   () => [
     map.value,
@@ -7043,43 +6941,6 @@ watch(
           } else {
             polyline.value.on("click", onPolylineClick);
           }
-
-          if (props.selectable && selectionContext) {
-            registerWithSelection();
-          }
-        }
-
-        if (polyline.value) {
-          const selectableChanged =
-            oldVal && Boolean(oldVal[5]) !== Boolean(newVal[5]);
-          if (selectableChanged) {
-            polyline.value.off("click");
-            polyline.value.off("mousedown");
-
-            const onPolylineClick = () => {
-              if (props.selectable && selectionContext) {
-                selectionContext.selectFeature("polyline", polylineId.value);
-              }
-              emit("click");
-            };
-
-            const onPolylineMouseDown = (e: any) => {
-              if (props.draggable && props.selectable && selectionContext) {
-                selectionContext.selectFeature("polyline", polylineId.value);
-              }
-            };
-
-            if (props.selectable && selectionContext) {
-              polyline.value.on("click", onPolylineClick);
-              polyline.value.on("mousedown", onPolylineMouseDown);
-              registerWithSelection();
-            } else {
-              polyline.value.on("click", onPolylineClick);
-              if (selectionContext) {
-                selectionContext.unregisterFeature(polylineId.value);
-              }
-            }
-          }
         }
 
         if (props.draggable && !props.editable) {
@@ -7103,17 +6964,6 @@ watch(
   },
   { immediate: true, flush: "post" },
 );
-
-onBeforeUnmount(() => {
-  if (props.selectable && selectionContext) {
-    selectionContext.unregisterFeature(polylineId.value);
-  }
-
-  clearEditMarkers();
-  if (polyline.value) {
-    polyline.value.remove();
-  }
-});
 </script>
 
 <template><slot /></template>
@@ -7127,11 +6977,13 @@ import {
   ref,
   type Ref,
   nextTick,
-  onBeforeUnmount,
   type HTMLAttributes,
 } from "vue";
 import { useCssParser } from "~~/registry/new-york/composables/use-css-parser/useCssParser";
 import { useLeaflet } from "~~/registry/new-york/composables/use-leaflet/useLeaflet";
+import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
+
+const { checkIn } = useCheckIn<FeatureReference>();
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from ".";
 import type { FeatureReference } from "./LeafletFeaturesSelector.vue";
 import "./leaflet-editing.css";
@@ -7181,6 +7033,31 @@ const isDragging = ref(false);
 const rectangleId = ref<string | number>(
   props.id ?? `rectangle-${Date.now()}-${Math.random()}`,
 );
+
+const { desk } = selectionContext
+  ? checkIn(selectionContext, {
+      autoCheckIn: props.selectable,
+      id: rectangleId.value,
+      data: () => ({
+        id: rectangleId.value,
+        type: "rectangle" as const,
+        getBounds: () => {
+          if (!rectangle.value) return null;
+          return rectangle.value.getBounds();
+        },
+        applyTransform: (bounds: L.LatLngBounds) => {
+          if (!rectangle.value) return;
+
+          rectangle.value.setBounds(bounds);
+          emit("update:bounds", [
+            [bounds.getSouth(), bounds.getWest()],
+            [bounds.getNorth(), bounds.getEast()],
+          ] as [[number, number], [number, number]]);
+        },
+      }),
+      watchData: [() => props.selectable],
+    })
+  : { desk: ref(null) };
 
 let dragStartBounds: L.LatLngBounds | null = null;
 let dragStartMousePoint: L.Point | null = null;
@@ -7360,30 +7237,6 @@ const setupMapDragHandlers = () => {
   }
 };
 
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext || !rectangle.value) return;
-
-  const featureRef: FeatureReference = {
-    id: rectangleId.value,
-    type: "rectangle",
-    getBounds: () => {
-      if (!rectangle.value) return null;
-      return rectangle.value.getBounds();
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!rectangle.value) return;
-
-      rectangle.value.setBounds(bounds);
-      emit("update:bounds", [
-        [bounds.getSouth(), bounds.getWest()],
-        [bounds.getNorth(), bounds.getEast()],
-      ] as [[number, number], [number, number]]);
-    },
-  };
-
-  selectionContext.registerFeature(featureRef);
-};
-
 watch(
   () => [
     map.value,
@@ -7446,43 +7299,6 @@ watch(
           } else {
             rectangle.value.on("click", onRectangleClick);
           }
-
-          if (props.selectable && selectionContext) {
-            registerWithSelection();
-          }
-        }
-
-        if (rectangle.value) {
-          const selectableChanged =
-            oldVal && Boolean(oldVal[4]) !== Boolean(newVal[4]);
-          if (selectableChanged) {
-            rectangle.value.off("click");
-            rectangle.value.off("mousedown");
-
-            const onRectangleClick = () => {
-              if (props.selectable && selectionContext) {
-                selectionContext.selectFeature("rectangle", rectangleId.value);
-              }
-              emit("click");
-            };
-
-            const onRectangleMouseDown = (e: any) => {
-              if (props.draggable && props.selectable && selectionContext) {
-                selectionContext.selectFeature("rectangle", rectangleId.value);
-              }
-            };
-
-            if (props.selectable && selectionContext) {
-              rectangle.value.on("click", onRectangleClick);
-              rectangle.value.on("mousedown", onRectangleMouseDown);
-              registerWithSelection();
-            } else {
-              rectangle.value.on("click", onRectangleClick);
-              if (selectionContext) {
-                selectionContext.unregisterFeature(rectangleId.value);
-              }
-            }
-          }
         }
 
         if (props.draggable && !props.editable) {
@@ -7506,17 +7322,6 @@ watch(
   },
   { immediate: true, flush: "post" },
 );
-
-onBeforeUnmount(() => {
-  if (props.selectable && selectionContext) {
-    selectionContext.unregisterFeature(rectangleId.value);
-  }
-
-  clearEditMarkers();
-  if (rectangle.value) {
-    rectangle.value.remove();
-  }
-});
 </script>
 
 <template><slot /></template>
@@ -8753,170 +8558,6 @@ export const useCssParser = () => {
 };
 ```
 
-```ts [src/composables/use-colors/useColors.ts]
-export const useColors = () => {
-  const oklchToRgb = (
-    l: number,
-    c: number,
-    h: number,
-  ): { r: number; g: number; b: number } => {
-    const hRad = (h * Math.PI) / 180;
-
-    const a = c * Math.cos(hRad);
-    const b = c * Math.sin(hRad);
-
-    const l_ = l + 0.3963377774 * a + 0.2158037573 * b;
-    const m_ = l - 0.1055613458 * a - 0.0638541728 * b;
-    const s_ = l - 0.0894841775 * a - 1.291485548 * b;
-
-    const l3 = l_ * l_ * l_;
-    const m3 = m_ * m_ * m_;
-    const s3 = s_ * s_ * s_;
-
-    let r = +4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3;
-    let g = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3;
-    let bl = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3;
-
-    const gammaCorrect = (val: number): number => {
-      if (val <= 0.0031308) {
-        return 12.92 * val;
-      }
-      return 1.055 * Math.pow(val, 1 / 2.4) - 0.055;
-    };
-
-    r = gammaCorrect(r);
-    g = gammaCorrect(g);
-    bl = gammaCorrect(bl);
-
-    r = Math.max(0, Math.min(1, r));
-    g = Math.max(0, Math.min(1, g));
-    bl = Math.max(0, Math.min(1, bl));
-
-    return { r, g, b: bl };
-  };
-
-  const oklabToRgb = (
-    l: number,
-    a: number,
-    b: number,
-  ): { r: number; g: number; b: number } => {
-    const l_ = l + 0.3963377774 * a + 0.2158037573 * b;
-    const m_ = l - 0.1055613458 * a - 0.0638541728 * b;
-    const s_ = l - 0.0894841775 * a - 1.291485548 * b;
-
-    const l3 = l_ * l_ * l_;
-    const m3 = m_ * m_ * m_;
-    const s3 = s_ * s_ * s_;
-
-    let r = +4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3;
-    let g = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3;
-    let bl = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3;
-
-    const gammaCorrect = (val: number): number => {
-      if (val <= 0.0031308) {
-        return 12.92 * val;
-      }
-      return 1.055 * Math.pow(val, 1 / 2.4) - 0.055;
-    };
-
-    r = gammaCorrect(r);
-    g = gammaCorrect(g);
-    bl = gammaCorrect(bl);
-
-    r = Math.max(0, Math.min(1, r));
-    g = Math.max(0, Math.min(1, g));
-    bl = Math.max(0, Math.min(1, bl));
-
-    return { r, g, b: bl };
-  };
-
-  const parseOklchOrOklab = (
-    colorString: string,
-  ): { r: number; g: number; b: number } | null => {
-    const defaultColor = { r: 0.2, g: 0.53, b: 1.0 };
-
-    const oklchMatch = colorString.match(
-      /oklch\(\s*([\d.]+)%?\s+([\d.]+)\s+([\d.]+)(?:deg)?\s*(?:\/\s*([\d.]+%?))?\s*\)/i,
-    );
-    if (oklchMatch) {
-      let l = parseFloat(oklchMatch[1]!);
-      const c = parseFloat(oklchMatch[2]!);
-      const h = parseFloat(oklchMatch[3]!);
-
-      if (oklchMatch[1]!.includes("%") || l > 1) {
-        l = l / 100;
-      }
-
-      return oklchToRgb(l, c, h);
-    }
-
-    const oklabMatch = colorString.match(
-      /oklab\(\s*([\d.]+)%?\s+([-\d.]+)\s+([-\d.]+)\s*(?:\/\s*([\d.]+%?))?\s*\)/i,
-    );
-    if (oklabMatch) {
-      let l = parseFloat(oklabMatch[1]!);
-      const a = parseFloat(oklabMatch[2]!);
-      const b = parseFloat(oklabMatch[3]!);
-
-      if (oklabMatch[1]!.includes("%") || l > 1) {
-        l = l / 100;
-      }
-
-      return oklabToRgb(l, a, b);
-    }
-
-    return null;
-  };
-
-  const parseColor = (color: string): { r: number; g: number; b: number } => {
-    const defaultColor = { r: 0.2, g: 0.53, b: 1.0 };
-
-    if (!color) return defaultColor;
-
-    if (color.startsWith("oklch") || color.startsWith("oklab")) {
-      const result = parseOklchOrOklab(color);
-      if (result) return result;
-      return defaultColor;
-    }
-
-    if (color.startsWith("#")) {
-      const hex = color.replace("#", "");
-      if (hex.length === 3 && hex[0] && hex[1] && hex[2]) {
-        return {
-          r: parseInt(hex[0] + hex[0], 16) / 255,
-          g: parseInt(hex[1] + hex[1], 16) / 255,
-          b: parseInt(hex[2] + hex[2], 16) / 255,
-        };
-      } else if (hex.length === 6) {
-        return {
-          r: parseInt(hex.substring(0, 2), 16) / 255,
-          g: parseInt(hex.substring(2, 4), 16) / 255,
-          b: parseInt(hex.substring(4, 6), 16) / 255,
-        };
-      }
-    }
-
-    const rgbMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-    if (rgbMatch && rgbMatch[1] && rgbMatch[2] && rgbMatch[3]) {
-      return {
-        r: parseInt(rgbMatch[1]) / 255,
-        g: parseInt(rgbMatch[2]) / 255,
-        b: parseInt(rgbMatch[3]) / 255,
-      };
-    }
-
-    return defaultColor;
-  };
-
-  return {
-    oklchToRgb,
-    oklabToRgb,
-    parseOklchOrOklab,
-    parseColor,
-  };
-};
-```
-
 ```ts [src/composables/use-check-in/useCheckIn.ts]
 import {
   ref,
@@ -9118,6 +8759,170 @@ export const useCheckIn = <T = any,>() => {
     checkIn,
     generateId,
     standaloneDesk,
+  };
+};
+```
+
+```ts [src/composables/use-colors/useColors.ts]
+export const useColors = () => {
+  const oklchToRgb = (
+    l: number,
+    c: number,
+    h: number,
+  ): { r: number; g: number; b: number } => {
+    const hRad = (h * Math.PI) / 180;
+
+    const a = c * Math.cos(hRad);
+    const b = c * Math.sin(hRad);
+
+    const l_ = l + 0.3963377774 * a + 0.2158037573 * b;
+    const m_ = l - 0.1055613458 * a - 0.0638541728 * b;
+    const s_ = l - 0.0894841775 * a - 1.291485548 * b;
+
+    const l3 = l_ * l_ * l_;
+    const m3 = m_ * m_ * m_;
+    const s3 = s_ * s_ * s_;
+
+    let r = +4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3;
+    let g = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3;
+    let bl = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3;
+
+    const gammaCorrect = (val: number): number => {
+      if (val <= 0.0031308) {
+        return 12.92 * val;
+      }
+      return 1.055 * Math.pow(val, 1 / 2.4) - 0.055;
+    };
+
+    r = gammaCorrect(r);
+    g = gammaCorrect(g);
+    bl = gammaCorrect(bl);
+
+    r = Math.max(0, Math.min(1, r));
+    g = Math.max(0, Math.min(1, g));
+    bl = Math.max(0, Math.min(1, bl));
+
+    return { r, g, b: bl };
+  };
+
+  const oklabToRgb = (
+    l: number,
+    a: number,
+    b: number,
+  ): { r: number; g: number; b: number } => {
+    const l_ = l + 0.3963377774 * a + 0.2158037573 * b;
+    const m_ = l - 0.1055613458 * a - 0.0638541728 * b;
+    const s_ = l - 0.0894841775 * a - 1.291485548 * b;
+
+    const l3 = l_ * l_ * l_;
+    const m3 = m_ * m_ * m_;
+    const s3 = s_ * s_ * s_;
+
+    let r = +4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3;
+    let g = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3;
+    let bl = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3;
+
+    const gammaCorrect = (val: number): number => {
+      if (val <= 0.0031308) {
+        return 12.92 * val;
+      }
+      return 1.055 * Math.pow(val, 1 / 2.4) - 0.055;
+    };
+
+    r = gammaCorrect(r);
+    g = gammaCorrect(g);
+    bl = gammaCorrect(bl);
+
+    r = Math.max(0, Math.min(1, r));
+    g = Math.max(0, Math.min(1, g));
+    bl = Math.max(0, Math.min(1, bl));
+
+    return { r, g, b: bl };
+  };
+
+  const parseOklchOrOklab = (
+    colorString: string,
+  ): { r: number; g: number; b: number } | null => {
+    const defaultColor = { r: 0.2, g: 0.53, b: 1.0 };
+
+    const oklchMatch = colorString.match(
+      /oklch\(\s*([\d.]+)%?\s+([\d.]+)\s+([\d.]+)(?:deg)?\s*(?:\/\s*([\d.]+%?))?\s*\)/i,
+    );
+    if (oklchMatch) {
+      let l = parseFloat(oklchMatch[1]!);
+      const c = parseFloat(oklchMatch[2]!);
+      const h = parseFloat(oklchMatch[3]!);
+
+      if (oklchMatch[1]!.includes("%") || l > 1) {
+        l = l / 100;
+      }
+
+      return oklchToRgb(l, c, h);
+    }
+
+    const oklabMatch = colorString.match(
+      /oklab\(\s*([\d.]+)%?\s+([-\d.]+)\s+([-\d.]+)\s*(?:\/\s*([\d.]+%?))?\s*\)/i,
+    );
+    if (oklabMatch) {
+      let l = parseFloat(oklabMatch[1]!);
+      const a = parseFloat(oklabMatch[2]!);
+      const b = parseFloat(oklabMatch[3]!);
+
+      if (oklabMatch[1]!.includes("%") || l > 1) {
+        l = l / 100;
+      }
+
+      return oklabToRgb(l, a, b);
+    }
+
+    return null;
+  };
+
+  const parseColor = (color: string): { r: number; g: number; b: number } => {
+    const defaultColor = { r: 0.2, g: 0.53, b: 1.0 };
+
+    if (!color) return defaultColor;
+
+    if (color.startsWith("oklch") || color.startsWith("oklab")) {
+      const result = parseOklchOrOklab(color);
+      if (result) return result;
+      return defaultColor;
+    }
+
+    if (color.startsWith("#")) {
+      const hex = color.replace("#", "");
+      if (hex.length === 3 && hex[0] && hex[1] && hex[2]) {
+        return {
+          r: parseInt(hex[0] + hex[0], 16) / 255,
+          g: parseInt(hex[1] + hex[1], 16) / 255,
+          b: parseInt(hex[2] + hex[2], 16) / 255,
+        };
+      } else if (hex.length === 6) {
+        return {
+          r: parseInt(hex.substring(0, 2), 16) / 255,
+          g: parseInt(hex.substring(2, 4), 16) / 255,
+          b: parseInt(hex.substring(4, 6), 16) / 255,
+        };
+      }
+    }
+
+    const rgbMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (rgbMatch && rgbMatch[1] && rgbMatch[2] && rgbMatch[3]) {
+      return {
+        r: parseInt(rgbMatch[1]) / 255,
+        g: parseInt(rgbMatch[2]) / 255,
+        b: parseInt(rgbMatch[3]) / 255,
+      };
+    }
+
+    return defaultColor;
+  };
+
+  return {
+    oklchToRgb,
+    oklabToRgb,
+    parseOklchOrOklab,
+    parseColor,
   };
 };
 ```

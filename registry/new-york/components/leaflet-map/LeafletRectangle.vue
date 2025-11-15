@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { inject, watch, ref, type Ref, nextTick, onBeforeUnmount, type HTMLAttributes } from 'vue';
+import { inject, watch, ref, type Ref, nextTick, type HTMLAttributes } from 'vue';
 import { useCssParser } from '~~/registry/new-york/composables/use-css-parser/useCssParser';
 import { useLeaflet } from '~~/registry/new-york/composables/use-leaflet/useLeaflet';
+import { useCheckIn } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
+
+const { checkIn } = useCheckIn<FeatureReference>();
 import { LeafletMapKey, LeafletModuleKey, LeafletSelectionKey } from '.';
 import type { FeatureReference } from './LeafletFeaturesSelector.vue';
 import './leaflet-editing.css';
@@ -49,6 +52,36 @@ const rectangle = ref<L.Rectangle | null>(null);
 const editMarkers = ref<L.Marker[]>([]);
 const isDragging = ref(false);
 const rectangleId = ref<string | number>(props.id ?? `rectangle-${Date.now()}-${Math.random()}`);
+
+// Check in with selection desk
+const { desk } = selectionContext
+  ? checkIn(
+      // @ts-ignore - selectionContext has deskSymbol property
+      selectionContext,
+      {
+        autoCheckIn: props.selectable,
+        id: rectangleId.value,
+        data: () => ({
+          id: rectangleId.value,
+          type: 'rectangle' as const,
+          getBounds: () => {
+            if (!rectangle.value) return null;
+            return rectangle.value.getBounds();
+          },
+          applyTransform: (bounds: L.LatLngBounds) => {
+            if (!rectangle.value) return;
+
+            rectangle.value.setBounds(bounds);
+            emit('update:bounds', [
+              [bounds.getSouth(), bounds.getWest()],
+              [bounds.getNorth(), bounds.getEast()],
+            ] as [[number, number], [number, number]]);
+          },
+        }),
+        watchData: [() => props.selectable],
+      }
+    )
+  : { desk: ref(null) };
 
 // Variables pour le drag
 let dragStartBounds: L.LatLngBounds | null = null;
@@ -220,31 +253,7 @@ const setupMapDragHandlers = () => {
   }
 };
 
-// Selection context integration
-const registerWithSelection = () => {
-  if (!props.selectable || !selectionContext || !rectangle.value) return;
-
-  const featureRef: FeatureReference = {
-    id: rectangleId.value,
-    type: 'rectangle',
-    getBounds: () => {
-      if (!rectangle.value) return null;
-      return rectangle.value.getBounds();
-    },
-    applyTransform: (bounds: L.LatLngBounds) => {
-      if (!rectangle.value) return;
-
-      rectangle.value.setBounds(bounds);
-      emit('update:bounds', [
-        [bounds.getSouth(), bounds.getWest()],
-        [bounds.getNorth(), bounds.getEast()],
-      ] as [[number, number], [number, number]]);
-    },
-    // Pas de rotation pour les rectangles (ils restent axis-aligned)
-  };
-
-  selectionContext.registerFeature(featureRef);
-};
+// Selection handled by checkIn above
 
 watch(
   () => [map.value, props.bounds, props.editable, props.draggable, props.selectable],
@@ -303,46 +312,6 @@ watch(
           } else {
             rectangle.value.on('click', onRectangleClick);
           }
-
-          // Register with selection context if selectable
-          if (props.selectable && selectionContext) {
-            registerWithSelection();
-          }
-        }
-
-        // Check if selectable changed and we need to register/unregister
-        if (rectangle.value) {
-          const selectableChanged = oldVal && Boolean(oldVal[4]) !== Boolean(newVal[4]);
-          if (selectableChanged) {
-            // Remove old event listeners
-            rectangle.value.off('click');
-            rectangle.value.off('mousedown');
-
-            const onRectangleClick = () => {
-              if (props.selectable && selectionContext) {
-                selectionContext.selectFeature('rectangle', rectangleId.value);
-              }
-              emit('click');
-            };
-
-            const onRectangleMouseDown = (e: any) => {
-              if (props.draggable && props.selectable && selectionContext) {
-                selectionContext.selectFeature('rectangle', rectangleId.value);
-              }
-            };
-
-            // Add new event listeners based on selectable state
-            if (props.selectable && selectionContext) {
-              rectangle.value.on('click', onRectangleClick);
-              rectangle.value.on('mousedown', onRectangleMouseDown);
-              registerWithSelection();
-            } else {
-              rectangle.value.on('click', onRectangleClick);
-              if (selectionContext) {
-                selectionContext.unregisterFeature(rectangleId.value);
-              }
-            }
-          }
         }
 
         // Gestion des modes : draggable OU editable, pas les deux
@@ -367,18 +336,6 @@ watch(
   },
   { immediate: true, flush: 'post' }
 );
-
-onBeforeUnmount(() => {
-  // Unregister from selection context
-  if (props.selectable && selectionContext) {
-    selectionContext.unregisterFeature(rectangleId.value);
-  }
-
-  clearEditMarkers();
-  if (rectangle.value) {
-    rectangle.value.remove();
-  }
-});
 </script>
 
 <template><slot /></template>
