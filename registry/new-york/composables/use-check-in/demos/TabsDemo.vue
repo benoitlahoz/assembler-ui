@@ -34,14 +34,12 @@ const { desk, deskSymbol: tabsDesk } = openDesk({
     },
   },
   onCheckIn: (id, data) => {
-    console.log('Tab checked in:', id, data);
     tabCount.value++;
     if (tabCount.value === 1) {
       activeTab.value = id as string;
     }
   },
   onCheckOut: (id) => {
-    console.log('Tab checked out:', id);
     tabCount.value--;
   },
 });

@@ -36,7 +36,7 @@ const { desk, deskSymbol: toolbarDesk } = openDesk({
     isActive: (id: string | number) => activeTool.value === id,
   },
   onCheckIn: (id, data) => {
-    console.log('Tool checked in:', id, data);
+    // console.log('Tool checked in:', id, data);
   },
 });
 

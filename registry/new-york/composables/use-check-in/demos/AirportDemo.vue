@@ -16,6 +16,48 @@ const flightNumber = ref('AF1234');
 const gate = ref('A12');
 const departureTime = ref('14:30');
 
+// Type d'avion et configuration des sièges
+type AircraftType = 'Airbus A320' | 'Boeing 737';
+const aircraftType = ref<AircraftType>('Airbus A320');
+const aircraftConfig: Record<
+  AircraftType,
+  {
+    rows: { Business: number[]; Premium: number[]; Eco: number[] };
+    letters: { Business: string[]; Premium: string[]; Eco: string[] };
+    totalSeats: number;
+  }
+> = {
+  'Airbus A320': {
+    rows: {
+      Business: [1, 2, 3, 4],
+      Premium: [5, 6, 7, 8, 9],
+      Eco: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30],
+    },
+    letters: {
+      Business: ['A', 'C', 'D', 'F'],
+      Premium: ['A', 'B', 'C', 'D', 'E', 'F'],
+      Eco: ['A', 'B', 'C', 'D', 'E', 'F'],
+    },
+    totalSeats: 174,
+  },
+  'Boeing 737': {
+    rows: {
+      Business: [1, 2, 3],
+      Premium: [4, 5, 6, 7],
+      Eco: [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29],
+    },
+    letters: {
+      Business: ['A', 'C', 'D', 'F'],
+      Premium: ['A', 'B', 'C', 'D', 'E', 'F'],
+      Eco: ['A', 'B', 'C', 'D', 'E', 'F'],
+    },
+    totalSeats: 162,
+  },
+};
+
+// Sièges déjà occupés (pour éviter les doublons)
+const occupiedSeats = ref(new Set<string>());
+
 // Mapping des classes tarifaires vers les groupes d'embarquement
 const boardingGroups = ref({
   Business: 'A',
@@ -46,9 +88,8 @@ const addBaggage = (passengerId: string, weight: number = 10): boolean => {
     return false;
   }
 
-  // Mise à jour directe du registry
-  passenger.data.baggage = newWeight;
-  airportDesk.desk.registry.value.set(passengerId, passenger);
+  // Utilisation de update() pour mettre à jour les bagages
+  airportDesk.desk.update(passengerId, { baggage: newWeight });
   console.log(
     `➕ ${passenger.data.name}: Ajout de ${weight}kg de bagages (${currentWeight}kg → ${newWeight}kg)`
   );
@@ -63,9 +104,8 @@ const removeBaggage = (passengerId: string, weight: number = 10): boolean => {
   const currentWeight = passenger.data.baggage;
   const newWeight = Math.max(0, currentWeight - weight);
 
-  // Mise à jour directe du registry
-  passenger.data.baggage = newWeight;
-  airportDesk.desk.registry.value.set(passengerId, passenger);
+  // Utilisation de update() pour mettre à jour les bagages
+  airportDesk.desk.update(passengerId, { baggage: newWeight });
   console.log(
     `➖ ${passenger.data.name}: Retrait de ${weight}kg de bagages (${currentWeight}kg → ${newWeight}kg)`
   );
@@ -73,32 +113,64 @@ const removeBaggage = (passengerId: string, weight: number = 10): boolean => {
 };
 
 // Fonction pour assigner un nouveau siège (responsabilité du desk)
-const assignSeat = (passengerId: string, passengerName: string) => {
-  const rows = ['8', '12', '15', '18', '22', '25'];
-  const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
-  const rowPart = rows[Math.floor(Math.random() * rows.length)];
-  const letterPart = letters[Math.floor(Math.random() * letters.length)];
+const assignSeat = (
+  passengerId: string,
+  passengerName: string,
+  fareClass: 'Business' | 'Premium' | 'Eco' = 'Eco'
+) => {
+  const config = aircraftConfig[aircraftType.value];
+  const availableRows = config.rows[fareClass];
+  const availableLetters = config.letters[fareClass];
 
-  if (rowPart && letterPart) {
-    const newSeat = rowPart + letterPart;
-    const passenger = airportDesk.desk.get(passengerId);
-    const oldSeat = passenger?.data.seat;
-
-    // Mise à jour directe du registry pour éviter de re-déclencher onCheckIn
-    if (passenger) {
-      passenger.data.seat = newSeat;
-      airportDesk.desk.registry.value.set(passengerId, passenger);
+  // Générer toutes les combinaisons possibles pour cette classe
+  const possibleSeats: string[] = [];
+  for (const row of availableRows) {
+    for (const letter of availableLetters) {
+      const seat = `${row}${letter}`;
+      if (!occupiedSeats.value.has(seat)) {
+        possibleSeats.push(seat);
+      }
     }
-
-    if (oldSeat) {
-      console.log(`💺 Le comptoir a changé le siège de ${passengerName}: ${oldSeat} → ${newSeat}`);
-    } else {
-      console.log(`💺 Le comptoir a assigné le siège ${newSeat} à ${passengerName}`);
-    }
-
-    return newSeat;
   }
-  return null;
+
+  // Si aucun siège disponible
+  if (possibleSeats.length === 0) {
+    console.log(`❌ Aucun siège disponible en classe ${fareClass} pour ${passengerName}`);
+    return null;
+  }
+
+  // Choisir un siège aléatoire parmi les disponibles
+  const newSeat = possibleSeats[Math.floor(Math.random() * possibleSeats.length)];
+
+  if (!newSeat) {
+    console.log(`❌ Erreur lors de l'assignation du siège pour ${passengerName}`);
+    return null;
+  }
+
+  const passenger = airportDesk.desk.get(passengerId);
+  const oldSeat = passenger?.data.seat;
+
+  // Mise à jour directe du registry pour éviter de re-déclencher onCheckIn
+  if (passenger) {
+    // Libérer l'ancien siège
+    if (oldSeat) {
+      occupiedSeats.value.delete(oldSeat);
+    }
+
+    // Occuper le nouveau siège
+    occupiedSeats.value.add(newSeat);
+
+    passenger.data.seat = newSeat;
+    airportDesk.desk.registry.value.set(passengerId, passenger);
+  }
+
+  if (oldSeat) {
+    console.log(`💺 Le comptoir a changé le siège de ${passengerName}: ${oldSeat} → ${newSeat}`);
+  } else {
+    console.log(`💺 Le comptoir a assigné le siège ${newSeat} à ${passengerName} (${fareClass})`);
+  }
+
+  return newSeat;
 };
 
 const { openDesk } = useCheckIn<
@@ -127,11 +199,16 @@ const airportDesk = openDesk({
     addBaggage,
     removeBaggage,
   },
-  debug: true,
+  debug: false,
   onCheckIn: (id, data) => {
-    // Le comptoir assigne automatiquement un siège lors de l'enregistrement
-    const assignedSeat = assignSeat(String(id), data.name);
-    console.log(`✅ ${data.name} s'est enregistré(e) au comptoir avec le siège ${assignedSeat} !`);
+    // Le comptoir assigne automatiquement un siège UNIQUEMENT lors de l'enregistrement initial
+    // (si le passager n'a pas déjà un siège)
+    if (!data.seat) {
+      const assignedSeat = assignSeat(String(id), data.name, data.fareClass);
+      console.log(
+        `✅ ${data.name} s'est enregistré(e) au comptoir avec le siège ${assignedSeat} !`
+      );
+    }
   },
   onCheckOut: (id) => {
     console.log(`🚪 Passager ${id} a quitté le comptoir`);
@@ -150,13 +227,19 @@ const passengers = computed(() => {
 });
 
 // Statistiques du vol
-const stats = computed(() => ({
-  total: passengers.value.length,
-  groupA: passengers.value.filter((p) => boardingGroups.value[p.data.fareClass] === 'A').length,
-  groupB: passengers.value.filter((p) => boardingGroups.value[p.data.fareClass] === 'B').length,
-  groupC: passengers.value.filter((p) => boardingGroups.value[p.data.fareClass] === 'C').length,
-  totalWeight: passengers.value.reduce((sum, p) => sum + p.data.baggage, 0),
-}));
+const stats = computed(() => {
+  const config = aircraftConfig[aircraftType.value];
+  return {
+    total: passengers.value.length,
+    groupA: passengers.value.filter((p) => boardingGroups.value[p.data.fareClass] === 'A').length,
+    groupB: passengers.value.filter((p) => boardingGroups.value[p.data.fareClass] === 'B').length,
+    groupC: passengers.value.filter((p) => boardingGroups.value[p.data.fareClass] === 'C').length,
+    totalWeight: passengers.value.reduce((sum, p) => sum + p.data.baggage, 0),
+    totalSeats: config.totalSeats,
+    occupiedSeats: occupiedSeats.value.size,
+    availableSeats: config.totalSeats - occupiedSeats.value.size,
+  };
+});
 
 // Embarquement de tous les passagers d'un groupe
 const boardGroup = (group: 'A' | 'B' | 'C') => {
@@ -183,6 +266,26 @@ const changeGate = () => {
   const newGate = gates[(currentIndex + 1) % gates.length];
   if (newGate) gate.value = newGate;
 };
+
+// Changer de type d'avion (réinitialise les sièges)
+const changeAircraft = () => {
+  const types: AircraftType[] = ['Airbus A320', 'Boeing 737'];
+  const currentIndex = types.indexOf(aircraftType.value);
+  const nextType = types[(currentIndex + 1) % types.length];
+  if (!nextType) return;
+
+  aircraftType.value = nextType;
+
+  // Réinitialiser les sièges occupés
+  occupiedSeats.value.clear();
+
+  // Réassigner tous les sièges
+  passengers.value.forEach((p) => {
+    assignSeat(String(p.id), p.data.name, p.data.fareClass);
+  });
+
+  console.log(`✈️ Changement d'appareil: ${aircraftType.value}`);
+};
 </script>
 
 <template>
@@ -190,10 +293,14 @@ const changeGate = () => {
     <!-- Panneau d'affichage du vol -->
     <div class="bg-primary/10 p-4 rounded-lg border-2 border-primary">
       <h3 class="text-lg font-bold mb-3">✈️ Panneau d'affichage - Comptoir d'enregistrement</h3>
-      <div class="grid grid-cols-3 gap-4 text-sm">
+      <div class="grid grid-cols-4 gap-4 text-sm">
         <div>
           <div class="text-muted-foreground">Vol</div>
           <div class="font-mono font-bold">{{ flightNumber }}</div>
+        </div>
+        <div>
+          <div class="text-muted-foreground">Appareil</div>
+          <div class="font-mono font-bold text-xs">{{ aircraftType }}</div>
         </div>
         <div>
           <div class="text-muted-foreground">Porte</div>
@@ -204,23 +311,42 @@ const changeGate = () => {
           <div class="font-mono font-bold">{{ departureTime }}</div>
         </div>
       </div>
-      <button
-        @click="changeGate"
-        class="mt-3 px-3 py-1 bg-primary text-primary-foreground rounded text-sm hover:bg-primary/90"
-      >
-        🔄 Changer de porte
-      </button>
+      <div class="flex gap-2 mt-3">
+        <button
+          @click="changeGate"
+          class="px-3 py-1 bg-primary text-primary-foreground rounded text-sm hover:bg-primary/90"
+        >
+          🔄 Changer de porte
+        </button>
+        <button
+          @click="changeAircraft"
+          class="px-3 py-1 bg-secondary text-secondary-foreground rounded text-sm hover:bg-secondary/90"
+        >
+          ✈️ Changer d'appareil
+        </button>
+      </div>
     </div>
 
     <!-- Statistiques d'enregistrement -->
-    <div class="grid grid-cols-2 gap-4">
+    <div class="grid grid-cols-4 gap-4">
       <div class="bg-muted p-4 rounded-lg">
-        <h4 class="font-semibold mb-2">📊 Passagers enregistrés</h4>
-        <div class="text-3xl font-bold">{{ stats.total }}</div>
+        <h4 class="font-semibold mb-2 text-sm">📊 Passagers</h4>
+        <div class="text-2xl font-bold">{{ stats.total }}</div>
       </div>
       <div class="bg-muted p-4 rounded-lg">
-        <h4 class="font-semibold mb-2">🧳 Total Luggages Weight</h4>
-        <div class="text-3xl font-bold">{{ stats.totalWeight }}kg</div>
+        <h4 class="font-semibold mb-2 text-sm">💺 Sièges</h4>
+        <div class="text-2xl font-bold">{{ stats.occupiedSeats }}/{{ stats.totalSeats }}</div>
+        <div class="text-xs text-muted-foreground mt-1">{{ stats.availableSeats }} disponibles</div>
+      </div>
+      <div class="bg-muted p-4 rounded-lg">
+        <h4 class="font-semibold mb-2 text-sm">🧳 Bagages</h4>
+        <div class="text-2xl font-bold">{{ stats.totalWeight }}kg</div>
+      </div>
+      <div class="bg-muted p-4 rounded-lg">
+        <h4 class="font-semibold mb-2 text-sm">✈️ Capacité</h4>
+        <div class="text-lg font-bold">
+          {{ Math.round((stats.occupiedSeats / stats.totalSeats) * 100) }}%
+        </div>
       </div>
     </div>
 

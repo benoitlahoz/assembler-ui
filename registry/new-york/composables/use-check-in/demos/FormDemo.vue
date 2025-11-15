@@ -35,13 +35,12 @@ const { desk, deskSymbol: formDesk } = openDesk({
     getError: (name: string) => errors.value[name],
   },
   onCheckIn: (id, data) => {
-    console.log('Field checked in:', id, data);
     if (data.value !== undefined) {
       formData.value[data.name] = data.value;
     }
   },
   onCheckOut: (id) => {
-    console.log('Field checked out:', id);
+    // console.log('Field checked out:', id);
   },
 });
 

@@ -135,7 +135,7 @@ const airportDesk = openDesk({
     addBaggage,
     removeBaggage,
   },
-  debug: true,
+  debug: false,
   onCheckIn: (id, data) => {
     const assignedSeat = assignSeat(String(id), data.name);
     console.log(
