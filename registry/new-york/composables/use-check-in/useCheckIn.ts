@@ -6,6 +6,7 @@
  * @type registry:hook
  * @category data
  *
+ * @demo AirportDemo
  * @demo FormDemo
  * @demo AccordionDemo
  * @demo TabsDemo
