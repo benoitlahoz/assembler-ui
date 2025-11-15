@@ -52,7 +52,7 @@ const readonlyData = ref({
 <template>
   <div class="h-128 max-h-128 overflow-auto">
     <div class="mb-4">
-      <ObjectComposer v-model="userData" title="Données Utilisateur">
+      <ObjectComposer v-model="userData">
         <ObjectComposerHeader>
           <ObjectComposerTitle>User Data (Default)</ObjectComposerTitle>
           <ObjectComposerDescription>
