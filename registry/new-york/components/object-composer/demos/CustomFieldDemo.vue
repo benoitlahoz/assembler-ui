@@ -57,16 +57,7 @@ const userProfile = ref({
             </ObjectComposerTitle>
           </ObjectComposerHeader>
           <Separator class="mb-4" />
-          <ObjectComposerItem>
-            <template #default="{ itemKey, value, valueType, displayValue }">
-              <CustomObjectComposerField
-                :item-key="itemKey"
-                :value="value"
-                :value-type="valueType"
-                :display-value="displayValue"
-              />
-            </template>
-          </ObjectComposerItem>
+          <ObjectComposerItem :field-component="CustomObjectComposerField" />
         </ObjectComposer>
       </div>
 
@@ -82,16 +73,7 @@ const userProfile = ref({
             </ObjectComposerTitle>
           </ObjectComposerHeader>
           <Separator class="mb-4" />
-          <ObjectComposerItem>
-            <template #default="{ itemKey, value, valueType, displayValue }">
-              <CustomObjectComposerField
-                :item-key="itemKey"
-                :value="value"
-                :value-type="valueType"
-                :display-value="displayValue"
-              />
-            </template>
-          </ObjectComposerItem>
+          <ObjectComposerItem :field-component="CustomObjectComposerField" />
         </ObjectComposer>
       </div>
     </div>
@@ -132,19 +114,15 @@ const userProfile = ref({
     <div class="space-y-3">
       <h3 class="font-semibold">Usage</h3>
       <div class="bg-muted/50 rounded-lg p-4 font-mono text-xs space-y-2">
-        <div>&lt;ObjectComposerItem&gt;</div>
-        <div class="ml-4">
-          &lt;template #default="{{ '{' }} itemKey, value, valueType, displayValue {{ '}' }}"&gt;
-        </div>
-        <div class="ml-8">&lt;CustomObjectComposerField</div>
-        <div class="ml-12">:item-key="itemKey"</div>
-        <div class="ml-12">:value="value"</div>
-        <div class="ml-12">:value-type="valueType"</div>
-        <div class="ml-12">:display-value="displayValue"</div>
-        <div class="ml-8">/&gt;</div>
-        <div class="ml-4">&lt;/template&gt;</div>
-        <div>&lt;/ObjectComposerItem&gt;</div>
+        <div>&lt;ObjectComposerItem</div>
+        <div class="ml-4">:field-component="CustomObjectComposerField"</div>
+        <div>/&gt;</div>
       </div>
+      <p class="text-sm text-muted-foreground">
+        ObjectComposerField receives the custom component via the
+        <code class="bg-muted px-1 py-0.5 rounded">as</code> prop and distributes all props
+        (itemKey, value, valueType, displayValue, desk) to it.
+      </p>
     </div>
   </div>
 </template>

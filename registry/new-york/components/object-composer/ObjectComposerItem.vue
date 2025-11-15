@@ -6,6 +6,7 @@ import {
   provide,
   type HTMLAttributes,
   type InjectionKey,
+  type Component,
   onMounted,
 } from 'vue';
 import { cn } from '@/lib/utils';
@@ -39,6 +40,7 @@ interface ObjectComposerItemProps {
   path?: string[];
   isInArray?: boolean;
   class?: HTMLAttributes['class'];
+  fieldComponent?: Component | string;
 }
 
 interface SlotProps {
@@ -228,6 +230,7 @@ function addChild() {
       :depth="depth"
       :path="path"
       :is-in-array="Array.isArray(composerDesk.model.value)"
+      :field-component="fieldComponent"
     >
       <template v-if="$slots.default" #default="slotProps">
         <slot v-bind="slotProps" />
@@ -261,6 +264,7 @@ function addChild() {
           :is-editing="isEditing"
           :edit-key="editKey"
           :edit-value="editValue"
+          :as="fieldComponent"
         >
           <template v-if="$slots.default" #default="slotProps">
             <slot v-bind="slotProps" />
@@ -370,6 +374,7 @@ function addChild() {
             :is-editing="isEditing"
             :edit-key="editKey"
             :edit-value="editValue"
+            :as="fieldComponent"
           >
             <template v-if="$slots.default" #default="slotProps">
               <slot v-bind="slotProps" />

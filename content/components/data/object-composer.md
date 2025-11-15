@@ -346,7 +346,7 @@ const props = defineProps<ObjectComposerDescriptionProps>();
 
 ```vue [src/components/ui/object-composer/ObjectComposerField.vue]
 <script setup lang="ts">
-import { inject } from "vue";
+import { inject, type Component } from "vue";
 import { cn } from "@/lib/utils";
 import type { CheckInDesk } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
 
@@ -359,18 +359,30 @@ interface ObjectComposerFieldProps {
   isEditing: boolean;
   editKey: string;
   editValue: string;
+  as?: Component | string;
 }
 
-defineProps<ObjectComposerFieldProps>();
+const props = defineProps<ObjectComposerFieldProps>();
 
 const itemDesk = inject<{ desk: CheckInDesk<any> }>("objectComposerItemDesk");
 
-if (itemDesk) {
-}
+const slotProps = {
+  itemKey: props.itemKey,
+  value: props.value,
+  valueType: props.valueType,
+  displayValue: props.displayValue,
+  isExpandable: props.isExpandable,
+  isEditing: props.isEditing,
+  editKey: props.editKey,
+  editValue: props.editValue,
+  desk: itemDesk?.desk,
+};
 </script>
 
 <template>
-  <div class="flex items-center gap-1.5">
+  <component v-if="as" :is="as" v-bind="slotProps" />
+
+  <div v-else class="flex items-center gap-1.5">
     <span class="font-medium text-foreground">{{ itemKey }}</span>
     <span class="text-muted-foreground">:</span>
     <span
@@ -406,6 +418,7 @@ import {
   provide,
   type HTMLAttributes,
   type InjectionKey,
+  type Component,
   onMounted,
 } from "vue";
 import { cn } from "@/lib/utils";
@@ -439,6 +452,7 @@ interface ObjectComposerItemProps {
   path?: string[];
   isInArray?: boolean;
   class?: HTMLAttributes["class"];
+  fieldComponent?: Component | string;
 }
 
 interface SlotProps {
@@ -624,6 +638,7 @@ function addChild() {
       :depth="depth"
       :path="path"
       :is-in-array="Array.isArray(composerDesk.model.value)"
+      :field-component="fieldComponent"
     >
       <template v-if="$slots.default" #default="slotProps">
         <slot v-bind="slotProps" />
@@ -655,6 +670,7 @@ function addChild() {
           :is-editing="isEditing"
           :edit-key="editKey"
           :edit-value="editValue"
+          :as="fieldComponent"
         >
           <template v-if="$slots.default" #default="slotProps">
             <slot v-bind="slotProps" />
@@ -800,6 +816,7 @@ function addChild() {
             :is-editing="isEditing"
             :edit-key="editKey"
             :edit-value="editValue"
+            :as="fieldComponent"
           >
             <template v-if="$slots.default" #default="slotProps">
               <slot v-bind="slotProps" />
@@ -2250,6 +2267,7 @@ export const useCheckIn = <
 | `isEditing`{.primary .text-primary} | `boolean` | - |  |
 | `editKey`{.primary .text-primary} | `string` | - |  |
 | `editValue`{.primary .text-primary} | `string` | - |  |
+| `as`{.primary .text-primary} | `Component \| string` | - |  |
 
   ### Inject
 | Key | Default | Type | Description |
@@ -2286,6 +2304,7 @@ export const useCheckIn = <
 | `path`{.primary .text-primary} | `string[]` |  |  |
 | `isInArray`{.primary .text-primary} | `boolean` | false |  |
 | `class`{.primary .text-primary} | `HTMLAttributes['class']` | - |  |
+| `fieldComponent`{.primary .text-primary} | `Component \| string` | - |  |
 
   ### Slots
 | Name | Description |
@@ -2462,17 +2481,8 @@ const userProfile = ref({
               </span>
             </ObjectComposerTitle>
           </ObjectComposerHeader>
-          <Separator class="my-3" />
-          <ObjectComposerItem>
-            <template #default="{ itemKey, value, valueType, displayValue }">
-              <CustomObjectComposerField
-                :item-key="itemKey"
-                :value="value"
-                :value-type="valueType"
-                :display-value="displayValue"
-              />
-            </template>
-          </ObjectComposerItem>
+          <Separator class="mb-4" />
+          <ObjectComposerItem :field-component="CustomObjectComposerField" />
         </ObjectComposer>
       </div>
 
@@ -2487,17 +2497,8 @@ const userProfile = ref({
               </span>
             </ObjectComposerTitle>
           </ObjectComposerHeader>
-          <Separator class="my-3" />
-          <ObjectComposerItem>
-            <template #default="{ itemKey, value, valueType, displayValue }">
-              <CustomObjectComposerField
-                :item-key="itemKey"
-                :value="value"
-                :value-type="valueType"
-                :display-value="displayValue"
-              />
-            </template>
-          </ObjectComposerItem>
+          <Separator class="mb-4" />
+          <ObjectComposerItem :field-component="CustomObjectComposerField" />
         </ObjectComposer>
       </div>
     </div>
@@ -2538,19 +2539,13 @@ const userProfile = ref({
     <div class="space-y-3">
       <h3 class="font-semibold">Usage</h3>
       <div class="bg-muted/50 rounded-lg p-4 font-mono text-xs space-y-2">
-        <div><ObjectComposerItem></div>
-        <div class="ml-4">
-          <template #default="{{ '{' }} itemKey, value, valueType, displayValue {{ '}' }}">
-        </div>
-        <div class="ml-8"><CustomObjectComposerField</div>
-        <div class="ml-12">:item-key="itemKey"</div>
-        <div class="ml-12">:value="value"</div>
-        <div class="ml-12">:value-type="valueType"</div>
-        <div class="ml-12">:display-value="displayValue"</div>
-        <div class="ml-8">/></div>
-        <div class="ml-4"></template></div>
-        <div></ObjectComposerItem></div>
+        <div><ObjectComposerItem</div>
+        <div class="ml-4">:field-component="CustomObjectComposerField"</div>
+        <div>/></div>
       </div>
+      <p class="text-sm text-muted-foreground">
+        ObjectComposerField receives the custom component via the <code class="bg-muted px-1 py-0.5 rounded">as</code> prop and distributes all props (itemKey, value, valueType, displayValue, desk) to it.
+      </p>
     </div>
   </div>
 </template>

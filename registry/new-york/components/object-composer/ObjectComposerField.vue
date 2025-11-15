@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject } from 'vue';
+import { inject, type Component } from 'vue';
 import { cn } from '@/lib/utils';
 import type { CheckInDesk } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
 
@@ -12,23 +12,34 @@ interface ObjectComposerFieldProps {
   isEditing: boolean;
   editKey: string;
   editValue: string;
+  as?: Component | string;
 }
 
-defineProps<ObjectComposerFieldProps>();
+const props = defineProps<ObjectComposerFieldProps>();
 
 // Inject desk from parent ObjectComposerItem (like FormField pattern)
 const itemDesk = inject<{ desk: CheckInDesk<any> }>('objectComposerItemDesk');
 
-// Access to parent desk for potential custom logic
-if (itemDesk) {
-  // Field has access to: itemDesk.desk.updateValue, etc.
-  // This enables advanced custom field behavior
-}
+// Expose all props as slot props for custom component
+const slotProps = {
+  itemKey: props.itemKey,
+  value: props.value,
+  valueType: props.valueType,
+  displayValue: props.displayValue,
+  isExpandable: props.isExpandable,
+  isEditing: props.isEditing,
+  editKey: props.editKey,
+  editValue: props.editValue,
+  desk: itemDesk?.desk,
+};
 </script>
 
 <template>
-  <!-- Default rendering (customization via ObjectComposerItem slot) -->
-  <div class="flex items-center gap-1.5">
+  <!-- Custom component via 'as' prop -->
+  <component v-if="as" :is="as" v-bind="slotProps" />
+
+  <!-- Default rendering -->
+  <div v-else class="flex items-center gap-1.5">
     <span class="font-medium text-foreground">{{ itemKey }}</span>
     <span class="text-muted-foreground">:</span>
     <span
