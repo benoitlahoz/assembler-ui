@@ -204,33 +204,62 @@ import {
   inject,
   onMounted,
   onBeforeUnmount,
+  onUnmounted,
   watch,
+  computed,
+  triggerRef,
+  nextTick,
   type InjectionKey,
   type Ref,
+  type ComputedRef,
 } from "vue";
 
 export interface CheckInItem<T = any> {
   id: string | number;
   data: T;
+  timestamp?: number;
+  meta?: Record<string, any>;
 }
 
-export interface CheckInDesk<T = any> {
+export interface CheckInDesk<
+  T = any,
+  TContext extends Record<string, any> = {},
+> {
   registry: Ref<Map<string | number, CheckInItem<T>>>;
-  checkIn: (id: string | number, data: T) => void;
+  checkIn: (id: string | number, data: T, meta?: Record<string, any>) => void;
   checkOut: (id: string | number) => void;
   get: (id: string | number) => CheckInItem<T> | undefined;
-  getAll: () => CheckInItem<T>[];
+  getAll: (options?: {
+    sortBy?: keyof T | "timestamp";
+    order?: "asc" | "desc";
+  }) => CheckInItem<T>[];
   update: (id: string | number, data: Partial<T>) => void;
   has: (id: string | number) => boolean;
   clear: () => void;
+  checkInMany: (
+    items: Array<{ id: string | number; data: T; meta?: Record<string, any> }>,
+  ) => void;
+  checkOutMany: (ids: Array<string | number>) => void;
+  updateMany: (
+    updates: Array<{ id: string | number; data: Partial<T> }>,
+  ) => void;
 }
 
-export interface CheckInDeskOptions<T = any> {
-  extraContext?: Record<string, any>;
+export interface CheckInDeskOptions<
+  T = any,
+  TContext extends Record<string, any> = {},
+> {
+  extraContext?: TContext;
+
+  onBeforeCheckIn?: (id: string | number, data: T) => void | boolean;
 
   onCheckIn?: (id: string | number, data: T) => void;
 
+  onBeforeCheckOut?: (id: string | number) => void | boolean;
+
   onCheckOut?: (id: string | number) => void;
+
+  debug?: boolean;
 }
 
 export interface CheckInOptions<T = any> {
@@ -240,39 +269,115 @@ export interface CheckInOptions<T = any> {
 
   id?: string | number;
 
-  data?: T | (() => T);
+  data?: T | (() => T) | (() => Promise<T>);
 
   generateId?: () => string | number;
 
   watchData?: boolean;
+
+  shallow?: boolean;
+
+  watchCondition?: (() => boolean) | Ref<boolean>;
+
+  meta?: Record<string, any>;
+
+  debug?: boolean;
 }
 
-export const useCheckIn = <T = any,>() => {
-  const createDeskContext = <T = any,>(
-    options?: CheckInDeskOptions<T>,
-  ): CheckInDesk<T> => {
+const NoOpDebug = (_message: string, ..._args: any[]) => {};
+
+const Debug = (message: string, ...args: any[]) => {
+  console.log(`[useCheckIn] ${message}`, ...args);
+};
+
+export const useCheckIn = <
+  T = any,
+  TContext extends Record<string, any> = {},
+>() => {
+  const createDeskContext = <
+    T = any,
+    TContext extends Record<string, any> = {},
+  >(
+    options?: CheckInDeskOptions<T, TContext>,
+  ): CheckInDesk<T, TContext> => {
     const registry = ref<Map<string | number, CheckInItem<T>>>(
       new Map(),
     ) as Ref<Map<string | number, CheckInItem<T>>>;
 
-    const checkIn = (id: string | number, data: T) => {
-      registry.value.set(id, { id, data: data as any });
-      registry.value = new Map(registry.value);
+    const debug = options?.debug ? Debug : NoOpDebug;
+
+    const checkIn = (
+      id: string | number,
+      data: T,
+      meta?: Record<string, any>,
+    ) => {
+      debug("checkIn", { id, data, meta });
+
+      if (options?.onBeforeCheckIn) {
+        const result = options.onBeforeCheckIn(id, data);
+        if (result === false) {
+          debug("checkIn cancelled by onBeforeCheckIn", id);
+          return;
+        }
+      }
+
+      registry.value.set(id, {
+        id,
+        data: data as any,
+        timestamp: Date.now(),
+        meta,
+      });
+      triggerRef(registry);
+
       options?.onCheckIn?.(id, data);
     };
 
     const checkOut = (id: string | number) => {
+      debug("checkOut", id);
+
       const existed = registry.value.has(id);
-      registry.value.delete(id);
-      registry.value = new Map(registry.value);
-      if (existed) {
-        options?.onCheckOut?.(id);
+      if (!existed) return;
+
+      if (options?.onBeforeCheckOut) {
+        const result = options.onBeforeCheckOut(id);
+        if (result === false) {
+          debug("checkOut cancelled by onBeforeCheckOut", id);
+          return;
+        }
       }
+
+      registry.value.delete(id);
+      triggerRef(registry);
+
+      options?.onCheckOut?.(id);
     };
 
     const get = (id: string | number) => registry.value.get(id);
 
-    const getAll = () => Array.from(registry.value.values());
+    const getAll = (sortOptions?: {
+      sortBy?: keyof T | "timestamp";
+      order?: "asc" | "desc";
+    }) => {
+      const items = Array.from(registry.value.values());
+
+      if (!sortOptions?.sortBy) return items;
+
+      return items.sort((a, b) => {
+        let aVal: any, bVal: any;
+
+        if (sortOptions.sortBy === "timestamp") {
+          aVal = a.timestamp || 0;
+          bVal = b.timestamp || 0;
+        } else {
+          const key = sortOptions.sortBy as keyof T;
+          aVal = a.data[key];
+          bVal = b.data[key];
+        }
+
+        const comparison = aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+        return sortOptions.order === "desc" ? -comparison : comparison;
+      });
+    };
 
     const update = (id: string | number, data: Partial<T>) => {
       const existing = registry.value.get(id);
@@ -281,108 +386,225 @@ export const useCheckIn = <T = any,>() => {
         typeof existing.data === "object" &&
         typeof data === "object"
       ) {
-        checkIn(id, { ...existing.data, ...data } as T);
+        checkIn(id, { ...existing.data, ...data } as T, existing.meta);
       }
     };
 
     const has = (id: string | number) => registry.value.has(id);
 
     const clear = () => {
+      debug("clear");
       registry.value.clear();
-      registry.value = new Map();
+      triggerRef(registry);
     };
 
-    return { registry, checkIn, checkOut, get, getAll, update, has, clear };
+    const checkInMany = (
+      items: Array<{
+        id: string | number;
+        data: T;
+        meta?: Record<string, any>;
+      }>,
+    ) => {
+      debug("checkInMany", items.length, "items");
+      items.forEach(({ id, data, meta }) => checkIn(id, data, meta));
+    };
+
+    const checkOutMany = (ids: Array<string | number>) => {
+      debug("checkOutMany", ids.length, "items");
+      ids.forEach((id) => checkOut(id));
+    };
+
+    const updateMany = (
+      updates: Array<{ id: string | number; data: Partial<T> }>,
+    ) => {
+      debug("updateMany", updates.length, "items");
+      updates.forEach(({ id, data }) => update(id, data));
+    };
+
+    return {
+      registry,
+      checkIn,
+      checkOut,
+      get,
+      getAll,
+      update,
+      has,
+      clear,
+      checkInMany,
+      checkOutMany,
+      updateMany,
+    };
   };
 
-  const openDesk = (options?: CheckInDeskOptions<T>) => {
-    const deskSymbol = Symbol("CheckInDesk") as InjectionKey<CheckInDesk<T>>;
-    const deskContext = createDeskContext<T>(options);
+  const openDesk = (options?: CheckInDeskOptions<T, TContext>) => {
+    const deskSymbol = Symbol("CheckInDesk") as InjectionKey<
+      CheckInDesk<T, TContext> & TContext
+    >;
+    const deskContext = createDeskContext<T, TContext>(options);
 
     const fullContext = {
       ...deskContext,
       ...(options?.extraContext || {}),
-    } as any;
+    } as CheckInDesk<T, TContext> & TContext;
 
     provide(deskSymbol, fullContext);
 
     return {
-      desk: fullContext as CheckInDesk<T> & Record<string, any>,
+      desk: fullContext,
       deskSymbol,
     };
   };
 
-  const checkIn = (
-    parentDesk: { deskSymbol: InjectionKey<CheckInDesk<T>> },
-    options?: CheckInOptions<T>,
+  const checkIn = <
+    TDesk extends CheckInDesk<T, TContext> & TContext = CheckInDesk<
+      T,
+      TContext
+    > &
+      TContext,
+  >(
+    parentDeskOrSymbol:
+      | (CheckInDesk<T, TContext> & TContext)
+      | InjectionKey<CheckInDesk<T, TContext> & TContext>
+      | null
+      | undefined,
+    checkInOptions?: CheckInOptions<T>,
   ) => {
-    const desk = inject(
-      parentDesk.deskSymbol,
-      options?.required ? undefined : null,
-    );
+    const debug = checkInOptions?.debug ? Debug : NoOpDebug;
 
-    if (options?.required && !desk) {
-      throw new Error(
-        `[useCheckIn] Check-in desk not found. ` +
-          `Make sure a desk is open (parent provides context).`,
+    if (!parentDeskOrSymbol) {
+      debug("[useCheckIn] No parent desk provided - skipping check-in");
+
+      return {
+        desk: null as TDesk | null,
+        checkOut: () => {},
+        updateSelf: () => {},
+      };
+    }
+
+    let desk: (CheckInDesk<T, TContext> & TContext) | null | undefined;
+
+    if (typeof parentDeskOrSymbol === "symbol") {
+      desk = inject(parentDeskOrSymbol);
+      if (!desk) {
+        debug("[useCheckIn] Could not inject desk from symbol");
+
+        return {
+          desk: null as TDesk | null,
+          checkOut: () => {},
+          updateSelf: () => {},
+        };
+      }
+    } else {
+      desk = parentDeskOrSymbol;
+    }
+
+    const itemId = checkInOptions?.id || `item-${Date.now()}-${Math.random()}`;
+    let isCheckedIn = ref(false);
+    let conditionStopHandle: (() => void) | null = null;
+
+    const getCurrentData = async (): Promise<T> => {
+      if (!checkInOptions?.data) return undefined as T;
+
+      const dataValue =
+        typeof checkInOptions.data === "function"
+          ? (checkInOptions.data as (() => T) | (() => Promise<T>))()
+          : checkInOptions.data;
+
+      return dataValue instanceof Promise ? await dataValue : dataValue;
+    };
+
+    const performCheckIn = async () => {
+      if (isCheckedIn.value) return;
+
+      const data = await getCurrentData();
+      desk!.checkIn(itemId, data, checkInOptions?.meta);
+      isCheckedIn.value = true;
+
+      debug(`[useCheckIn] Checked in: ${itemId}`, data);
+    };
+
+    const performCheckOut = () => {
+      if (!isCheckedIn.value) return;
+
+      desk!.checkOut(itemId);
+      isCheckedIn.value = false;
+
+      debug(`[useCheckIn] Checked out: ${itemId}`);
+    };
+
+    if (checkInOptions?.watchCondition) {
+      const condition = checkInOptions.watchCondition;
+
+      const shouldBeCheckedIn =
+        typeof condition === "function" ? condition() : condition.value;
+      if (shouldBeCheckedIn && checkInOptions?.autoCheckIn !== false) {
+        performCheckIn();
+      }
+
+      conditionStopHandle = watch(
+        () => (typeof condition === "function" ? condition() : condition.value),
+        async (shouldCheckIn) => {
+          if (shouldCheckIn && !isCheckedIn.value) {
+            await performCheckIn();
+          } else if (!shouldCheckIn && isCheckedIn.value) {
+            performCheckOut();
+          }
+        },
+      );
+    } else if (checkInOptions?.autoCheckIn !== false) {
+      performCheckIn();
+    }
+
+    let watchStopHandle: (() => void) | null = null;
+    if (checkInOptions?.watchData && checkInOptions?.data) {
+      const watchOptions = checkInOptions.shallow
+        ? { deep: false }
+        : { deep: true };
+
+      watchStopHandle = watch(
+        () => {
+          if (!checkInOptions.data) return undefined;
+          return typeof checkInOptions.data === "function"
+            ? (checkInOptions.data as (() => T) | (() => Promise<T>))()
+            : checkInOptions.data;
+        },
+        async (newData) => {
+          if (isCheckedIn.value && newData !== undefined) {
+            const resolvedData =
+              newData instanceof Promise ? await newData : newData;
+            desk!.update(itemId, resolvedData);
+
+            debug(`[useCheckIn] Updated data for: ${itemId}`, resolvedData);
+          }
+        },
+        watchOptions,
       );
     }
 
-    if (options?.autoCheckIn && desk) {
-      const itemId = ref<string | number | undefined>(options.id);
+    onUnmounted(() => {
+      performCheckOut();
 
-      if (!itemId.value && options.generateId) {
-        itemId.value = options.generateId();
+      if (watchStopHandle) {
+        watchStopHandle();
       }
 
-      if (!itemId.value) {
-        throw new Error(
-          '[useCheckIn] Auto check-in requires an "id" or "generateId" option',
-        );
+      if (conditionStopHandle) {
+        conditionStopHandle();
       }
+    });
 
-      const getData = () => {
-        return typeof options.data === "function"
-          ? (options.data as () => T)()
-          : options.data!;
-      };
+    return {
+      desk: desk as TDesk,
+      checkOut: performCheckOut,
+      updateSelf: async (newData?: T) => {
+        if (!isCheckedIn.value) return;
 
-      onMounted(() => {
-        if (itemId.value) {
-          desk.checkIn(itemId.value, getData());
-        }
-      });
+        const data = newData !== undefined ? newData : await getCurrentData();
+        desk!.update(itemId, data);
 
-      if (options.watchData && options.data) {
-        watch(
-          () => getData(),
-          (newData) => {
-            if (itemId.value && newData) {
-              desk.update(itemId.value, newData);
-            }
-          },
-          { deep: true },
-        );
-      }
-
-      onBeforeUnmount(() => {
-        if (itemId.value) {
-          desk.checkOut(itemId.value);
-        }
-      });
-
-      return {
-        desk,
-        itemId,
-        updateSelf: (data: Partial<T>) => {
-          if (itemId.value) {
-            desk.update(itemId.value, data);
-          }
-        },
-      };
-    }
-
-    return { desk, itemId: ref(undefined), updateSelf: () => {} };
+        debug(`[useCheckIn] Manual update for: ${itemId}`, data);
+      },
+    };
   };
 
   const generateId = (prefix = "passenger"): string => {
@@ -393,11 +615,30 @@ export const useCheckIn = <T = any,>() => {
     return createDeskContext<T>(options);
   };
 
+  const isCheckedIn = <T = any, TContext extends Record<string, any> = {}>(
+    desk: CheckInDesk<T, TContext> & TContext,
+    id: string | number | Ref<string | number>,
+  ): ComputedRef<boolean> => {
+    return computed(() => {
+      const itemId = typeof id === "object" && "value" in id ? id.value : id;
+      return desk.has(itemId);
+    });
+  };
+
+  const getRegistry = <T = any, TContext extends Record<string, any> = {}>(
+    desk: CheckInDesk<T, TContext> & TContext,
+    options?: { sortBy?: keyof T | "timestamp"; order?: "asc" | "desc" },
+  ): ComputedRef<CheckInItem<T>[]> => {
+    return computed(() => desk.getAll(options));
+  };
+
   return {
     openDesk,
     checkIn,
     generateId,
     standaloneDesk,
+    isCheckedIn,
+    getRegistry,
   };
 };
 ```
@@ -417,6 +658,8 @@ Return both the desk and its symbol for children to inject
 | `checkIn`{.primary .text-primary} | `any` | — |
 | `generateId`{.primary .text-primary} | `any` | — |
 | `standaloneDesk`{.primary .text-primary} | `any` | — |
+| `isCheckedIn`{.primary .text-primary} | `Ref<any>` | — |
+| `getRegistry`{.primary .text-primary} | `any` | — |
 
   ### Types
 | Name | Type | Description |
@@ -593,7 +836,7 @@ const itemCount = computed(() => desk.getAll().length);
   :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
-import { ref, computed, provide } from "vue";
+import { ref, computed, provide, type Ref } from "vue";
 import { useCheckIn } from "../useCheckIn";
 import TabPanel from "./TabPanel.vue";
 
@@ -603,10 +846,16 @@ interface TabItemData {
   icon?: string;
 }
 
-const { openDesk } = useCheckIn<TabItemData>();
-
 const activeTab = ref<string>("tab1");
 const tabCount = ref(0);
+
+const { openDesk } = useCheckIn<
+  TabItemData,
+  {
+    activeTab: Ref<string>;
+    setActive: (id: string) => void;
+  }
+>();
 
 const { desk, deskSymbol: tabsDesk } = openDesk({
   extraContext: {

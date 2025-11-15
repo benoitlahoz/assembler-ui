@@ -30,7 +30,7 @@ const props = withDefaults(
 
 const { checkIn } = useCheckIn<FormFieldData>();
 
-const { desk } = checkIn(formDesk, {
+const { desk } = checkIn(formDesk?.deskSymbol, {
   required: true,
   autoCheckIn: true,
   id: props.name,

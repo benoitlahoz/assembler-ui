@@ -55,7 +55,7 @@ const rectangleId = ref<string | number>(props.id ?? `rectangle-${Date.now()}-${
 
 // Check in with selection desk
 const { desk } = selectionContext
-  ? checkIn(selectionContext, {
+  ? checkIn(selectionContext.deskSymbol, {
       autoCheckIn: props.selectable,
       id: rectangleId.value,
       data: () => ({

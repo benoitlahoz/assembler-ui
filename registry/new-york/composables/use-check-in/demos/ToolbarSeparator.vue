@@ -19,7 +19,7 @@ const props = defineProps<{
 
 const { checkIn } = useCheckIn<ToolItemData>();
 
-checkIn(toolbarDesk, {
+checkIn(toolbarDesk?.deskSymbol, {
   required: true,
   autoCheckIn: true,
   id: props.id,

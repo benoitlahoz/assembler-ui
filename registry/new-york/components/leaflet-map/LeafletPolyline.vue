@@ -58,7 +58,7 @@ const polylineId = ref<string | number>(props.id ?? `polyline-${Date.now()}-${Ma
 
 // Check in with selection desk
 const { desk } = selectionContext
-  ? checkIn(selectionContext, {
+  ? checkIn(selectionContext.deskSymbol, {
       autoCheckIn: props.selectable,
       id: polylineId.value,
       data: () => ({
