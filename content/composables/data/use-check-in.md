@@ -284,6 +284,12 @@ export interface CheckInOptions<T = any> {
   debug?: boolean;
 }
 
+const NoOpDebug = (_message: string, ..._args: any[]) => {};
+
+const Debug = (message: string, ...args: any[]) => {
+  console.log(`[useCheckIn] ${message}`, ...args);
+};
+
 export const useCheckIn = <
   T = any,
   TContext extends Record<string, any> = {},
@@ -298,11 +304,7 @@ export const useCheckIn = <
       new Map(),
     ) as Ref<Map<string | number, CheckInItem<T>>>;
 
-    const debug = (message: string, ...args: any[]) => {
-      if (options?.debug) {
-        console.log(`[useCheckIn] ${message}`, ...args);
-      }
-    };
+    const debug = options?.debug ? Debug : NoOpDebug;
 
     const checkIn = (
       id: string | number,
@@ -467,12 +469,11 @@ export const useCheckIn = <
       | undefined,
     checkInOptions?: CheckInOptions<T>,
   ) => {
+    const debug = checkInOptions?.debug ? Debug : NoOpDebug;
+
     if (!parentDeskOrSymbol) {
-      if (checkInOptions?.debug) {
-        console.warn(
-          "[useCheckIn] No parent desk provided - skipping check-in",
-        );
-      }
+      debug("[useCheckIn] No parent desk provided - skipping check-in");
+
       return {
         desk: null as TDesk | null,
         checkOut: () => {},
@@ -485,9 +486,8 @@ export const useCheckIn = <
     if (typeof parentDeskOrSymbol === "symbol") {
       desk = inject(parentDeskOrSymbol);
       if (!desk) {
-        if (checkInOptions?.debug) {
-          console.warn("[useCheckIn] Could not inject desk from symbol");
-        }
+        debug("[useCheckIn] Could not inject desk from symbol");
+
         return {
           desk: null as TDesk | null,
           checkOut: () => {},
@@ -520,9 +520,7 @@ export const useCheckIn = <
       desk!.checkIn(itemId, data, checkInOptions?.meta);
       isCheckedIn.value = true;
 
-      if (checkInOptions?.debug) {
-        console.log(`[useCheckIn] Checked in: ${itemId}`, data);
-      }
+      debug(`[useCheckIn] Checked in: ${itemId}`, data);
     };
 
     const performCheckOut = () => {
@@ -531,9 +529,7 @@ export const useCheckIn = <
       desk!.checkOut(itemId);
       isCheckedIn.value = false;
 
-      if (checkInOptions?.debug) {
-        console.log(`[useCheckIn] Checked out: ${itemId}`);
-      }
+      debug(`[useCheckIn] Checked out: ${itemId}`);
     };
 
     if (checkInOptions?.watchCondition) {
@@ -578,12 +574,7 @@ export const useCheckIn = <
               newData instanceof Promise ? await newData : newData;
             desk!.update(itemId, resolvedData);
 
-            if (checkInOptions?.debug) {
-              console.log(
-                `[useCheckIn] Updated data for: ${itemId}`,
-                resolvedData,
-              );
-            }
+            debug(`[useCheckIn] Updated data for: ${itemId}`, resolvedData);
           }
         },
         watchOptions,
@@ -611,9 +602,7 @@ export const useCheckIn = <
         const data = newData !== undefined ? newData : await getCurrentData();
         desk!.update(itemId, data);
 
-        if (checkInOptions?.debug) {
-          console.log(`[useCheckIn] Manual update for: ${itemId}`, data);
-        }
+        debug(`[useCheckIn] Manual update for: ${itemId}`, data);
       },
     };
   };
@@ -847,7 +836,7 @@ const itemCount = computed(() => desk.getAll().length);
   :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
-import { ref, computed, provide } from "vue";
+import { ref, computed, provide, type Ref } from "vue";
 import { useCheckIn } from "../useCheckIn";
 import TabPanel from "./TabPanel.vue";
 
@@ -857,16 +846,16 @@ interface TabItemData {
   icon?: string;
 }
 
+const activeTab = ref<string>("tab1");
+const tabCount = ref(0);
+
 const { openDesk } = useCheckIn<
   TabItemData,
   {
-    activeTab: typeof activeTab;
+    activeTab: Ref<string>;
     setActive: (id: string) => void;
   }
 >();
-
-const activeTab = ref<string>("tab1");
-const tabCount = ref(0);
 
 const { desk, deskSymbol: tabsDesk } = openDesk({
   extraContext: {
