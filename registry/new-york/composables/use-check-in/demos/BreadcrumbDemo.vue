@@ -7,7 +7,6 @@ import BreadcrumbItem from './BreadcrumbItem.vue';
 const currentPath = ref(['home', 'projects', 'assembler-ui']);
 
 const navigateTo = (segment: string) => {
-  console.log('Navigate to:', segment);
   const index = currentPath.value.indexOf(segment);
   if (index !== -1) {
     currentPath.value = currentPath.value.slice(0, index + 1);
