@@ -44,27 +44,63 @@ export interface CheckInItemMeta {
 }
 
 // ==========================================
-// TYPES DE PLUGINS
+// TYPES DE SLOTS (natifs)
 // ==========================================
 
-/** Contexte partagé entre plugins */
-export interface PluginContext<T = any> {
-  /** Registry des items */
-  registry: Ref<Map<string | number, CheckInItem<T>>>;
-  /** Options du desk */
-  options?: CheckInDeskOptions<T>;
-  /** Mode debug */
-  debug: (message: string, ...args: any[]) => void;
+/** Configuration d'un slot */
+export interface SlotConfig {
+  /** ID unique du slot */
+  id: string;
+  /** Type de slot (toolbar, menu, panel, etc.) */
+  type: string;
+  /** Métadonnées du slot */
+  meta?: Record<string, any>;
 }
 
-/** Interface de base pour tous les plugins */
-export interface Plugin<T = any> {
-  /** Nom unique du plugin */
+/** API des slots intégrée au desk */
+export interface SlotsAPI<T = any> {
+  /** Enregistre un nouveau slot */
+  register: (slotId: string, slotType: string, meta?: Record<string, any>) => void;
+  /** Désenregistre un slot */
+  unregister: (slotId: string) => void;
+  /** Récupère les items d'un slot spécifique */
+  get: (slotId: string) => CheckInItem<T>[];
+  /** Vérifie si un slot existe */
+  has: (slotId: string) => boolean;
+  /** Liste tous les slots */
+  list: () => SlotConfig[];
+  /** Nettoie tous les slots */
+  clear: () => void;
+}
+
+// ==========================================
+// TYPES DE HOOKS (plugins simplifiés)
+// ==========================================
+
+/** Hook simple qui s'intègre dans le lifecycle du desk */
+export interface DeskHook<T = any> {
+  /** Nom du hook */
   name: string;
-  /** Initialisation du plugin */
-  install: (context: PluginContext<T>) => void;
-  /** Nettoyage du plugin (optionnel) */
+  /** Appelé après un check-in */
+  onCheckIn?: (item: CheckInItem<T>) => void;
+  /** Appelé après un check-out */
+  onCheckOut?: (id: string | number) => void;
+  /** Appelé après une mise à jour */
+  onUpdate?: (item: CheckInItem<T>) => void;
+  /** Appelé après un clear */
+  onClear?: () => void;
+  /** Nettoyage du hook */
   cleanup?: () => void;
+}
+
+/** API des hooks */
+export interface HooksAPI<T = any> {
+  /** Ajoute un hook */
+  add: (hook: DeskHook<T>) => void;
+  /** Retire un hook par son nom */
+  remove: (name: string) => boolean;
+  /** Liste tous les hooks actifs */
+  list: () => string[];
 }
 
 // ==========================================
@@ -78,6 +114,10 @@ export interface CheckInDesk<T = any, TContext extends Record<string, any> = {}>
    * Map n'est pas réactive, seul le Ref l'est.
    */
   registry: Readonly<Ref<Map<string | number, CheckInItem<T>>>>;
+  /** API des slots intégrée */
+  slots: SlotsAPI<T>;
+  /** API des hooks (plugins simplifiés) */
+  hooks: HooksAPI<T>;
   checkIn: (id: string | number, data: T, meta?: CheckInItemMeta) => boolean;
   checkOut: (id: string | number) => boolean;
   get: (id: string | number) => CheckInItem<T> | undefined;
@@ -128,8 +168,8 @@ export interface CheckInDeskOptions<T = any, TContext extends Record<string, any
   onCheckOut?: (id: string | number) => void;
   /** Active le mode debug avec logging */
   debug?: boolean;
-  /** Plugins personnalisés à installer */
-  plugins?: Plugin<T>[];
+  /** Hooks personnalisés à installer */
+  hooks?: DeskHook<T>[];
 }
 
 export interface CheckInOptions<T = any> {

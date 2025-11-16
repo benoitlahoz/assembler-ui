@@ -6,14 +6,7 @@
  * @type registry:hook
  * @category data
  *
- * @demo AirportDemo
- * @demo FormDemo
- * @demo BreadcrumbDemo
- * @demo ContextMenuDemo
- * @demo NotificationDemo
- * @demo AccordionDemo
- * @demo TabsDemo
- * @demo ToolbarDemo
+ * @demo PluginsRuntimeDemo
  */
 
 import {
@@ -23,6 +16,7 @@ import {
   onUnmounted,
   watch,
   computed,
+  triggerRef,
   type InjectionKey,
   type Ref,
   type ComputedRef,
@@ -42,8 +36,10 @@ export type {
   SortOptions,
   DeskProvider,
   CheckInReturn,
-  Plugin,
-  PluginContext,
+  DeskHook,
+  HooksAPI,
+  SlotsAPI,
+  SlotConfig,
 } from './types';
 
 import type {
@@ -54,29 +50,15 @@ import type {
   DeskProvider,
   CheckInReturn,
   CheckInItemMeta,
+  DeskEventType,
+  DeskEventCallback,
+  DeskEventPayload,
+  DeskHook,
+  SlotsAPI,
+  HooksAPI,
+  SlotConfig,
+  GetAllOptions,
 } from './types';
-
-import { PluginManager } from './plugin-manager';
-import {
-  createEventsPlugin,
-  createRegistryPlugin,
-  createSortingPlugin,
-  createIdPlugin,
-  type EventsPlugin,
-  type RegistryPlugin,
-  type SortingPlugin,
-  type IdPlugin,
-} from './plugins';
-
-// Export plugins for advanced usage
-export {
-  PluginManager,
-  createEventsPlugin,
-  createRegistryPlugin,
-  createSortingPlugin,
-  createIdPlugin,
-};
-export type { EventsPlugin, RegistryPlugin, SortingPlugin, IdPlugin };
 
 // ==========================================
 // HELPERS
@@ -86,6 +68,75 @@ const NoOpDebug = (_message: string, ..._args: any[]) => {};
 
 const Debug = (message: string, ...args: any[]) => {
   console.log(`[useCheckIn] ${message}`, ...args);
+};
+
+// Cache pour les IDs mémorisés
+const instanceIdMap = new WeakMap<object, string>();
+const customIdMap = new Map<string, string>();
+
+// Cache pour les fonctions de tri compilées
+const sortFnCache = new Map<string, (a: CheckInItem<any>, b: CheckInItem<any>) => number>();
+
+/**
+ * Génère un ID unique et sécurisé
+ */
+const generateSecureId = (prefix = 'item'): string => {
+  // Utiliser crypto.randomUUID si disponible (Node 19+, tous les navigateurs modernes)
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+
+  // Fallback: crypto.getRandomValues
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const hex = Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    return `${prefix}-${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16)}`;
+  }
+
+  // Fallback final: timestamp + random
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+};
+
+/**
+ * Compile une fonction de tri optimisée
+ */
+const compileSortFn = <T = any>(
+  sortBy: keyof T | 'timestamp' | `meta.${string}`,
+  order: 'asc' | 'desc' = 'asc'
+): ((a: CheckInItem<T>, b: CheckInItem<T>) => number) => {
+  const cacheKey = `${String(sortBy)}-${order}`;
+  const cached = sortFnCache.get(cacheKey);
+  if (cached) return cached;
+
+  const fn = (a: CheckInItem<T>, b: CheckInItem<T>) => {
+    let aVal: any;
+    let bVal: any;
+
+    if (sortBy === 'timestamp') {
+      aVal = a.timestamp || 0;
+      bVal = b.timestamp || 0;
+    } else if (String(sortBy).startsWith('meta.')) {
+      const metaKey = String(sortBy).slice(5);
+      aVal = (a.meta as any)?.[metaKey];
+      bVal = (b.meta as any)?.[metaKey];
+    } else {
+      aVal = a.data[sortBy as keyof T];
+      bVal = b.data[sortBy as keyof T];
+    }
+
+    if (aVal === bVal) return 0;
+    if (aVal == null) return 1;
+    if (bVal == null) return -1;
+
+    const result = aVal < bVal ? -1 : 1;
+    return order === 'asc' ? result : -result;
+  };
+
+  sortFnCache.set(cacheKey, fn);
+  return fn;
 };
 
 // ==========================================
@@ -126,59 +177,296 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
 
     const debug = options?.debug ? Debug : NoOpDebug;
 
-    // Initialiser le plugin manager
-    const pluginManager = new PluginManager<T>();
+    // ==========================================
+    // SYSTÈME D'ÉVÉNEMENTS (natif)
+    // ==========================================
+    const eventListeners = new Map<DeskEventType, Set<DeskEventCallback<T, any>>>();
 
-    // Créer les plugins
-    const eventsPlugin = createEventsPlugin<T>();
-    const registryPlugin = createRegistryPlugin<T>(eventsPlugin.emit as any);
-    const sortingPlugin = createSortingPlugin<T>();
-    const idPlugin = createIdPlugin();
+    const emit = <E extends DeskEventType>(
+      event: E,
+      payload: Omit<DeskEventPayload<T>[E], 'timestamp'>
+    ) => {
+      const listeners = eventListeners.get(event);
+      if (!listeners) return;
 
-    // Initialiser le contexte
-    pluginManager.initialize({
-      registry,
-      options,
-      debug,
-    });
+      const eventPayload = {
+        ...payload,
+        timestamp: Date.now(),
+      } as DeskEventPayload<T>[E];
 
-    // Installer les plugins par défaut
-    pluginManager.install(eventsPlugin, registryPlugin, sortingPlugin, idPlugin);
+      debug(`[Event] ${event}`, eventPayload);
+      listeners.forEach((callback) => callback(eventPayload));
+    };
 
-    // Installer les plugins personnalisés si fournis
-    if (options?.plugins) {
-      pluginManager.install(...options.plugins);
-    }
+    const on = <E extends DeskEventType>(event: E, callback: DeskEventCallback<T, E>) => {
+      if (!eventListeners.has(event)) {
+        eventListeners.set(event, new Set());
+      }
+      eventListeners.get(event)!.add(callback);
 
-    // Computed pour récupérer un groupe spécifique
+      debug(`[Event] Listener added for '${event}', total: ${eventListeners.get(event)!.size}`);
+
+      // Return unsubscribe function
+      return () => off(event, callback);
+    };
+
+    const off = <E extends DeskEventType>(event: E, callback: DeskEventCallback<T, E>) => {
+      const listeners = eventListeners.get(event);
+      if (listeners) {
+        listeners.delete(callback);
+        debug(`[Event] Listener removed for '${event}', remaining: ${listeners.size}`);
+      }
+    };
+
+    // ==========================================
+    // REGISTRY (natif)
+    // ==========================================
+    const checkIn = (id: string | number, data: T, meta?: CheckInItemMeta): boolean => {
+      debug('checkIn', { id, data, meta });
+
+      // Lifecycle: before
+      if (options?.onBeforeCheckIn) {
+        const result = options.onBeforeCheckIn(id, data);
+        if (result === false) {
+          debug('checkIn cancelled by onBeforeCheckIn', id);
+          return false;
+        }
+      }
+
+      const item: CheckInItem<T> = {
+        id,
+        data: data as any,
+        timestamp: Date.now(),
+        meta,
+      };
+
+      registry.value.set(id, item);
+      triggerRef(registry);
+
+      // Emit event
+      emit('check-in', { id, data });
+
+      // Lifecycle: after
+      options?.onCheckIn?.(id, data);
+
+      // Hooks
+      hooks.trigger('onCheckIn', item);
+
+      if (options?.debug) {
+        debug('Registry state after check-in:', {
+          total: registry.value.size,
+          items: Array.from(registry.value.keys()),
+        });
+      }
+
+      return true;
+    };
+
+    const checkOut = (id: string | number): boolean => {
+      debug('checkOut', id);
+
+      const existed = registry.value.has(id);
+      if (!existed) return false;
+
+      // Lifecycle: before
+      if (options?.onBeforeCheckOut) {
+        const result = options.onBeforeCheckOut(id);
+        if (result === false) {
+          debug('checkOut cancelled by onBeforeCheckOut', id);
+          return false;
+        }
+      }
+
+      registry.value.delete(id);
+      triggerRef(registry);
+
+      // Emit event
+      emit('check-out', { id });
+
+      // Lifecycle: after
+      options?.onCheckOut?.(id);
+
+      // Hooks
+      hooks.trigger('onCheckOut', id);
+
+      if (options?.debug) {
+        debug('Registry state after check-out:', {
+          total: registry.value.size,
+          items: Array.from(registry.value.keys()),
+        });
+      }
+
+      return true;
+    };
+
+    const get = (id: string | number) => registry.value.get(id);
+
+    const has = (id: string | number) => registry.value.has(id);
+
+    const update = (id: string | number, data: Partial<T>): boolean => {
+      const item = registry.value.get(id);
+      if (!item) return false;
+
+      const updatedItem = {
+        ...item,
+        data: { ...item.data, ...data },
+      };
+
+      registry.value.set(id, updatedItem);
+      triggerRef(registry);
+
+      emit('update', { id, data: updatedItem.data });
+      hooks.trigger('onUpdate', updatedItem);
+
+      debug('update', { id, data });
+      return true;
+    };
+
+    const clear = () => {
+      registry.value.clear();
+      triggerRef(registry);
+      emit('clear', {});
+      hooks.trigger('onClear');
+      debug('clear');
+    };
+
+    const checkInMany = (
+      items: Array<{ id: string | number; data: T; meta?: CheckInItemMeta }>
+    ) => {
+      items.forEach(({ id, data, meta }) => checkIn(id, data, meta));
+    };
+
+    const checkOutMany = (ids: Array<string | number>) => {
+      ids.forEach((id) => checkOut(id));
+    };
+
+    const updateMany = (updates: Array<{ id: string | number; data: Partial<T> }>) => {
+      updates.forEach(({ id, data }) => update(id, data));
+    };
+
+    // ==========================================
+    // SORTING (natif)
+    // ==========================================
+    const getAll = (opts?: GetAllOptions<T>): CheckInItem<T>[] => {
+      let items = Array.from(registry.value.values());
+
+      // Filtrage par groupe
+      if (opts?.group) {
+        items = items.filter((item) => item.meta?.group === opts.group);
+      }
+
+      // Filtrage custom
+      if (opts?.filter) {
+        items = items.filter(opts.filter);
+      }
+
+      // Tri
+      if (opts?.sortBy) {
+        const sortFn = compileSortFn<T>(opts.sortBy, opts.order);
+        items.sort(sortFn);
+      }
+
+      return items;
+    };
+
     const getGroup = (
       group: string,
       sortOptions?: { sortBy?: keyof T | 'timestamp' | `meta.${string}`; order?: 'asc' | 'desc' }
     ) => {
-      return computed(() => sortingPlugin.getAll({ ...sortOptions, group }));
+      return computed(() => getAll({ ...sortOptions, group }));
     };
 
-    // Computed pour tous les items
-    const items = computed(() => sortingPlugin.getAll());
+    const items = computed(() => getAll());
+
+    // ==========================================
+    // SLOTS (natif)
+    // ==========================================
+    const slotsRegistry = new Map<string, SlotConfig>();
+
+    const slots: SlotsAPI<T> = {
+      register: (slotId: string, slotType: string, meta?: Record<string, any>) => {
+        slotsRegistry.set(slotId, { id: slotId, type: slotType, meta });
+        debug(`[Slots] Registered slot '${slotId}' of type '${slotType}'`);
+      },
+      unregister: (slotId: string) => {
+        slotsRegistry.delete(slotId);
+        debug(`[Slots] Unregistered slot '${slotId}'`);
+      },
+      get: (slotId: string): CheckInItem<T>[] => {
+        return getAll({
+          filter: (item) => item.meta?.user?.slotId === slotId,
+        });
+      },
+      has: (slotId: string): boolean => {
+        return slotsRegistry.has(slotId);
+      },
+      list: (): SlotConfig[] => {
+        return Array.from(slotsRegistry.values());
+      },
+      clear: () => {
+        slotsRegistry.clear();
+        debug('[Slots] All slots cleared');
+      },
+    };
+
+    // ==========================================
+    // HOOKS (plugins simplifiés)
+    // ==========================================
+    const hooksRegistry = new Map<string, DeskHook<T>>();
+
+    const hooks: HooksAPI<T> & { trigger: (method: keyof DeskHook<T>, ...args: any[]) => void } = {
+      add: (hook: DeskHook<T>) => {
+        hooksRegistry.set(hook.name, hook);
+        debug(`[Hooks] Added hook '${hook.name}'`);
+      },
+      remove: (name: string): boolean => {
+        const hook = hooksRegistry.get(name);
+        if (hook) {
+          hook.cleanup?.();
+          hooksRegistry.delete(name);
+          debug(`[Hooks] Removed hook '${name}'`);
+          return true;
+        }
+        return false;
+      },
+      list: (): string[] => {
+        return Array.from(hooksRegistry.keys());
+      },
+      trigger: (method: keyof DeskHook<T>, ...args: any[]) => {
+        hooksRegistry.forEach((hook) => {
+          const fn = hook[method];
+          if (typeof fn === 'function') {
+            (fn as any)(...args);
+          }
+        });
+      },
+    };
+
+    // Installer les hooks fournis dans les options
+    if (options?.hooks) {
+      options.hooks.forEach((hook) => hooks.add(hook));
+    }
 
     // Exposition du registry en lecture seule
     const readonlyRegistry = computed(() => registry.value);
 
     return {
-      registry: readonlyRegistry as any, // Cast pour compatibilité
-      checkIn: registryPlugin.checkIn,
-      checkOut: registryPlugin.checkOut,
-      get: registryPlugin.get,
-      getAll: sortingPlugin.getAll,
-      update: registryPlugin.update,
-      has: registryPlugin.has,
-      clear: registryPlugin.clear,
-      checkInMany: registryPlugin.checkInMany,
-      checkOutMany: registryPlugin.checkOutMany,
-      updateMany: registryPlugin.updateMany,
-      on: eventsPlugin.on,
-      off: eventsPlugin.off,
-      emit: eventsPlugin.emit,
+      registry: readonlyRegistry as any,
+      slots,
+      hooks,
+      checkIn,
+      checkOut,
+      get,
+      getAll,
+      update,
+      has,
+      clear,
+      checkInMany,
+      checkOutMany,
+      updateMany,
+      on,
+      off,
+      emit,
       getGroup,
       items,
     };
@@ -395,10 +683,7 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
    * @returns ID unique et sécurisé
    */
   const generateId = (prefix = 'item'): string => {
-    // Récupérer le plugin ID depuis n'importe quel desk (ils partagent le même plugin)
-    // Pour l'instant, on utilise directement le plugin
-    const plugin = createIdPlugin();
-    return plugin.generateId(prefix);
+    return generateSecureId(prefix);
   };
 
   /**
@@ -429,8 +714,35 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
     instanceOrId: object | string | number | null | undefined,
     prefix = 'item'
   ): string => {
-    const plugin = createIdPlugin();
-    return plugin.memoizedId(instanceOrId, prefix);
+    // Si c'est un objet (instance Vue), utiliser WeakMap
+    if (instanceOrId && typeof instanceOrId === 'object') {
+      const existing = instanceIdMap.get(instanceOrId);
+      if (existing) return existing;
+
+      const newId = generateSecureId(prefix);
+      instanceIdMap.set(instanceOrId, newId);
+      return newId;
+    }
+
+    // Si c'est une string ou un number, utiliser Map
+    if (typeof instanceOrId === 'string' || typeof instanceOrId === 'number') {
+      const key = `${prefix}-${instanceOrId}`;
+      const existing = customIdMap.get(key);
+      if (existing) return existing;
+
+      const newId = `${prefix}-${instanceOrId}`;
+      customIdMap.set(key, newId);
+      return newId;
+    }
+
+    // Si null/undefined, générer un ID unique (warning en dev)
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(
+        '[useCheckIn] memoizedId called with null/undefined. Consider passing getCurrentInstance() or a custom ID.'
+      );
+    }
+
+    return generateSecureId(prefix);
   };
 
   /**

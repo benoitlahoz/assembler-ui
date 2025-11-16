@@ -7,448 +7,831 @@ description: Generic check-in system for parent/child component registration pat
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <airport-demo />
+    <plugins-runtime-demo />
   :::
 
   :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
-import { ref, computed, provide } from "vue";
-import { useCheckIn } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
-import AirportPassenger from "./AirportPassenger.vue";
 
-interface PassengerData {
-  name: string;
-  seat: string;
-  baggage: number;
-  fareClass: "Business" | "Premium" | "Eco";
-  checkedInAt?: Date;
+
+import { ref, computed, onMounted } from 'vue';
+import { useCheckIn } from '../useCheckIn';
+import type { DeskHook, CheckInItem } from '../types';
+
+
+
+
+
+interface ToolbarButton {
+  label: string;
+  icon?: string;
+  variant?: 'primary' | 'secondary' | 'danger';
+  onClick: () => void;
+  disabled?: boolean;
 }
 
-const flightNumber = ref("AF1234");
-const gate = ref("A12");
-const departureTime = ref("14:30");
 
-type AircraftType = "Airbus A320" | "Boeing 737";
-const aircraftType = ref<AircraftType>("Airbus A320");
-const aircraftConfig: Record<
-  AircraftType,
-  {
-    rows: { Business: number[]; Premium: number[]; Eco: number[] };
-    letters: { Business: string[]; Premium: string[]; Eco: string[] };
-    totalSeats: number;
-  }
-> = {
-  "Airbus A320": {
-    rows: {
-      Business: [1, 2, 3, 4],
-      Premium: [5, 6, 7, 8, 9],
-      Eco: [
-        10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
-        28, 29, 30,
-      ],
-    },
-    letters: {
-      Business: ["A", "C", "D", "F"],
-      Premium: ["A", "B", "C", "D", "E", "F"],
-      Eco: ["A", "B", "C", "D", "E", "F"],
-    },
-    totalSeats: 174,
-  },
-  "Boeing 737": {
-    rows: {
-      Business: [1, 2, 3],
-      Premium: [4, 5, 6, 7],
-      Eco: [
-        8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
-        26, 27, 28, 29,
-      ],
-    },
-    letters: {
-      Business: ["A", "C", "D", "F"],
-      Premium: ["A", "B", "C", "D", "E", "F"],
-      Eco: ["A", "B", "C", "D", "E", "F"],
-    },
-    totalSeats: 162,
-  },
-};
 
-const occupiedSeats = ref(new Set<string>());
 
-const boardingGroups = ref({
-  Business: "A",
-  Premium: "B",
-  Eco: "C",
-});
 
-const maxBaggageWeight = {
-  Business: 40,
-  Premium: 30,
-  Eco: 23,
-};
+interface AnalyticsEvent {
+  type: 'button-click' | 'check-in' | 'check-out';
+  itemId: string | number;
+  timestamp: number;
+  data?: any;
+}
 
-const addBaggage = (passengerId: string, weight: number = 10): boolean => {
-  const passenger = airportDesk.desk.get(passengerId);
-  if (!passenger) return false;
-
-  const currentWeight = passenger.data.baggage;
-  const maxWeight = maxBaggageWeight[passenger.data.fareClass];
-  const newWeight = currentWeight + weight;
-
-  if (newWeight > maxWeight) {
-    console.log(
-      `❌ ${passenger.data.name}: Cannot add ${weight}kg (max ${maxWeight}kg, current ${currentWeight}kg)`,
-    );
-    return false;
-  }
-
-  const success = airportDesk.desk.update(passengerId, { baggage: newWeight });
-  if (success) {
-    console.log(
-      `➕ ${passenger.data.name}: Adding ${weight}kg of baggage (${currentWeight}kg → ${newWeight}kg)`,
-    );
-  }
-  return success;
-};
-
-const removeBaggage = (passengerId: string, weight: number = 10): boolean => {
-  const passenger = airportDesk.desk.get(passengerId);
-  if (!passenger) return false;
-
-  const currentWeight = passenger.data.baggage;
-  const newWeight = Math.max(0, currentWeight - weight);
-
-  const success = airportDesk.desk.update(passengerId, { baggage: newWeight });
-  if (success) {
-    console.log(
-      `➖ ${passenger.data.name}: Removing ${weight}kg of baggage (${currentWeight}kg → ${newWeight}kg)`,
-    );
-  }
-  return success;
-};
-
-const assignSeat = (
-  passengerId: string,
-  passengerName: string,
-  fareClass: "Business" | "Premium" | "Eco" = "Eco",
-) => {
-  const config = aircraftConfig[aircraftType.value];
-  const availableRows = config.rows[fareClass];
-  const availableLetters = config.letters[fareClass];
-
-  const possibleSeats: string[] = [];
-  for (const row of availableRows) {
-    for (const letter of availableLetters) {
-      const seat = `${row}${letter}`;
-      if (!occupiedSeats.value.has(seat)) {
-        possibleSeats.push(seat);
-      }
-    }
-  }
-
-  if (possibleSeats.length === 0) {
-    console.log(
-      `❌ No seat available in ${fareClass} class for ${passengerName}`,
-    );
-    return null;
-  }
-
-  const newSeat =
-    possibleSeats[Math.floor(Math.random() * possibleSeats.length)];
-
-  if (!newSeat) {
-    console.log(`❌ Error assigning seat for ${passengerName}`);
-    return null;
-  }
-
-  const passenger = airportDesk.desk.get(passengerId);
-  const oldSeat = passenger?.data.seat;
-
-  if (passenger) {
-    if (oldSeat) {
-      occupiedSeats.value.delete(oldSeat);
-    }
-
-    occupiedSeats.value.add(newSeat);
-    const success = airportDesk.desk.update(passengerId, { seat: newSeat });
-    if (!success) {
-      console.log(`❌ Failed to update seat for ${passengerName}`);
-      return null;
-    }
-  }
-
-  if (oldSeat) {
-    console.log(
-      `💺 The desk changed ${passengerName}'s seat: ${oldSeat} → ${newSeat}`,
-    );
-  } else {
-    console.log(
-      `💺 The desk assigned seat ${newSeat} to ${passengerName} (${fareClass})`,
-    );
-  }
-
-  return newSeat;
-};
-
-const { createDesk } = useCheckIn<
-  PassengerData,
-  {
-    flightNumber: typeof flightNumber;
-    gate: typeof gate;
-    departureTime: typeof departureTime;
-    boardingGroups: typeof boardingGroups;
-    maxBaggageWeight: typeof maxBaggageWeight;
-    assignSeat: typeof assignSeat;
-    addBaggage: typeof addBaggage;
-    removeBaggage: typeof removeBaggage;
-  }
->();
-
-const airportDesk = createDesk({
-  context: {
-    flightNumber,
-    gate,
-    departureTime,
-    boardingGroups,
-    maxBaggageWeight,
-    assignSeat,
-    addBaggage,
-    removeBaggage,
-  },
-  debug: false,
-  onCheckIn: (id, data) => {
-    if (!data.seat) {
-      const assignedSeat = assignSeat(String(id), data.name, data.fareClass);
-      console.log(
-        `✅ ${data.name} has checked in at the desk with seat ${assignedSeat}!`,
-      );
-    }
-    return true;
-  },
-  onCheckOut: (id) => {
-    console.log(`🚪 Passenger ${id} has left the desk`);
-    return true;
-  },
-});
-
-provide("airportDesk", { deskSymbol: airportDesk.DeskInjectionKey });
-
-const passengers = computed(() => {
-  const all = airportDesk.desk.getAll();
-
-  const fareOrder = { Business: 0, Premium: 1, Eco: 2 };
-  return all.sort(
-    (a, b) => fareOrder[a.data.fareClass] - fareOrder[b.data.fareClass],
-  );
-});
-
-const stats = computed(() => {
-  const config = aircraftConfig[aircraftType.value];
-  return {
-    total: passengers.value.length,
-    groupA: passengers.value.filter(
-      (p) => boardingGroups.value[p.data.fareClass] === "A",
-    ).length,
-    groupB: passengers.value.filter(
-      (p) => boardingGroups.value[p.data.fareClass] === "B",
-    ).length,
-    groupC: passengers.value.filter(
-      (p) => boardingGroups.value[p.data.fareClass] === "C",
-    ).length,
-    totalWeight: passengers.value.reduce((sum, p) => sum + p.data.baggage, 0),
-    totalSeats: config.totalSeats,
-    occupiedSeats: occupiedSeats.value.size,
-    availableSeats: config.totalSeats - occupiedSeats.value.size,
+const createAnalyticsHook = (): DeskHook<ToolbarButton> & {
+  getStats: () => { totalEvents: number; buttonClicks: number; checkIns: number; checkOuts: number };
+  getHistory: () => AnalyticsEvent[];
+} => {
+  const events: AnalyticsEvent[] = [];
+  const stats = {
+    totalEvents: 0,
+    buttonClicks: 0,
+    checkIns: 0,
+    checkOuts: 0,
   };
-});
 
-const boardGroup = (group: "A" | "B" | "C") => {
-  const groupPassengers = passengers.value
-    .filter((p) => boardingGroups.value[p.data.fareClass] === group)
-    .map((p) => p.id);
+  const track = (event: AnalyticsEvent) => {
+    events.push(event);
+    stats.totalEvents++;
+    
+    if (event.type === 'button-click') stats.buttonClicks++;
+    else if (event.type === 'check-in') stats.checkIns++;
+    else if (event.type === 'check-out') stats.checkOuts++;
+  };
 
-  console.log(
-    `📢 Boarding group ${group}: ${groupPassengers.length} passengers`,
-  );
+  return {
+    name: 'analytics',
+    onCheckIn: (item: CheckInItem<ToolbarButton>) => {
+      track({
+        type: 'check-in',
+        itemId: item.id,
+        timestamp: Date.now(),
+        data: item.data,
+      });
+    },
+    onCheckOut: (id: string | number) => {
+      track({
+        type: 'check-out',
+        itemId: id,
+        timestamp: Date.now(),
+      });
+    },
+    getStats: () => ({ ...stats }),
+    getHistory: () => [...events],
+  };
 };
 
-const passengersList = ref([
-  { id: "passenger-1", name: "Sophie Martin", fareClass: "Business" as const },
-  { id: "passenger-2", name: "Jean Dupont", fareClass: "Premium" as const },
-  { id: "passenger-3", name: "Marie Lambert", fareClass: "Business" as const },
-  { id: "passenger-4", name: "Pierre Dubois", fareClass: "Eco" as const },
-  { id: "passenger-5", name: "Claire Bernard", fareClass: "Premium" as const },
-]);
 
-const changeGate = () => {
-  const gates = ["A12", "B5", "C8", "D3"];
-  const currentIndex = gates.indexOf(gate.value);
-  const newGate = gates[(currentIndex + 1) % gates.length];
-  if (newGate) gate.value = newGate;
-};
 
-const changeAircraft = () => {
-  const types: AircraftType[] = ["Airbus A320", "Boeing 737"];
-  const currentIndex = types.indexOf(aircraftType.value);
-  const nextType = types[(currentIndex + 1) % types.length];
-  if (!nextType) return;
 
-  aircraftType.value = nextType;
 
-  occupiedSeats.value.clear();
+const { createDesk } = useCheckIn<ToolbarButton>();
+const { desk } = createDesk({ debug: true });
 
-  passengers.value.forEach((p) => {
-    assignSeat(String(p.id), p.data.name, p.data.fareClass);
+
+const analyticsHook = createAnalyticsHook();
+
+
+const showAnalytics = ref(false);
+const message = ref('');
+
+
+
+
+
+const initializeDeskFeatures = () => {
+  
+  desk.slots.register('header-left', 'toolbar', { align: 'left' });
+  desk.slots.register('header-right', 'toolbar', { align: 'right' });
+  desk.slots.register('footer', 'toolbar', { align: 'center' });
+
+  
+  desk.hooks.add(analyticsHook);
+
+  
+  desk.on('check-in', (payload) => {
+    console.log('[Demo] Item checked in:', payload);
   });
 
-  console.log(`✈️ Aircraft change: ${aircraftType.value}`);
+  message.value = 'Desk initialisé avec slots et hooks !';
+  setTimeout(() => message.value = '', 3000);
 };
+
+
+
+
+
+const addButton = (slotId: string, id: string, button: ToolbarButton) => {
+  desk.checkIn(id, button, {
+    user: { slotId }
+  });
+};
+
+const createButtonHandler = (label: string, id: string) => {
+  return () => {
+    message.value = `${label} cliqué !`;
+    
+    
+    analyticsHook.getHistory().push({
+      type: 'button-click',
+      itemId: id,
+      timestamp: Date.now(),
+      data: { label }
+    });
+    
+    setTimeout(() => message.value = '', 2000);
+  };
+};
+
+
+
+
+
+const headerLeft = computed(() => desk.slots.get('header-left'));
+const headerRight = computed(() => desk.slots.get('header-right'));
+const footer = computed(() => desk.slots.get('footer'));
+
+const stats = computed(() => analyticsHook.getStats());
+const history = computed(() => analyticsHook.getHistory());
+
+const activeHooks = computed(() => desk.hooks.list());
+const activeSlots = computed(() => desk.slots.list());
+
+
+
+
+
+const addSampleButtons = () => {
+  
+  addButton('header-left', 'btn-new', {
+    label: 'Nouveau',
+    icon: '➕',
+    variant: 'primary',
+    onClick: createButtonHandler('Nouveau', 'btn-new')
+  });
+
+  addButton('header-left', 'btn-open', {
+    label: 'Ouvrir',
+    icon: '📂',
+    variant: 'secondary',
+    onClick: createButtonHandler('Ouvrir', 'btn-open')
+  });
+
+  addButton('header-left', 'btn-save', {
+    label: 'Sauvegarder',
+    icon: '💾',
+    variant: 'primary',
+    onClick: createButtonHandler('Sauvegarder', 'btn-save')
+  });
+
+  
+  addButton('header-right', 'btn-settings', {
+    label: 'Paramètres',
+    icon: '⚙️',
+    variant: 'secondary',
+    onClick: createButtonHandler('Paramètres', 'btn-settings')
+  });
+
+  addButton('header-right', 'btn-help', {
+    label: 'Aide',
+    icon: '❓',
+    variant: 'secondary',
+    onClick: createButtonHandler('Aide', 'btn-help')
+  });
+
+  
+  addButton('footer', 'btn-delete', {
+    label: 'Supprimer',
+    icon: '🗑️',
+    variant: 'danger',
+    onClick: createButtonHandler('Supprimer', 'btn-delete')
+  });
+
+  addButton('footer', 'btn-close', {
+    label: 'Fermer',
+    icon: '✖️',
+    variant: 'secondary',
+    onClick: createButtonHandler('Fermer', 'btn-close')
+  });
+
+  message.value = 'Boutons ajoutés !';
+  setTimeout(() => message.value = '', 2000);
+};
+
+const removeAllButtons = () => {
+  desk.clear();
+  message.value = 'Tous les boutons supprimés !';
+  setTimeout(() => message.value = '', 2000);
+};
+
+const toggleAnalytics = () => {
+  showAnalytics.value = !showAnalytics.value;
+};
+
+
+
+
+
+onMounted(() => {
+  initializeDeskFeatures();
+  addSampleButtons();
+});
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="bg-primary/10 p-4 rounded-lg border-2 border-primary">
-      <h3 class="text-lg font-bold mb-3">✈️ Flight Display - Check-in Desk</h3>
-      <div class="grid grid-cols-4 gap-4 text-sm">
-        <div>
-          <div class="text-muted-foreground">Flight</div>
-          <div class="font-mono font-bold">{{ flightNumber }}</div>
-        </div>
-        <div>
-          <div class="text-muted-foreground">Aircraft</div>
-          <div class="font-mono font-bold text-xs">{{ aircraftType }}</div>
-        </div>
-        <div>
-          <div class="text-muted-foreground">Gate</div>
-          <div class="font-mono font-bold">{{ gate }}</div>
-        </div>
-        <div>
-          <div class="text-muted-foreground">Departure</div>
-          <div class="font-mono font-bold">{{ departureTime }}</div>
+  <div class="demo-container">
+    
+    <div class="demo-header">
+      <h2>🔌 Démo: Slots Natifs + Hooks Runtime</h2>
+      <p class="demo-description">
+        Cette démo montre les slots intégrés au desk et les hooks comme simple système d'extension.
+      </p>
+    </div>
+
+    
+    <Transition name="fade">
+      <div v-if="message" class="message">
+        {{ message }}
+      </div>
+    </Transition>
+
+    
+    <div class="plugins-info">
+      <div class="info-section">
+        <h3>🎣 Hooks actifs</h3>
+        <div class="plugins-list">
+          <span
+            v-for="hook in activeHooks"
+            :key="hook"
+            class="plugin-badge plugin-custom"
+          >
+            {{ hook }}
+          </span>
         </div>
       </div>
-      <div class="flex gap-2 mt-3">
+
+      <div class="info-section">
+        <h3>📦 Slots enregistrés</h3>
+        <div class="plugins-list">
+          <span
+            v-for="slot in activeSlots"
+            :key="slot.id"
+            class="plugin-badge plugin-core"
+            :title="`Type: ${slot.type}`"
+          >
+            {{ slot.id }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    
+    <div class="toolbar-demo">
+      
+      <header class="toolbar-header">
+        <div class="toolbar-section left">
+          <button
+            v-for="item in headerLeft"
+            :key="item.id"
+            :class="['toolbar-btn', `btn-${item.data.variant}`]"
+            :disabled="item.data.disabled"
+            @click="item.data.onClick"
+          >
+            <span v-if="item.data.icon" class="btn-icon">{{ item.data.icon }}</span>
+            {{ item.data.label }}
+          </button>
+        </div>
+
+        <div class="toolbar-section right">
+          <button
+            v-for="item in headerRight"
+            :key="item.id"
+            :class="['toolbar-btn', `btn-${item.data.variant}`]"
+            :disabled="item.data.disabled"
+            @click="item.data.onClick"
+          >
+            <span v-if="item.data.icon" class="btn-icon">{{ item.data.icon }}</span>
+            {{ item.data.label }}
+          </button>
+        </div>
+      </header>
+
+      
+      <main class="toolbar-content">
+        <div class="content-placeholder">
+          <h3>📋 Zone de contenu</h3>
+          <p>Les boutons de la toolbar sont organisés dynamiquement via le plugin Slots.</p>
+          <p>Chaque interaction est trackée par le plugin Analytics.</p>
+          
+          <div class="stats-summary" v-if="stats">
+            <div class="stat-item">
+              <strong>{{ stats.totalEvents }}</strong>
+              <span>événements</span>
+            </div>
+            <div class="stat-item">
+              <strong>{{ stats.buttonClicks }}</strong>
+              <span>clics</span>
+            </div>
+            <div class="stat-item">
+              <strong>{{ stats.checkIns }}</strong>
+              <span>check-ins</span>
+            </div>
+            <div class="stat-item">
+              <strong>{{ stats.checkOuts }}</strong>
+              <span>check-outs</span>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      
+      <footer class="toolbar-footer">
         <button
-          @click="changeGate"
-          class="px-3 py-1 bg-primary text-primary-foreground rounded text-sm hover:bg-primary/90"
+          v-for="item in footer"
+          :key="item.id"
+          :class="['toolbar-btn', `btn-${item.data.variant}`]"
+          :disabled="item.data.disabled"
+          @click="item.data.onClick"
         >
-          🔄 Change Gate
+          <span v-if="item.data.icon" class="btn-icon">{{ item.data.icon }}</span>
+          {{ item.data.label }}
         </button>
-        <button
-          @click="changeAircraft"
-          class="px-3 py-1 bg-secondary text-secondary-foreground rounded text-sm hover:bg-secondary/90"
-        >
-          ✈️ Change Aircraft
-        </button>
-      </div>
+      </footer>
     </div>
 
-    <div class="grid grid-cols-4 gap-4">
-      <div class="bg-muted p-4 rounded-lg">
-        <h4 class="font-semibold mb-2 text-sm">📊 Passengers</h4>
-        <div class="text-2xl font-bold">{{ stats.total }}</div>
-      </div>
-      <div class="bg-muted p-4 rounded-lg">
-        <h4 class="font-semibold mb-2 text-sm">💺 Seats</h4>
-        <div class="text-2xl font-bold">
-          {{ stats.occupiedSeats }}/{{ stats.totalSeats }}
-        </div>
-        <div class="text-xs text-muted-foreground mt-1">
-          {{ stats.availableSeats }} available
-        </div>
-      </div>
-      <div class="bg-muted p-4 rounded-lg">
-        <h4 class="font-semibold mb-2 text-sm">🧳 Baggage</h4>
-        <div class="text-2xl font-bold">{{ stats.totalWeight }}kg</div>
-      </div>
-      <div class="bg-muted p-4 rounded-lg">
-        <h4 class="font-semibold mb-2 text-sm">✈️ Capacity</h4>
-        <div class="text-lg font-bold">
-          {{ Math.round((stats.occupiedSeats / stats.totalSeats) * 100) }}%
-        </div>
-      </div>
+    
+    <div class="demo-controls">
+      <button @click="addSampleButtons" class="control-btn">
+        ➕ Ajouter des boutons
+      </button>
+      <button @click="removeAllButtons" class="control-btn danger">
+        🗑️ Tout supprimer
+      </button>
+      <button @click="toggleAnalytics" class="control-btn">
+        📊 {{ showAnalytics ? 'Masquer' : 'Afficher' }} Analytics
+      </button>
     </div>
 
-    <div class="space-y-2">
-      <h4 class="font-semibold">Boarding Groups</h4>
-      <div class="flex gap-4">
-        <div
-          class="flex-1 p-3 bg-green-100 dark:bg-green-900/20 rounded border border-green-300 dark:border-green-700"
-        >
-          <div class="text-sm text-muted-foreground">Business</div>
-          <div class="text-2xl font-bold">{{ stats.groupA }}</div>
-          <button
-            @click="boardGroup('A')"
-            :disabled="stats.groupA === 0"
-            class="mt-2 px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            🎫 Board
-          </button>
+    
+    <Transition name="slide">
+      <div v-if="showAnalytics" class="analytics-panel">
+        <h3>📊 Analytics en temps réel</h3>
+        
+        <div class="analytics-stats">
+          <h4>Statistiques</h4>
+          <pre>{{ stats }}</pre>
         </div>
-        <div
-          class="flex-1 p-3 bg-blue-100 dark:bg-blue-900/20 rounded border border-blue-300 dark:border-blue-700"
-        >
-          <div class="text-sm text-muted-foreground">Premium</div>
-          <div class="text-2xl font-bold">{{ stats.groupB }}</div>
-          <button
-            @click="boardGroup('B')"
-            :disabled="stats.groupB === 0"
-            class="mt-2 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            🎫 Board
-          </button>
-        </div>
-        <div
-          class="flex-1 p-3 bg-orange-100 dark:bg-orange-900/20 rounded border border-orange-300 dark:border-orange-700"
-        >
-          <div class="text-sm text-muted-foreground">Eco</div>
-          <div class="text-2xl font-bold">{{ stats.groupC }}</div>
-          <button
-            @click="boardGroup('C')"
-            :disabled="stats.groupC === 0"
-            class="mt-2 px-2 py-1 bg-orange-600 text-white rounded text-xs hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            🎫 Board
-          </button>
-        </div>
-      </div>
-    </div>
 
-    <div class="space-y-2">
-      <h4 class="font-semibold">🛂 Check-in Desk</h4>
-      <div class="space-y-2">
-        <AirportPassenger
-          v-for="passenger in passengersList"
-          :key="passenger.id"
-          :id="passenger.id"
-          :name="passenger.name"
-          :fare-class="passenger.fareClass"
-        />
+        <div class="analytics-history">
+          <h4>Historique des événements ({{ history.length }} derniers)</h4>
+          <div class="events-list">
+            <div
+              v-for="(event, index) in history.slice(-10).reverse()"
+              :key="index"
+              class="event-item"
+              :class="`event-${event.type}`"
+            >
+              <span class="event-type">{{ event.type }}</span>
+              <span class="event-id">{{ event.itemId }}</span>
+              <span class="event-time">
+                {{ new Date(event.timestamp).toLocaleTimeString() }}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </Transition>
 
-    <div class="text-xs text-muted-foreground space-y-1 border-t pt-4">
-      <div><strong>💡 Metaphor:</strong></div>
-      <div>• <strong>Desk</strong> = Airport check-in desk</div>
-      <div>
-        • <strong>Check-in</strong> = Passenger registers with their data (name,
-        seat, baggage)
+    
+    <details class="code-section">
+      <summary>📝 Voir le code source</summary>
+      <div class="code-example">
+        <h4>Initialisation du desk avec slots et hooks</h4>
+        <pre><code>const { createDesk } = useCheckIn<ToolbarButton>();
+const { desk } = createDesk({ debug: true });
+
+
+desk.slots.register('header-left', 'toolbar', { align: 'left' });
+desk.slots.register('header-right', 'toolbar', { align: 'right' });
+
+
+const analyticsHook = createAnalyticsHook();
+desk.hooks.add(analyticsHook);</code></pre>
+
+        <h4>Utilisation des slots</h4>
+        <pre><code>
+const headerLeft = computed(() => desk.slots.get('header-left'));
+
+
+desk.checkIn('btn-new', buttonData, {
+  user: { slotId: 'header-left' }
+});</code></pre>
+
+        <h4>Créer un hook simple</h4>
+        <pre><code>const createAnalyticsHook = (): DeskHook<T> => ({
+  name: 'analytics',
+  onCheckIn: (item) => {
+    console.log('Item checked in:', item);
+  },
+  onCheckOut: (id) => {
+    console.log('Item checked out:', id);
+  },
+});</code></pre>
       </div>
-      <div>
-        • <strong>Check-out</strong> = Passenger leaves the desk (component
-        unmounted)
-      </div>
-      <div>
-        • <strong>Extra context</strong> = Shared flight info (number, gate,
-        time)
-      </div>
-      <div>
-        • <strong>Registry</strong> = List of registered passengers sorted by
-        group
-      </div>
-    </div>
+    </details>
   </div>
 </template>
+
+<style scoped>
+.demo-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.demo-header {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.demo-header h2 {
+  margin: 0 0 0.5rem;
+  color: #2c3e50;
+}
+
+.demo-description {
+  color: #666;
+  margin: 0;
+}
+
+.message {
+  position: fixed;
+  top: 2rem;
+  right: 2rem;
+  background: #4caf50;
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  font-weight: 500;
+}
+
+.plugins-info {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.info-section h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  color: #666;
+}
+
+.plugins-list {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.plugin-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.plugin-core {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.plugin-custom {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.toolbar-demo {
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: white;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  margin-bottom: 2rem;
+}
+
+.toolbar-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.toolbar-section {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.toolbar-btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.toolbar-btn:hover:not(:disabled) {
+  background: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #667eea;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #5568d3;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.btn-danger {
+  background: #ef5350;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #e53935;
+}
+
+.btn-icon {
+  font-size: 1rem;
+}
+
+.toolbar-content {
+  min-height: 300px;
+  padding: 2rem;
+  background: #fafafa;
+}
+
+.content-placeholder {
+  text-align: center;
+  color: #666;
+}
+
+.content-placeholder h3 {
+  margin: 0 0 0.5rem;
+  color: #333;
+}
+
+.stats-summary {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  min-width: 100px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.stat-item strong {
+  font-size: 2rem;
+  color: #667eea;
+  margin-bottom: 0.25rem;
+}
+
+.stat-item span {
+  font-size: 0.75rem;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.toolbar-footer {
+  padding: 1rem;
+  background: #f5f5f5;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.demo-controls {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.control-btn {
+  padding: 0.75rem 1.5rem;
+  border: 2px solid #667eea;
+  background: white;
+  color: #667eea;
+  cursor: pointer;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.control-btn:hover {
+  background: #667eea;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.control-btn.danger {
+  border-color: #ef5350;
+  color: #ef5350;
+}
+
+.control-btn.danger:hover {
+  background: #ef5350;
+  color: white;
+}
+
+.analytics-panel {
+  background: #1e1e1e;
+  color: #e0e0e0;
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+}
+
+.analytics-panel h3 {
+  margin: 0 0 1.5rem;
+  color: white;
+}
+
+.analytics-panel h4 {
+  margin: 0 0 0.75rem;
+  color: #64b5f6;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+}
+
+.analytics-stats pre {
+  background: #2d2d2d;
+  padding: 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0 0 1.5rem;
+}
+
+.events-list {
+  max-height: 200px;
+  overflow-y: auto;
+  background: #2d2d2d;
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+.event-item {
+  display: flex;
+  gap: 1rem;
+  padding: 0.5rem;
+  border-radius: 4px;
+  margin-bottom: 0.25rem;
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+}
+
+.event-button-click {
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.event-check-in {
+  background: rgba(33, 150, 243, 0.1);
+}
+
+.event-check-out {
+  background: rgba(255, 152, 0, 0.1);
+}
+
+.event-type {
+  color: #64b5f6;
+  font-weight: 600;
+  min-width: 100px;
+}
+
+.event-id {
+  color: #81c784;
+  flex: 1;
+}
+
+.event-time {
+  color: #999;
+}
+
+.code-section {
+  margin-top: 2rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.code-section summary {
+  padding: 1rem;
+  background: #f5f5f5;
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+
+.code-section summary:hover {
+  background: #eeeeee;
+}
+
+.code-example {
+  padding: 1.5rem;
+  background: #fafafa;
+}
+
+.code-example h4 {
+  margin: 1.5rem 0 0.5rem;
+  color: #666;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+}
+
+.code-example h4:first-child {
+  margin-top: 0;
+}
+
+.code-example pre {
+  background: #2d2d2d;
+  color: #e0e0e0;
+  padding: 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0;
+}
+
+.code-example code {
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-enter-active,
+.slide-leave-active {
+  transition: all 0.3s;
+}
+
+.slide-enter-from,
+.slide-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+</style>
 ```
   :::
 ::
@@ -493,6 +876,7 @@ import {
   onUnmounted,
   watch,
   computed,
+  triggerRef,
   type InjectionKey,
   type Ref,
   type ComputedRef,
@@ -511,8 +895,10 @@ export type {
   SortOptions,
   DeskProvider,
   CheckInReturn,
-  Plugin,
-  PluginContext,
+  DeskHook,
+  HooksAPI,
+  SlotsAPI,
+  SlotConfig,
 } from "./types";
 
 import type {
@@ -523,33 +909,81 @@ import type {
   DeskProvider,
   CheckInReturn,
   CheckInItemMeta,
+  DeskEventType,
+  DeskEventCallback,
+  DeskEventPayload,
+  DeskHook,
+  SlotsAPI,
+  HooksAPI,
+  SlotConfig,
+  GetAllOptions,
 } from "./types";
-
-import { PluginManager } from "./plugin-manager";
-import {
-  createEventsPlugin,
-  createRegistryPlugin,
-  createSortingPlugin,
-  createIdPlugin,
-  type EventsPlugin,
-  type RegistryPlugin,
-  type SortingPlugin,
-  type IdPlugin,
-} from "./plugins";
-
-export {
-  PluginManager,
-  createEventsPlugin,
-  createRegistryPlugin,
-  createSortingPlugin,
-  createIdPlugin,
-};
-export type { EventsPlugin, RegistryPlugin, SortingPlugin, IdPlugin };
 
 const NoOpDebug = (_message: string, ..._args: any[]) => {};
 
 const Debug = (message: string, ...args: any[]) => {
   console.log(`[useCheckIn] ${message}`, ...args);
+};
+
+const instanceIdMap = new WeakMap<object, string>();
+const customIdMap = new Map<string, string>();
+
+const sortFnCache = new Map<
+  string,
+  (a: CheckInItem<any>, b: CheckInItem<any>) => number
+>();
+
+const generateSecureId = (prefix = "item"): string => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const hex = Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    return `${prefix}-${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16)}`;
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+};
+
+const compileSortFn = <T = any,>(
+  sortBy: keyof T | "timestamp" | `meta.${string}`,
+  order: "asc" | "desc" = "asc",
+): ((a: CheckInItem<T>, b: CheckInItem<T>) => number) => {
+  const cacheKey = `${String(sortBy)}-${order}`;
+  const cached = sortFnCache.get(cacheKey);
+  if (cached) return cached;
+
+  const fn = (a: CheckInItem<T>, b: CheckInItem<T>) => {
+    let aVal: any;
+    let bVal: any;
+
+    if (sortBy === "timestamp") {
+      aVal = a.timestamp || 0;
+      bVal = b.timestamp || 0;
+    } else if (String(sortBy).startsWith("meta.")) {
+      const metaKey = String(sortBy).slice(5);
+      aVal = (a.meta as any)?.[metaKey];
+      bVal = (b.meta as any)?.[metaKey];
+    } else {
+      aVal = a.data[sortBy as keyof T];
+      bVal = b.data[sortBy as keyof T];
+    }
+
+    if (aVal === bVal) return 0;
+    if (aVal == null) return 1;
+    if (bVal == null) return -1;
+
+    const result = aVal < bVal ? -1 : 1;
+    return order === "asc" ? result : -result;
+  };
+
+  sortFnCache.set(cacheKey, fn);
+  return fn;
 };
 
 export const useCheckIn = <
@@ -568,29 +1002,195 @@ export const useCheckIn = <
 
     const debug = options?.debug ? Debug : NoOpDebug;
 
-    const pluginManager = new PluginManager<T>();
+    const eventListeners = new Map<
+      DeskEventType,
+      Set<DeskEventCallback<T, any>>
+    >();
 
-    const eventsPlugin = createEventsPlugin<T>();
-    const registryPlugin = createRegistryPlugin<T>(eventsPlugin.emit as any);
-    const sortingPlugin = createSortingPlugin<T>();
-    const idPlugin = createIdPlugin();
+    const emit = <E extends DeskEventType>(
+      event: E,
+      payload: Omit<DeskEventPayload<T>[E], "timestamp">,
+    ) => {
+      const listeners = eventListeners.get(event);
+      if (!listeners) return;
 
-    pluginManager.initialize({
-      registry,
-      options,
-      debug,
-    });
+      const eventPayload = {
+        ...payload,
+        timestamp: Date.now(),
+      } as DeskEventPayload<T>[E];
 
-    pluginManager.install(
-      eventsPlugin,
-      registryPlugin,
-      sortingPlugin,
-      idPlugin,
-    );
+      debug(`[Event] ${event}`, eventPayload);
+      listeners.forEach((callback) => callback(eventPayload));
+    };
 
-    if (options?.plugins) {
-      pluginManager.install(...options.plugins);
-    }
+    const on = <E extends DeskEventType>(
+      event: E,
+      callback: DeskEventCallback<T, E>,
+    ) => {
+      if (!eventListeners.has(event)) {
+        eventListeners.set(event, new Set());
+      }
+      eventListeners.get(event)!.add(callback);
+
+      debug(
+        `[Event] Listener added for '${event}', total: ${eventListeners.get(event)!.size}`,
+      );
+
+      return () => off(event, callback);
+    };
+
+    const off = <E extends DeskEventType>(
+      event: E,
+      callback: DeskEventCallback<T, E>,
+    ) => {
+      const listeners = eventListeners.get(event);
+      if (listeners) {
+        listeners.delete(callback);
+        debug(
+          `[Event] Listener removed for '${event}', remaining: ${listeners.size}`,
+        );
+      }
+    };
+
+    const checkIn = (
+      id: string | number,
+      data: T,
+      meta?: CheckInItemMeta,
+    ): boolean => {
+      debug("checkIn", { id, data, meta });
+
+      if (options?.onBeforeCheckIn) {
+        const result = options.onBeforeCheckIn(id, data);
+        if (result === false) {
+          debug("checkIn cancelled by onBeforeCheckIn", id);
+          return false;
+        }
+      }
+
+      const item: CheckInItem<T> = {
+        id,
+        data: data as any,
+        timestamp: Date.now(),
+        meta,
+      };
+
+      registry.value.set(id, item);
+      triggerRef(registry);
+
+      emit("check-in", { id, data });
+
+      options?.onCheckIn?.(id, data);
+
+      hooks.trigger("onCheckIn", item);
+
+      if (options?.debug) {
+        debug("Registry state after check-in:", {
+          total: registry.value.size,
+          items: Array.from(registry.value.keys()),
+        });
+      }
+
+      return true;
+    };
+
+    const checkOut = (id: string | number): boolean => {
+      debug("checkOut", id);
+
+      const existed = registry.value.has(id);
+      if (!existed) return false;
+
+      if (options?.onBeforeCheckOut) {
+        const result = options.onBeforeCheckOut(id);
+        if (result === false) {
+          debug("checkOut cancelled by onBeforeCheckOut", id);
+          return false;
+        }
+      }
+
+      registry.value.delete(id);
+      triggerRef(registry);
+
+      emit("check-out", { id });
+
+      options?.onCheckOut?.(id);
+
+      hooks.trigger("onCheckOut", id);
+
+      if (options?.debug) {
+        debug("Registry state after check-out:", {
+          total: registry.value.size,
+          items: Array.from(registry.value.keys()),
+        });
+      }
+
+      return true;
+    };
+
+    const get = (id: string | number) => registry.value.get(id);
+
+    const has = (id: string | number) => registry.value.has(id);
+
+    const update = (id: string | number, data: Partial<T>): boolean => {
+      const item = registry.value.get(id);
+      if (!item) return false;
+
+      const updatedItem = {
+        ...item,
+        data: { ...item.data, ...data },
+      };
+
+      registry.value.set(id, updatedItem);
+      triggerRef(registry);
+
+      emit("update", { id, data: updatedItem.data });
+      hooks.trigger("onUpdate", updatedItem);
+
+      debug("update", { id, data });
+      return true;
+    };
+
+    const clear = () => {
+      registry.value.clear();
+      triggerRef(registry);
+      emit("clear", {});
+      hooks.trigger("onClear");
+      debug("clear");
+    };
+
+    const checkInMany = (
+      items: Array<{ id: string | number; data: T; meta?: CheckInItemMeta }>,
+    ) => {
+      items.forEach(({ id, data, meta }) => checkIn(id, data, meta));
+    };
+
+    const checkOutMany = (ids: Array<string | number>) => {
+      ids.forEach((id) => checkOut(id));
+    };
+
+    const updateMany = (
+      updates: Array<{ id: string | number; data: Partial<T> }>,
+    ) => {
+      updates.forEach(({ id, data }) => update(id, data));
+    };
+
+    const getAll = (opts?: GetAllOptions<T>): CheckInItem<T>[] => {
+      let items = Array.from(registry.value.values());
+
+      if (opts?.group) {
+        items = items.filter((item) => item.meta?.group === opts.group);
+      }
+
+      if (opts?.filter) {
+        items = items.filter(opts.filter);
+      }
+
+      if (opts?.sortBy) {
+        const sortFn = compileSortFn<T>(opts.sortBy, opts.order);
+        items.sort(sortFn);
+      }
+
+      return items;
+    };
 
     const getGroup = (
       group: string,
@@ -599,28 +1199,98 @@ export const useCheckIn = <
         order?: "asc" | "desc";
       },
     ) => {
-      return computed(() => sortingPlugin.getAll({ ...sortOptions, group }));
+      return computed(() => getAll({ ...sortOptions, group }));
     };
 
-    const items = computed(() => sortingPlugin.getAll());
+    const items = computed(() => getAll());
+
+    const slotsRegistry = new Map<string, SlotConfig>();
+
+    const slots: SlotsAPI<T> = {
+      register: (
+        slotId: string,
+        slotType: string,
+        meta?: Record<string, any>,
+      ) => {
+        slotsRegistry.set(slotId, { id: slotId, type: slotType, meta });
+        debug(`[Slots] Registered slot '${slotId}' of type '${slotType}'`);
+      },
+      unregister: (slotId: string) => {
+        slotsRegistry.delete(slotId);
+        debug(`[Slots] Unregistered slot '${slotId}'`);
+      },
+      get: (slotId: string): CheckInItem<T>[] => {
+        return getAll({
+          filter: (item) => item.meta?.user?.slotId === slotId,
+        });
+      },
+      has: (slotId: string): boolean => {
+        return slotsRegistry.has(slotId);
+      },
+      list: (): SlotConfig[] => {
+        return Array.from(slotsRegistry.values());
+      },
+      clear: () => {
+        slotsRegistry.clear();
+        debug("[Slots] All slots cleared");
+      },
+    };
+
+    const hooksRegistry = new Map<string, DeskHook<T>>();
+
+    const hooks: HooksAPI<T> & {
+      trigger: (method: keyof DeskHook<T>, ...args: any[]) => void;
+    } = {
+      add: (hook: DeskHook<T>) => {
+        hooksRegistry.set(hook.name, hook);
+        debug(`[Hooks] Added hook '${hook.name}'`);
+      },
+      remove: (name: string): boolean => {
+        const hook = hooksRegistry.get(name);
+        if (hook) {
+          hook.cleanup?.();
+          hooksRegistry.delete(name);
+          debug(`[Hooks] Removed hook '${name}'`);
+          return true;
+        }
+        return false;
+      },
+      list: (): string[] => {
+        return Array.from(hooksRegistry.keys());
+      },
+      trigger: (method: keyof DeskHook<T>, ...args: any[]) => {
+        hooksRegistry.forEach((hook) => {
+          const fn = hook[method];
+          if (typeof fn === "function") {
+            (fn as any)(...args);
+          }
+        });
+      },
+    };
+
+    if (options?.hooks) {
+      options.hooks.forEach((hook) => hooks.add(hook));
+    }
 
     const readonlyRegistry = computed(() => registry.value);
 
     return {
       registry: readonlyRegistry as any,
-      checkIn: registryPlugin.checkIn,
-      checkOut: registryPlugin.checkOut,
-      get: registryPlugin.get,
-      getAll: sortingPlugin.getAll,
-      update: registryPlugin.update,
-      has: registryPlugin.has,
-      clear: registryPlugin.clear,
-      checkInMany: registryPlugin.checkInMany,
-      checkOutMany: registryPlugin.checkOutMany,
-      updateMany: registryPlugin.updateMany,
-      on: eventsPlugin.on,
-      off: eventsPlugin.off,
-      emit: eventsPlugin.emit,
+      slots,
+      hooks,
+      checkIn,
+      checkOut,
+      get,
+      getAll,
+      update,
+      has,
+      clear,
+      checkInMany,
+      checkOutMany,
+      updateMany,
+      on,
+      off,
+      emit,
       getGroup,
       items,
     };
@@ -822,16 +1492,39 @@ export const useCheckIn = <
   };
 
   const generateId = (prefix = "item"): string => {
-    const plugin = createIdPlugin();
-    return plugin.generateId(prefix);
+    return generateSecureId(prefix);
   };
 
   const memoizedId = (
     instanceOrId: object | string | number | null | undefined,
     prefix = "item",
   ): string => {
-    const plugin = createIdPlugin();
-    return plugin.memoizedId(instanceOrId, prefix);
+    if (instanceOrId && typeof instanceOrId === "object") {
+      const existing = instanceIdMap.get(instanceOrId);
+      if (existing) return existing;
+
+      const newId = generateSecureId(prefix);
+      instanceIdMap.set(instanceOrId, newId);
+      return newId;
+    }
+
+    if (typeof instanceOrId === "string" || typeof instanceOrId === "number") {
+      const key = `${prefix}-${instanceOrId}`;
+      const existing = customIdMap.get(key);
+      if (existing) return existing;
+
+      const newId = `${prefix}-${instanceOrId}`;
+      customIdMap.set(key, newId);
+      return newId;
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[useCheckIn] memoizedId called with null/undefined. Consider passing getCurrentInstance() or a custom ID.",
+      );
+    }
+
+    return generateSecureId(prefix);
   };
 
   const standaloneDesk = <T = any,>(options?: CheckInDeskOptions<T>) => {
@@ -976,20 +1669,52 @@ export interface CheckInItemMeta {
   user?: Record<string, any>;
 }
 
-export interface PluginContext<T = any> {
-  registry: Ref<Map<string | number, CheckInItem<T>>>;
+export interface SlotConfig {
+  id: string;
 
-  options?: CheckInDeskOptions<T>;
+  type: string;
 
-  debug: (message: string, ...args: any[]) => void;
+  meta?: Record<string, any>;
 }
 
-export interface Plugin<T = any> {
+export interface SlotsAPI<T = any> {
+  register: (
+    slotId: string,
+    slotType: string,
+    meta?: Record<string, any>,
+  ) => void;
+
+  unregister: (slotId: string) => void;
+
+  get: (slotId: string) => CheckInItem<T>[];
+
+  has: (slotId: string) => boolean;
+
+  list: () => SlotConfig[];
+
+  clear: () => void;
+}
+
+export interface DeskHook<T = any> {
   name: string;
 
-  install: (context: PluginContext<T>) => void;
+  onCheckIn?: (item: CheckInItem<T>) => void;
+
+  onCheckOut?: (id: string | number) => void;
+
+  onUpdate?: (item: CheckInItem<T>) => void;
+
+  onClear?: () => void;
 
   cleanup?: () => void;
+}
+
+export interface HooksAPI<T = any> {
+  add: (hook: DeskHook<T>) => void;
+
+  remove: (name: string) => boolean;
+
+  list: () => string[];
 }
 
 export interface CheckInDesk<
@@ -997,6 +1722,10 @@ export interface CheckInDesk<
   TContext extends Record<string, any> = {},
 > {
   registry: Readonly<Ref<Map<string | number, CheckInItem<T>>>>;
+
+  slots: SlotsAPI<T>;
+
+  hooks: HooksAPI<T>;
   checkIn: (id: string | number, data: T, meta?: CheckInItemMeta) => boolean;
   checkOut: (id: string | number) => boolean;
   get: (id: string | number) => CheckInItem<T> | undefined;
@@ -1063,7 +1792,7 @@ export interface CheckInDeskOptions<
 
   debug?: boolean;
 
-  plugins?: Plugin<T>[];
+  hooks?: DeskHook<T>[];
 }
 
 export interface CheckInOptions<T = any> {
@@ -1540,6 +2269,460 @@ export const createRegistryPlugin = <T = any,>(
     updateMany,
   };
 };
+```
+
+```ts [src/composables/use-check-in/plugins/runtime-usage.example.ts]
+import type { Plugin, PluginContext, CheckInItem } from "../types";
+
+export interface AnalyticsEvent {
+  type: "check-in" | "check-out" | "update";
+  itemId: string | number;
+  timestamp: number;
+  data?: any;
+}
+
+export interface AnalyticsPluginOptions {
+  endpoint?: string;
+  batchSize?: number;
+  flushInterval?: number;
+}
+
+export interface AnalyticsPlugin<T = any> extends Plugin<T> {
+  track: (event: AnalyticsEvent) => void;
+
+  flush: () => Promise<void>;
+
+  getStats: () => {
+    totalEvents: number;
+    checkIns: number;
+    checkOuts: number;
+    updates: number;
+  };
+}
+
+export const createAnalyticsPlugin = <T = any,>(
+  options?: AnalyticsPluginOptions,
+): AnalyticsPlugin<T> => {
+  let context: PluginContext<T> | null = null;
+  const events: AnalyticsEvent[] = [];
+  let stats = {
+    totalEvents: 0,
+    checkIns: 0,
+    checkOuts: 0,
+    updates: 0,
+  };
+
+  const track = (event: AnalyticsEvent) => {
+    events.push(event);
+    stats.totalEvents++;
+
+    if (event.type === "check-in") stats.checkIns++;
+    else if (event.type === "check-out") stats.checkOuts++;
+    else if (event.type === "update") stats.updates++;
+
+    context?.debug("[Analytics] Tracked event:", event);
+
+    if (options?.batchSize && events.length >= options.batchSize) {
+      flush();
+    }
+  };
+
+  const flush = async () => {
+    if (events.length === 0) return;
+
+    const endpoint = options?.endpoint || "/api/analytics";
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ events: [...events] }),
+      });
+
+      if (response.ok) {
+        context?.debug("[Analytics] Flushed", events.length, "events");
+        events.length = 0;
+      }
+    } catch (error) {
+      console.error("[Analytics] Failed to flush:", error);
+    }
+  };
+
+  const getStats = () => ({ ...stats });
+
+  let flushInterval: NodeJS.Timeout | null = null;
+
+  return {
+    name: "analytics",
+    install: (ctx: PluginContext<T>) => {
+      context = ctx;
+      ctx.debug("[Plugin] Analytics plugin installed");
+
+      if (options?.flushInterval) {
+        flushInterval = setInterval(() => {
+          flush();
+        }, options.flushInterval);
+      }
+    },
+    cleanup: () => {
+      flush();
+
+      if (flushInterval) {
+        clearInterval(flushInterval);
+      }
+
+      context?.debug("[Analytics] Plugin cleaned up");
+    },
+    track,
+    flush,
+    getStats,
+  };
+};
+
+import { ref, onMounted, onUnmounted } from "vue";
+import { useCheckIn, type CheckInDesk } from "../useCheckIn";
+import type { SlotsPlugin } from "./slots.plugin.example";
+
+export interface ToolbarItem {
+  label: string;
+  icon?: string;
+  onClick: () => void;
+  disabled?: boolean;
+}
+
+export function useToolbarWithPlugins() {
+  const { createDesk } = useCheckIn<ToolbarItem>();
+  const { desk } = createDesk({ debug: true });
+
+  const slotsPlugin = ref<SlotsPlugin<ToolbarItem>>();
+  const analyticsPlugin = ref<AnalyticsPlugin<ToolbarItem>>();
+
+  const loadPlugins = async () => {
+    const { createSlotsPlugin } = await import("./slots.plugin.example");
+    const slots = createSlotsPlugin<ToolbarItem>();
+    desk.plugins.install(slots);
+    slotsPlugin.value = desk.plugins.get<SlotsPlugin<ToolbarItem>>("slots");
+
+    slotsPlugin.value?.registerSlot("header-left", "toolbar", {
+      align: "left",
+    });
+    slotsPlugin.value?.registerSlot("header-right", "toolbar", {
+      align: "right",
+    });
+    slotsPlugin.value?.registerSlot("footer", "toolbar", { align: "center" });
+
+    if (
+      typeof process !== "undefined" &&
+      process.env?.NODE_ENV === "production"
+    ) {
+      const analytics = createAnalyticsPlugin<ToolbarItem>({
+        endpoint: "/api/analytics",
+        batchSize: 10,
+        flushInterval: 30000,
+      });
+
+      desk.plugins.install(analytics);
+      analyticsPlugin.value =
+        desk.plugins.get<AnalyticsPlugin<ToolbarItem>>("analytics");
+
+      desk.on("check-in", (payload) => {
+        analyticsPlugin.value?.track({
+          type: "check-in",
+          itemId: payload.id,
+          timestamp: payload.timestamp,
+          data: payload.data,
+        });
+      });
+
+      desk.on("check-out", (payload) => {
+        analyticsPlugin.value?.track({
+          type: "check-out",
+          itemId: payload.id,
+          timestamp: payload.timestamp,
+        });
+      });
+    }
+  };
+
+  const addToSlot = (slotId: string, id: string, item: ToolbarItem) => {
+    if (!slotsPlugin.value) {
+      console.warn("Slots plugin not loaded");
+      return;
+    }
+
+    desk.checkIn(id, item, {
+      user: { slotId, slotType: "toolbar" },
+    });
+  };
+
+  const getSlotItems = (slotId: string) => {
+    return slotsPlugin.value?.getSlotItems(slotId) ?? [];
+  };
+
+  const getAnalyticsStats = () => {
+    return analyticsPlugin.value?.getStats() ?? null;
+  };
+
+  onMounted(() => {
+    loadPlugins();
+  });
+
+  onUnmounted(() => {
+    analyticsPlugin.value?.flush();
+  });
+
+  return {
+    desk,
+    slotsPlugin,
+    analyticsPlugin,
+    addToSlot,
+    getSlotItems,
+    getAnalyticsStats,
+    loadPlugins,
+  };
+}
+
+export const ToolbarWithPluginsExample = `
+<script setup lang="ts">
+import { computed, ref } from 'vue';
+import { useToolbarWithPlugins } from './useToolbarWithPlugins';
+
+const {
+  desk,
+  slotsPlugin,
+  analyticsPlugin,
+  addToSlot,
+  getSlotItems,
+  getAnalyticsStats
+} = useToolbarWithPlugins();
+
+
+const addSaveButton = () => {
+  addToSlot('header-left', 'btn-save', {
+    label: 'Save',
+    icon: 'save',
+    onClick: () => console.log('Save clicked')
+  });
+};
+
+const addCancelButton = () => {
+  addToSlot('header-right', 'btn-cancel', {
+    label: 'Cancel',
+    icon: 'close',
+    onClick: () => console.log('Cancel clicked')
+  });
+};
+
+
+const headerLeft = computed(() => getSlotItems('header-left'));
+const headerRight = computed(() => getSlotItems('header-right'));
+const footer = computed(() => getSlotItems('footer'));
+
+
+const stats = computed(() => getAnalyticsStats());
+
+
+const loadExtraPlugin = async () => {
+  
+  if (userHasPermission.value) {
+    const { createPermissionsPlugin } = await import('./permissions.plugin');
+    const permPlugin = createPermissionsPlugin();
+    desk.plugins.install(permPlugin);
+  }
+};
+
+
+onMounted(() => {
+  addSaveButton();
+  addCancelButton();
+});
+</script>
+
+<template>
+  <div class="toolbar-container">
+    
+    <header class="toolbar-header">
+      <div class="toolbar-section left">
+        <button
+          v-for="item in headerLeft"
+          :key="item.id"
+          :disabled="item.data.disabled"
+          @click="item.data.onClick"
+          class="toolbar-button"
+        >
+          <span v-if="item.data.icon" class="icon">{{ item.data.icon }}</span>
+          {{ item.data.label }}
+        </button>
+      </div>
+
+      <div class="toolbar-section right">
+        <button
+          v-for="item in headerRight"
+          :key="item.id"
+          :disabled="item.data.disabled"
+          @click="item.data.onClick"
+          class="toolbar-button"
+        >
+          <span v-if="item.data.icon" class="icon">{{ item.data.icon }}</span>
+          {{ item.data.label }}
+        </button>
+      </div>
+    </header>
+
+    
+    <main class="content">
+      <slot />
+    </main>
+
+    
+    <footer class="toolbar-footer">
+      <button
+        v-for="item in footer"
+        :key="item.id"
+        :disabled="item.data.disabled"
+        @click="item.data.onClick"
+        class="toolbar-button"
+      >
+        {{ item.data.label }}
+      </button>
+    </footer>
+
+    
+    <div v-if="import.meta.env.DEV && stats" class="analytics-debug">
+      <h4>Analytics Stats</h4>
+      <pre>{{ stats }}</pre>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.toolbar-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.toolbar-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem;
+  background: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+}
+
+.toolbar-section {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.toolbar-button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ccc;
+  background: white;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.toolbar-button:hover {
+  background: #f0f0f0;
+}
+
+.toolbar-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.content {
+  flex: 1;
+  padding: 1rem;
+  overflow: auto;
+}
+
+.toolbar-footer {
+  padding: 1rem;
+  background: #f5f5f5;
+  border-top: 1px solid #ddd;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.analytics-debug {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+</style>
+`;
+
+export const PluginRuntimeTests = `
+import { describe, it, expect, vi } from 'vitest';
+import { useCheckIn } from '../useCheckIn';
+import { createAnalyticsPlugin } from './analytics.plugin';
+
+describe('Plugin Runtime Loading', () => {
+  it('should load plugin at runtime', () => {
+    const { desk } = useCheckIn<any>().createDesk();
+    
+    expect(desk.plugins.has('analytics')).toBe(false);
+    
+    const analytics = createAnalyticsPlugin();
+    desk.plugins.install(analytics);
+    
+    expect(desk.plugins.has('analytics')).toBe(true);
+  });
+
+  it('should provide typesafe access to plugin', () => {
+    const { desk } = useCheckIn<any>().createDesk();
+    
+    const analytics = createAnalyticsPlugin();
+    desk.plugins.install(analytics);
+    
+    const plugin = desk.plugins.get<AnalyticsPlugin>('analytics');
+    
+    expect(plugin).toBeDefined();
+    expect(typeof plugin?.track).toBe('function');
+    expect(typeof plugin?.flush).toBe('function');
+  });
+
+  it('should track events', () => {
+    const { desk } = useCheckIn<any>().createDesk();
+    
+    const analytics = createAnalyticsPlugin();
+    desk.plugins.install(analytics);
+    
+    const plugin = desk.plugins.get<AnalyticsPlugin>('analytics')!;
+    
+    plugin.track({
+      type: 'check-in',
+      itemId: 'test',
+      timestamp: Date.now()
+    });
+    
+    const stats = plugin.getStats();
+    expect(stats.totalEvents).toBe(1);
+    expect(stats.checkIns).toBe(1);
+  });
+
+  it('should uninstall plugin', () => {
+    const { desk } = useCheckIn<any>().createDesk();
+    
+    const analytics = createAnalyticsPlugin();
+    desk.plugins.install(analytics);
+    
+    expect(desk.plugins.has('analytics')).toBe(true);
+    
+    desk.plugins.uninstall('analytics');
+    
+    expect(desk.plugins.has('analytics')).toBe(false);
+  });
+});
+`;
 ```
 
 ```ts [src/composables/use-check-in/plugins/slots.plugin.example.ts]
@@ -1837,6 +3020,7 @@ import {
   onUnmounted,
   watch,
   computed,
+  triggerRef,
   type InjectionKey,
   type Ref,
   type ComputedRef,
@@ -1855,8 +3039,10 @@ export type {
   SortOptions,
   DeskProvider,
   CheckInReturn,
-  Plugin,
-  PluginContext,
+  DeskHook,
+  HooksAPI,
+  SlotsAPI,
+  SlotConfig,
 } from "./types";
 
 import type {
@@ -1867,33 +3053,81 @@ import type {
   DeskProvider,
   CheckInReturn,
   CheckInItemMeta,
+  DeskEventType,
+  DeskEventCallback,
+  DeskEventPayload,
+  DeskHook,
+  SlotsAPI,
+  HooksAPI,
+  SlotConfig,
+  GetAllOptions,
 } from "./types";
-
-import { PluginManager } from "./plugin-manager";
-import {
-  createEventsPlugin,
-  createRegistryPlugin,
-  createSortingPlugin,
-  createIdPlugin,
-  type EventsPlugin,
-  type RegistryPlugin,
-  type SortingPlugin,
-  type IdPlugin,
-} from "./plugins";
-
-export {
-  PluginManager,
-  createEventsPlugin,
-  createRegistryPlugin,
-  createSortingPlugin,
-  createIdPlugin,
-};
-export type { EventsPlugin, RegistryPlugin, SortingPlugin, IdPlugin };
 
 const NoOpDebug = (_message: string, ..._args: any[]) => {};
 
 const Debug = (message: string, ...args: any[]) => {
   console.log(`[useCheckIn] ${message}`, ...args);
+};
+
+const instanceIdMap = new WeakMap<object, string>();
+const customIdMap = new Map<string, string>();
+
+const sortFnCache = new Map<
+  string,
+  (a: CheckInItem<any>, b: CheckInItem<any>) => number
+>();
+
+const generateSecureId = (prefix = "item"): string => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const hex = Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    return `${prefix}-${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16)}`;
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+};
+
+const compileSortFn = <T = any,>(
+  sortBy: keyof T | "timestamp" | `meta.${string}`,
+  order: "asc" | "desc" = "asc",
+): ((a: CheckInItem<T>, b: CheckInItem<T>) => number) => {
+  const cacheKey = `${String(sortBy)}-${order}`;
+  const cached = sortFnCache.get(cacheKey);
+  if (cached) return cached;
+
+  const fn = (a: CheckInItem<T>, b: CheckInItem<T>) => {
+    let aVal: any;
+    let bVal: any;
+
+    if (sortBy === "timestamp") {
+      aVal = a.timestamp || 0;
+      bVal = b.timestamp || 0;
+    } else if (String(sortBy).startsWith("meta.")) {
+      const metaKey = String(sortBy).slice(5);
+      aVal = (a.meta as any)?.[metaKey];
+      bVal = (b.meta as any)?.[metaKey];
+    } else {
+      aVal = a.data[sortBy as keyof T];
+      bVal = b.data[sortBy as keyof T];
+    }
+
+    if (aVal === bVal) return 0;
+    if (aVal == null) return 1;
+    if (bVal == null) return -1;
+
+    const result = aVal < bVal ? -1 : 1;
+    return order === "asc" ? result : -result;
+  };
+
+  sortFnCache.set(cacheKey, fn);
+  return fn;
 };
 
 export const useCheckIn = <
@@ -1912,29 +3146,195 @@ export const useCheckIn = <
 
     const debug = options?.debug ? Debug : NoOpDebug;
 
-    const pluginManager = new PluginManager<T>();
+    const eventListeners = new Map<
+      DeskEventType,
+      Set<DeskEventCallback<T, any>>
+    >();
 
-    const eventsPlugin = createEventsPlugin<T>();
-    const registryPlugin = createRegistryPlugin<T>(eventsPlugin.emit as any);
-    const sortingPlugin = createSortingPlugin<T>();
-    const idPlugin = createIdPlugin();
+    const emit = <E extends DeskEventType>(
+      event: E,
+      payload: Omit<DeskEventPayload<T>[E], "timestamp">,
+    ) => {
+      const listeners = eventListeners.get(event);
+      if (!listeners) return;
 
-    pluginManager.initialize({
-      registry,
-      options,
-      debug,
-    });
+      const eventPayload = {
+        ...payload,
+        timestamp: Date.now(),
+      } as DeskEventPayload<T>[E];
 
-    pluginManager.install(
-      eventsPlugin,
-      registryPlugin,
-      sortingPlugin,
-      idPlugin,
-    );
+      debug(`[Event] ${event}`, eventPayload);
+      listeners.forEach((callback) => callback(eventPayload));
+    };
 
-    if (options?.plugins) {
-      pluginManager.install(...options.plugins);
-    }
+    const on = <E extends DeskEventType>(
+      event: E,
+      callback: DeskEventCallback<T, E>,
+    ) => {
+      if (!eventListeners.has(event)) {
+        eventListeners.set(event, new Set());
+      }
+      eventListeners.get(event)!.add(callback);
+
+      debug(
+        `[Event] Listener added for '${event}', total: ${eventListeners.get(event)!.size}`,
+      );
+
+      return () => off(event, callback);
+    };
+
+    const off = <E extends DeskEventType>(
+      event: E,
+      callback: DeskEventCallback<T, E>,
+    ) => {
+      const listeners = eventListeners.get(event);
+      if (listeners) {
+        listeners.delete(callback);
+        debug(
+          `[Event] Listener removed for '${event}', remaining: ${listeners.size}`,
+        );
+      }
+    };
+
+    const checkIn = (
+      id: string | number,
+      data: T,
+      meta?: CheckInItemMeta,
+    ): boolean => {
+      debug("checkIn", { id, data, meta });
+
+      if (options?.onBeforeCheckIn) {
+        const result = options.onBeforeCheckIn(id, data);
+        if (result === false) {
+          debug("checkIn cancelled by onBeforeCheckIn", id);
+          return false;
+        }
+      }
+
+      const item: CheckInItem<T> = {
+        id,
+        data: data as any,
+        timestamp: Date.now(),
+        meta,
+      };
+
+      registry.value.set(id, item);
+      triggerRef(registry);
+
+      emit("check-in", { id, data });
+
+      options?.onCheckIn?.(id, data);
+
+      hooks.trigger("onCheckIn", item);
+
+      if (options?.debug) {
+        debug("Registry state after check-in:", {
+          total: registry.value.size,
+          items: Array.from(registry.value.keys()),
+        });
+      }
+
+      return true;
+    };
+
+    const checkOut = (id: string | number): boolean => {
+      debug("checkOut", id);
+
+      const existed = registry.value.has(id);
+      if (!existed) return false;
+
+      if (options?.onBeforeCheckOut) {
+        const result = options.onBeforeCheckOut(id);
+        if (result === false) {
+          debug("checkOut cancelled by onBeforeCheckOut", id);
+          return false;
+        }
+      }
+
+      registry.value.delete(id);
+      triggerRef(registry);
+
+      emit("check-out", { id });
+
+      options?.onCheckOut?.(id);
+
+      hooks.trigger("onCheckOut", id);
+
+      if (options?.debug) {
+        debug("Registry state after check-out:", {
+          total: registry.value.size,
+          items: Array.from(registry.value.keys()),
+        });
+      }
+
+      return true;
+    };
+
+    const get = (id: string | number) => registry.value.get(id);
+
+    const has = (id: string | number) => registry.value.has(id);
+
+    const update = (id: string | number, data: Partial<T>): boolean => {
+      const item = registry.value.get(id);
+      if (!item) return false;
+
+      const updatedItem = {
+        ...item,
+        data: { ...item.data, ...data },
+      };
+
+      registry.value.set(id, updatedItem);
+      triggerRef(registry);
+
+      emit("update", { id, data: updatedItem.data });
+      hooks.trigger("onUpdate", updatedItem);
+
+      debug("update", { id, data });
+      return true;
+    };
+
+    const clear = () => {
+      registry.value.clear();
+      triggerRef(registry);
+      emit("clear", {});
+      hooks.trigger("onClear");
+      debug("clear");
+    };
+
+    const checkInMany = (
+      items: Array<{ id: string | number; data: T; meta?: CheckInItemMeta }>,
+    ) => {
+      items.forEach(({ id, data, meta }) => checkIn(id, data, meta));
+    };
+
+    const checkOutMany = (ids: Array<string | number>) => {
+      ids.forEach((id) => checkOut(id));
+    };
+
+    const updateMany = (
+      updates: Array<{ id: string | number; data: Partial<T> }>,
+    ) => {
+      updates.forEach(({ id, data }) => update(id, data));
+    };
+
+    const getAll = (opts?: GetAllOptions<T>): CheckInItem<T>[] => {
+      let items = Array.from(registry.value.values());
+
+      if (opts?.group) {
+        items = items.filter((item) => item.meta?.group === opts.group);
+      }
+
+      if (opts?.filter) {
+        items = items.filter(opts.filter);
+      }
+
+      if (opts?.sortBy) {
+        const sortFn = compileSortFn<T>(opts.sortBy, opts.order);
+        items.sort(sortFn);
+      }
+
+      return items;
+    };
 
     const getGroup = (
       group: string,
@@ -1943,28 +3343,98 @@ export const useCheckIn = <
         order?: "asc" | "desc";
       },
     ) => {
-      return computed(() => sortingPlugin.getAll({ ...sortOptions, group }));
+      return computed(() => getAll({ ...sortOptions, group }));
     };
 
-    const items = computed(() => sortingPlugin.getAll());
+    const items = computed(() => getAll());
+
+    const slotsRegistry = new Map<string, SlotConfig>();
+
+    const slots: SlotsAPI<T> = {
+      register: (
+        slotId: string,
+        slotType: string,
+        meta?: Record<string, any>,
+      ) => {
+        slotsRegistry.set(slotId, { id: slotId, type: slotType, meta });
+        debug(`[Slots] Registered slot '${slotId}' of type '${slotType}'`);
+      },
+      unregister: (slotId: string) => {
+        slotsRegistry.delete(slotId);
+        debug(`[Slots] Unregistered slot '${slotId}'`);
+      },
+      get: (slotId: string): CheckInItem<T>[] => {
+        return getAll({
+          filter: (item) => item.meta?.user?.slotId === slotId,
+        });
+      },
+      has: (slotId: string): boolean => {
+        return slotsRegistry.has(slotId);
+      },
+      list: (): SlotConfig[] => {
+        return Array.from(slotsRegistry.values());
+      },
+      clear: () => {
+        slotsRegistry.clear();
+        debug("[Slots] All slots cleared");
+      },
+    };
+
+    const hooksRegistry = new Map<string, DeskHook<T>>();
+
+    const hooks: HooksAPI<T> & {
+      trigger: (method: keyof DeskHook<T>, ...args: any[]) => void;
+    } = {
+      add: (hook: DeskHook<T>) => {
+        hooksRegistry.set(hook.name, hook);
+        debug(`[Hooks] Added hook '${hook.name}'`);
+      },
+      remove: (name: string): boolean => {
+        const hook = hooksRegistry.get(name);
+        if (hook) {
+          hook.cleanup?.();
+          hooksRegistry.delete(name);
+          debug(`[Hooks] Removed hook '${name}'`);
+          return true;
+        }
+        return false;
+      },
+      list: (): string[] => {
+        return Array.from(hooksRegistry.keys());
+      },
+      trigger: (method: keyof DeskHook<T>, ...args: any[]) => {
+        hooksRegistry.forEach((hook) => {
+          const fn = hook[method];
+          if (typeof fn === "function") {
+            (fn as any)(...args);
+          }
+        });
+      },
+    };
+
+    if (options?.hooks) {
+      options.hooks.forEach((hook) => hooks.add(hook));
+    }
 
     const readonlyRegistry = computed(() => registry.value);
 
     return {
       registry: readonlyRegistry as any,
-      checkIn: registryPlugin.checkIn,
-      checkOut: registryPlugin.checkOut,
-      get: registryPlugin.get,
-      getAll: sortingPlugin.getAll,
-      update: registryPlugin.update,
-      has: registryPlugin.has,
-      clear: registryPlugin.clear,
-      checkInMany: registryPlugin.checkInMany,
-      checkOutMany: registryPlugin.checkOutMany,
-      updateMany: registryPlugin.updateMany,
-      on: eventsPlugin.on,
-      off: eventsPlugin.off,
-      emit: eventsPlugin.emit,
+      slots,
+      hooks,
+      checkIn,
+      checkOut,
+      get,
+      getAll,
+      update,
+      has,
+      clear,
+      checkInMany,
+      checkOutMany,
+      updateMany,
+      on,
+      off,
+      emit,
       getGroup,
       items,
     };
@@ -2166,16 +3636,39 @@ export const useCheckIn = <
   };
 
   const generateId = (prefix = "item"): string => {
-    const plugin = createIdPlugin();
-    return plugin.generateId(prefix);
+    return generateSecureId(prefix);
   };
 
   const memoizedId = (
     instanceOrId: object | string | number | null | undefined,
     prefix = "item",
   ): string => {
-    const plugin = createIdPlugin();
-    return plugin.memoizedId(instanceOrId, prefix);
+    if (instanceOrId && typeof instanceOrId === "object") {
+      const existing = instanceIdMap.get(instanceOrId);
+      if (existing) return existing;
+
+      const newId = generateSecureId(prefix);
+      instanceIdMap.set(instanceOrId, newId);
+      return newId;
+    }
+
+    if (typeof instanceOrId === "string" || typeof instanceOrId === "number") {
+      const key = `${prefix}-${instanceOrId}`;
+      const existing = customIdMap.get(key);
+      if (existing) return existing;
+
+      const newId = `${prefix}-${instanceOrId}`;
+      customIdMap.set(key, newId);
+      return newId;
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[useCheckIn] memoizedId called with null/undefined. Consider passing getCurrentInstance() or a custom ID.",
+      );
+    }
+
+    return generateSecureId(prefix);
   };
 
   const standaloneDesk = <T = any,>(options?: CheckInDeskOptions<T>) => {
@@ -2320,20 +3813,52 @@ export interface CheckInItemMeta {
   user?: Record<string, any>;
 }
 
-export interface PluginContext<T = any> {
-  registry: Ref<Map<string | number, CheckInItem<T>>>;
+export interface SlotConfig {
+  id: string;
 
-  options?: CheckInDeskOptions<T>;
+  type: string;
 
-  debug: (message: string, ...args: any[]) => void;
+  meta?: Record<string, any>;
 }
 
-export interface Plugin<T = any> {
+export interface SlotsAPI<T = any> {
+  register: (
+    slotId: string,
+    slotType: string,
+    meta?: Record<string, any>,
+  ) => void;
+
+  unregister: (slotId: string) => void;
+
+  get: (slotId: string) => CheckInItem<T>[];
+
+  has: (slotId: string) => boolean;
+
+  list: () => SlotConfig[];
+
+  clear: () => void;
+}
+
+export interface DeskHook<T = any> {
   name: string;
 
-  install: (context: PluginContext<T>) => void;
+  onCheckIn?: (item: CheckInItem<T>) => void;
+
+  onCheckOut?: (id: string | number) => void;
+
+  onUpdate?: (item: CheckInItem<T>) => void;
+
+  onClear?: () => void;
 
   cleanup?: () => void;
+}
+
+export interface HooksAPI<T = any> {
+  add: (hook: DeskHook<T>) => void;
+
+  remove: (name: string) => boolean;
+
+  list: () => string[];
 }
 
 export interface CheckInDesk<
@@ -2341,6 +3866,10 @@ export interface CheckInDesk<
   TContext extends Record<string, any> = {},
 > {
   registry: Readonly<Ref<Map<string | number, CheckInItem<T>>>>;
+
+  slots: SlotsAPI<T>;
+
+  hooks: HooksAPI<T>;
   checkIn: (id: string | number, data: T, meta?: CheckInItemMeta) => boolean;
   checkOut: (id: string | number) => boolean;
   get: (id: string | number) => CheckInItem<T> | undefined;
@@ -2407,7 +3936,7 @@ export interface CheckInDeskOptions<
 
   debug?: boolean;
 
-  plugins?: Plugin<T>[];
+  hooks?: DeskHook<T>[];
 }
 
 export interface CheckInOptions<T = any> {
@@ -2884,6 +4413,460 @@ export const createRegistryPlugin = <T = any,>(
     updateMany,
   };
 };
+```
+
+```ts [src/composables/use-check-in/plugins/runtime-usage.example.ts]
+import type { Plugin, PluginContext, CheckInItem } from "../types";
+
+export interface AnalyticsEvent {
+  type: "check-in" | "check-out" | "update";
+  itemId: string | number;
+  timestamp: number;
+  data?: any;
+}
+
+export interface AnalyticsPluginOptions {
+  endpoint?: string;
+  batchSize?: number;
+  flushInterval?: number;
+}
+
+export interface AnalyticsPlugin<T = any> extends Plugin<T> {
+  track: (event: AnalyticsEvent) => void;
+
+  flush: () => Promise<void>;
+
+  getStats: () => {
+    totalEvents: number;
+    checkIns: number;
+    checkOuts: number;
+    updates: number;
+  };
+}
+
+export const createAnalyticsPlugin = <T = any,>(
+  options?: AnalyticsPluginOptions,
+): AnalyticsPlugin<T> => {
+  let context: PluginContext<T> | null = null;
+  const events: AnalyticsEvent[] = [];
+  let stats = {
+    totalEvents: 0,
+    checkIns: 0,
+    checkOuts: 0,
+    updates: 0,
+  };
+
+  const track = (event: AnalyticsEvent) => {
+    events.push(event);
+    stats.totalEvents++;
+
+    if (event.type === "check-in") stats.checkIns++;
+    else if (event.type === "check-out") stats.checkOuts++;
+    else if (event.type === "update") stats.updates++;
+
+    context?.debug("[Analytics] Tracked event:", event);
+
+    if (options?.batchSize && events.length >= options.batchSize) {
+      flush();
+    }
+  };
+
+  const flush = async () => {
+    if (events.length === 0) return;
+
+    const endpoint = options?.endpoint || "/api/analytics";
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ events: [...events] }),
+      });
+
+      if (response.ok) {
+        context?.debug("[Analytics] Flushed", events.length, "events");
+        events.length = 0;
+      }
+    } catch (error) {
+      console.error("[Analytics] Failed to flush:", error);
+    }
+  };
+
+  const getStats = () => ({ ...stats });
+
+  let flushInterval: NodeJS.Timeout | null = null;
+
+  return {
+    name: "analytics",
+    install: (ctx: PluginContext<T>) => {
+      context = ctx;
+      ctx.debug("[Plugin] Analytics plugin installed");
+
+      if (options?.flushInterval) {
+        flushInterval = setInterval(() => {
+          flush();
+        }, options.flushInterval);
+      }
+    },
+    cleanup: () => {
+      flush();
+
+      if (flushInterval) {
+        clearInterval(flushInterval);
+      }
+
+      context?.debug("[Analytics] Plugin cleaned up");
+    },
+    track,
+    flush,
+    getStats,
+  };
+};
+
+import { ref, onMounted, onUnmounted } from "vue";
+import { useCheckIn, type CheckInDesk } from "../useCheckIn";
+import type { SlotsPlugin } from "./slots.plugin.example";
+
+export interface ToolbarItem {
+  label: string;
+  icon?: string;
+  onClick: () => void;
+  disabled?: boolean;
+}
+
+export function useToolbarWithPlugins() {
+  const { createDesk } = useCheckIn<ToolbarItem>();
+  const { desk } = createDesk({ debug: true });
+
+  const slotsPlugin = ref<SlotsPlugin<ToolbarItem>>();
+  const analyticsPlugin = ref<AnalyticsPlugin<ToolbarItem>>();
+
+  const loadPlugins = async () => {
+    const { createSlotsPlugin } = await import("./slots.plugin.example");
+    const slots = createSlotsPlugin<ToolbarItem>();
+    desk.plugins.install(slots);
+    slotsPlugin.value = desk.plugins.get<SlotsPlugin<ToolbarItem>>("slots");
+
+    slotsPlugin.value?.registerSlot("header-left", "toolbar", {
+      align: "left",
+    });
+    slotsPlugin.value?.registerSlot("header-right", "toolbar", {
+      align: "right",
+    });
+    slotsPlugin.value?.registerSlot("footer", "toolbar", { align: "center" });
+
+    if (
+      typeof process !== "undefined" &&
+      process.env?.NODE_ENV === "production"
+    ) {
+      const analytics = createAnalyticsPlugin<ToolbarItem>({
+        endpoint: "/api/analytics",
+        batchSize: 10,
+        flushInterval: 30000,
+      });
+
+      desk.plugins.install(analytics);
+      analyticsPlugin.value =
+        desk.plugins.get<AnalyticsPlugin<ToolbarItem>>("analytics");
+
+      desk.on("check-in", (payload) => {
+        analyticsPlugin.value?.track({
+          type: "check-in",
+          itemId: payload.id,
+          timestamp: payload.timestamp,
+          data: payload.data,
+        });
+      });
+
+      desk.on("check-out", (payload) => {
+        analyticsPlugin.value?.track({
+          type: "check-out",
+          itemId: payload.id,
+          timestamp: payload.timestamp,
+        });
+      });
+    }
+  };
+
+  const addToSlot = (slotId: string, id: string, item: ToolbarItem) => {
+    if (!slotsPlugin.value) {
+      console.warn("Slots plugin not loaded");
+      return;
+    }
+
+    desk.checkIn(id, item, {
+      user: { slotId, slotType: "toolbar" },
+    });
+  };
+
+  const getSlotItems = (slotId: string) => {
+    return slotsPlugin.value?.getSlotItems(slotId) ?? [];
+  };
+
+  const getAnalyticsStats = () => {
+    return analyticsPlugin.value?.getStats() ?? null;
+  };
+
+  onMounted(() => {
+    loadPlugins();
+  });
+
+  onUnmounted(() => {
+    analyticsPlugin.value?.flush();
+  });
+
+  return {
+    desk,
+    slotsPlugin,
+    analyticsPlugin,
+    addToSlot,
+    getSlotItems,
+    getAnalyticsStats,
+    loadPlugins,
+  };
+}
+
+export const ToolbarWithPluginsExample = `
+<script setup lang="ts">
+import { computed, ref } from 'vue';
+import { useToolbarWithPlugins } from './useToolbarWithPlugins';
+
+const {
+  desk,
+  slotsPlugin,
+  analyticsPlugin,
+  addToSlot,
+  getSlotItems,
+  getAnalyticsStats
+} = useToolbarWithPlugins();
+
+
+const addSaveButton = () => {
+  addToSlot('header-left', 'btn-save', {
+    label: 'Save',
+    icon: 'save',
+    onClick: () => console.log('Save clicked')
+  });
+};
+
+const addCancelButton = () => {
+  addToSlot('header-right', 'btn-cancel', {
+    label: 'Cancel',
+    icon: 'close',
+    onClick: () => console.log('Cancel clicked')
+  });
+};
+
+
+const headerLeft = computed(() => getSlotItems('header-left'));
+const headerRight = computed(() => getSlotItems('header-right'));
+const footer = computed(() => getSlotItems('footer'));
+
+
+const stats = computed(() => getAnalyticsStats());
+
+
+const loadExtraPlugin = async () => {
+  
+  if (userHasPermission.value) {
+    const { createPermissionsPlugin } = await import('./permissions.plugin');
+    const permPlugin = createPermissionsPlugin();
+    desk.plugins.install(permPlugin);
+  }
+};
+
+
+onMounted(() => {
+  addSaveButton();
+  addCancelButton();
+});
+</script>
+
+<template>
+  <div class="toolbar-container">
+    
+    <header class="toolbar-header">
+      <div class="toolbar-section left">
+        <button
+          v-for="item in headerLeft"
+          :key="item.id"
+          :disabled="item.data.disabled"
+          @click="item.data.onClick"
+          class="toolbar-button"
+        >
+          <span v-if="item.data.icon" class="icon">{{ item.data.icon }}</span>
+          {{ item.data.label }}
+        </button>
+      </div>
+
+      <div class="toolbar-section right">
+        <button
+          v-for="item in headerRight"
+          :key="item.id"
+          :disabled="item.data.disabled"
+          @click="item.data.onClick"
+          class="toolbar-button"
+        >
+          <span v-if="item.data.icon" class="icon">{{ item.data.icon }}</span>
+          {{ item.data.label }}
+        </button>
+      </div>
+    </header>
+
+    
+    <main class="content">
+      <slot />
+    </main>
+
+    
+    <footer class="toolbar-footer">
+      <button
+        v-for="item in footer"
+        :key="item.id"
+        :disabled="item.data.disabled"
+        @click="item.data.onClick"
+        class="toolbar-button"
+      >
+        {{ item.data.label }}
+      </button>
+    </footer>
+
+    
+    <div v-if="import.meta.env.DEV && stats" class="analytics-debug">
+      <h4>Analytics Stats</h4>
+      <pre>{{ stats }}</pre>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.toolbar-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.toolbar-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem;
+  background: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+}
+
+.toolbar-section {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.toolbar-button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ccc;
+  background: white;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.toolbar-button:hover {
+  background: #f0f0f0;
+}
+
+.toolbar-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.content {
+  flex: 1;
+  padding: 1rem;
+  overflow: auto;
+}
+
+.toolbar-footer {
+  padding: 1rem;
+  background: #f5f5f5;
+  border-top: 1px solid #ddd;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.analytics-debug {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+</style>
+`;
+
+export const PluginRuntimeTests = `
+import { describe, it, expect, vi } from 'vitest';
+import { useCheckIn } from '../useCheckIn';
+import { createAnalyticsPlugin } from './analytics.plugin';
+
+describe('Plugin Runtime Loading', () => {
+  it('should load plugin at runtime', () => {
+    const { desk } = useCheckIn<any>().createDesk();
+    
+    expect(desk.plugins.has('analytics')).toBe(false);
+    
+    const analytics = createAnalyticsPlugin();
+    desk.plugins.install(analytics);
+    
+    expect(desk.plugins.has('analytics')).toBe(true);
+  });
+
+  it('should provide typesafe access to plugin', () => {
+    const { desk } = useCheckIn<any>().createDesk();
+    
+    const analytics = createAnalyticsPlugin();
+    desk.plugins.install(analytics);
+    
+    const plugin = desk.plugins.get<AnalyticsPlugin>('analytics');
+    
+    expect(plugin).toBeDefined();
+    expect(typeof plugin?.track).toBe('function');
+    expect(typeof plugin?.flush).toBe('function');
+  });
+
+  it('should track events', () => {
+    const { desk } = useCheckIn<any>().createDesk();
+    
+    const analytics = createAnalyticsPlugin();
+    desk.plugins.install(analytics);
+    
+    const plugin = desk.plugins.get<AnalyticsPlugin>('analytics')!;
+    
+    plugin.track({
+      type: 'check-in',
+      itemId: 'test',
+      timestamp: Date.now()
+    });
+    
+    const stats = plugin.getStats();
+    expect(stats.totalEvents).toBe(1);
+    expect(stats.checkIns).toBe(1);
+  });
+
+  it('should uninstall plugin', () => {
+    const { desk } = useCheckIn<any>().createDesk();
+    
+    const analytics = createAnalyticsPlugin();
+    desk.plugins.install(analytics);
+    
+    expect(desk.plugins.has('analytics')).toBe(true);
+    
+    desk.plugins.uninstall('analytics');
+    
+    expect(desk.plugins.has('analytics')).toBe(false);
+  });
+});
+`;
 ```
 
 ```ts [src/composables/use-check-in/plugins/slots.plugin.example.ts]
@@ -3217,8 +5200,10 @@ Types et interfaces pour le système de check-in
 | `DeskEventCallback`{.primary .text-primary} | `type` | — |
 | `CheckInItem`{.primary .text-primary} | `interface` | — |
 | `CheckInItemMeta`{.primary .text-primary} | `interface` | — |
-| `PluginContext`{.primary .text-primary} | `interface` | — |
-| `Plugin`{.primary .text-primary} | `interface` | — |
+| `SlotConfig`{.primary .text-primary} | `interface` | — |
+| `SlotsAPI`{.primary .text-primary} | `interface` | — |
+| `DeskHook`{.primary .text-primary} | `interface` | — |
+| `HooksAPI`{.primary .text-primary} | `interface` | — |
 | `CheckInDesk`{.primary .text-primary} | `interface` | — |
 | `GetAllOptions`{.primary .text-primary} | `interface` | — |
 | `SortOptions`{.primary .text-primary} | `interface` | — |
@@ -3253,6 +5238,12 @@ Types et interfaces pour le système de check-in
 
 ---
 
+## plugins/runtime-usage.example
+::hr-underline
+::
+
+---
+
 ## plugins/slots.plugin.example
 ::hr-underline
 ::
@@ -3264,1109 +5255,6 @@ Types et interfaces pour le système de check-in
 ::
 
 ---
-
-  ## Examples
-  ::hr-underline
-  ::
-
-::tabs
-  :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <form-demo />
-  :::
-
-  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
-```vue
-<script setup lang="ts">
-import { ref } from "vue";
-import { Button } from "~/components/ui/button";
-import FormContainer from "./FormContainer.vue";
-import FormField from "./FormField.vue";
-
-const formData = ref({
-  name: "",
-  email: "",
-  password: "",
-  message: "",
-});
-
-const submittedData = ref<Record<string, any> | null>(null);
-
-const handleSubmit = (values: Record<string, any>) => {
-  console.log("Form submitted:", values);
-  submittedData.value = values;
-};
-
-const handleChange = (values: Record<string, any>) => {
-  console.log("Form changed:", values);
-};
-
-const validateEmail = (value: string) => {
-  if (value && !value.includes("@")) {
-    return "Invalid email format";
-  }
-};
-
-const validatePassword = (value: string) => {
-  if (value && value.length < 6) {
-    return "Password must be at least 6 characters";
-  }
-};
-
-const resetForm = () => {
-  formData.value = {
-    name: "",
-    email: "",
-    password: "",
-    message: "",
-  };
-  submittedData.value = null;
-};
-</script>
-
-<template>
-  <div class="demo-container">
-    <h2>Form Pattern Demo</h2>
-    <p>
-      Les FormField s'enregistrent et sont validés automatiquement par le
-      FormContainer.
-    </p>
-
-    <FormContainer @submit="handleSubmit" @change="handleChange">
-      <FormField
-        id="name"
-        name="name"
-        label="Name"
-        type="text"
-        v-model="formData.name"
-        required
-        :position="1"
-      />
-
-      <FormField
-        id="email"
-        name="email"
-        label="Email"
-        type="email"
-        v-model="formData.email"
-        required
-        :position="2"
-        :validate="validateEmail"
-      />
-
-      <FormField
-        id="password"
-        name="password"
-        label="Password"
-        type="password"
-        v-model="formData.password"
-        required
-        :position="3"
-        :validate="validatePassword"
-      />
-
-      <FormField
-        id="message"
-        name="message"
-        label="Message"
-        type="textarea"
-        v-model="formData.message"
-        :position="4"
-      />
-
-      <template #actions>
-        <div class="actions">
-          <Button type="submit">Submit</Button>
-          <Button type="button" variant="outline" @click="resetForm"
-            >Reset</Button
-          >
-        </div>
-      </template>
-    </FormContainer>
-
-    <div class="state-display">
-      <h3>Current Form Data:</h3>
-      <pre>{{ JSON.stringify(formData, null, 2) }}</pre>
-
-      <div v-if="submittedData" class="submitted-data">
-        <h3>Submitted Data:</h3>
-        <pre>{{ JSON.stringify(submittedData, null, 2) }}</pre>
-      </div>
-    </div>
-  </div>
-</template>
-
-<style scoped>
-.demo-container {
-  padding: 2rem;
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-h2 {
-  margin-bottom: 0.5rem;
-}
-
-p {
-  color: hsl(var(--muted-foreground));
-  margin-bottom: 2rem;
-}
-
-.actions {
-  display: flex;
-  gap: 1rem;
-}
-
-.state-display {
-  margin-top: 2rem;
-  padding: 1rem;
-  background: hsl(var(--muted) / 0.3);
-  border-radius: var(--radius);
-}
-
-.state-display h3 {
-  margin-bottom: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
-}
-
-.state-display pre {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  margin: 0.5rem 0;
-  white-space: pre-wrap;
-  background: hsl(var(--background));
-  padding: 0.5rem;
-  border-radius: var(--radius);
-}
-
-.submitted-data {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid hsl(var(--border));
-}
-</style>
-```
-  :::
-::
-
-::tabs
-  :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <breadcrumb-demo />
-  :::
-
-  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
-```vue
-<script setup lang="ts">
-import { ref } from "vue";
-import { Button } from "~/components/ui/button";
-import BreadcrumbContainer from "./BreadcrumbContainerDemo.vue";
-import BreadcrumbItem from "./BreadcrumbItemDemo.vue";
-
-const currentPath = ref(["home", "projects", "assembler-ui"]);
-
-const navigateTo = (segment: string) => {
-  const index = currentPath.value.indexOf(segment);
-  if (index !== -1) {
-    currentPath.value = currentPath.value.slice(0, index + 1);
-  }
-};
-
-const goToRoot = () => {
-  currentPath.value = ["home"];
-};
-
-const addLevel = () => {
-  currentPath.value.push(`level-${currentPath.value.length}`);
-};
-</script>
-
-<template>
-  <div class="demo-container">
-    <h2>Breadcrumb Pattern Demo</h2>
-    <p>
-      Les BreadcrumbItem s'enregistrent automatiquement dans le
-      BreadcrumbContainer.
-    </p>
-
-    <BreadcrumbContainer separator="›">
-      <BreadcrumbItem
-        v-for="(segment, index) in currentPath"
-        :key="segment"
-        :id="segment"
-        :label="segment.charAt(0).toUpperCase() + segment.slice(1)"
-        :href="`/${currentPath.slice(0, index + 1).join('/')}`"
-        :icon="index === 0 ? '🏠' : undefined"
-        :disabled="index === currentPath.length - 1"
-        :position="index"
-        @click="navigateTo(segment)"
-      />
-    </BreadcrumbContainer>
-
-    <div class="controls">
-      <Button @click="goToRoot" variant="outline">Reset to Home</Button>
-      <Button @click="addLevel" variant="outline">Add Level</Button>
-    </div>
-
-    <div class="state-display">
-      <h3>Current Path:</h3>
-      <pre>{{ currentPath.join(" > ") }}</pre>
-    </div>
-  </div>
-</template>
-
-<style scoped>
-.demo-container {
-  padding: 2rem;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  color: hsl(var(--foreground));
-}
-
-p {
-  color: hsl(var(--muted-foreground));
-  margin-bottom: 2rem;
-}
-
-.controls {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 2rem;
-}
-
-.state-display {
-  margin-top: 2rem;
-  padding: 1rem;
-  background: hsl(var(--muted) / 0.3);
-  border-radius: var(--radius);
-  border: 1px solid hsl(var(--border));
-}
-
-.state-display h3 {
-  margin-bottom: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
-}
-
-.state-display pre {
-  font-family: var(--font-mono);
-  margin: 0;
-  white-space: pre-wrap;
-  color: hsl(var(--foreground));
-}
-</style>
-```
-  :::
-::
-
-::tabs
-  :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <context-menu-demo />
-  :::
-
-  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
-```vue
-<script setup lang="ts">
-import { ref } from "vue";
-import ContextMenuProvider from "./ContextMenuProvider.vue";
-import ContextMenuItem from "./ContextMenuItem.vue";
-
-const showMenu = ref(false);
-const menuX = ref(0);
-const menuY = ref(0);
-const lastAction = ref("");
-
-const handleContextMenu = (event: MouseEvent) => {
-  event.preventDefault();
-  menuX.value = event.clientX;
-  menuY.value = event.clientY;
-  showMenu.value = true;
-};
-
-const closeMenu = () => {
-  showMenu.value = false;
-};
-
-const handleAction = (action: string) => {
-  lastAction.value = action;
-  console.log("Action:", action);
-};
-</script>
-
-<template>
-  <div class="demo-container">
-    <h2>Context Menu Pattern Demo</h2>
-    <p>
-      Faites un clic droit dans la zone ci-dessous pour afficher le menu
-      contextuel.
-    </p>
-
-    <ContextMenuProvider
-      :show="showMenu"
-      :x="menuX"
-      :y="menuY"
-      @close="closeMenu"
-    >
-      <ContextMenuItem
-        id="open"
-        label="Open"
-        icon="📂"
-        :position="1"
-        @click="handleAction('open')"
-      />
-      <ContextMenuItem
-        id="copy"
-        label="Copy"
-        icon="📋"
-        :position="2"
-        @click="handleAction('copy')"
-      />
-      <ContextMenuItem
-        id="paste"
-        label="Paste"
-        icon="📄"
-        :position="3"
-        @click="handleAction('paste')"
-      />
-      <ContextMenuItem
-        id="rename"
-        label="Rename"
-        icon="✏️"
-        :position="4"
-        @click="handleAction('rename')"
-      />
-
-      <ContextMenuItem
-        id="delete"
-        label="Delete"
-        icon="🗑️"
-        danger
-        :position="1"
-        @click="handleAction('delete')"
-      />
-    </ContextMenuProvider>
-
-    <div class="context-area" @contextmenu="handleContextMenu">
-      Right-click here to open the context menu
-    </div>
-
-    <div class="state-display">
-      <h3>Last Action:</h3>
-      <pre>{{ lastAction || "None" }}</pre>
-      <p class="hint">Menu Position: ({{ menuX }}, {{ menuY }})</p>
-    </div>
-  </div>
-</template>
-
-<style scoped>
-.demo-container {
-  padding: 2rem;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-h2 {
-  margin-bottom: 0.5rem;
-}
-
-p {
-  color: hsl(var(--muted-foreground));
-  margin-bottom: 2rem;
-}
-
-.context-area {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 300px;
-  border: 2px dashed hsl(var(--border));
-  border-radius: var(--radius);
-  background: hsl(var(--muted) / 0.2);
-  cursor: context-menu;
-  user-select: none;
-  transition: all 0.2s;
-  font-size: 1.125rem;
-  color: hsl(var(--muted-foreground));
-}
-
-.context-area:hover {
-  border-color: hsl(var(--muted-foreground) / 0.5);
-  background: hsl(var(--muted) / 0.3);
-}
-
-.state-display {
-  margin-top: 2rem;
-  padding: 1rem;
-  background: hsl(var(--muted) / 0.3);
-  border-radius: var(--radius);
-}
-
-.state-display h3 {
-  margin-bottom: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
-}
-
-.state-display pre {
-  font-family: var(--font-mono);
-  margin: 0.5rem 0;
-}
-
-.state-display .hint {
-  margin: 0.5rem 0 0;
-  font-size: 0.75rem;
-  color: hsl(var(--muted-foreground) / 0.7);
-}
-</style>
-```
-  :::
-::
-
-::tabs
-  :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <notification-demo />
-  :::
-
-  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
-```vue
-<script setup lang="ts">
-import { ref } from "vue";
-import { Button } from "~/components/ui/button";
-import NotificationProvider from "./NotificationProvider.vue";
-import NotificationItem from "./NotificationItem.vue";
-
-const notifications = ref<
-  Array<{
-    id: string;
-    message: string;
-    type: "info" | "success" | "warning" | "error";
-    duration: number;
-  }>
->([]);
-
-let notificationCounter = 0;
-
-const addNotification = (
-  type: "info" | "success" | "warning" | "error",
-  duration = 5000,
-) => {
-  const id = `notif-${++notificationCounter}`;
-  const messages = {
-    info: "This is an informational message",
-    success: "Operation completed successfully!",
-    warning: "Please be careful with this action",
-    error: "An error occurred during the operation",
-  };
-
-  notifications.value.push({
-    id,
-    message: messages[type],
-    type,
-    duration,
-  });
-
-  if (duration > 0) {
-    setTimeout(() => {
-      const index = notifications.value.findIndex((n) => n.id === id);
-      if (index !== -1) {
-        notifications.value.splice(index, 1);
-      }
-    }, duration);
-  }
-};
-
-const handleDismiss = (id: string) => {
-  console.log("Notification dismissed:", id);
-  const index = notifications.value.findIndex((n) => n.id === id);
-  if (index !== -1) {
-    notifications.value.splice(index, 1);
-  }
-};
-</script>
-
-<template>
-  <div class="demo-container">
-    <h2>Notification Pattern Demo</h2>
-    <p>
-      Les NotificationItem s'enregistrent et sont auto-removed après leur durée.
-    </p>
-
-    <NotificationProvider position="top-right">
-      <NotificationItem
-        v-for="notif in notifications"
-        :key="notif.id"
-        :id="notif.id"
-        :message="notif.message"
-        :type="notif.type"
-        :duration="notif.duration"
-        @dismiss="handleDismiss(notif.id)"
-      />
-    </NotificationProvider>
-
-    <div class="controls">
-      <h3>Add Notification:</h3>
-      <div class="button-group">
-        <Button @click="addNotification('info')" variant="default" size="sm"
-          >Info</Button
-        >
-        <Button @click="addNotification('success')" variant="default" size="sm"
-          >Success</Button
-        >
-        <Button @click="addNotification('warning')" variant="default" size="sm"
-          >Warning</Button
-        >
-        <Button
-          @click="addNotification('error')"
-          variant="destructive"
-          size="sm"
-          >Error</Button
-        >
-      </div>
-      <Button @click="addNotification('info', 0)" variant="outline" size="sm">
-        Add Persistent (no auto-dismiss)
-      </Button>
-    </div>
-
-    <div class="state-display">
-      <h3>Active Notifications:</h3>
-      <pre>{{ notifications.length }} notification(s)</pre>
-      <ul v-if="notifications.length > 0">
-        <li v-for="notif in notifications" :key="notif.id">
-          {{ notif.type }}: {{ notif.message }}
-        </li>
-      </ul>
-    </div>
-  </div>
-</template>
-
-<style scoped>
-.demo-container {
-  padding: 2rem;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-h2 {
-  margin-bottom: 0.5rem;
-}
-
-p {
-  color: hsl(var(--muted-foreground));
-  margin-bottom: 2rem;
-}
-
-.controls {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  margin-top: 2rem;
-}
-
-.controls h3 {
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
-  margin: 0;
-}
-
-.button-group {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.state-display {
-  margin-top: 2rem;
-  padding: 1rem;
-  background: hsl(var(--muted) / 0.3);
-  border-radius: var(--radius);
-}
-
-.state-display h3 {
-  margin-bottom: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
-}
-
-.state-display pre {
-  font-family: var(--font-mono);
-  margin: 0.5rem 0;
-}
-
-.state-display ul {
-  margin: 0.5rem 0;
-  padding-left: 1.5rem;
-}
-
-.state-display li {
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
-  margin: 0.25rem 0;
-}
-</style>
-```
-  :::
-::
-
-::tabs
-  :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <accordion-demo />
-  :::
-
-  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
-```vue
-<script setup lang="ts">
-import { ref, computed, provide } from "vue";
-import { useCheckIn } from "../useCheckIn";
-import AccordionItem from "./AccordionDemoItem.vue";
-
-interface AccordionItemData {
-  title: string;
-  open?: boolean;
-}
-
-const { createDesk } = useCheckIn<AccordionItemData>();
-
-const openItems = ref<Set<string | number>>(new Set());
-const allowMultiple = ref(false);
-
-const { desk, DeskInjectionKey: accordionDesk } = createDesk({
-  context: {
-    openItems,
-    toggle: (id: string | number) => {
-      if (openItems.value.has(id)) {
-        openItems.value.delete(id);
-      } else {
-        if (!allowMultiple.value) {
-          openItems.value.clear();
-        }
-        openItems.value.add(id);
-      }
-
-      openItems.value = new Set(openItems.value);
-    },
-    isOpen: (id: string | number) => openItems.value.has(id),
-  },
-  onCheckIn: (id, data) => {
-    if (data.open) {
-      if (!allowMultiple.value) {
-        openItems.value.clear();
-      }
-      openItems.value.add(id);
-      openItems.value = new Set(openItems.value);
-    }
-    return true;
-  },
-});
-
-provide("accordionDesk", { deskSymbol: accordionDesk });
-
-const itemCount = computed(() => desk.getAll().length);
-</script>
-
-<template>
-  <div class="w-full max-w-2xl mx-auto space-y-6 p-6">
-    <div class="space-y-2">
-      <h2 class="text-2xl font-bold">useCheckIn - Accordion Demo</h2>
-      <p class="text-muted-foreground">
-        Collapsible sections with check-in desk state management
-      </p>
-    </div>
-
-    <div class="flex items-center gap-4 p-4 bg-muted rounded-lg">
-      <label class="flex items-center gap-2">
-        <input v-model="allowMultiple" type="checkbox" class="rounded" />
-        <span class="text-sm font-medium">Allow multiple open</span>
-      </label>
-      <span class="text-sm text-muted-foreground"
-        >{{ itemCount }} items registered</span
-      >
-    </div>
-
-    <div class="border border-border rounded-lg divide-y divide-border">
-      <AccordionItem id="item1" title="What is useCheckIn?" :open="true">
-        <p class="text-muted-foreground">
-          <strong>useCheckIn</strong> is a generic composable for managing
-          parent-child component relationships using Vue's provide/inject
-          pattern. Parent components open a "check-in desk" where children check
-          in with their data, like passengers at an airport.
-        </p>
-      </AccordionItem>
-
-      <AccordionItem id="item2" title="How does it work?">
-        <ul class="space-y-2 text-muted-foreground list-disc list-inside">
-          <li>
-            Parent component opens a check-in desk using
-            <code>createDesk()</code>
-          </li>
-          <li>
-            Child components check in using <code>checkIn()</code> with
-            auto-registration
-          </li>
-          <li>Desk maintains a reactive Map of all checked-in items</li>
-          <li>
-            Changes propagate automatically through Vue's reactivity system
-          </li>
-        </ul>
-      </AccordionItem>
-
-      <AccordionItem id="item3" title="What are the benefits?">
-        <div class="space-y-2 text-muted-foreground">
-          <p><strong>Benefits include:</strong></p>
-          <ul class="list-disc list-inside space-y-1 ml-4">
-            <li>Type-safe with full TypeScript support</li>
-            <li>Auto-cleanup when components unmount</li>
-            <li>Flexible extra context for custom logic</li>
-            <li>Automatic reactivity updates</li>
-            <li>Reusable across different component types</li>
-          </ul>
-        </div>
-      </AccordionItem>
-
-      <AccordionItem id="item4" title="Common use cases">
-        <div class="space-y-2 text-muted-foreground">
-          <p>Common patterns that benefit from this approach:</p>
-          <ul class="list-disc list-inside space-y-1 ml-4">
-            <li>Tabs / Tab Panels</li>
-            <li>Accordions / Collapsible sections</li>
-            <li>Dropdown menus with items</li>
-            <li>Form field registration</li>
-            <li>Wizard steps</li>
-            <li>List items with selection state</li>
-          </ul>
-        </div>
-      </AccordionItem>
-    </div>
-
-    <div class="p-4 bg-muted rounded-lg space-y-2">
-      <h4 class="font-semibold">Debug Info</h4>
-      <div class="text-sm space-y-1">
-        <p>
-          <strong>Open Items:</strong>
-          {{ Array.from(openItems).join(", ") || "None" }}
-        </p>
-        <p><strong>Allow Multiple:</strong> {{ allowMultiple }}</p>
-        <p>
-          <strong>All Items:</strong>
-          {{
-            desk
-              .getAll()
-              .map((i) => `${i.id}: "${i.data.title}"`)
-              .join(", ")
-          }}
-        </p>
-      </div>
-    </div>
-  </div>
-</template>
-```
-  :::
-::
-
-::tabs
-  :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <tabs-demo />
-  :::
-
-  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
-```vue
-<script setup lang="ts">
-import { ref, computed, provide, type Ref } from "vue";
-import { useCheckIn } from "../useCheckIn";
-import TabPanel from "./TabPanel.vue";
-
-interface TabItemData {
-  label: string;
-  disabled?: boolean;
-  icon?: string;
-}
-
-const activeTab = ref<string>("tab1");
-const tabCount = ref(0);
-
-const { createDesk } = useCheckIn<
-  TabItemData,
-  {
-    activeTab: Ref<string>;
-    setActive: (id: string) => void;
-  }
->();
-
-const { desk, DeskInjectionKey: tabsDesk } = createDesk({
-  context: {
-    activeTab,
-    setActive: (id: string) => {
-      const tab = desk.get(id as string);
-      if (tab && !tab.data.disabled) {
-        activeTab.value = id as string;
-      }
-    },
-  },
-});
-
-desk.on("check-in", (id, data) => {
-  tabCount.value++;
-  if (tabCount.value === 1) {
-    activeTab.value = id as string;
-  }
-});
-
-desk.on("check-out", (id) => {
-  tabCount.value--;
-});
-
-provide("tabsDesk", { deskSymbol: tabsDesk });
-
-const allTabs = computed(() => desk.getAll());
-const activeTabData = computed(() => desk.get(activeTab.value));
-</script>
-
-<template>
-  <div class="w-full max-w-2xl mx-auto space-y-6 p-6">
-    <div class="space-y-2">
-      <h2 class="text-2xl font-bold">useCheckIn - Tabs Demo</h2>
-      <p class="text-muted-foreground">
-        Tabs system using parent provide / child inject pattern
-      </p>
-    </div>
-
-    <div class="border-b border-border">
-      <div class="flex gap-2">
-        <button
-          v-for="tab in allTabs"
-          :key="tab.id"
-          :class="[
-            'px-4 py-2 font-medium transition-colors border-b-2',
-            activeTab === tab.id
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground',
-            tab.data.disabled && 'opacity-50 cursor-not-allowed',
-          ]"
-          :disabled="tab.data.disabled"
-          @click="desk.setActive(tab.id as string)"
-        >
-          <span v-if="tab.data.icon" class="mr-2">{{ tab.data.icon }}</span>
-          {{ tab.data.label }}
-        </button>
-      </div>
-    </div>
-
-    <div class="p-4 border border-border rounded-lg">
-      <TabPanel id="tab1" label="Profile" icon="👤">
-        <div class="space-y-4">
-          <h3 class="text-xl font-semibold">Profile Settings</h3>
-          <p class="text-muted-foreground">Manage your profile information.</p>
-        </div>
-      </TabPanel>
-
-      <TabPanel id="tab2" label="Settings" icon="⚙️">
-        <div class="space-y-4">
-          <h3 class="text-xl font-semibold">Settings</h3>
-          <p class="text-muted-foreground">Configure your preferences.</p>
-        </div>
-      </TabPanel>
-
-      <TabPanel id="tab3" label="Security" icon="🔒">
-        <div class="space-y-4">
-          <h3 class="text-xl font-semibold">Security</h3>
-          <p class="text-muted-foreground">Keep your account secure.</p>
-        </div>
-      </TabPanel>
-    </div>
-
-    <div class="p-4 bg-muted rounded-lg space-y-2">
-      <h4 class="font-semibold">Debug Info</h4>
-      <div class="text-sm space-y-1">
-        <p><strong>Active Tab:</strong> {{ activeTab }}</p>
-        <p><strong>Active Label:</strong> {{ activeTabData?.data.label }}</p>
-        <p><strong>Total Tabs:</strong> {{ tabCount }}</p>
-      </div>
-    </div>
-  </div>
-</template>
-```
-  :::
-::
-
-::tabs
-  :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <toolbar-demo />
-  :::
-
-  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
-```vue
-<script setup lang="ts">
-import { ref } from "vue";
-import ToolbarContainer from "./ToolbarContainer.vue";
-import ToolbarButton from "./ToolbarButton.vue";
-
-const showSearch = ref(false);
-const isEditMode = ref(false);
-
-const handleSave = () => {
-  console.log("Save clicked");
-};
-
-const handleUndo = () => {
-  console.log("Undo clicked");
-};
-
-const handleRedo = () => {
-  console.log("Redo clicked");
-};
-
-const toggleSearch = () => {
-  showSearch.value = !showSearch.value;
-};
-
-const toggleEditMode = () => {
-  isEditMode.value = !isEditMode.value;
-};
-
-const handleSettings = () => {
-  console.log("Settings clicked");
-};
-</script>
-
-<template>
-  <div class="demo-container">
-    <h2>Toolbar Pattern Demo</h2>
-    <p>
-      Les ToolbarButton sont dans le slot de ToolbarContainer et s'enregistrent
-      automatiquement.
-    </p>
-
-    <ToolbarContainer desk-id="main-toolbar">
-      <ToolbarButton
-        id="save"
-        label="Save"
-        icon="💾"
-        group="start"
-        :position="1"
-        @click="handleSave"
-      />
-      <ToolbarButton
-        id="undo"
-        label="Undo"
-        icon="↶"
-        group="start"
-        :position="2"
-        :disabled="!isEditMode"
-        @click="handleUndo"
-      />
-      <ToolbarButton
-        id="redo"
-        label="Redo"
-        icon="↷"
-        group="start"
-        :position="3"
-        :disabled="!isEditMode"
-        @click="handleRedo"
-      />
-
-      <ToolbarButton
-        id="edit"
-        :label="isEditMode ? 'View Mode' : 'Edit Mode'"
-        icon="✏️"
-        group="main"
-        :position="1"
-        @click="toggleEditMode"
-      />
-
-      <ToolbarButton
-        id="search"
-        :label="showSearch ? 'Hide Search' : 'Search'"
-        icon="🔍"
-        group="end"
-        :position="1"
-        @click="toggleSearch"
-      />
-      <ToolbarButton
-        id="settings"
-        label="Settings"
-        icon="⚙️"
-        group="end"
-        :position="2"
-        @click="handleSettings"
-      />
-    </ToolbarContainer>
-
-    <div class="state-display">
-      <h3>État actuel:</h3>
-      <ul>
-        <li>Edit Mode: {{ isEditMode ? "ON" : "OFF" }}</li>
-        <li>Search: {{ showSearch ? "Visible" : "Hidden" }}</li>
-        <li>Undo/Redo: {{ isEditMode ? "Enabled" : "Disabled" }}</li>
-      </ul>
-    </div>
-  </div>
-</template>
-
-<style scoped>
-.demo-container {
-  padding: 2rem;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  color: hsl(var(--foreground));
-}
-
-p {
-  color: hsl(var(--muted-foreground));
-  margin-bottom: 2rem;
-}
-
-.state-display {
-  margin-top: 2rem;
-  padding: 1rem;
-  background: hsl(var(--muted) / 0.3);
-  border-radius: var(--radius);
-  border: 1px solid hsl(var(--border));
-}
-
-.state-display h3 {
-  margin-bottom: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
-}
-
-.state-display ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.state-display li {
-  padding: 0.25rem 0;
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
-  color: hsl(var(--foreground));
-}
-</style>
-```
-  :::
-::
 
 ::tip
 You can copy and adapt this template for any composable documentation.
