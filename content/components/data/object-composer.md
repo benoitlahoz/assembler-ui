@@ -1817,6 +1817,8 @@ export const useCheckIn = <
   T = any,
   TContext extends Record<string, any> = {},
 >() => {
+  let debug = NoOpDebug;
+
   const createDeskContext = <
     T = any,
     TContext extends Record<string, any> = {},
@@ -1827,7 +1829,7 @@ export const useCheckIn = <
       new Map(),
     ) as Ref<Map<string | number, CheckInItem<T>>>;
 
-    const debug = options?.debug ? Debug : NoOpDebug;
+    debug = options?.debug ? Debug : NoOpDebug;
 
     const eventListeners = new Map<DeskEventType, Set<DeskEventCallback<T>>>();
 
@@ -2092,8 +2094,6 @@ export const useCheckIn = <
       | undefined,
     checkInOptions?: CheckInOptions<T>,
   ) => {
-    const debug = checkInOptions?.debug ? Debug : NoOpDebug;
-
     if (!parentDeskOrKey) {
       debug("[useCheckIn] No parent desk provided - skipping check-in");
 
@@ -2310,15 +2310,11 @@ export const useCheckIn = <
       return id;
     }
 
-    const isDev =
-      typeof process !== "undefined" && process.env?.NODE_ENV === "development";
-    if (isDev) {
-      console.warn(
-        `[useCheckIn] memoizedId: no instance or custom ID provided. ` +
-          `Generated cryptographically secure ID. ` +
-          `Consider passing getCurrentInstance() or a custom ID (nanoid, uuid, props.id, etc.).`,
-      );
-    }
+    debug(
+      `[useCheckIn] memoizedId: no instance or custom ID provided. ` +
+        `Generated cryptographically secure ID. ` +
+        `Consider passing getCurrentInstance() or a custom ID (nanoid, uuid, props.id, etc.).`,
+    );
     return generateId(prefix);
   };
 
@@ -2343,6 +2339,20 @@ export const useCheckIn = <
     return computed(() => desk.getAll(options));
   };
 
+  const clearIdCache = (resetCounter = false) => {
+    const customIdCount = customIdMap.size;
+    customIdMap.clear();
+
+    if (resetCounter) {
+      instanceCounter = 0;
+    }
+
+    debug(
+      `[useCheckIn] Cleared ${customIdCount} custom IDs from cache` +
+        (resetCounter ? " and reset counter" : ""),
+    );
+  };
+
   return {
     createDesk,
     checkIn,
@@ -2351,6 +2361,7 @@ export const useCheckIn = <
     standaloneDesk,
     isCheckedIn,
     getRegistry,
+    clearIdCache,
   };
 };
 ```
