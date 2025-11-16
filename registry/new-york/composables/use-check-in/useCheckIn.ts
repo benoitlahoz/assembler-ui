@@ -701,6 +701,40 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
     return computed(() => desk.getAll(options));
   };
 
+  /**
+   * Clears the memoization cache for custom IDs.
+   * Useful for cleanup after major route changes or in long-running SPAs.
+   * Note: instanceIdMap (WeakMap) is auto-cleaned by garbage collection.
+   *
+   * @param resetCounter - If true, also resets the instance counter (default: false)
+   *
+   * @example
+   * ```ts
+   * // After a major route change or context switch
+   * const { clearIdsCache } = useCheckIn();
+   * clearIdsCache();
+   *
+   * // Full reset including counter
+   * clearIdsCache(true);
+   * ```
+   */
+  const clearIdCache = (resetCounter = false) => {
+    const customIdCount = customIdMap.size;
+    customIdMap.clear();
+
+    if (resetCounter) {
+      instanceCounter = 0;
+    }
+
+    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+    if (isDev) {
+      console.log(
+        `[useCheckIn] Cleared ${customIdCount} custom IDs from cache` +
+          (resetCounter ? ' and reset counter' : '')
+      );
+    }
+  };
+
   return {
     createDesk,
     checkIn,
@@ -709,5 +743,6 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
     standaloneDesk,
     isCheckedIn,
     getRegistry,
+    clearIdCache,
   };
 };
