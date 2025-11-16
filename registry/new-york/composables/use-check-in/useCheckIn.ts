@@ -61,8 +61,10 @@ export interface CheckInDesk<T = any, TContext extends Record<string, any> = {}>
   checkOut: (id: string | number) => boolean;
   get: (id: string | number) => CheckInItem<T> | undefined;
   getAll: (options?: {
-    sortBy?: keyof T | 'timestamp';
+    sortBy?: keyof T | 'timestamp' | string;
     order?: 'asc' | 'desc';
+    group?: string;
+    filter?: (item: CheckInItem<T>) => boolean;
   }) => CheckInItem<T>[];
   update: (id: string | number, data: Partial<T>) => boolean;
   has: (id: string | number) => boolean;
@@ -76,6 +78,13 @@ export interface CheckInDesk<T = any, TContext extends Record<string, any> = {}>
   off: (event: DeskEventType, callback: DeskEventCallback<T>) => void;
   /** Émet un événement (usage interne principalement) */
   emit: (event: DeskEventType, payload: { id?: string | number; data?: T }) => void;
+  /** Récupère les items d'un groupe spécifique (computed) */
+  getGroup: (
+    group: string,
+    options?: { sortBy?: keyof T | 'timestamp' | string; order?: 'asc' | 'desc' }
+  ) => ComputedRef<CheckInItem<T>[]>;
+  /** Computed de tous les items */
+  items: ComputedRef<CheckInItem<T>[]>;
 }
 
 export interface CheckInDeskOptions<T = any, TContext extends Record<string, any> = {}> {
@@ -112,6 +121,12 @@ export interface CheckInOptions<T = any> {
   watchCondition?: (() => boolean) | Ref<boolean>;
   /** Métadonnées additionnelles */
   meta?: Record<string, any>;
+  /** Groupe auquel appartient cet item (pour filtrage/organisation) */
+  group?: string;
+  /** Position/ordre de l'item (pour tri) */
+  position?: number;
+  /** Priorité de l'item (pour tri) */
+  priority?: number;
   /** Active le mode debug avec logging */
   debug?: boolean;
 }
@@ -274,25 +289,46 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
 
     const get = (id: string | number) => registry.value.get(id);
 
-    const getAll = (sortOptions?: { sortBy?: keyof T | 'timestamp'; order?: 'asc' | 'desc' }) => {
-      const items = Array.from(registry.value.values());
+    const getAll = (options?: {
+      sortBy?: keyof T | 'timestamp' | string;
+      order?: 'asc' | 'desc';
+      group?: string;
+      filter?: (item: CheckInItem<T>) => boolean;
+    }) => {
+      let items = Array.from(registry.value.values());
 
-      if (!sortOptions?.sortBy) return items;
+      // Filtrage par groupe (via meta.group)
+      if (options?.group !== undefined) {
+        items = items.filter((item) => item.meta?.group === options.group);
+      }
+
+      // Filtrage custom
+      if (options?.filter) {
+        items = items.filter(options.filter);
+      }
+
+      // Tri
+      if (!options?.sortBy) return items;
 
       return items.sort((a, b) => {
         let aVal: any, bVal: any;
 
-        if (sortOptions.sortBy === 'timestamp') {
+        if (options.sortBy === 'timestamp') {
           aVal = a.timestamp || 0;
           bVal = b.timestamp || 0;
+        } else if (typeof options.sortBy === 'string' && options.sortBy.startsWith('meta.')) {
+          // Support pour tri par clés meta (ex: 'meta.position')
+          const metaKey = options.sortBy.slice(5); // Remove 'meta.' prefix
+          aVal = a.meta?.[metaKey];
+          bVal = b.meta?.[metaKey];
         } else {
-          const key = sortOptions.sortBy as keyof T;
+          const key = options.sortBy as keyof T;
           aVal = a.data[key];
           bVal = b.data[key];
         }
 
         const comparison = aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-        return sortOptions.order === 'desc' ? -comparison : comparison;
+        return options.order === 'desc' ? -comparison : comparison;
       });
     };
 
@@ -359,6 +395,17 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       updates.forEach(({ id, data }) => update(id, data));
     };
 
+    // Computed pour récupérer un groupe spécifique
+    const getGroup = (
+      group: string,
+      sortOptions?: { sortBy?: keyof T | 'timestamp' | string; order?: 'asc' | 'desc' }
+    ) => {
+      return computed(() => getAll({ ...sortOptions, group }));
+    };
+
+    // Computed pour tous les items
+    const items = computed(() => getAll());
+
     return {
       registry,
       checkIn,
@@ -374,6 +421,8 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       on,
       off,
       emit,
+      getGroup,
+      items,
     };
   };
 
@@ -470,7 +519,16 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       if (isCheckedIn.value) return true;
 
       const data = await getCurrentData();
-      const success = desk!.checkIn(itemId, data, checkInOptions?.meta);
+
+      // Merge group/position/priority into meta
+      const meta = {
+        ...checkInOptions?.meta,
+        ...(checkInOptions?.group !== undefined && { group: checkInOptions.group }),
+        ...(checkInOptions?.position !== undefined && { position: checkInOptions.position }),
+        ...(checkInOptions?.priority !== undefined && { priority: checkInOptions.priority }),
+      };
+
+      const success = desk!.checkIn(itemId, data, meta);
 
       if (success) {
         isCheckedIn.value = true;

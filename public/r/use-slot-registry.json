@@ -1,0 +1,11 @@
+{
+  "name": "use-slot-registry",
+  "type": "registry:hook",
+  "files": [
+    {
+      "path": "composables/use-slot-registry/useSlotRegistry.ts",
+      "type": "registry:hook"
+    }
+  ],
+  "dependencies": []
+}
