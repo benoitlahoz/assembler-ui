@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { inject } from 'vue';
 import { useCheckIn } from '../useCheckIn';
-import type { BreadcrumbItemData } from './BreadcrumbContainer.vue';
+import type { BreadcrumbItemData } from './BreadcrumbContainerDemo.vue';
 
 const props = withDefaults(
   defineProps<{

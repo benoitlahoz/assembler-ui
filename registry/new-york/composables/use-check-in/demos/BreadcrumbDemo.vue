@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { Button } from '~/components/ui/button';
-import BreadcrumbContainer from './BreadcrumbContainer.vue';
-import BreadcrumbItem from './BreadcrumbItem.vue';
+import BreadcrumbContainer from './BreadcrumbContainerDemo.vue';
+import BreadcrumbItem from './BreadcrumbItemDemo.vue';
 
 const currentPath = ref(['home', 'projects', 'assembler-ui']);
 

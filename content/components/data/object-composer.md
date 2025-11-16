@@ -908,137 +908,67 @@ import {
   ref,
   provide,
   inject,
-  onMounted,
-  onBeforeUnmount,
   onUnmounted,
   watch,
   computed,
-  triggerRef,
-  nextTick,
   type InjectionKey,
   type Ref,
   type ComputedRef,
 } from "vue";
 
-export type DeskEventType = "check-in" | "check-out" | "update" | "clear";
+export type {
+  DeskEventType,
+  DeskEventPayload,
+  DeskEventCallback,
+  CheckInItem,
+  CheckInItemMeta,
+  CheckInDesk,
+  CheckInDeskOptions,
+  CheckInOptions,
+  GetAllOptions,
+  SortOptions,
+  DeskProvider,
+  CheckInReturn,
+  Plugin,
+  PluginContext,
+} from "./types";
 
-export type DeskEventCallback<T = any> = (payload: {
-  id?: string | number;
-  data?: T;
-  timestamp: number;
-}) => void;
+import type {
+  CheckInItem,
+  CheckInDesk,
+  CheckInDeskOptions,
+  CheckInOptions,
+  DeskProvider,
+  CheckInReturn,
+  CheckInItemMeta,
+} from "./types";
 
-export interface CheckInItem<T = any> {
-  id: string | number;
-  data: T;
-  timestamp?: number;
-  meta?: Record<string, any>;
-}
+import { PluginManager } from "./plugin-manager";
+import {
+  createEventsPlugin,
+  createRegistryPlugin,
+  createSortingPlugin,
+  createIdPlugin,
+  type EventsPlugin,
+  type RegistryPlugin,
+  type SortingPlugin,
+  type IdPlugin,
+} from "./plugins";
 
-export interface CheckInDesk<
-  T = any,
-  TContext extends Record<string, any> = {},
-> {
-  registry: Ref<Map<string | number, CheckInItem<T>>>;
-  checkIn: (
-    id: string | number,
-    data: T,
-    meta?: Record<string, any>,
-  ) => boolean;
-  checkOut: (id: string | number) => boolean;
-  get: (id: string | number) => CheckInItem<T> | undefined;
-  getAll: (options?: {
-    sortBy?: keyof T | "timestamp" | string;
-    order?: "asc" | "desc";
-    group?: string;
-    filter?: (item: CheckInItem<T>) => boolean;
-  }) => CheckInItem<T>[];
-  update: (id: string | number, data: Partial<T>) => boolean;
-  has: (id: string | number) => boolean;
-  clear: () => void;
-  checkInMany: (
-    items: Array<{ id: string | number; data: T; meta?: Record<string, any> }>,
-  ) => void;
-  checkOutMany: (ids: Array<string | number>) => void;
-  updateMany: (
-    updates: Array<{ id: string | number; data: Partial<T> }>,
-  ) => void;
-
-  on: (event: DeskEventType, callback: DeskEventCallback<T>) => () => void;
-
-  off: (event: DeskEventType, callback: DeskEventCallback<T>) => void;
-
-  emit: (
-    event: DeskEventType,
-    payload: { id?: string | number; data?: T },
-  ) => void;
-
-  getGroup: (
-    group: string,
-    options?: {
-      sortBy?: keyof T | "timestamp" | string;
-      order?: "asc" | "desc";
-    },
-  ) => ComputedRef<CheckInItem<T>[]>;
-
-  items: ComputedRef<CheckInItem<T>[]>;
-}
-
-export interface CheckInDeskOptions<
-  T = any,
-  TContext extends Record<string, any> = {},
-> {
-  context?: TContext;
-
-  onBeforeCheckIn?: (id: string | number, data: T) => void | boolean;
-
-  onCheckIn?: (id: string | number, data: T) => void;
-
-  onBeforeCheckOut?: (id: string | number) => void | boolean;
-
-  onCheckOut?: (id: string | number) => void;
-
-  debug?: boolean;
-}
-
-export interface CheckInOptions<T = any> {
-  required?: boolean;
-
-  autoCheckIn?: boolean;
-
-  id?: string | number;
-
-  data?: T | (() => T) | (() => Promise<T>);
-
-  generateId?: () => string | number;
-
-  watchData?: boolean;
-
-  shallow?: boolean;
-
-  watchCondition?: (() => boolean) | Ref<boolean>;
-
-  meta?: Record<string, any>;
-
-  group?: string;
-
-  position?: number;
-
-  priority?: number;
-
-  debug?: boolean;
-}
+export {
+  PluginManager,
+  createEventsPlugin,
+  createRegistryPlugin,
+  createSortingPlugin,
+  createIdPlugin,
+};
+export type { EventsPlugin, RegistryPlugin, SortingPlugin, IdPlugin };
 
 const NoOpDebug = (_message: string, ..._args: any[]) => {};
 
 const Debug = (message: string, ...args: any[]) => {
   console.log(`[useCheckIn] ${message}`, ...args);
 };
-
-const instanceIdMap = new WeakMap<object, string>();
-
-const customIdMap = new Map<string, string>();
-let instanceCounter = 0;
 
 export const useCheckIn = <
   T = any,
@@ -1056,252 +986,59 @@ export const useCheckIn = <
 
     const debug = options?.debug ? Debug : NoOpDebug;
 
-    const eventListeners = new Map<DeskEventType, Set<DeskEventCallback<T>>>();
+    const pluginManager = new PluginManager<T>();
 
-    const emit = (
-      event: DeskEventType,
-      payload: { id?: string | number; data?: T },
-    ) => {
-      const listeners = eventListeners.get(event);
-      if (!listeners) return;
+    const eventsPlugin = createEventsPlugin<T>();
+    const registryPlugin = createRegistryPlugin<T>(eventsPlugin.emit as any);
+    const sortingPlugin = createSortingPlugin<T>();
+    const idPlugin = createIdPlugin();
 
-      const eventPayload = {
-        ...payload,
-        timestamp: Date.now(),
-      };
+    pluginManager.initialize({
+      registry,
+      options,
+      debug,
+    });
 
-      debug(`[Event] ${event}`, eventPayload);
-      listeners.forEach((callback) => callback(eventPayload));
-    };
+    pluginManager.install(
+      eventsPlugin,
+      registryPlugin,
+      sortingPlugin,
+      idPlugin,
+    );
 
-    const on = (event: DeskEventType, callback: DeskEventCallback<T>) => {
-      if (!eventListeners.has(event)) {
-        eventListeners.set(event, new Set());
-      }
-      eventListeners.get(event)!.add(callback);
-
-      debug(
-        `[Event] Listener added for '${event}', total: ${eventListeners.get(event)!.size}`,
-      );
-
-      return () => off(event, callback);
-    };
-
-    const off = (event: DeskEventType, callback: DeskEventCallback<T>) => {
-      const listeners = eventListeners.get(event);
-      if (listeners) {
-        listeners.delete(callback);
-        debug(
-          `[Event] Listener removed for '${event}', remaining: ${listeners.size}`,
-        );
-      }
-    };
-
-    const checkIn = (
-      id: string | number,
-      data: T,
-      meta?: Record<string, any>,
-    ): boolean => {
-      debug("checkIn", { id, data, meta });
-
-      if (options?.onBeforeCheckIn) {
-        const result = options.onBeforeCheckIn(id, data);
-        if (result === false) {
-          debug("checkIn cancelled by onBeforeCheckIn", id);
-          return false;
-        }
-      }
-
-      registry.value.set(id, {
-        id,
-        data: data as any,
-        timestamp: Date.now(),
-        meta,
-      });
-      triggerRef(registry);
-
-      emit("check-in", { id, data });
-
-      options?.onCheckIn?.(id, data);
-
-      if (options?.debug) {
-        debug("Registry state after check-in:", {
-          total: registry.value.size,
-          items: Array.from(registry.value.keys()),
-        });
-      }
-
-      return true;
-    };
-
-    const checkOut = (id: string | number): boolean => {
-      debug("checkOut", id);
-
-      const existed = registry.value.has(id);
-      if (!existed) return false;
-
-      if (options?.onBeforeCheckOut) {
-        const result = options.onBeforeCheckOut(id);
-        if (result === false) {
-          debug("checkOut cancelled by onBeforeCheckOut", id);
-          return false;
-        }
-      }
-
-      registry.value.delete(id);
-      triggerRef(registry);
-
-      emit("check-out", { id });
-
-      options?.onCheckOut?.(id);
-
-      if (options?.debug) {
-        debug("Registry state after check-out:", {
-          total: registry.value.size,
-          items: Array.from(registry.value.keys()),
-        });
-      }
-
-      return true;
-    };
-
-    const get = (id: string | number) => registry.value.get(id);
-
-    const getAll = (options?: {
-      sortBy?: keyof T | "timestamp" | string;
-      order?: "asc" | "desc";
-      group?: string;
-      filter?: (item: CheckInItem<T>) => boolean;
-    }) => {
-      let items = Array.from(registry.value.values());
-
-      if (options?.group !== undefined) {
-        items = items.filter((item) => item.meta?.group === options.group);
-      }
-
-      if (options?.filter) {
-        items = items.filter(options.filter);
-      }
-
-      if (!options?.sortBy) return items;
-
-      return items.sort((a, b) => {
-        let aVal: any, bVal: any;
-
-        if (options.sortBy === "timestamp") {
-          aVal = a.timestamp || 0;
-          bVal = b.timestamp || 0;
-        } else if (
-          typeof options.sortBy === "string" &&
-          options.sortBy.startsWith("meta.")
-        ) {
-          const metaKey = options.sortBy.slice(5);
-          aVal = a.meta?.[metaKey];
-          bVal = b.meta?.[metaKey];
-        } else {
-          const key = options.sortBy as keyof T;
-          aVal = a.data[key];
-          bVal = b.data[key];
-        }
-
-        const comparison = aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-        return options.order === "desc" ? -comparison : comparison;
-      });
-    };
-
-    const update = (id: string | number, data: Partial<T>): boolean => {
-      const existing = registry.value.get(id);
-      if (!existing) {
-        debug("update failed: item not found", id);
-        return false;
-      }
-
-      if (typeof existing.data === "object" && typeof data === "object") {
-        const previousData = { ...existing.data };
-
-        Object.assign(existing.data as object, data);
-        triggerRef(registry);
-
-        emit("update", { id, data: existing.data });
-
-        if (options?.debug) {
-          debug("update diff:", {
-            id,
-            before: previousData,
-            after: existing.data,
-            changes: data,
-          });
-        }
-
-        return true;
-      }
-
-      return false;
-    };
-
-    const has = (id: string | number) => registry.value.has(id);
-
-    const clear = () => {
-      debug("clear");
-      const count = registry.value.size;
-      registry.value.clear();
-      triggerRef(registry);
-
-      emit("clear", {});
-
-      debug(`Cleared ${count} items from registry`);
-    };
-
-    const checkInMany = (
-      items: Array<{
-        id: string | number;
-        data: T;
-        meta?: Record<string, any>;
-      }>,
-    ) => {
-      debug("checkInMany", items.length, "items");
-      items.forEach(({ id, data, meta }) => checkIn(id, data, meta));
-    };
-
-    const checkOutMany = (ids: Array<string | number>) => {
-      debug("checkOutMany", ids.length, "items");
-      ids.forEach((id) => checkOut(id));
-    };
-
-    const updateMany = (
-      updates: Array<{ id: string | number; data: Partial<T> }>,
-    ) => {
-      debug("updateMany", updates.length, "items");
-      updates.forEach(({ id, data }) => update(id, data));
-    };
+    if (options?.plugins) {
+      pluginManager.install(...options.plugins);
+    }
 
     const getGroup = (
       group: string,
       sortOptions?: {
-        sortBy?: keyof T | "timestamp" | string;
+        sortBy?: keyof T | "timestamp" | `meta.${string}`;
         order?: "asc" | "desc";
       },
     ) => {
-      return computed(() => getAll({ ...sortOptions, group }));
+      return computed(() => sortingPlugin.getAll({ ...sortOptions, group }));
     };
 
-    const items = computed(() => getAll());
+    const items = computed(() => sortingPlugin.getAll());
+
+    const readonlyRegistry = computed(() => registry.value);
 
     return {
-      registry,
-      checkIn,
-      checkOut,
-      get,
-      getAll,
-      update,
-      has,
-      clear,
-      checkInMany,
-      checkOutMany,
-      updateMany,
-      on,
-      off,
-      emit,
+      registry: readonlyRegistry as any,
+      checkIn: registryPlugin.checkIn,
+      checkOut: registryPlugin.checkOut,
+      get: registryPlugin.get,
+      getAll: sortingPlugin.getAll,
+      update: registryPlugin.update,
+      has: registryPlugin.has,
+      clear: registryPlugin.clear,
+      checkInMany: registryPlugin.checkInMany,
+      checkOutMany: registryPlugin.checkOutMany,
+      updateMany: registryPlugin.updateMany,
+      on: eventsPlugin.on,
+      off: eventsPlugin.off,
+      emit: eventsPlugin.emit,
       getGroup,
       items,
     };
@@ -1503,65 +1240,16 @@ export const useCheckIn = <
   };
 
   const generateId = (prefix = "item"): string => {
-    if (typeof crypto !== "undefined" && crypto.randomUUID) {
-      return `${prefix}-${crypto.randomUUID()}`;
-    }
-
-    if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-      const array = new Uint8Array(16);
-      crypto.getRandomValues(array);
-      const id = Array.from(array, (b) => b.toString(16).padStart(2, "0")).join(
-        "",
-      );
-      return `${prefix}-${id}`;
-    }
-
-    const isDev =
-      typeof process !== "undefined" && process.env?.NODE_ENV === "development";
-    if (isDev) {
-      console.warn(
-        "[useCheckIn] crypto API not available, using Math.random fallback. " +
-          "Consider upgrading to a modern environment.",
-      );
-    }
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 15);
-    return `${prefix}-${timestamp}-${random}`;
+    const plugin = createIdPlugin();
+    return plugin.generateId(prefix);
   };
 
   const memoizedId = (
     instanceOrId: object | string | number | null | undefined,
     prefix = "item",
   ): string => {
-    if (typeof instanceOrId === "string" || typeof instanceOrId === "number") {
-      const key = `${prefix}-${instanceOrId}`;
-      let id = customIdMap.get(key);
-      if (!id) {
-        id = String(instanceOrId);
-        customIdMap.set(key, id);
-      }
-      return id;
-    }
-
-    if (instanceOrId && typeof instanceOrId === "object") {
-      let id = instanceIdMap.get(instanceOrId);
-      if (!id) {
-        id = `${prefix}-${++instanceCounter}`;
-        instanceIdMap.set(instanceOrId, id);
-      }
-      return id;
-    }
-
-    const isDev =
-      typeof process !== "undefined" && process.env?.NODE_ENV === "development";
-    if (isDev) {
-      console.warn(
-        `[useCheckIn] memoizedId: no instance or custom ID provided. ` +
-          `Generated cryptographically secure ID. ` +
-          `Consider passing getCurrentInstance() or a custom ID (nanoid, uuid, props.id, etc.).`,
-      );
-    }
-    return generateId(prefix);
+    const plugin = createIdPlugin();
+    return plugin.memoizedId(instanceOrId, prefix);
   };
 
   const standaloneDesk = <T = any,>(options?: CheckInDeskOptions<T>) => {
@@ -1594,6 +1282,968 @@ export const useCheckIn = <
     isCheckedIn,
     getRegistry,
   };
+};
+```
+
+```ts [src/composables/use-check-in/plugin-manager.ts]
+import type { Plugin, PluginContext } from "./types";
+
+export class PluginManager<T = any> {
+  private plugins = new Map<string, Plugin<T>>();
+  private context: PluginContext<T> | null = null;
+
+  constructor() {}
+
+  initialize(context: PluginContext<T>) {
+    this.context = context;
+    context.debug("[PluginManager] Initialized with context");
+  }
+
+  install(...plugins: Plugin<T>[]) {
+    if (!this.context) {
+      throw new Error(
+        "[PluginManager] Context not initialized. Call initialize() first.",
+      );
+    }
+
+    for (const plugin of plugins) {
+      if (this.plugins.has(plugin.name)) {
+        this.context.debug(
+          `[PluginManager] Plugin '${plugin.name}' already installed, skipping`,
+        );
+        continue;
+      }
+
+      this.context.debug(`[PluginManager] Installing plugin '${plugin.name}'`);
+      plugin.install(this.context);
+      this.plugins.set(plugin.name, plugin);
+    }
+  }
+
+  get<P extends Plugin<T>>(name: string): P | undefined {
+    return this.plugins.get(name) as P | undefined;
+  }
+
+  has(name: string): boolean {
+    return this.plugins.has(name);
+  }
+
+  uninstall(name: string): boolean {
+    const plugin = this.plugins.get(name);
+    if (!plugin) {
+      this.context?.debug(`[PluginManager] Plugin '${name}' not found`);
+      return false;
+    }
+
+    this.context?.debug(`[PluginManager] Uninstalling plugin '${name}'`);
+    plugin.cleanup?.();
+    this.plugins.delete(name);
+    return true;
+  }
+
+  cleanup() {
+    this.context?.debug(
+      `[PluginManager] Cleaning up ${this.plugins.size} plugins`,
+    );
+
+    for (const [name, plugin] of this.plugins) {
+      this.context?.debug(`[PluginManager] Cleaning up plugin '${name}'`);
+      plugin.cleanup?.();
+    }
+
+    this.plugins.clear();
+  }
+
+  list(): string[] {
+    return Array.from(this.plugins.keys());
+  }
+}
+```
+
+```ts [src/composables/use-check-in/types.ts]
+import type { Ref, ComputedRef, InjectionKey } from "vue";
+
+export type DeskEventType = "check-in" | "check-out" | "update" | "clear";
+
+export type DeskEventPayload<T = any> = {
+  "check-in": { id: string | number; data: T; timestamp: number };
+  "check-out": { id: string | number; timestamp: number };
+  update: { id: string | number; data: T; timestamp: number };
+  clear: { timestamp: number };
+};
+
+export type DeskEventCallback<
+  T = any,
+  E extends DeskEventType = DeskEventType,
+> = (payload: DeskEventPayload<T>[E]) => void;
+
+export interface CheckInItem<T = any> {
+  id: string | number;
+  data: T;
+  timestamp?: number;
+  meta?: CheckInItemMeta;
+}
+
+export interface CheckInItemMeta {
+  group?: string;
+
+  order?: number;
+
+  priority?: number;
+
+  user?: Record<string, any>;
+}
+
+export interface PluginContext<T = any> {
+  registry: Ref<Map<string | number, CheckInItem<T>>>;
+
+  options?: CheckInDeskOptions<T>;
+
+  debug: (message: string, ...args: any[]) => void;
+}
+
+export interface Plugin<T = any> {
+  name: string;
+
+  install: (context: PluginContext<T>) => void;
+
+  cleanup?: () => void;
+}
+
+export interface CheckInDesk<
+  T = any,
+  TContext extends Record<string, any> = {},
+> {
+  registry: Readonly<Ref<Map<string | number, CheckInItem<T>>>>;
+  checkIn: (id: string | number, data: T, meta?: CheckInItemMeta) => boolean;
+  checkOut: (id: string | number) => boolean;
+  get: (id: string | number) => CheckInItem<T> | undefined;
+  getAll: (options?: GetAllOptions<T>) => CheckInItem<T>[];
+  update: (id: string | number, data: Partial<T>) => boolean;
+  has: (id: string | number) => boolean;
+  clear: () => void;
+  checkInMany: (
+    items: Array<{ id: string | number; data: T; meta?: CheckInItemMeta }>,
+  ) => void;
+  checkOutMany: (ids: Array<string | number>) => void;
+  updateMany: (
+    updates: Array<{ id: string | number; data: Partial<T> }>,
+  ) => void;
+
+  on: <E extends DeskEventType>(
+    event: E,
+    callback: DeskEventCallback<T, E>,
+  ) => () => void;
+
+  off: <E extends DeskEventType>(
+    event: E,
+    callback: DeskEventCallback<T, E>,
+  ) => void;
+
+  emit: <E extends DeskEventType>(
+    event: E,
+    payload: Omit<DeskEventPayload<T>[E], "timestamp">,
+  ) => void;
+
+  getGroup: (
+    group: string,
+    options?: SortOptions<T>,
+  ) => ComputedRef<CheckInItem<T>[]>;
+
+  items: ComputedRef<CheckInItem<T>[]>;
+}
+
+export interface GetAllOptions<T = any> {
+  sortBy?: keyof T | "timestamp" | `meta.${string}`;
+  order?: "asc" | "desc";
+  group?: string;
+  filter?: (item: CheckInItem<T>) => boolean;
+}
+
+export interface SortOptions<T = any> {
+  sortBy?: keyof T | "timestamp" | `meta.${string}`;
+  order?: "asc" | "desc";
+}
+
+export interface CheckInDeskOptions<
+  T = any,
+  TContext extends Record<string, any> = {},
+> {
+  context?: TContext;
+
+  onBeforeCheckIn?: (id: string | number, data: T) => void | boolean;
+
+  onCheckIn?: (id: string | number, data: T) => void;
+
+  onBeforeCheckOut?: (id: string | number) => void | boolean;
+
+  onCheckOut?: (id: string | number) => void;
+
+  debug?: boolean;
+
+  plugins?: Plugin<T>[];
+}
+
+export interface CheckInOptions<T = any> {
+  required?: boolean;
+
+  autoCheckIn?: boolean;
+
+  id?: string | number;
+
+  data?: T | (() => T) | (() => Promise<T>);
+
+  generateId?: () => string | number;
+
+  watchData?: boolean;
+
+  shallow?: boolean;
+
+  watchCondition?: (() => boolean) | Ref<boolean>;
+
+  meta?: CheckInItemMeta;
+
+  group?: string;
+
+  position?: number;
+
+  priority?: number;
+
+  debug?: boolean;
+}
+
+export interface DeskProvider<
+  T = any,
+  TContext extends Record<string, any> = {},
+> {
+  desk: CheckInDesk<T, TContext> & TContext;
+  DeskInjectionKey: InjectionKey<CheckInDesk<T, TContext> & TContext>;
+}
+
+export interface CheckInReturn<
+  T = any,
+  TContext extends Record<string, any> = {},
+> {
+  desk: (CheckInDesk<T, TContext> & TContext) | null;
+  checkOut: () => void;
+  updateSelf: (newData?: T) => void;
+}
+```
+
+```ts [src/composables/use-check-in/plugins/events.plugin.ts]
+import type {
+  Plugin,
+  PluginContext,
+  DeskEventType,
+  DeskEventCallback,
+  DeskEventPayload,
+} from "../types";
+
+export interface EventsPlugin<T = any> extends Plugin<T> {
+  on: <E extends DeskEventType>(
+    event: E,
+    callback: DeskEventCallback<T, E>,
+  ) => () => void;
+  off: <E extends DeskEventType>(
+    event: E,
+    callback: DeskEventCallback<T, E>,
+  ) => void;
+  emit: <E extends DeskEventType>(
+    event: E,
+    payload: Omit<DeskEventPayload<T>[E], "timestamp">,
+  ) => void;
+}
+
+export const createEventsPlugin = <T = any,>(): EventsPlugin<T> => {
+  const eventListeners = new Map<
+    DeskEventType,
+    Set<DeskEventCallback<T, any>>
+  >();
+  let context: PluginContext<T> | null = null;
+
+  const emit = <E extends DeskEventType>(
+    event: E,
+    payload: Omit<DeskEventPayload<T>[E], "timestamp">,
+  ) => {
+    const listeners = eventListeners.get(event);
+    if (!listeners || listeners.size === 0) return;
+
+    const eventPayload = {
+      ...payload,
+      timestamp: Date.now(),
+    } as DeskEventPayload<T>[E];
+
+    context?.debug(`[Event] ${event}`, eventPayload);
+    listeners.forEach((callback) => callback(eventPayload));
+  };
+
+  const on = <E extends DeskEventType>(
+    event: E,
+    callback: DeskEventCallback<T, E>,
+  ) => {
+    if (!eventListeners.has(event)) {
+      eventListeners.set(event, new Set());
+    }
+    eventListeners.get(event)!.add(callback);
+
+    context?.debug(
+      `[Event] Listener added for '${event}', total: ${eventListeners.get(event)!.size}`,
+    );
+
+    return () => off(event, callback);
+  };
+
+  const off = <E extends DeskEventType>(
+    event: E,
+    callback: DeskEventCallback<T, E>,
+  ) => {
+    const listeners = eventListeners.get(event);
+    if (listeners) {
+      listeners.delete(callback);
+      context?.debug(
+        `[Event] Listener removed for '${event}', remaining: ${listeners.size}`,
+      );
+    }
+  };
+
+  const cleanup = () => {
+    eventListeners.clear();
+    context?.debug("[Event] Cleaned up all event listeners");
+  };
+
+  return {
+    name: "events",
+    install: (ctx: PluginContext<T>) => {
+      context = ctx;
+      ctx.debug("[Plugin] Events plugin installed");
+    },
+    cleanup,
+    on,
+    off,
+    emit,
+  };
+};
+```
+
+```ts [src/composables/use-check-in/plugins/id.plugin.ts]
+import type { Plugin, PluginContext } from "../types";
+
+export interface IdPlugin extends Plugin {
+  generateId: (prefix?: string) => string;
+  memoizedId: (
+    instanceOrId: object | string | number | null | undefined,
+    prefix?: string,
+  ) => string;
+  clearCache: () => void;
+}
+
+const instanceIdMap = new WeakMap<object, string>();
+
+const customIdMap = new Map<string, string>();
+let instanceCounter = 0;
+
+const generateSecureId = (prefix = "item"): string => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    const array = new Uint8Array(16);
+    crypto.getRandomValues(array);
+    const id = Array.from(array, (b) => b.toString(16).padStart(2, "0")).join(
+      "",
+    );
+    return `${prefix}-${id}`;
+  }
+
+  const isDev =
+    typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+  if (isDev) {
+    console.warn(
+      "[useCheckIn] crypto API not available, using Math.random fallback. " +
+        "Consider upgrading to a modern environment.",
+    );
+  }
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 15);
+  return `${prefix}-${timestamp}-${random}`;
+};
+
+export const createIdPlugin = (): IdPlugin => {
+  let context: PluginContext | null = null;
+
+  const generateId = (prefix = "item"): string => {
+    const id = generateSecureId(prefix);
+    context?.debug("[ID] Generated secure ID:", id);
+    return id;
+  };
+
+  const memoizedId = (
+    instanceOrId: object | string | number | null | undefined,
+    prefix = "item",
+  ): string => {
+    if (typeof instanceOrId === "string" || typeof instanceOrId === "number") {
+      const key = `${prefix}-${instanceOrId}`;
+      let id = customIdMap.get(key);
+      if (!id) {
+        id = String(instanceOrId);
+        customIdMap.set(key, id);
+        context?.debug("[ID] Memoized custom ID:", { key, id });
+      }
+      return id;
+    }
+
+    if (instanceOrId && typeof instanceOrId === "object") {
+      let id = instanceIdMap.get(instanceOrId);
+      if (!id) {
+        id = `${prefix}-${++instanceCounter}`;
+        instanceIdMap.set(instanceOrId, id);
+        context?.debug("[ID] Memoized instance ID:", {
+          prefix,
+          id,
+          counter: instanceCounter,
+        });
+      }
+      return id;
+    }
+
+    const isDev =
+      typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+    if (isDev) {
+      console.warn(
+        `[useCheckIn] memoizedId: no instance or custom ID provided. ` +
+          `Generated cryptographically secure ID. ` +
+          `Consider passing getCurrentInstance() or a custom ID (nanoid, uuid, props.id, etc.).`,
+      );
+    }
+    return generateId(prefix);
+  };
+
+  const clearCache = () => {
+    customIdMap.clear();
+    instanceCounter = 0;
+    context?.debug("[ID] Cleared ID cache");
+  };
+
+  const cleanup = () => {
+    clearCache();
+    context?.debug("[ID] Plugin cleaned up");
+  };
+
+  return {
+    name: "id",
+    install: (ctx: PluginContext) => {
+      context = ctx;
+      ctx.debug("[Plugin] ID plugin installed");
+    },
+    cleanup,
+    generateId,
+    memoizedId,
+    clearCache,
+  };
+};
+
+export const clearIdCache = () => {
+  customIdMap.clear();
+  instanceCounter = 0;
+};
+```
+
+```ts [src/composables/use-check-in/plugins/index.ts]
+export { createEventsPlugin, type EventsPlugin } from "./events.plugin";
+export { createRegistryPlugin, type RegistryPlugin } from "./registry.plugin";
+export {
+  createSortingPlugin,
+  clearSortCache,
+  type SortingPlugin,
+} from "./sorting.plugin";
+export { createIdPlugin, clearIdCache, type IdPlugin } from "./id.plugin";
+```
+
+```ts [src/composables/use-check-in/plugins/registry.plugin.ts]
+import { triggerRef } from "vue";
+import type {
+  Plugin,
+  PluginContext,
+  CheckInItem,
+  CheckInItemMeta,
+} from "../types";
+
+export interface RegistryPlugin<T = any> extends Plugin<T> {
+  checkIn: (id: string | number, data: T, meta?: CheckInItemMeta) => boolean;
+  checkOut: (id: string | number) => boolean;
+  get: (id: string | number) => CheckInItem<T> | undefined;
+  update: (id: string | number, data: Partial<T>) => boolean;
+  has: (id: string | number) => boolean;
+  clear: () => void;
+  checkInMany: (
+    items: Array<{ id: string | number; data: T; meta?: CheckInItemMeta }>,
+  ) => void;
+  checkOutMany: (ids: Array<string | number>) => void;
+  updateMany: (
+    updates: Array<{ id: string | number; data: Partial<T> }>,
+  ) => void;
+}
+
+export const createRegistryPlugin = <T = any,>(
+  emitEvent?: <E extends string>(event: E, payload: any) => void,
+): RegistryPlugin<T> => {
+  let context: PluginContext<T> | null = null;
+
+  const checkIn = (
+    id: string | number,
+    data: T,
+    meta?: CheckInItemMeta,
+  ): boolean => {
+    if (!context) return false;
+
+    context.debug("checkIn", { id, data, meta });
+
+    if (context.options?.onBeforeCheckIn) {
+      const result = context.options.onBeforeCheckIn(id, data);
+      if (result === false) {
+        context.debug("checkIn cancelled by onBeforeCheckIn", id);
+        return false;
+      }
+    }
+
+    context.registry.value.set(id, {
+      id,
+      data: data as any,
+      timestamp: Date.now(),
+      meta,
+    });
+    triggerRef(context.registry);
+
+    emitEvent?.("check-in", { id, data });
+
+    context.options?.onCheckIn?.(id, data);
+
+    if (context.options?.debug) {
+      context.debug("Registry state after check-in:", {
+        total: context.registry.value.size,
+        items: Array.from(context.registry.value.keys()),
+      });
+    }
+
+    return true;
+  };
+
+  const checkOut = (id: string | number): boolean => {
+    if (!context) return false;
+
+    context.debug("checkOut", id);
+
+    const existed = context.registry.value.has(id);
+    if (!existed) return false;
+
+    if (context.options?.onBeforeCheckOut) {
+      const result = context.options.onBeforeCheckOut(id);
+      if (result === false) {
+        context.debug("checkOut cancelled by onBeforeCheckOut", id);
+        return false;
+      }
+    }
+
+    context.registry.value.delete(id);
+    triggerRef(context.registry);
+
+    emitEvent?.("check-out", { id });
+
+    context.options?.onCheckOut?.(id);
+
+    if (context.options?.debug) {
+      context.debug("Registry state after check-out:", {
+        total: context.registry.value.size,
+        items: Array.from(context.registry.value.keys()),
+      });
+    }
+
+    return true;
+  };
+
+  const get = (id: string | number) => {
+    return context?.registry.value.get(id);
+  };
+
+  const update = (id: string | number, data: Partial<T>): boolean => {
+    if (!context) return false;
+
+    const existing = context.registry.value.get(id);
+    if (!existing) {
+      context.debug("update failed: item not found", id);
+      return false;
+    }
+
+    if (typeof existing.data === "object" && typeof data === "object") {
+      const previousData = { ...existing.data };
+
+      Object.assign(existing.data as object, data);
+      triggerRef(context.registry);
+
+      emitEvent?.("update", { id, data: existing.data });
+
+      if (context.options?.debug) {
+        context.debug("update diff:", {
+          id,
+          before: previousData,
+          after: existing.data,
+          changes: data,
+        });
+      }
+
+      return true;
+    }
+
+    return false;
+  };
+
+  const has = (id: string | number) => {
+    return context?.registry.value.has(id) ?? false;
+  };
+
+  const clear = () => {
+    if (!context) return;
+
+    context.debug("clear");
+    const count = context.registry.value.size;
+    context.registry.value.clear();
+    triggerRef(context.registry);
+
+    emitEvent?.("clear", {});
+
+    context.debug(`Cleared ${count} items from registry`);
+  };
+
+  const checkInMany = (
+    items: Array<{ id: string | number; data: T; meta?: CheckInItemMeta }>,
+  ) => {
+    context?.debug("checkInMany", items.length, "items");
+    items.forEach(({ id, data, meta }) => checkIn(id, data, meta));
+  };
+
+  const checkOutMany = (ids: Array<string | number>) => {
+    context?.debug("checkOutMany", ids.length, "items");
+    ids.forEach((id) => checkOut(id));
+  };
+
+  const updateMany = (
+    updates: Array<{ id: string | number; data: Partial<T> }>,
+  ) => {
+    context?.debug("updateMany", updates.length, "items");
+    updates.forEach(({ id, data }) => update(id, data));
+  };
+
+  const cleanup = () => {
+    if (!context) return;
+    context.registry.value.clear();
+    context.debug("[Registry] Cleaned up registry");
+  };
+
+  return {
+    name: "registry",
+    install: (ctx: PluginContext<T>) => {
+      context = ctx;
+      ctx.debug("[Plugin] Registry plugin installed");
+    },
+    cleanup,
+    checkIn,
+    checkOut,
+    get,
+    update,
+    has,
+    clear,
+    checkInMany,
+    checkOutMany,
+    updateMany,
+  };
+};
+```
+
+```ts [src/composables/use-check-in/plugins/slots.plugin.example.ts]
+import type { Plugin, PluginContext, CheckInItem } from "../types";
+
+export interface SlotMeta {
+  slotId?: string;
+  slotType?: string;
+  slotData?: Record<string, any>;
+}
+
+export interface SlotsPlugin<T = any> extends Plugin<T> {
+  registerSlot: (
+    slotId: string,
+    slotType: string,
+    config?: Record<string, any>,
+  ) => void;
+
+  unregisterSlot: (slotId: string) => void;
+
+  getSlotItems: (slotId: string) => CheckInItem<T>[];
+
+  hasSlot: (slotId: string) => boolean;
+}
+
+export const createSlotsPlugin = <T = any,>(): SlotsPlugin<T> => {
+  let context: PluginContext<T> | null = null;
+
+  const slots = new Map<
+    string,
+    {
+      slotId: string;
+      slotType: string;
+      config?: Record<string, any>;
+    }
+  >();
+
+  const registerSlot = (
+    slotId: string,
+    slotType: string,
+    config?: Record<string, any>,
+  ) => {
+    if (slots.has(slotId)) {
+      context?.debug(
+        `[Slots] Slot '${slotId}' already registered, updating config`,
+      );
+    }
+
+    slots.set(slotId, { slotId, slotType, config });
+    context?.debug(
+      `[Slots] Registered slot '${slotId}' of type '${slotType}'`,
+      config,
+    );
+  };
+
+  const unregisterSlot = (slotId: string) => {
+    const existed = slots.delete(slotId);
+    if (existed) {
+      context?.debug(`[Slots] Unregistered slot '${slotId}'`);
+    }
+  };
+
+  const getSlotItems = (slotId: string): CheckInItem<T>[] => {
+    if (!context) return [];
+
+    const items = Array.from(context.registry.value.values()).filter(
+      (item) => (item.meta as any)?.slotId === slotId,
+    );
+
+    context?.debug(
+      `[Slots] Retrieved ${items.length} items from slot '${slotId}'`,
+    );
+    return items;
+  };
+
+  const hasSlot = (slotId: string): boolean => {
+    return slots.has(slotId);
+  };
+
+  const cleanup = () => {
+    slots.clear();
+    context?.debug("[Slots] Cleaned up all slots");
+  };
+
+  return {
+    name: "slots",
+    install: (ctx: PluginContext<T>) => {
+      context = ctx;
+      ctx.debug("[Plugin] Slots plugin installed");
+    },
+    cleanup,
+    registerSlot,
+    unregisterSlot,
+    getSlotItems,
+    hasSlot,
+  };
+};
+
+export const SlotsPluginExample = `
+
+<script setup lang="ts">
+import { useCheckIn, createSlotsPlugin } from './useCheckIn';
+
+interface ToolbarItem {
+  label: string;
+  icon?: string;
+  onClick: () => void;
+}
+
+const { createDesk } = useCheckIn<ToolbarItem>();
+const slotsPlugin = createSlotsPlugin<ToolbarItem>();
+
+const { desk } = createDesk({
+  plugins: [slotsPlugin]
+});
+
+
+slotsPlugin.registerSlot('header-left', 'toolbar', { align: 'left' });
+slotsPlugin.registerSlot('header-right', 'toolbar', { align: 'right' });
+slotsPlugin.registerSlot('footer-actions', 'toolbar', { align: 'center' });
+
+
+const headerLeftItems = computed(() => slotsPlugin.getSlotItems('header-left'));
+const headerRightItems = computed(() => slotsPlugin.getSlotItems('header-right'));
+const footerItems = computed(() => slotsPlugin.getSlotItems('footer-actions'));
+</script>
+
+<template>
+  <div>
+    <header>
+      <div class="left">
+        <ToolbarButton
+          v-for="item in headerLeftItems"
+          :key="item.id"
+          v-bind="item.data"
+        />
+      </div>
+      <div class="right">
+        <ToolbarButton
+          v-for="item in headerRightItems"
+          :key="item.id"
+          v-bind="item.data"
+        />
+      </div>
+    </header>
+    
+    <main>
+      <slot /> 
+    </main>
+    
+    <footer>
+      <ToolbarButton
+        v-for="item in footerItems"
+        :key="item.id"
+        v-bind="item.data"
+      />
+    </footer>
+  </div>
+</template>
+
+
+<script setup lang="ts">
+import { useCheckIn } from './useCheckIn';
+
+const props = defineProps<{
+  slotId: 'header-left' | 'header-right' | 'footer-actions';
+  label: string;
+  icon?: string;
+}>();
+
+const { checkIn } = useCheckIn<ToolbarItem>();
+
+checkIn(desk, {
+  autoCheckIn: true,
+  id: \`btn-\${props.label}\`,
+  data: {
+    label: props.label,
+    icon: props.icon,
+    onClick: () => console.log(\`\${props.label} clicked\`)
+  },
+  meta: {
+    slotId: props.slotId,
+    slotType: 'toolbar',
+    user: {
+      
+    }
+  }
+});
+</script>
+`;
+```
+
+```ts [src/composables/use-check-in/plugins/sorting.plugin.ts]
+import type {
+  Plugin,
+  PluginContext,
+  CheckInItem,
+  GetAllOptions,
+} from "../types";
+
+export interface SortingPlugin<T = any> extends Plugin<T> {
+  getAll: (options?: GetAllOptions<T>) => CheckInItem<T>[];
+}
+
+const sortFnCache = new Map<string, (a: any, b: any) => number>();
+
+const compileSortFn = <T,>(
+  sortBy: keyof T | "timestamp" | `meta.${string}`,
+  order: "asc" | "desc" = "asc",
+): ((a: CheckInItem<T>, b: CheckInItem<T>) => number) => {
+  const cacheKey = `${String(sortBy)}-${order}`;
+  const cached = sortFnCache.get(cacheKey);
+  if (cached) return cached;
+
+  let fn: (a: CheckInItem<T>, b: CheckInItem<T>) => number;
+
+  if (sortBy === "timestamp") {
+    fn = (a, b) => {
+      const aVal = a.timestamp || 0;
+      const bVal = b.timestamp || 0;
+      const comparison = aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      return order === "desc" ? -comparison : comparison;
+    };
+  } else if (typeof sortBy === "string" && sortBy.startsWith("meta.")) {
+    const metaKey = sortBy.slice(5);
+    fn = (a, b) => {
+      const aVal = (a.meta as any)?.[metaKey];
+      const bVal = (b.meta as any)?.[metaKey];
+      const comparison = aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      return order === "desc" ? -comparison : comparison;
+    };
+  } else {
+    const key = sortBy as keyof T;
+    fn = (a, b) => {
+      const aVal = a.data[key];
+      const bVal = b.data[key];
+      const comparison = aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      return order === "desc" ? -comparison : comparison;
+    };
+  }
+
+  sortFnCache.set(cacheKey, fn);
+  return fn;
+};
+
+export const createSortingPlugin = <T = any,>(): SortingPlugin<T> => {
+  let context: PluginContext<T> | null = null;
+
+  const getAll = (options?: GetAllOptions<T>): CheckInItem<T>[] => {
+    if (!context) return [];
+
+    let items = Array.from(context.registry.value.values());
+
+    if (options?.group !== undefined) {
+      items = items.filter((item) => item.meta?.group === options.group);
+    }
+
+    if (options?.filter) {
+      items = items.filter(options.filter);
+    }
+
+    if (options?.sortBy) {
+      const sortFn = compileSortFn<T>(options.sortBy, options.order);
+      items.sort(sortFn);
+    }
+
+    return items;
+  };
+
+  const cleanup = () => {
+    context?.debug("[Sorting] Plugin cleaned up");
+  };
+
+  return {
+    name: "sorting",
+    install: (ctx: PluginContext<T>) => {
+      context = ctx;
+      ctx.debug("[Plugin] Sorting plugin installed");
+    },
+    cleanup,
+    getAll,
+  };
+};
+
+export const clearSortCache = () => {
+  sortFnCache.clear();
 };
 ```
 :::
