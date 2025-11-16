@@ -8396,6 +8396,35 @@ export const useCssParser = () => {
 };
 ```
 
+```ts [src/composables/use-check-in/index.ts]
+export { useCheckIn } from "./useCheckIn";
+
+export type {
+  DeskEventType,
+  DeskEventCallback,
+  CheckInItem,
+  CheckInDesk,
+  CheckInDeskOptions,
+  CheckInOptions,
+} from "./useCheckIn";
+
+export type { CheckInPlugin } from "./types";
+
+export {
+  createActiveItemPlugin,
+  createValidationPlugin,
+  createLoggerPlugin,
+  createHistoryPlugin,
+} from "./plugins";
+
+export type {
+  ValidationOptions,
+  LoggerOptions,
+  HistoryOptions,
+  HistoryEntry,
+} from "./plugins";
+```
+
 ```ts [src/composables/use-check-in/useCheckIn.ts]
 import {
   ref,
@@ -8409,6 +8438,7 @@ import {
   type Ref,
   type ComputedRef,
 } from "vue";
+import type { CheckInPlugin } from "./types";
 
 export type DeskEventType = "check-in" | "check-out" | "update" | "clear";
 
@@ -8469,6 +8499,7 @@ export interface CheckInDeskOptions<
   onBeforeCheckOut?: (id: string | number) => void | boolean;
   onCheckOut?: (id: string | number) => void;
   debug?: boolean;
+  plugins?: CheckInPlugin<T>[];
 }
 
 export interface CheckInOptions<T = any> {
@@ -8514,6 +8545,8 @@ export const useCheckIn = <
     debug = options?.debug ? Debug : NoOpDebug;
 
     const eventListeners = new Map<DeskEventType, Set<DeskEventCallback<T>>>();
+
+    const pluginCleanups: Array<() => void> = [];
 
     const emit = (
       event: DeskEventType,
@@ -8561,6 +8594,18 @@ export const useCheckIn = <
     ): boolean => {
       debug("checkIn", { id, data, meta });
 
+      if (options?.plugins) {
+        for (const plugin of options.plugins) {
+          if (plugin.onBeforeCheckIn) {
+            const result = plugin.onBeforeCheckIn(id, data);
+            if (result === false) {
+              debug("checkIn cancelled by plugin:", plugin.name);
+              return false;
+            }
+          }
+        }
+      }
+
       if (options?.onBeforeCheckIn) {
         const result = options.onBeforeCheckIn(id, data);
         if (result === false) {
@@ -8596,6 +8641,18 @@ export const useCheckIn = <
 
       const existed = registry.value.has(id);
       if (!existed) return false;
+
+      if (options?.plugins) {
+        for (const plugin of options.plugins) {
+          if (plugin.onBeforeCheckOut) {
+            const result = plugin.onBeforeCheckOut(id);
+            if (result === false) {
+              debug("checkOut cancelled by plugin:", plugin.name);
+              return false;
+            }
+          }
+        }
+      }
 
       if (options?.onBeforeCheckOut) {
         const result = options.onBeforeCheckOut(id);
@@ -8689,6 +8746,9 @@ export const useCheckIn = <
 
       emit("clear", {});
 
+      pluginCleanups.forEach((cleanup) => cleanup());
+      pluginCleanups.length = 0;
+
       debug(`Cleared ${count} items from registry`);
     };
 
@@ -8715,7 +8775,7 @@ export const useCheckIn = <
       updates.forEach(({ id, data }) => update(id, data));
     };
 
-    return {
+    const desk: CheckInDesk<T, TContext> = {
       registry,
       checkIn,
       checkOut,
@@ -8731,6 +8791,49 @@ export const useCheckIn = <
       off,
       emit,
     };
+
+    if (options?.plugins) {
+      options.plugins.forEach((plugin) => {
+        debug("Installing plugin:", plugin.name);
+
+        if (plugin.install) {
+          const cleanup = plugin.install(desk);
+          if (cleanup) {
+            pluginCleanups.push(cleanup);
+          }
+        }
+
+        if (plugin.onCheckIn) {
+          desk.on("check-in", ({ id, data }) => {
+            plugin.onCheckIn!(id!, data!);
+          });
+        }
+
+        if (plugin.onCheckOut) {
+          desk.on("check-out", ({ id }) => {
+            plugin.onCheckOut!(id!);
+          });
+        }
+
+        if (plugin.methods) {
+          Object.entries(plugin.methods).forEach(([name, method]) => {
+            (desk as any)[name] = (...args: any[]) => method(desk, ...args);
+          });
+        }
+
+        if (plugin.computed) {
+          Object.entries(plugin.computed).forEach(([name, getter]) => {
+            Object.defineProperty(desk, name, {
+              get: () => getter(desk),
+              enumerable: true,
+              configurable: true,
+            });
+          });
+        }
+      });
+    }
+
+    return desk;
   };
 
   const createDesk = (
@@ -9046,6 +9149,360 @@ export const useCheckIn = <
     clearIdCache,
   };
 };
+
+export type { CheckInPlugin } from "./types";
+export {
+  createActiveItemPlugin,
+  createValidationPlugin,
+  createLoggerPlugin,
+  createHistoryPlugin,
+  type ValidationOptions,
+  type LoggerOptions,
+  type HistoryOptions,
+  type HistoryEntry,
+} from "./plugins";
+```
+
+```ts [src/composables/use-check-in/types.ts]
+import type { CheckInDesk } from "./useCheckIn";
+
+export interface CheckInPlugin<T = any> {
+  name: string;
+
+  version?: string;
+
+  install?: (desk: CheckInDesk<T>) => void | (() => void);
+
+  onBeforeCheckIn?: (id: string | number, data: T) => void | boolean;
+
+  onCheckIn?: (id: string | number, data: T) => void;
+
+  onBeforeCheckOut?: (id: string | number) => void | boolean;
+
+  onCheckOut?: (id: string | number) => void;
+
+  methods?: Record<string, (desk: CheckInDesk<T>, ...args: any[]) => any>;
+
+  computed?: Record<string, (desk: CheckInDesk<T>) => any>;
+}
+```
+
+```ts [src/composables/use-check-in/plugins/activeItem.ts]
+import { ref } from "vue";
+import type { CheckInPlugin } from "../types";
+import type { CheckInDesk } from "../useCheckIn";
+
+export const createActiveItemPlugin = <T = any,>(): CheckInPlugin<T> => ({
+  name: "active-item",
+  version: "1.0.0",
+
+  install: (desk) => {
+    const activeId = ref<string | number | null>(null);
+    (desk as any).activeId = activeId;
+
+    return () => {
+      activeId.value = null;
+    };
+  },
+
+  methods: {
+    setActive(desk: CheckInDesk<T>, id: string | number | null) {
+      const deskWithActive = desk as any;
+      const previousId = deskWithActive.activeId?.value;
+
+      if (id === null) {
+        deskWithActive.activeId.value = null;
+
+        desk.emit("active-changed" as any, {
+          id: undefined,
+          data: undefined,
+        });
+        return true;
+      }
+
+      if (!desk.has(id)) return false;
+
+      deskWithActive.activeId.value = id;
+      desk.emit("active-changed" as any, {
+        id,
+        data: desk.get(id)?.data,
+      });
+      return true;
+    },
+
+    getActive(desk: CheckInDesk<T>) {
+      const deskWithActive = desk as any;
+      const id = deskWithActive.activeId?.value;
+      return id ? desk.get(id) : null;
+    },
+
+    clearActive(desk: CheckInDesk<T>) {
+      const deskWithActive = desk as any;
+      return deskWithActive.setActive?.(null);
+    },
+  },
+
+  computed: {
+    hasActive(desk: CheckInDesk<T>) {
+      const deskWithActive = desk as any;
+      return deskWithActive.activeId?.value !== null;
+    },
+  },
+});
+```
+
+```ts [src/composables/use-check-in/plugins/example.ts]
+import {
+  useCheckIn,
+  createActiveItemPlugin,
+  createLoggerPlugin,
+} from "../../useCheckIn";
+
+interface DrawingHandler {
+  type: "marker" | "circle" | "polyline" | "polygon" | "rectangle";
+  enable: () => void;
+  disable: () => void;
+  supportsRepeatMode?: boolean;
+}
+
+const { createDesk } = useCheckIn<DrawingHandler>();
+
+const { desk } = createDesk("drawingHandlers", {
+  debug: true,
+
+  plugins: [
+    createActiveItemPlugin(),
+
+    createLoggerPlugin({
+      prefix: "[FeaturesEditor]",
+      verbose: true,
+    }),
+  ],
+});
+
+desk.checkIn("marker", {
+  type: "marker",
+  enable: () => console.log("Marker drawing enabled"),
+  disable: () => console.log("Marker drawing disabled"),
+  supportsRepeatMode: true,
+});
+
+desk.checkIn("circle", {
+  type: "circle",
+  enable: () => console.log("Circle drawing enabled"),
+  disable: () => console.log("Circle drawing disabled"),
+  supportsRepeatMode: true,
+});
+
+(desk as any).setActive("marker");
+
+const activeHandler = (desk as any).getActive();
+console.log(activeHandler?.data.type);
+
+(desk as any).setActive("circle");
+
+watch(
+  () => (desk as any).activeId?.value,
+  (activeId) => {
+    console.log("Active handler changed:", activeId);
+
+    if (activeId) {
+      const handler = desk.get(activeId);
+      handler?.data.enable();
+    }
+  },
+);
+```
+
+```ts [src/composables/use-check-in/plugins/history.ts]
+import { ref } from "vue";
+import type { CheckInPlugin } from "../types";
+import type { CheckInDesk, CheckInItem } from "../useCheckIn";
+
+export interface HistoryEntry<T = any> {
+  action: "check-in" | "check-out" | "update";
+  id: string | number;
+  data?: T;
+  timestamp: number;
+}
+
+export interface HistoryOptions {
+  maxHistory?: number;
+}
+
+export const createHistoryPlugin = <T = any,>(
+  options?: HistoryOptions,
+): CheckInPlugin<T> => {
+  const maxHistory = options?.maxHistory || 50;
+
+  return {
+    name: "history",
+    version: "1.0.0",
+
+    install: (desk) => {
+      const history = ref<HistoryEntry<T>[]>([]);
+
+      (desk as any).history = history;
+
+      const unsubCheckIn = desk.on("check-in", ({ id, data, timestamp }) => {
+        history.value.push({
+          action: "check-in",
+          id: id!,
+          data: data as any,
+          timestamp,
+        });
+        if (history.value.length > maxHistory) {
+          history.value.shift();
+        }
+      });
+
+      const unsubCheckOut = desk.on("check-out", ({ id, timestamp }) => {
+        history.value.push({ action: "check-out", id: id!, timestamp });
+        if (history.value.length > maxHistory) {
+          history.value.shift();
+        }
+      });
+
+      const unsubUpdate = desk.on("update", ({ id, data, timestamp }) => {
+        history.value.push({
+          action: "update",
+          id: id!,
+          data: data as any,
+          timestamp,
+        });
+        if (history.value.length > maxHistory) {
+          history.value.shift();
+        }
+      });
+
+      return () => {
+        unsubCheckIn();
+        unsubCheckOut();
+        unsubUpdate();
+        history.value = [];
+      };
+    },
+
+    methods: {
+      getHistory(desk: CheckInDesk<T>): HistoryEntry<T>[] {
+        return (desk as any).history?.value || [];
+      },
+
+      clearHistory(desk: CheckInDesk<T>) {
+        const deskWithHistory = desk as any;
+        if (deskWithHistory.history) {
+          deskWithHistory.history.value = [];
+        }
+      },
+
+      getLastHistory(desk: CheckInDesk<T>, count: number): HistoryEntry<T>[] {
+        const history = (desk as any).history?.value || [];
+        return history.slice(-count);
+      },
+
+      getHistoryByAction(
+        desk: CheckInDesk<T>,
+        action: "check-in" | "check-out" | "update",
+      ): HistoryEntry<T>[] {
+        const history = (desk as any).history?.value || [];
+        return history.filter(
+          (entry: HistoryEntry<T>) => entry.action === action,
+        );
+      },
+    },
+  };
+};
+```
+
+```ts [src/composables/use-check-in/plugins/index.ts]
+export { createActiveItemPlugin } from "./activeItem";
+export { createValidationPlugin, type ValidationOptions } from "./validation";
+export { createLoggerPlugin, type LoggerOptions } from "./logger";
+export {
+  createHistoryPlugin,
+  type HistoryOptions,
+  type HistoryEntry,
+} from "./history";
+```
+
+```ts [src/composables/use-check-in/plugins/logger.ts]
+import type { CheckInPlugin } from "../types";
+
+export interface LoggerOptions {
+  prefix?: string;
+
+  logLevel?: "info" | "debug";
+
+  verbose?: boolean;
+}
+
+export const createLoggerPlugin = <T = any,>(
+  options?: LoggerOptions,
+): CheckInPlugin<T> => {
+  const prefix = options?.prefix || "[CheckIn]";
+  const verbose = options?.verbose ?? false;
+
+  return {
+    name: "logger",
+    version: "1.0.0",
+
+    onCheckIn: (id, data) => {
+      if (verbose) {
+        console.log(`${prefix} ✅ Item checked in:`, { id, data });
+      } else {
+        console.log(`${prefix} ✅ Item checked in:`, id);
+      }
+    },
+
+    onCheckOut: (id) => {
+      console.log(`${prefix} ❌ Item checked out:`, id);
+    },
+  };
+};
+```
+
+```ts [src/composables/use-check-in/plugins/validation.ts]
+import type { CheckInPlugin } from "../types";
+
+export interface ValidationOptions<T = any> {
+  required?: (keyof T)[];
+
+  validate?: (data: T) => boolean | string;
+}
+
+export const createValidationPlugin = <T = any,>(
+  options: ValidationOptions<T>,
+): CheckInPlugin<T> => ({
+  name: "validation",
+  version: "1.0.0",
+
+  onBeforeCheckIn: (id, data) => {
+    if (options.required) {
+      for (const field of options.required) {
+        if (data[field] === undefined || data[field] === null) {
+          console.error(
+            `[Validation Plugin] Field '${String(field)}' is required for item ${id}`,
+          );
+          return false;
+        }
+      }
+    }
+
+    if (options.validate) {
+      const result = options.validate(data);
+      if (result === false) {
+        console.error(`[Validation Plugin] Validation failed for item ${id}`);
+        return false;
+      }
+      if (typeof result === "string") {
+        console.error(`[Validation Plugin] ${result}`);
+        return false;
+      }
+    }
+
+    return true;
+  },
+});
 ```
 
 ```ts [src/composables/use-colors/useColors.ts]
