@@ -6,115 +6,63 @@
  * @type registry:hook
  * @category data
  *
- * @demo AirportDemo
- * @demo FormDemo
- * @demo AccordionDemo
- * @demo TabsDemo
- * @demo ToolbarDemo
+ * @demo PluginsRuntimeDemo
  */
 
 import {
   ref,
   provide,
   inject,
-  onMounted,
-  onBeforeUnmount,
   onUnmounted,
   watch,
   computed,
   triggerRef,
-  nextTick,
   type InjectionKey,
   type Ref,
   type ComputedRef,
 } from 'vue';
 
+// Export types
+export type {
+  DeskEventType,
+  DeskEventPayload,
+  DeskEventCallback,
+  CheckInItem,
+  CheckInItemMeta,
+  CheckInDesk,
+  CheckInDeskOptions,
+  CheckInOptions,
+  GetAllOptions,
+  SortOptions,
+  DeskProvider,
+  CheckInReturn,
+  DeskHook,
+  HooksAPI,
+  SlotsAPI,
+  SlotConfig,
+} from './types';
+
+import type {
+  CheckInItem,
+  CheckInDesk,
+  CheckInDeskOptions,
+  CheckInOptions,
+  DeskProvider,
+  CheckInReturn,
+  CheckInItemMeta,
+  DeskEventType,
+  DeskEventCallback,
+  DeskEventPayload,
+  DeskHook,
+  SlotsAPI,
+  HooksAPI,
+  SlotConfig,
+  GetAllOptions,
+} from './types';
+
 // ==========================================
-// TYPES
+// HELPERS
 // ==========================================
-
-/** Type d'événement émis par le desk */
-export type DeskEventType = 'check-in' | 'check-out' | 'update' | 'clear';
-
-/** Callback pour les événements du desk */
-export type DeskEventCallback<T = any> = (payload: {
-  id?: string | number;
-  data?: T;
-  timestamp: number;
-}) => void;
-
-export interface CheckInItem<T = any> {
-  id: string | number;
-  data: T;
-  timestamp?: number;
-  meta?: Record<string, any>;
-}
-
-export interface CheckInDesk<T = any, TContext extends Record<string, any> = {}> {
-  /**
-   * Registry interne des items. ⚠️ NE PAS UTILISER DIRECTEMENT dans les templates.
-   * Utilisez plutôt les helpers : get(), getAll(), ou le computed getRegistry().
-   * Map n'est pas réactive, seul le Ref l'est.
-   */
-  registry: Ref<Map<string | number, CheckInItem<T>>>;
-  checkIn: (id: string | number, data: T, meta?: Record<string, any>) => boolean;
-  checkOut: (id: string | number) => boolean;
-  get: (id: string | number) => CheckInItem<T> | undefined;
-  getAll: (options?: {
-    sortBy?: keyof T | 'timestamp';
-    order?: 'asc' | 'desc';
-  }) => CheckInItem<T>[];
-  update: (id: string | number, data: Partial<T>) => boolean;
-  has: (id: string | number) => boolean;
-  clear: () => void;
-  checkInMany: (items: Array<{ id: string | number; data: T; meta?: Record<string, any> }>) => void;
-  checkOutMany: (ids: Array<string | number>) => void;
-  updateMany: (updates: Array<{ id: string | number; data: Partial<T> }>) => void;
-  /** Écoute un type d'événement */
-  on: (event: DeskEventType, callback: DeskEventCallback<T>) => () => void;
-  /** Retire un listener d'événement */
-  off: (event: DeskEventType, callback: DeskEventCallback<T>) => void;
-  /** Émet un événement (usage interne principalement) */
-  emit: (event: DeskEventType, payload: { id?: string | number; data?: T }) => void;
-}
-
-export interface CheckInDeskOptions<T = any, TContext extends Record<string, any> = {}> {
-  /** Contexte additionnel à merger avec le desk (typé) */
-  context?: TContext;
-  /** Callback appelé avant le check-in d'un item */
-  onBeforeCheckIn?: (id: string | number, data: T) => void | boolean;
-  /** Callback appelé après le check-in d'un item */
-  onCheckIn?: (id: string | number, data: T) => void;
-  /** Callback appelé avant le check-out d'un item */
-  onBeforeCheckOut?: (id: string | number) => void | boolean;
-  /** Callback appelé après le check-out d'un item */
-  onCheckOut?: (id: string | number) => void;
-  /** Active le mode debug avec logging */
-  debug?: boolean;
-}
-
-export interface CheckInOptions<T = any> {
-  /** Lève une erreur si le desk n'existe pas */
-  required?: boolean;
-  /** Auto check-in au montage du composant */
-  autoCheckIn?: boolean;
-  /** ID de l'item à enregistrer */
-  id?: string | number;
-  /** Données de l'item à enregistrer (peut être async) */
-  data?: T | (() => T) | (() => Promise<T>);
-  /** Fonction pour générer un ID unique si non fourni */
-  generateId?: () => string | number;
-  /** Watch les changements de data pour mettre à jour l'enregistrement */
-  watchData?: boolean;
-  /** Watch shallow au lieu de deep (meilleure performance) */
-  shallow?: boolean;
-  /** Condition réactive pour check-in/out automatique */
-  watchCondition?: (() => boolean) | Ref<boolean>;
-  /** Métadonnées additionnelles */
-  meta?: Record<string, any>;
-  /** Active le mode debug avec logging */
-  debug?: boolean;
-}
 
 const NoOpDebug = (_message: string, ..._args: any[]) => {};
 
@@ -122,11 +70,74 @@ const Debug = (message: string, ...args: any[]) => {
   console.log(`[useCheckIn] ${message}`, ...args);
 };
 
-// WeakMap pour générer des IDs stables basés sur l'instance du composant
+// Cache pour les IDs mémorisés
 const instanceIdMap = new WeakMap<object, string>();
-// Map pour les IDs custom fournis par l'utilisateur
 const customIdMap = new Map<string, string>();
-let instanceCounter = 0;
+
+// Cache pour les fonctions de tri compilées
+const sortFnCache = new Map<string, (a: CheckInItem<any>, b: CheckInItem<any>) => number>();
+
+/**
+ * Génère un ID unique et sécurisé
+ */
+const generateSecureId = (prefix = 'item'): string => {
+  // Utiliser crypto.randomUUID si disponible (Node 19+, tous les navigateurs modernes)
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+
+  // Fallback: crypto.getRandomValues
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const hex = Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    return `${prefix}-${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16)}`;
+  }
+
+  // Fallback final: timestamp + random
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+};
+
+/**
+ * Compile une fonction de tri optimisée
+ */
+const compileSortFn = <T = any>(
+  sortBy: keyof T | 'timestamp' | `meta.${string}`,
+  order: 'asc' | 'desc' = 'asc'
+): ((a: CheckInItem<T>, b: CheckInItem<T>) => number) => {
+  const cacheKey = `${String(sortBy)}-${order}`;
+  const cached = sortFnCache.get(cacheKey);
+  if (cached) return cached;
+
+  const fn = (a: CheckInItem<T>, b: CheckInItem<T>) => {
+    let aVal: any;
+    let bVal: any;
+
+    if (sortBy === 'timestamp') {
+      aVal = a.timestamp || 0;
+      bVal = b.timestamp || 0;
+    } else if (String(sortBy).startsWith('meta.')) {
+      const metaKey = String(sortBy).slice(5);
+      aVal = (a.meta as any)?.[metaKey];
+      bVal = (b.meta as any)?.[metaKey];
+    } else {
+      aVal = a.data[sortBy as keyof T];
+      bVal = b.data[sortBy as keyof T];
+    }
+
+    if (aVal === bVal) return 0;
+    if (aVal == null) return 1;
+    if (bVal == null) return -1;
+
+    const result = aVal < bVal ? -1 : 1;
+    return order === 'asc' ? result : -result;
+  };
+
+  sortFnCache.set(cacheKey, fn);
+  return fn;
+};
 
 // ==========================================
 // COMPOSABLE PRINCIPAL
@@ -141,7 +152,7 @@ let instanceCounter = 0;
  * // In parent component - open a desk
  * const { createDesk } = useCheckIn<TabItem, { activeTab: Ref<string> }>();
  * const desk = createDesk({
- *   extraContext: { activeTab: ref('tab1') }
+ *   context: { activeTab: ref('tab1') }
  * });
  *
  * // In child component - check in at parent's desk
@@ -166,23 +177,28 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
 
     const debug = options?.debug ? Debug : NoOpDebug;
 
-    // Système d'événements
-    const eventListeners = new Map<DeskEventType, Set<DeskEventCallback<T>>>();
+    // ==========================================
+    // SYSTÈME D'ÉVÉNEMENTS (natif)
+    // ==========================================
+    const eventListeners = new Map<DeskEventType, Set<DeskEventCallback<T, any>>>();
 
-    const emit = (event: DeskEventType, payload: { id?: string | number; data?: T }) => {
+    const emit = <E extends DeskEventType>(
+      event: E,
+      payload: Omit<DeskEventPayload<T>[E], 'timestamp'>
+    ) => {
       const listeners = eventListeners.get(event);
       if (!listeners) return;
 
       const eventPayload = {
         ...payload,
         timestamp: Date.now(),
-      };
+      } as DeskEventPayload<T>[E];
 
       debug(`[Event] ${event}`, eventPayload);
       listeners.forEach((callback) => callback(eventPayload));
     };
 
-    const on = (event: DeskEventType, callback: DeskEventCallback<T>) => {
+    const on = <E extends DeskEventType>(event: E, callback: DeskEventCallback<T, E>) => {
       if (!eventListeners.has(event)) {
         eventListeners.set(event, new Set());
       }
@@ -194,7 +210,7 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       return () => off(event, callback);
     };
 
-    const off = (event: DeskEventType, callback: DeskEventCallback<T>) => {
+    const off = <E extends DeskEventType>(event: E, callback: DeskEventCallback<T, E>) => {
       const listeners = eventListeners.get(event);
       if (listeners) {
         listeners.delete(callback);
@@ -202,7 +218,10 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       }
     };
 
-    const checkIn = (id: string | number, data: T, meta?: Record<string, any>): boolean => {
+    // ==========================================
+    // REGISTRY (natif)
+    // ==========================================
+    const checkIn = (id: string | number, data: T, meta?: CheckInItemMeta): boolean => {
       debug('checkIn', { id, data, meta });
 
       // Lifecycle: before
@@ -214,12 +233,14 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
         }
       }
 
-      registry.value.set(id, {
+      const item: CheckInItem<T> = {
         id,
         data: data as any,
         timestamp: Date.now(),
         meta,
-      });
+      };
+
+      registry.value.set(id, item);
       triggerRef(registry);
 
       // Emit event
@@ -227,6 +248,9 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
 
       // Lifecycle: after
       options?.onCheckIn?.(id, data);
+
+      // Hooks
+      hooks.trigger('onCheckIn', item);
 
       if (options?.debug) {
         debug('Registry state after check-in:', {
@@ -262,6 +286,9 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       // Lifecycle: after
       options?.onCheckOut?.(id);
 
+      // Hooks
+      hooks.trigger('onCheckOut', id);
+
       if (options?.debug) {
         debug('Registry state after check-out:', {
           total: registry.value.size,
@@ -274,93 +301,159 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
 
     const get = (id: string | number) => registry.value.get(id);
 
-    const getAll = (sortOptions?: { sortBy?: keyof T | 'timestamp'; order?: 'asc' | 'desc' }) => {
-      const items = Array.from(registry.value.values());
-
-      if (!sortOptions?.sortBy) return items;
-
-      return items.sort((a, b) => {
-        let aVal: any, bVal: any;
-
-        if (sortOptions.sortBy === 'timestamp') {
-          aVal = a.timestamp || 0;
-          bVal = b.timestamp || 0;
-        } else {
-          const key = sortOptions.sortBy as keyof T;
-          aVal = a.data[key];
-          bVal = b.data[key];
-        }
-
-        const comparison = aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-        return sortOptions.order === 'desc' ? -comparison : comparison;
-      });
-    };
-
-    const update = (id: string | number, data: Partial<T>): boolean => {
-      const existing = registry.value.get(id);
-      if (!existing) {
-        debug('update failed: item not found', id);
-        return false;
-      }
-
-      if (typeof existing.data === 'object' && typeof data === 'object') {
-        const previousData = { ...existing.data };
-
-        // Mise à jour directe sans relancer checkIn pour préserver le lifecycle
-        Object.assign(existing.data as object, data);
-        triggerRef(registry);
-
-        // Emit event
-        emit('update', { id, data: existing.data });
-
-        if (options?.debug) {
-          debug('update diff:', {
-            id,
-            before: previousData,
-            after: existing.data,
-            changes: data,
-          });
-        }
-
-        return true;
-      }
-
-      return false;
-    };
-
     const has = (id: string | number) => registry.value.has(id);
 
-    const clear = () => {
-      debug('clear');
-      const count = registry.value.size;
-      registry.value.clear();
+    const update = (id: string | number, data: Partial<T>): boolean => {
+      const item = registry.value.get(id);
+      if (!item) return false;
+
+      const updatedItem = {
+        ...item,
+        data: { ...item.data, ...data },
+      };
+
+      registry.value.set(id, updatedItem);
       triggerRef(registry);
 
-      // Emit event
-      emit('clear', {});
+      emit('update', { id, data: updatedItem.data });
+      hooks.trigger('onUpdate', updatedItem);
 
-      debug(`Cleared ${count} items from registry`);
+      debug('update', { id, data });
+      return true;
+    };
+
+    const clear = () => {
+      registry.value.clear();
+      triggerRef(registry);
+      emit('clear', {});
+      hooks.trigger('onClear');
+      debug('clear');
     };
 
     const checkInMany = (
-      items: Array<{ id: string | number; data: T; meta?: Record<string, any> }>
+      items: Array<{ id: string | number; data: T; meta?: CheckInItemMeta }>
     ) => {
-      debug('checkInMany', items.length, 'items');
       items.forEach(({ id, data, meta }) => checkIn(id, data, meta));
     };
 
     const checkOutMany = (ids: Array<string | number>) => {
-      debug('checkOutMany', ids.length, 'items');
       ids.forEach((id) => checkOut(id));
     };
 
     const updateMany = (updates: Array<{ id: string | number; data: Partial<T> }>) => {
-      debug('updateMany', updates.length, 'items');
       updates.forEach(({ id, data }) => update(id, data));
     };
 
+    // ==========================================
+    // SORTING (natif)
+    // ==========================================
+    const getAll = (opts?: GetAllOptions<T>): CheckInItem<T>[] => {
+      let items = Array.from(registry.value.values());
+
+      // Filtrage par groupe
+      if (opts?.group) {
+        items = items.filter((item) => item.meta?.group === opts.group);
+      }
+
+      // Filtrage custom
+      if (opts?.filter) {
+        items = items.filter(opts.filter);
+      }
+
+      // Tri
+      if (opts?.sortBy) {
+        const sortFn = compileSortFn<T>(opts.sortBy, opts.order);
+        items.sort(sortFn);
+      }
+
+      return items;
+    };
+
+    const getGroup = (
+      group: string,
+      sortOptions?: { sortBy?: keyof T | 'timestamp' | `meta.${string}`; order?: 'asc' | 'desc' }
+    ) => {
+      return computed(() => getAll({ ...sortOptions, group }));
+    };
+
+    const items = computed(() => getAll());
+
+    // ==========================================
+    // SLOTS (natif)
+    // ==========================================
+    const slotsRegistry = new Map<string, SlotConfig>();
+
+    const slots: SlotsAPI<T> = {
+      register: (slotId: string, slotType: string, meta?: Record<string, any>) => {
+        slotsRegistry.set(slotId, { id: slotId, type: slotType, meta });
+        debug(`[Slots] Registered slot '${slotId}' of type '${slotType}'`);
+      },
+      unregister: (slotId: string) => {
+        slotsRegistry.delete(slotId);
+        debug(`[Slots] Unregistered slot '${slotId}'`);
+      },
+      get: (slotId: string): CheckInItem<T>[] => {
+        return getAll({
+          filter: (item) => item.meta?.user?.slotId === slotId,
+        });
+      },
+      has: (slotId: string): boolean => {
+        return slotsRegistry.has(slotId);
+      },
+      list: (): SlotConfig[] => {
+        return Array.from(slotsRegistry.values());
+      },
+      clear: () => {
+        slotsRegistry.clear();
+        debug('[Slots] All slots cleared');
+      },
+    };
+
+    // ==========================================
+    // HOOKS (plugins simplifiés)
+    // ==========================================
+    const hooksRegistry = new Map<string, DeskHook<T>>();
+
+    const hooks: HooksAPI<T> & { trigger: (method: keyof DeskHook<T>, ...args: any[]) => void } = {
+      add: (hook: DeskHook<T>) => {
+        hooksRegistry.set(hook.name, hook);
+        debug(`[Hooks] Added hook '${hook.name}'`);
+      },
+      remove: (name: string): boolean => {
+        const hook = hooksRegistry.get(name);
+        if (hook) {
+          hook.cleanup?.();
+          hooksRegistry.delete(name);
+          debug(`[Hooks] Removed hook '${name}'`);
+          return true;
+        }
+        return false;
+      },
+      list: (): string[] => {
+        return Array.from(hooksRegistry.keys());
+      },
+      trigger: (method: keyof DeskHook<T>, ...args: any[]) => {
+        hooksRegistry.forEach((hook) => {
+          const fn = hook[method];
+          if (typeof fn === 'function') {
+            (fn as any)(...args);
+          }
+        });
+      },
+    };
+
+    // Installer les hooks fournis dans les options
+    if (options?.hooks) {
+      options.hooks.forEach((hook) => hooks.add(hook));
+    }
+
+    // Exposition du registry en lecture seule
+    const readonlyRegistry = computed(() => registry.value);
+
     return {
-      registry,
+      registry: readonlyRegistry as any,
+      slots,
+      hooks,
       checkIn,
       checkOut,
       get,
@@ -374,6 +467,8 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       on,
       off,
       emit,
+      getGroup,
+      items,
     };
   };
 
@@ -470,7 +565,16 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       if (isCheckedIn.value) return true;
 
       const data = await getCurrentData();
-      const success = desk!.checkIn(itemId, data, checkInOptions?.meta);
+
+      // Merge group/position/priority into meta
+      const meta = {
+        ...checkInOptions?.meta,
+        ...(checkInOptions?.group !== undefined && { group: checkInOptions.group }),
+        ...(checkInOptions?.position !== undefined && { position: checkInOptions.position }),
+        ...(checkInOptions?.priority !== undefined && { priority: checkInOptions.priority }),
+      };
+
+      const success = desk!.checkIn(itemId, data, meta);
 
       if (success) {
         isCheckedIn.value = true;
@@ -579,30 +683,7 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
    * @returns ID unique et sécurisé
    */
   const generateId = (prefix = 'item'): string => {
-    // Essaie crypto.randomUUID si disponible (navigateur moderne + Node 19+)
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-      return `${prefix}-${crypto.randomUUID()}`;
-    }
-
-    // Sinon utilise crypto.getRandomValues (quasi-universel)
-    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-      const array = new Uint8Array(16);
-      crypto.getRandomValues(array);
-      const id = Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('');
-      return `${prefix}-${id}`;
-    }
-
-    // Fallback ultime pour environnements très anciens
-    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-    if (isDev) {
-      console.warn(
-        '[useCheckIn] crypto API not available, using Math.random fallback. ' +
-          'Consider upgrading to a modern environment.'
-      );
-    }
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 15);
-    return `${prefix}-${timestamp}-${random}`;
+    return generateSecureId(prefix);
   };
 
   /**
@@ -633,37 +714,35 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
     instanceOrId: object | string | number | null | undefined,
     prefix = 'item'
   ): string => {
-    // Cas 1: C'est un string ou number = ID custom fourni par l'utilisateur
+    // Si c'est un objet (instance Vue), utiliser WeakMap
+    if (instanceOrId && typeof instanceOrId === 'object') {
+      const existing = instanceIdMap.get(instanceOrId);
+      if (existing) return existing;
+
+      const newId = generateSecureId(prefix);
+      instanceIdMap.set(instanceOrId, newId);
+      return newId;
+    }
+
+    // Si c'est une string ou un number, utiliser Map
     if (typeof instanceOrId === 'string' || typeof instanceOrId === 'number') {
       const key = `${prefix}-${instanceOrId}`;
-      let id = customIdMap.get(key);
-      if (!id) {
-        id = String(instanceOrId);
-        customIdMap.set(key, id);
-      }
-      return id;
+      const existing = customIdMap.get(key);
+      if (existing) return existing;
+
+      const newId = `${prefix}-${instanceOrId}`;
+      customIdMap.set(key, newId);
+      return newId;
     }
 
-    // Cas 2: C'est un object = instance Vue (getCurrentInstance())
-    if (instanceOrId && typeof instanceOrId === 'object') {
-      let id = instanceIdMap.get(instanceOrId);
-      if (!id) {
-        id = `${prefix}-${++instanceCounter}`;
-        instanceIdMap.set(instanceOrId, id);
-      }
-      return id;
-    }
-
-    // Cas 3: null/undefined = génération cryptographiquement sécurisée avec warning
-    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-    if (isDev) {
+    // Si null/undefined, générer un ID unique (warning en dev)
+    if (process.env.NODE_ENV !== 'production') {
       console.warn(
-        `[useCheckIn] memoizedId: no instance or custom ID provided. ` +
-          `Generated cryptographically secure ID. ` +
-          `Consider passing getCurrentInstance() or a custom ID (nanoid, uuid, props.id, etc.).`
+        '[useCheckIn] memoizedId called with null/undefined. Consider passing getCurrentInstance() or a custom ID.'
       );
     }
-    return generateId(prefix);
+
+    return generateSecureId(prefix);
   };
 
   /**
