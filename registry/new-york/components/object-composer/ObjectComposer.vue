@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, provide, type HTMLAttributes, type InjectionKey } from 'vue';
+import { computed, ref, provide, triggerRef, type HTMLAttributes, type InjectionKey } from 'vue';
 import { cn } from '@/lib/utils';
 import { ObjectComposerItem } from '.';
 import { Button } from '@/components/ui/button';
@@ -55,7 +55,10 @@ const { desk, DeskInjectionKey } = openDesk({
         if (key) current = current[key];
       }
       const lastKey = path[path.length - 1];
-      if (lastKey) current[lastKey] = value;
+      if (lastKey) {
+        current[lastKey] = value;
+        triggerRef(model); // Force reactivity update
+      }
     },
     deleteValue: (path: string[]) => {
       let current: any = model.value;
@@ -70,6 +73,7 @@ const { desk, DeskInjectionKey } = openDesk({
         } else {
           delete current[lastKey];
         }
+        triggerRef(model); // Force reactivity update
       }
     },
     addValue: (path: string[], key: string, value: any) => {
@@ -81,6 +85,21 @@ const { desk, DeskInjectionKey } = openDesk({
         current.push(value);
       } else {
         current[key] = value;
+      }
+      triggerRef(model); // Force reactivity update
+    },
+    updateKey: (path: string[], newKey: string) => {
+      const parent = path.length > 1 ? path.slice(0, -1) : [];
+      const oldKey = path[path.length - 1];
+      let current: any = model.value;
+      for (const key of parent) {
+        current = current[key];
+      }
+      if (current && oldKey && !Array.isArray(current) && oldKey !== newKey) {
+        const value = current[oldKey];
+        delete current[oldKey];
+        current[newKey] = value;
+        triggerRef(model); // Force reactivity update
       }
     },
     startEdit: (path: string[]) => {

@@ -99,40 +99,7 @@ const readonlyData = ref({
         <Separator class="my-4" />
 
         <ObjectComposerItem>
-          <template #default="{ itemKey, value, valueType }">
-            <div class="flex items-center gap-2">
-              <span class="flex items-center gap-1.5">
-                <span v-if="valueType === 'string'" class="text-red-500"
-                  >📝</span
-                >
-                <span v-else-if="valueType === 'number'" class="text-blue-500"
-                  >🔢</span
-                >
-                <span
-                  v-else-if="valueType === 'boolean'"
-                  class="text-purple-500"
-                  >✓</span
-                >
-                <span v-else class="text-gray-500">📦</span>
-                <span class="font-mono text-sm">{{ itemKey }}</span>
-              </span>
-              <span class="text-muted-foreground">=</span>
-
-              <span
-                class="px-2 py-0.5 rounded-md text-xs font-medium"
-                :class="{
-                  'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300':
-                    valueType === 'string',
-                  'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300':
-                    valueType === 'number',
-                  'bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300':
-                    valueType === 'boolean',
-                }"
-              >
-                {{ typeof value === "string" ? `"${value}"` : String(value) }}
-              </span>
-            </div>
-          </template>
+          <ObjectComposerField />
         </ObjectComposerItem>
       </ObjectComposer>
     </div>
@@ -199,6 +166,7 @@ import {
   computed,
   ref,
   provide,
+  triggerRef,
   type HTMLAttributes,
   type InjectionKey,
 } from "vue";
@@ -254,7 +222,10 @@ const { desk, DeskInjectionKey } = openDesk({
         if (key) current = current[key];
       }
       const lastKey = path[path.length - 1];
-      if (lastKey) current[lastKey] = value;
+      if (lastKey) {
+        current[lastKey] = value;
+        triggerRef(model);
+      }
     },
     deleteValue: (path: string[]) => {
       let current: any = model.value;
@@ -269,6 +240,7 @@ const { desk, DeskInjectionKey } = openDesk({
         } else {
           delete current[lastKey];
         }
+        triggerRef(model);
       }
     },
     addValue: (path: string[], key: string, value: any) => {
@@ -280,6 +252,21 @@ const { desk, DeskInjectionKey } = openDesk({
         current.push(value);
       } else {
         current[key] = value;
+      }
+      triggerRef(model);
+    },
+    updateKey: (path: string[], newKey: string) => {
+      const parent = path.length > 1 ? path.slice(0, -1) : [];
+      const oldKey = path[path.length - 1];
+      let current: any = model.value;
+      for (const key of parent) {
+        current = current[key];
+      }
+      if (current && oldKey && !Array.isArray(current) && oldKey !== newKey) {
+        const value = current[oldKey];
+        delete current[oldKey];
+        current[newKey] = value;
+        triggerRef(model);
       }
     },
     startEdit: (path: string[]) => {
@@ -347,54 +334,201 @@ const props = defineProps<ObjectComposerDescriptionProps>();
 
 ```vue [src/components/ui/object-composer/ObjectComposerField.vue]
 <script setup lang="ts">
-import { inject } from "vue";
+import { inject, computed, ref, type ComputedRef } from "vue";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/Input";
+import { Check, X, Edit, Plus, Trash } from "lucide-vue-next";
 import type { CheckInDesk } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
 
-interface SlotProps {
-  itemKey: string;
-  value: any;
-  valueType: string;
-  displayValue: string;
-  isExpandable: boolean;
-  isEditing: boolean;
-  editKey: string;
-  editValue: string;
+interface ObjectComposerFieldProps {
+  asChild?: boolean;
 }
 
-defineProps<SlotProps>();
+const props = defineProps<ObjectComposerFieldProps>();
 
-defineSlots<{
-  default?: (props: SlotProps) => any;
-}>();
+const itemContext = inject<{
+  desk: CheckInDesk<any>;
+  itemKey: ComputedRef<string>;
+  value: ComputedRef<any>;
+  valueType: ComputedRef<string>;
+  displayValue: ComputedRef<string>;
+  isExpandable: ComputedRef<boolean>;
+  isEditing: ComputedRef<boolean>;
+  isInArray: ComputedRef<boolean>;
+  currentPath: ComputedRef<string[]>;
+  handleStartEdit: () => void;
+  handleCancelEdit: () => void;
+  saveEdit: (editKey: string, editValue: string) => void;
+  deleteItem: () => void;
+  addChild: () => void;
+}>("objectComposerItemContext");
 
-const itemDesk = inject<{ desk: CheckInDesk<any> }>("objectComposerItemDesk");
+const editKey = ref("");
+const editValue = ref<string>("");
 
-if (itemDesk) {
-}
+const initEditValues = () => {
+  if (!itemContext) return;
+
+  editKey.value = itemContext.itemKey.value;
+
+  editValue.value =
+    itemContext.valueType.value === "string"
+      ? itemContext.value.value
+      : JSON.stringify(itemContext.value.value);
+};
+
+const slotProps = computed(() => ({
+  itemKey: itemContext?.itemKey.value,
+  value: itemContext?.value.value,
+  valueType: itemContext?.valueType.value,
+  displayValue: itemContext?.displayValue.value,
+  isExpandable: itemContext?.isExpandable.value,
+  isEditing: itemContext?.isEditing.value,
+  desk: itemContext?.desk,
+  itemDesk: itemContext?.desk,
+  handleStartEdit: () => {
+    initEditValues();
+    itemContext?.handleStartEdit();
+  },
+  handleCancelEdit: itemContext?.handleCancelEdit,
+  deleteItem: itemContext?.deleteItem,
+  addChild: itemContext?.addChild,
+}));
+
+const handleSaveEdit = () => {
+  if (!itemContext) return;
+  itemContext.saveEdit(editKey.value, editValue.value);
+};
+
+const handleEditStart = () => {
+  initEditValues();
+  itemContext?.handleStartEdit();
+};
 </script>
 
 <template>
-  <slot v-bind="$props">
-    <div class="flex items-center gap-1.5">
-      <span class="font-medium text-foreground">{{ itemKey }}</span>
+  <slot v-if="asChild" v-bind="slotProps" />
+
+  <div
+    v-else-if="itemContext?.isEditing?.value"
+    class="flex items-center gap-2 p-3 rounded-md border bg-background w-full"
+  >
+    <template v-if="!itemContext?.isInArray?.value">
+      <Input
+        v-model="editKey"
+        class="flex-none w-32"
+        placeholder="Clé"
+        type="text"
+        @keyup.enter="handleSaveEdit"
+        @keyup.esc="itemContext?.handleCancelEdit"
+      />
+      <span
+        v-if="!itemContext?.isExpandable?.value"
+        class="text-muted-foreground"
+        >:</span
+      >
+    </template>
+
+    <Input
+      v-if="!itemContext?.isExpandable?.value"
+      v-model="editValue"
+      class="flex-1"
+      placeholder="Valeur"
+      type="text"
+      @keyup.enter="handleSaveEdit"
+      @keyup.esc="itemContext?.handleCancelEdit"
+    />
+    <div class="flex ml-auto">
+      <Button
+        variant="ghost"
+        size="icon"
+        title="Sauvegarder"
+        @click="handleSaveEdit"
+      >
+        <Check :size="14" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        title="Annuler"
+        @click="itemContext?.handleCancelEdit"
+      >
+        <X :size="14" />
+      </Button>
+    </div>
+  </div>
+
+  <div v-else class="flex items-center w-full group">
+    <div class="flex-1 flex items-center gap-1.5">
+      <span class="font-medium text-foreground">{{
+        itemContext?.itemKey.value
+      }}</span>
       <span class="text-muted-foreground">:</span>
       <span
         :class="
           cn({
-            'text-red-600 dark:text-red-400': valueType === 'string',
-            'text-blue-600 dark:text-blue-400': valueType === 'number',
-            'text-purple-600 dark:text-purple-400': valueType === 'boolean',
-            'text-muted-foreground italic': valueType === 'null',
+            'text-red-600 dark:text-red-400':
+              itemContext?.valueType.value === 'string',
+            'text-blue-600 dark:text-blue-400':
+              itemContext?.valueType.value === 'number',
+            'text-purple-600 dark:text-purple-400':
+              itemContext?.valueType.value === 'boolean',
+            'text-muted-foreground italic':
+              itemContext?.valueType.value === 'null',
             'text-muted-foreground italic text-sm':
-              valueType === 'object' || valueType === 'array',
+              itemContext?.valueType.value === 'object' ||
+              itemContext?.valueType.value === 'array',
           })
         "
       >
-        {{ displayValue }}
+        {{ itemContext?.displayValue.value }}
       </span>
     </div>
-  </slot>
+
+    <div
+      class="flex ml-auto opacity-0 group-hover:opacity-100 transition-opacity"
+    >
+      <Button
+        v-if="!itemContext?.isExpandable.value"
+        variant="ghost"
+        size="icon"
+        title="Éditer"
+        @click="handleEditStart"
+      >
+        <Edit :size="14" />
+      </Button>
+
+      <Button
+        v-if="itemContext?.isExpandable.value && !itemContext?.isInArray.value"
+        variant="ghost"
+        size="icon"
+        title="Éditer la clé"
+        @click="handleEditStart"
+      >
+        <Edit :size="14" />
+      </Button>
+
+      <Button
+        v-if="itemContext?.isExpandable.value"
+        variant="ghost"
+        size="icon"
+        title="Ajouter un enfant"
+        @click="itemContext?.addChild"
+      >
+        <Plus :size="14" />
+      </Button>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        title="Supprimer"
+        @click="itemContext?.deleteItem"
+      >
+        <Trash :size="14" />
+      </Button>
+    </div>
+  </div>
 </template>
 ```
 
@@ -416,15 +550,13 @@ import {
   onMounted,
 } from "vue";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/Input";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ChevronRight, Trash } from "lucide-vue-next";
+import { ChevronRight } from "lucide-vue-next";
 import {
   useCheckIn,
   type CheckInDesk,
@@ -465,8 +597,9 @@ const props = withDefaults(defineProps<ObjectComposerItemProps>(), {
   isInArray: false,
 });
 
-defineSlots<{
-  default(props: SlotProps): any;
+const slots = defineSlots<{
+  field?: () => any;
+  default?: (props: SlotProps) => any;
 }>();
 
 const composerDesk = inject<{
@@ -513,19 +646,43 @@ const deskResult = props.itemKey
 const desk = deskResult?.desk;
 
 const editingPath = desk ? (desk as any).editingPath : ref(null);
-const updateValueInDesk = desk ? (desk as any).updateValue : () => {};
-const deleteValueInDesk = desk ? (desk as any).deleteValue : () => {};
-const addValueInDesk = desk ? (desk as any).addValue : () => {};
-const startEditInDesk = desk ? (desk as any).startEdit : () => {};
-const cancelEditInDesk = desk ? (desk as any).cancelEdit : () => {};
+const updateValueInDesk = desk
+  ? (desk as any).updateValue
+  : () => console.warn("No desk available");
+const deleteValueInDesk = desk
+  ? (desk as any).deleteValue
+  : () => console.warn("No desk available");
+const addValueInDesk = desk
+  ? (desk as any).addValue
+  : () => console.warn("No desk available");
+const updateKeyInDesk = desk
+  ? (desk as any).updateKey
+  : () => console.warn("No desk available");
+const startEditInDesk = desk
+  ? (desk as any).startEdit
+  : () => console.warn("No desk available");
+const cancelEditInDesk = desk
+  ? (desk as any).cancelEdit
+  : () => console.warn("No desk available");
 
-if (desk) {
-  provide("objectComposerItemDesk", { desk });
-}
+provide("objectComposerItemContext", {
+  desk,
+  itemKey: computed(() => props.itemKey),
+  value: computed(() => props.value),
+  valueType: computed(() => valueType.value),
+  displayValue: computed(() => displayValue.value),
+  isExpandable: computed(() => isExpandable.value),
+  isEditing: computed(() => isEditing.value),
+  isInArray: computed(() => props.isInArray),
+  currentPath: computed(() => currentPath.value),
+  handleStartEdit,
+  handleCancelEdit,
+  saveEdit,
+  deleteItem,
+  addChild,
+});
 
 const accordionValue = ref<string>("item-1");
-const editKey = ref(props.itemKey || "");
-const editValue = ref<string>("");
 
 const isEditing = computed(() => {
   if (!editingPath.value) return false;
@@ -575,38 +732,46 @@ const displayValue = computed(() => {
 
 function handleStartEdit() {
   if (!props.itemKey) return;
-  editKey.value = props.itemKey;
-  editValue.value =
-    valueType.value === "string" ? props.value : JSON.stringify(props.value);
   startEditInDesk(currentPath.value);
 }
 
 function handleCancelEdit() {
   if (!props.itemKey) return;
-  editKey.value = props.itemKey;
   cancelEditInDesk();
 }
 
-function saveEdit() {
+function saveEdit(newKey: string, newValueStr: string) {
   let newValue: any;
 
   try {
     if (valueType.value === "object" || valueType.value === "array") {
-      newValue = JSON.parse(editValue.value);
+      newValue = JSON.parse(newValueStr);
     } else if (valueType.value === "number") {
-      newValue = Number(editValue.value);
+      newValue = Number(newValueStr);
+      if (isNaN(newValue)) {
+        throw new Error("Valeur numérique invalide");
+      }
     } else if (valueType.value === "boolean") {
-      newValue = editValue.value === "true";
+      newValue = newValueStr === "true";
     } else if (valueType.value === "null") {
       newValue = null;
     } else {
-      newValue = editValue.value;
+      newValue = newValueStr;
     }
 
     updateValueInDesk(currentPath.value, newValue);
+
+    if (newKey !== props.itemKey && !props.isInArray && newKey.trim() !== "") {
+      updateKeyInDesk(currentPath.value, newKey);
+    }
+
     cancelEditInDesk();
   } catch (e) {
-    console.error("Invalid value", e);
+    console.error("Invalid value:", e);
+
+    alert(
+      `Erreur de sauvegarde: ${e instanceof Error ? e.message : "Valeur invalide"}`,
+    );
   }
 }
 
@@ -632,8 +797,8 @@ function addChild() {
       :path="path"
       :is-in-array="Array.isArray(composerDesk.model.value)"
     >
-      <template v-if="$slots.default" #default="slotProps">
-        <slot v-bind="slotProps" />
+      <template v-if="slots.field" #field>
+        <slot name="field" />
       </template>
     </ObjectComposerItem>
   </template>
@@ -643,134 +808,19 @@ function addChild() {
     data-slot="object-composer-item"
     :class="
       cn(
-        'group select-none',
+        'select-none',
         !isEditing && 'hover:bg-accent border-l border-border relative',
         props.class,
       )
     "
   >
-    <div v-if="!isEditing" class="flex items-center w-full">
+    <div class="flex items-center w-full">
       <div class="w-8" />
 
       <div class="flex-1">
-        <ObjectComposerField
-          :item-key="itemKey || ''"
-          :value="value"
-          :value-type="valueType"
-          :display-value="displayValue"
-          :is-expandable="isExpandable"
-          :is-editing="isEditing"
-          :edit-key="editKey"
-          :edit-value="editValue"
-        >
-          <template v-if="$slots.default" #default="slotProps">
-            <slot v-bind="slotProps" />
-          </template>
-        </ObjectComposerField>
-      </div>
-
-      <div
-        class="flex ml-auto opacity-0 group-hover:opacity-100 transition-opacity"
-      >
-        <Button
-          variant="ghost"
-          size="icon"
-          title="Éditer"
-          @click="handleStartEdit"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path
-              d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
-            />
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-          </svg>
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          title="Supprimer"
-          @click="deleteItem"
-        >
-          <Trash class="w-4 h-4" />
-        </Button>
-      </div>
-    </div>
-
-    <div
-      v-else
-      class="flex items-center gap-2 p-3 rounded-md border bg-background w-full ml-0"
-    >
-      <template v-if="!isInArray">
-        <Input
-          v-model="editKey"
-          class="flex-none w-32"
-          placeholder="Clé"
-          type="text"
-          @keyup.enter="saveEdit"
-          @keyup.esc="handleCancelEdit"
-        />
-        <span class="text-muted-foreground">:</span>
-      </template>
-      <Input
-        v-model="editValue"
-        class="flex-1"
-        placeholder="Valeur"
-        type="text"
-        @keyup.enter="saveEdit"
-        @keyup.esc="handleCancelEdit"
-      />
-      <div class="flex ml-auto">
-        <Button
-          variant="ghost"
-          size="icon"
-          title="Sauvegarder"
-          @click="saveEdit"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          title="Annuler"
-          @click="handleCancelEdit"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </Button>
+        <slot name="field">
+          <ObjectComposerField />
+        </slot>
       </div>
     </div>
   </div>
@@ -780,13 +830,10 @@ function addChild() {
     v-model="accordionValue"
     type="single"
     collapsible
-    :class="cn(!isEditing)"
+    :class="cn()"
   >
     <AccordionItem value="item-1" class="border-b-0">
-      <div
-        v-if="!isEditing"
-        class="group flex items-center w-full hover:bg-accent select-none"
-      >
+      <div class="flex items-center w-full hover:bg-accent select-none">
         <AccordionTrigger
           class="flex-none hover:no-underline select-none py-1! px-2"
         >
@@ -798,158 +845,11 @@ function addChild() {
         </AccordionTrigger>
 
         <div class="flex-1">
-          <ObjectComposerField
-            :item-key="itemKey || ''"
-            :value="value"
-            :value-type="valueType"
-            :display-value="displayValue"
-            :is-expandable="isExpandable"
-            :is-editing="isEditing"
-            :edit-key="editKey"
-            :edit-value="editValue"
-          >
-            <template v-if="$slots.default" #default="slotProps">
-              <slot v-bind="slotProps" />
-            </template>
-          </ObjectComposerField>
-        </div>
-
-        <div
-          class="flex ml-auto opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <Button
-            v-if="!isInArray"
-            variant="ghost"
-            size="icon"
-            title="Éditer"
-            @click="handleStartEdit"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
-              />
-              <path
-                d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
-              />
-            </svg>
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            title="Ajouter un enfant"
-            @click="addChild"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-          </Button>
-
-          <Button
-            v-if="!isEditing"
-            variant="ghost"
-            size="icon"
-            title="Supprimer"
-            @click="deleteItem"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polyline points="3 6 5 6 21 6" />
-              <path
-                d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-              />
-            </svg>
-          </Button>
+          <slot name="field">
+            <ObjectComposerField />
+          </slot>
         </div>
       </div>
-
-      <div
-        v-if="!isInArray && isEditing"
-        class="flex items-center gap-2 p-3 rounded-md border bg-background w-full"
-      >
-        <Input
-          v-model="editKey"
-          class="flex-1"
-          placeholder="Clé"
-          type="text"
-          @keyup.enter="saveEdit"
-          @keyup.esc="handleCancelEdit"
-        />
-        <div class="flex ml-auto">
-          <Button
-            variant="ghost"
-            size="icon"
-            title="Sauvegarder"
-            @click="saveEdit"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            title="Annuler"
-            @click="handleCancelEdit"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </Button>
-        </div>
-      </div>
-
       <AccordionContent class="pb-0!">
         <div class="border-l border-border ml-4">
           <ObjectComposerItem
@@ -961,8 +861,8 @@ function addChild() {
             :path="currentPath"
             :is-in-array="valueType === 'array'"
           >
-            <template v-if="$slots.default" #default="childSlotProps">
-              <slot v-bind="childSlotProps" />
+            <template v-if="slots.field" #field>
+              <slot name="field" />
             </template>
           </ObjectComposerItem>
         </div>
@@ -2249,24 +2149,33 @@ export const useCheckIn = <
   ### Props
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `itemKey`{.primary .text-primary} | `string` | - |  |
-| `value`{.primary .text-primary} | `any` | - |  |
-| `valueType`{.primary .text-primary} | `string` | - |  |
-| `displayValue`{.primary .text-primary} | `string` | - |  |
-| `isExpandable`{.primary .text-primary} | `boolean` | - |  |
-| `isEditing`{.primary .text-primary} | `boolean` | - |  |
-| `editKey`{.primary .text-primary} | `string` | - |  |
-| `editValue`{.primary .text-primary} | `string` | - |  |
+| `asChild`{.primary .text-primary} | `boolean` | - |  |
 
   ### Slots
 | Name | Description |
 |------|-------------|
-| `default`{.primary .text-primary} | — |
+| `default`{.primary .text-primary} | Custom field via asChild pattern (Radix UI style) |
 
   ### Inject
 | Key | Default | Type | Description |
 |-----|--------|------|-------------|
-| `objectComposerItemDesk`{.primary .text-primary} | — | — | Inject desk from parent ObjectComposerItem (like FormField pattern) |
+| `objectComposerItemContext`{.primary .text-primary} | — | — | Inject desk from parent ObjectComposerItem (useCheckIn pattern) |
+
+  ### Child Components
+
+  `Input`{.primary .text-primary}
+
+  `Button`{.primary .text-primary}
+
+  `Check`{.primary .text-primary}
+
+  `X`{.primary .text-primary}
+
+  `Edit`{.primary .text-primary}
+
+  `Plus`{.primary .text-primary}
+
+  `Trash`{.primary .text-primary}
 
 ---
 
@@ -2302,12 +2211,27 @@ export const useCheckIn = <
   ### Slots
 | Name | Description |
 |------|-------------|
-| `default`{.primary .text-primary} | — |
+| `field`{.primary .text-primary} | — |
 
   ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-| `objectComposerItemDesk`{.primary .text-primary} | `{ desk }` | `any` | — |
+| `objectComposerItemContext`{.primary .text-primary} | `{
+  desk,
+  itemKey: computed(() => props.itemKey),
+  value: computed(() => props.value),
+  valueType: computed(() => valueType.value),
+  displayValue: computed(() => displayValue.value),
+  isExpandable: computed(() => isExpandable.value),
+  isEditing: computed(() => isEditing.value),
+  isInArray: computed(() => props.isInArray),
+  currentPath: computed(() => currentPath.value),
+  handleStartEdit,
+  handleCancelEdit,
+  saveEdit,
+  deleteItem,
+  addChild,
+}` | `any` | Always provide context to ObjectComposerField (even without desk for auto-iterate mode) |
 
   ### Inject
 | Key | Default | Type | Description |
@@ -2319,12 +2243,6 @@ export const useCheckIn = <
   `ObjectComposerItem`{.primary .text-primary}
 
   `ObjectComposerField`{.primary .text-primary}
-
-  `Button`{.primary .text-primary}
-
-  `Trash`{.primary .text-primary}
-
-  `Input`{.primary .text-primary}
 
   `Accordion`{.primary .text-primary}
 
@@ -2404,6 +2322,156 @@ export const useCheckIn = <
   `ObjectComposerItem`{.primary .text-primary}
 
 ---
+
+  ## Examples
+  ::hr-underline
+  ::
+
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <custom-field-demo />
+  :::
+
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
+```vue
+<script setup lang="ts">
+import { ref } from "vue";
+import {
+  ObjectComposer,
+  ObjectComposerHeader,
+  ObjectComposerTitle,
+  ObjectComposerDescription,
+  ObjectComposerItem,
+  ObjectComposerField,
+} from "@/components/ui/object-composer";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+
+const serverMetrics = ref({
+  cpu: 78,
+  memory: 4096,
+  disk: 512000,
+  uptime: 86400,
+  requests: 15234,
+  errors: 12,
+  latency: 45.6,
+  healthy: true,
+  region: "us-east-1",
+  environment: "production",
+});
+
+const userProfile = ref({
+  username: "john.doe",
+  email: "john@example.com",
+  role: "admin",
+  active: true,
+  loginCount: 342,
+  lastLogin: "2025-11-15",
+  permissions: ["read", "write", "delete"],
+});
+</script>
+
+<template>
+  <div class="space-y-8">
+    <div>
+      <h2 class="text-2xl font-bold mb-2">
+        Custom ObjectComposerField (asChild Pattern)
+      </h2>
+      <p class="text-muted-foreground mb-6">
+        Use the
+        <code class="bg-muted px-1 rounded text-sm">asChild</code> pattern to
+        replace ObjectComposerField rendering. Data flows via useCheckIn (desk
+        context) - no props needed!
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="border rounded-lg p-4 bg-card">
+        <ObjectComposer v-model="serverMetrics">
+          <ObjectComposerHeader>
+            <ObjectComposerTitle>
+              <span class="flex items-center gap-2">
+                <span class="text-green-600">●</span>
+                Server Metrics
+              </span>
+            </ObjectComposerTitle>
+          </ObjectComposerHeader>
+          <Separator class="mb-4" />
+          <ObjectComposerItem>
+            <ObjectComposerField
+              as-child
+              v-slot="{ itemKey, displayValue, itemDesk }"
+            >
+              <div
+                class="flex items-center gap-2 p-2 rounded hover:bg-accent/50 transition-colors"
+              >
+                <span class="font-mono text-xs text-muted-foreground min-w-24">
+                  {{ itemKey }}
+                </span>
+
+                <Badge class="font-mono text-xs">
+                  {{ displayValue }}
+                </Badge>
+
+                <span
+                  v-if="itemDesk"
+                  class="ml-auto text-xs text-green-600"
+                  title="Desk connected"
+                >
+                  ●
+                </span>
+              </div>
+            </ObjectComposerField>
+          </ObjectComposerItem>
+        </ObjectComposer>
+      </div>
+
+      <div class="border rounded-lg p-4 bg-card">
+        <ObjectComposer v-model="userProfile">
+          <ObjectComposerHeader>
+            <ObjectComposerTitle>
+              <span class="flex items-center gap-2">
+                <span class="text-blue-600">●</span>
+                User Profile
+              </span>
+            </ObjectComposerTitle>
+          </ObjectComposerHeader>
+          <Separator class="mb-4" />
+          <ObjectComposerItem>
+            <ObjectComposerField
+              as-child
+              v-slot="{ itemKey, displayValue, itemDesk }"
+            >
+              <div
+                class="flex items-center gap-2 p-2 rounded hover:bg-accent/50 transition-colors"
+              >
+                <span class="font-mono text-xs text-muted-foreground min-w-24">
+                  {{ itemKey }}
+                </span>
+
+                <Badge class="font-mono text-xs">
+                  {{ displayValue }}
+                </Badge>
+
+                <span
+                  v-if="itemDesk"
+                  class="ml-auto text-xs text-green-600"
+                  title="Desk connected"
+                >
+                  ●
+                </span>
+              </div>
+            </ObjectComposerField>
+          </ObjectComposerItem>
+        </ObjectComposer>
+      </div>
+    </div>
+  </div>
+</template>
+```
+  :::
+::
 
 ::tip
 You can copy and adapt this template for any component documentation.
