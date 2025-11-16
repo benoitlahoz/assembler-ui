@@ -1,71 +1,56 @@
 <script setup lang="ts">
-import { computed, inject, type InjectionKey } from 'vue';
-import { useCheckIn, type CheckInDesk } from '../useCheckIn';
-
-interface ToolItemData {
-  label: string;
-  icon?: string;
-  type: 'button' | 'toggle' | 'separator';
-  active?: boolean;
-  disabled?: boolean;
-}
-
-// Récupère le Symbol du desk fourni par le parent
-const toolbarDesk = inject<{ deskSymbol: InjectionKey<CheckInDesk<ToolItemData>> }>('toolbarDesk')!;
+import { computed, inject } from 'vue';
+import { useCheckIn } from '../../../composables/use-check-in/useCheckIn';
+import type { ToolbarItemData } from './ToolbarContainer.vue';
 
 const props = withDefaults(
   defineProps<{
-    id: string;
+    /** Identifiant unique du bouton */
+    id?: string;
+    /** Label du bouton */
     label: string;
+    /** Icône optionnelle */
     icon?: string;
-    type: 'button' | 'toggle';
+    /** Bouton désactivé */
     disabled?: boolean;
+    /** Groupe d'appartenance: start, main, end */
+    group?: 'start' | 'main' | 'end';
+    /** Position dans le groupe (pour tri) */
+    position?: number;
   }>(),
   {
-    disabled: false,
+    group: 'main',
+    position: 0,
   }
 );
 
-const { checkIn, memoizedId } = useCheckIn<ToolItemData>();
+const emit = defineEmits<{
+  click: [];
+}>();
 
-const { desk } = checkIn(toolbarDesk?.deskSymbol, {
-  required: true,
+// Récupérer le contexte fourni par useCheckIn().createDesk()
+// Dans ToolbarContainer, on a utilisé provide(DeskInjectionKey, desk)
+// On peut donc injecter n'importe quel desk avec ce type
+const desk = inject<any>('__check_in_desk__' as any);
+
+// Utiliser useCheckIn pour s'enregistrer dans le desk fourni par ToolbarContainer
+const {} = useCheckIn<ToolbarItemData>().checkIn(desk, {
   autoCheckIn: true,
-  id: memoizedId(props.id),
+  id: props.id,
+  group: props.group,
+  position: props.position,
   data: () => ({
     label: props.label,
     icon: props.icon,
-    type: props.type,
     disabled: props.disabled,
+    onClick: () => emit('click'),
   }),
   watchData: true,
+  shallow: true,
 });
-
-const isActive = computed(() => {
-  if (props.type !== 'toggle') return false;
-  return desk && 'isActive' in desk ? desk.isActive(props.id) : false;
-});
-
-const handleClick = () => {
-  if (!props.disabled && desk && 'handleClick' in desk) {
-    desk.handleClick(props.id, props.type);
-  }
-};
 </script>
 
 <template>
-  <button
-    :class="[
-      'px-3 py-2 rounded font-medium text-sm transition-colors',
-      'hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed',
-      isActive && 'bg-primary text-primary-foreground hover:bg-primary/90',
-      !isActive && 'bg-background text-foreground',
-    ]"
-    :disabled="disabled"
-    :title="label"
-    @click="handleClick"
-  >
-    <span v-if="icon" class="text-base">{{ icon }}</span>
-    <span v-else>{{ label }}</span>
-  </button>
+  <!-- Ce composant ne rend rien, il s'enregistre juste auprès du ToolbarContainer -->
+  <!-- Le rendu est géré par ToolbarContainer qui lit les items enregistrés -->
 </template>

@@ -8,6 +8,9 @@
  *
  * @demo AirportDemo
  * @demo FormDemo
+ * @demo BreadcrumbDemo
+ * @demo ContextMenuDemo
+ * @demo NotificationDemo
  * @demo AccordionDemo
  * @demo TabsDemo
  * @demo ToolbarDemo

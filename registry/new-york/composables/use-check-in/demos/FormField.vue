@@ -1,98 +1,82 @@
 <script setup lang="ts">
-import { computed, ref, watch, inject, type InjectionKey } from 'vue';
-import { useCheckIn, type CheckInDesk } from '../useCheckIn';
-
-interface FormFieldData {
-  name: string;
-  label: string;
-  value: any;
-  required?: boolean;
-}
-
-// Récupère le Symbol du desk fourni par le parent
-const formDesk = inject<{ deskSymbol: InjectionKey<CheckInDesk<FormFieldData>> }>('formDesk')!;
+import { inject, ref, watch } from 'vue';
+import { useCheckIn } from '../../../composables/use-check-in/useCheckIn';
+import type { FormFieldData } from './FormContainer.vue';
 
 const props = withDefaults(
   defineProps<{
+    /** Identifiant unique du champ */
+    id?: string;
+    /** Nom du champ (pour les valeurs du formulaire) */
     name: string;
+    /** Label du champ */
     label: string;
-    type?: 'text' | 'email' | 'textarea';
+    /** Type de champ */
+    type?: 'text' | 'email' | 'password' | 'textarea' | 'select';
+    /** Valeur initiale */
+    modelValue?: any;
+    /** Champ requis */
     required?: boolean;
-    placeholder?: string;
-    value?: any;
+    /** Position dans le formulaire */
+    position?: number;
+    /** Fonction de validation custom */
+    validate?: (value: any) => string | undefined;
   }>(),
   {
     type: 'text',
-    required: false,
-    value: '',
+    position: 0,
   }
 );
 
-const { checkIn, memoizedId } = useCheckIn<FormFieldData>();
+const emit = defineEmits<{
+  'update:modelValue': [value: any];
+}>();
 
-const { desk } = checkIn(formDesk?.deskSymbol, {
-  required: true,
-  autoCheckIn: true,
-  id: memoizedId(props.name),
-  data: () => ({
-    name: props.name,
-    label: props.label,
-    value: props.value,
-    required: props.required,
-  }),
-});
+// Injecter le desk
+const desk = inject<any>('__check_in_desk__' as any);
 
-const localValue = ref(props.value);
+// État local de la valeur
+const localValue = ref(props.modelValue);
 
+// Émettre les changements
+const handleChange = (value: any) => {
+  localValue.value = value;
+  emit('update:modelValue', value);
+};
+
+// Watch les changements externes de modelValue
 watch(
-  localValue,
+  () => props.modelValue,
   (newValue) => {
-    if (desk && 'updateValue' in desk) {
-      desk.updateValue(props.name, newValue);
-    }
-  },
-  { immediate: true }
+    localValue.value = newValue;
+  }
 );
 
-const error = computed(() => {
-  if (!desk || !('getError' in desk)) return '';
-  return desk.getError(props.name) || '';
+// S'enregistrer auprès du desk
+const { updateSelf } = useCheckIn<FormFieldData>().checkIn(desk, {
+  autoCheckIn: true,
+  id: props.id || props.name,
+  group: 'field',
+  position: props.position,
+  data: () => ({
+    name: props.name,
+    value: localValue.value,
+    label: props.label,
+    type: props.type,
+    required: props.required,
+    validate: props.validate,
+    onChange: handleChange,
+  }),
+  watchData: true,
+  shallow: true,
 });
 
-const inputId = computed(() => `field-${props.name}`);
+// Watch localValue pour mettre à jour le desk
+watch(localValue, () => {
+  updateSelf();
+});
 </script>
 
 <template>
-  <div class="space-y-2">
-    <label :for="inputId" class="block text-sm font-medium">
-      {{ label }}
-      <span v-if="required" class="text-red-500">*</span>
-    </label>
-
-    <input
-      v-if="type !== 'textarea'"
-      :id="inputId"
-      v-model="localValue"
-      :type="type"
-      :placeholder="placeholder"
-      :class="[
-        'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2',
-        error ? 'border-red-500 focus:ring-red-500' : 'border-border focus:ring-primary',
-      ]"
-    />
-
-    <textarea
-      v-else
-      :id="inputId"
-      v-model="localValue"
-      :placeholder="placeholder"
-      rows="4"
-      :class="[
-        'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2',
-        error ? 'border-red-500 focus:ring-red-500' : 'border-border focus:ring-primary',
-      ]"
-    />
-
-    <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
-  </div>
+  <!-- Transparent - ne rend rien -->
 </template>

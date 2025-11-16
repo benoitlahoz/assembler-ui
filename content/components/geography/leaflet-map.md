@@ -8453,8 +8453,10 @@ export interface CheckInDesk<
   checkOut: (id: string | number) => boolean;
   get: (id: string | number) => CheckInItem<T> | undefined;
   getAll: (options?: {
-    sortBy?: keyof T | "timestamp";
+    sortBy?: keyof T | "timestamp" | string;
     order?: "asc" | "desc";
+    group?: string;
+    filter?: (item: CheckInItem<T>) => boolean;
   }) => CheckInItem<T>[];
   update: (id: string | number, data: Partial<T>) => boolean;
   has: (id: string | number) => boolean;
@@ -8475,6 +8477,16 @@ export interface CheckInDesk<
     event: DeskEventType,
     payload: { id?: string | number; data?: T },
   ) => void;
+
+  getGroup: (
+    group: string,
+    options?: {
+      sortBy?: keyof T | "timestamp" | string;
+      order?: "asc" | "desc";
+    },
+  ) => ComputedRef<CheckInItem<T>[]>;
+
+  items: ComputedRef<CheckInItem<T>[]>;
 }
 
 export interface CheckInDeskOptions<
@@ -8512,6 +8524,12 @@ export interface CheckInOptions<T = any> {
   watchCondition?: (() => boolean) | Ref<boolean>;
 
   meta?: Record<string, any>;
+
+  group?: string;
+
+  position?: number;
+
+  priority?: number;
 
   debug?: boolean;
 }
@@ -8654,28 +8672,45 @@ export const useCheckIn = <
 
     const get = (id: string | number) => registry.value.get(id);
 
-    const getAll = (sortOptions?: {
-      sortBy?: keyof T | "timestamp";
+    const getAll = (options?: {
+      sortBy?: keyof T | "timestamp" | string;
       order?: "asc" | "desc";
+      group?: string;
+      filter?: (item: CheckInItem<T>) => boolean;
     }) => {
-      const items = Array.from(registry.value.values());
+      let items = Array.from(registry.value.values());
 
-      if (!sortOptions?.sortBy) return items;
+      if (options?.group !== undefined) {
+        items = items.filter((item) => item.meta?.group === options.group);
+      }
+
+      if (options?.filter) {
+        items = items.filter(options.filter);
+      }
+
+      if (!options?.sortBy) return items;
 
       return items.sort((a, b) => {
         let aVal: any, bVal: any;
 
-        if (sortOptions.sortBy === "timestamp") {
+        if (options.sortBy === "timestamp") {
           aVal = a.timestamp || 0;
           bVal = b.timestamp || 0;
+        } else if (
+          typeof options.sortBy === "string" &&
+          options.sortBy.startsWith("meta.")
+        ) {
+          const metaKey = options.sortBy.slice(5);
+          aVal = a.meta?.[metaKey];
+          bVal = b.meta?.[metaKey];
         } else {
-          const key = sortOptions.sortBy as keyof T;
+          const key = options.sortBy as keyof T;
           aVal = a.data[key];
           bVal = b.data[key];
         }
 
         const comparison = aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-        return sortOptions.order === "desc" ? -comparison : comparison;
+        return options.order === "desc" ? -comparison : comparison;
       });
     };
 
@@ -8745,6 +8780,18 @@ export const useCheckIn = <
       updates.forEach(({ id, data }) => update(id, data));
     };
 
+    const getGroup = (
+      group: string,
+      sortOptions?: {
+        sortBy?: keyof T | "timestamp" | string;
+        order?: "asc" | "desc";
+      },
+    ) => {
+      return computed(() => getAll({ ...sortOptions, group }));
+    };
+
+    const items = computed(() => getAll());
+
     return {
       registry,
       checkIn,
@@ -8760,6 +8807,8 @@ export const useCheckIn = <
       on,
       off,
       emit,
+      getGroup,
+      items,
     };
   };
 
@@ -8848,7 +8897,21 @@ export const useCheckIn = <
       if (isCheckedIn.value) return true;
 
       const data = await getCurrentData();
-      const success = desk!.checkIn(itemId, data, checkInOptions?.meta);
+
+      const meta = {
+        ...checkInOptions?.meta,
+        ...(checkInOptions?.group !== undefined && {
+          group: checkInOptions.group,
+        }),
+        ...(checkInOptions?.position !== undefined && {
+          position: checkInOptions.position,
+        }),
+        ...(checkInOptions?.priority !== undefined && {
+          priority: checkInOptions.priority,
+        }),
+      };
+
+      const success = desk!.checkIn(itemId, data, meta);
 
       if (success) {
         isCheckedIn.value = true;

@@ -530,8 +530,10 @@ export interface CheckInDesk<
   checkOut: (id: string | number) => boolean;
   get: (id: string | number) => CheckInItem<T> | undefined;
   getAll: (options?: {
-    sortBy?: keyof T | "timestamp";
+    sortBy?: keyof T | "timestamp" | string;
     order?: "asc" | "desc";
+    group?: string;
+    filter?: (item: CheckInItem<T>) => boolean;
   }) => CheckInItem<T>[];
   update: (id: string | number, data: Partial<T>) => boolean;
   has: (id: string | number) => boolean;
@@ -552,6 +554,16 @@ export interface CheckInDesk<
     event: DeskEventType,
     payload: { id?: string | number; data?: T },
   ) => void;
+
+  getGroup: (
+    group: string,
+    options?: {
+      sortBy?: keyof T | "timestamp" | string;
+      order?: "asc" | "desc";
+    },
+  ) => ComputedRef<CheckInItem<T>[]>;
+
+  items: ComputedRef<CheckInItem<T>[]>;
 }
 
 export interface CheckInDeskOptions<
@@ -589,6 +601,12 @@ export interface CheckInOptions<T = any> {
   watchCondition?: (() => boolean) | Ref<boolean>;
 
   meta?: Record<string, any>;
+
+  group?: string;
+
+  position?: number;
+
+  priority?: number;
 
   debug?: boolean;
 }
@@ -731,28 +749,45 @@ export const useCheckIn = <
 
     const get = (id: string | number) => registry.value.get(id);
 
-    const getAll = (sortOptions?: {
-      sortBy?: keyof T | "timestamp";
+    const getAll = (options?: {
+      sortBy?: keyof T | "timestamp" | string;
       order?: "asc" | "desc";
+      group?: string;
+      filter?: (item: CheckInItem<T>) => boolean;
     }) => {
-      const items = Array.from(registry.value.values());
+      let items = Array.from(registry.value.values());
 
-      if (!sortOptions?.sortBy) return items;
+      if (options?.group !== undefined) {
+        items = items.filter((item) => item.meta?.group === options.group);
+      }
+
+      if (options?.filter) {
+        items = items.filter(options.filter);
+      }
+
+      if (!options?.sortBy) return items;
 
       return items.sort((a, b) => {
         let aVal: any, bVal: any;
 
-        if (sortOptions.sortBy === "timestamp") {
+        if (options.sortBy === "timestamp") {
           aVal = a.timestamp || 0;
           bVal = b.timestamp || 0;
+        } else if (
+          typeof options.sortBy === "string" &&
+          options.sortBy.startsWith("meta.")
+        ) {
+          const metaKey = options.sortBy.slice(5);
+          aVal = a.meta?.[metaKey];
+          bVal = b.meta?.[metaKey];
         } else {
-          const key = sortOptions.sortBy as keyof T;
+          const key = options.sortBy as keyof T;
           aVal = a.data[key];
           bVal = b.data[key];
         }
 
         const comparison = aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-        return sortOptions.order === "desc" ? -comparison : comparison;
+        return options.order === "desc" ? -comparison : comparison;
       });
     };
 
@@ -822,6 +857,18 @@ export const useCheckIn = <
       updates.forEach(({ id, data }) => update(id, data));
     };
 
+    const getGroup = (
+      group: string,
+      sortOptions?: {
+        sortBy?: keyof T | "timestamp" | string;
+        order?: "asc" | "desc";
+      },
+    ) => {
+      return computed(() => getAll({ ...sortOptions, group }));
+    };
+
+    const items = computed(() => getAll());
+
     return {
       registry,
       checkIn,
@@ -837,6 +884,8 @@ export const useCheckIn = <
       on,
       off,
       emit,
+      getGroup,
+      items,
     };
   };
 
@@ -925,7 +974,21 @@ export const useCheckIn = <
       if (isCheckedIn.value) return true;
 
       const data = await getCurrentData();
-      const success = desk!.checkIn(itemId, data, checkInOptions?.meta);
+
+      const meta = {
+        ...checkInOptions?.meta,
+        ...(checkInOptions?.group !== undefined && {
+          group: checkInOptions.group,
+        }),
+        ...(checkInOptions?.position !== undefined && {
+          position: checkInOptions.position,
+        }),
+        ...(checkInOptions?.priority !== undefined && {
+          priority: checkInOptions.priority,
+        }),
+      };
+
+      const success = desk!.checkIn(itemId, data, meta);
 
       if (success) {
         isCheckedIn.value = true;
@@ -1159,154 +1222,728 @@ Return both the desk and its symbol for children to inject
   :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
-import { ref, computed, provide } from "vue";
-import { useCheckIn } from "../useCheckIn";
+import { ref } from "vue";
+import FormContainer from "./FormContainer.vue";
 import FormField from "./FormField.vue";
 
-interface FormFieldData {
-  name: string;
-  label: string;
-  value: any;
-  required?: boolean;
-}
-
-const { createDesk } = useCheckIn<FormFieldData>();
-
-const formData = ref<Record<string, any>>({});
-const errors = ref<Record<string, string>>({});
-
-const { desk, DeskInjectionKey: formDesk } = createDesk({
-  context: {
-    updateValue: (name: string, value: any) => {
-      formData.value[name] = value;
-      if (errors.value[name]) {
-        delete errors.value[name];
-        errors.value = { ...errors.value };
-      }
-    },
-    getValue: (name: string) => formData.value[name],
-    setError: (name: string, error: string) => {
-      errors.value[name] = error;
-      errors.value = { ...errors.value };
-    },
-    getError: (name: string) => errors.value[name],
-  },
-  onCheckIn: (id, data) => {
-    if (data.value !== undefined) {
-      formData.value[data.name] = data.value;
-    }
-    return true;
-  },
-  onCheckOut: (id) => {
-    return true;
-  },
+const formData = ref({
+  name: "",
+  email: "",
+  password: "",
+  message: "",
 });
 
-provide("formDesk", { deskSymbol: formDesk });
+const submittedData = ref<Record<string, any> | null>(null);
 
-const allFields = computed(() => desk.getAll());
-const isValid = computed(() => Object.keys(errors.value).length === 0);
-const fieldCount = computed(() => allFields.value.length);
-
-const validateForm = () => {
-  errors.value = {};
-  allFields.value.forEach((field) => {
-    if (field.data.required && !formData.value[field.data.name]) {
-      errors.value[field.data.name] = `${field.data.label} is required`;
-    }
-  });
-  errors.value = { ...errors.value };
-  return Object.keys(errors.value).length === 0;
+const handleSubmit = (values: Record<string, any>) => {
+  console.log("Form submitted:", values);
+  submittedData.value = values;
 };
 
-const handleSubmit = () => {
-  if (validateForm()) {
-    alert(`Form submitted!\n\n${JSON.stringify(formData.value, null, 2)}`);
+const handleChange = (values: Record<string, any>) => {
+  console.log("Form changed:", values);
+};
+
+const validateEmail = (value: string) => {
+  if (value && !value.includes("@")) {
+    return "Invalid email format";
+  }
+};
+
+const validatePassword = (value: string) => {
+  if (value && value.length < 6) {
+    return "Password must be at least 6 characters";
   }
 };
 
 const resetForm = () => {
-  formData.value = {};
-  errors.value = {};
+  formData.value = {
+    name: "",
+    email: "",
+    password: "",
+    message: "",
+  };
+  submittedData.value = null;
 };
 </script>
 
 <template>
-  <div class="w-full max-w-2xl mx-auto space-y-6 p-6">
-    <div class="space-y-2">
-      <h2 class="text-2xl font-bold">useCheckIn - Form Demo</h2>
-      <p class="text-muted-foreground">
-        Form fields check in with parent for centralized state management
-      </p>
-    </div>
+  <div class="demo-container">
+    <h2>Form Pattern Demo</h2>
+    <p>
+      Les FormField s'enregistrent et sont validés automatiquement par le
+      FormContainer.
+    </p>
 
-    <div class="flex items-center gap-4 p-4 bg-muted rounded-lg">
-      <span class="text-sm font-medium">{{ fieldCount }} fields</span>
-      <span
-        :class="[
-          'text-sm font-medium',
-          isValid ? 'text-green-600' : 'text-red-600',
-        ]"
-      >
-        {{ isValid ? "✓ Valid" : "✗ Invalid" }}
-      </span>
-    </div>
-
-    <form
-      @submit.prevent="handleSubmit"
-      class="space-y-4 p-6 border border-border rounded-lg"
-    >
+    <FormContainer @submit="handleSubmit" @change="handleChange">
       <FormField
-        name="username"
-        label="Username"
-        :required="true"
-        placeholder="Enter username"
+        id="name"
+        name="name"
+        label="Name"
+        type="text"
+        v-model="formData.name"
+        required
+        :position="1"
       />
+
       <FormField
+        id="email"
         name="email"
         label="Email"
         type="email"
-        :required="true"
-        placeholder="email@example.com"
+        v-model="formData.email"
+        required
+        :position="2"
+        :validate="validateEmail"
       />
+
       <FormField
-        name="bio"
-        label="Bio"
-        type="textarea"
-        placeholder="Tell us about yourself..."
+        id="password"
+        name="password"
+        label="Password"
+        type="password"
+        v-model="formData.password"
+        required
+        :position="3"
+        :validate="validatePassword"
       />
 
-      <div class="flex gap-2 pt-4">
-        <button
-          type="submit"
-          class="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
-        >
-          Submit
-        </button>
-        <button
-          type="button"
-          @click="resetForm"
-          class="px-4 py-2 bg-secondary text-secondary-foreground rounded hover:bg-secondary/80"
-        >
-          Reset
-        </button>
-      </div>
-    </form>
+      <FormField
+        id="message"
+        name="message"
+        label="Message"
+        type="textarea"
+        v-model="formData.message"
+        :position="4"
+      />
 
-    <div class="p-4 bg-muted rounded-lg space-y-2">
-      <h4 class="font-semibold">Debug Info</h4>
-      <div class="text-sm space-y-1">
-        <pre class="bg-background p-2 rounded">{{
-          JSON.stringify(formData, null, 2)
-        }}</pre>
-        <p>
-          <strong>Fields:</strong>
-          {{ allFields.map((f) => f.data.name).join(", ") }}
-        </p>
+      <template #actions>
+        <div class="actions">
+          <button type="submit" class="submit-button">Submit</button>
+          <button type="button" class="reset-button" @click="resetForm">
+            Reset
+          </button>
+        </div>
+      </template>
+    </FormContainer>
+
+    <div class="state-display">
+      <h3>Current Form Data:</h3>
+      <pre>{{ JSON.stringify(formData, null, 2) }}</pre>
+
+      <div v-if="submittedData" class="submitted-data">
+        <h3>Submitted Data:</h3>
+        <pre>{{ JSON.stringify(submittedData, null, 2) }}</pre>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.demo-container {
+  padding: 2rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+h2 {
+  margin-bottom: 0.5rem;
+}
+
+p {
+  color: #6b7280;
+  margin-bottom: 2rem;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.submit-button,
+.reset-button {
+  padding: 0.5rem 1.5rem;
+  border: none;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.submit-button {
+  background: #3b82f6;
+  color: white;
+}
+
+.submit-button:hover {
+  background: #2563eb;
+}
+
+.reset-button {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.reset-button:hover {
+  background: #d1d5db;
+}
+
+.state-display {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 0.375rem;
+}
+
+.state-display h3 {
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.state-display pre {
+  font-family: monospace;
+  font-size: 0.75rem;
+  margin: 0.5rem 0;
+  white-space: pre-wrap;
+  background: white;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+}
+
+.submitted-data {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+</style>
+```
+  :::
+::
+
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <breadcrumb-demo />
+  :::
+
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
+```vue
+<script setup lang="ts">
+import { ref } from "vue";
+import BreadcrumbContainer from "./BreadcrumbContainer.vue";
+import BreadcrumbItem from "./BreadcrumbItem.vue";
+
+const currentPath = ref(["home", "projects", "assembler-ui"]);
+
+const navigateTo = (segment: string) => {
+  console.log("Navigate to:", segment);
+  const index = currentPath.value.indexOf(segment);
+  if (index !== -1) {
+    currentPath.value = currentPath.value.slice(0, index + 1);
+  }
+};
+
+const goToRoot = () => {
+  currentPath.value = ["home"];
+};
+
+const addLevel = () => {
+  currentPath.value.push(`level-${currentPath.value.length}`);
+};
+</script>
+
+<template>
+  <div class="demo-container">
+    <h2>Breadcrumb Pattern Demo</h2>
+    <p>
+      Les BreadcrumbItem s'enregistrent automatiquement dans le
+      BreadcrumbContainer.
+    </p>
+
+    <BreadcrumbContainer separator="›">
+      <BreadcrumbItem
+        v-for="(segment, index) in currentPath"
+        :key="segment"
+        :id="segment"
+        :label="segment.charAt(0).toUpperCase() + segment.slice(1)"
+        :href="`/${currentPath.slice(0, index + 1).join('/')}`"
+        :icon="index === 0 ? '🏠' : undefined"
+        :disabled="index === currentPath.length - 1"
+        :position="index"
+        @click="navigateTo(segment)"
+      />
+    </BreadcrumbContainer>
+
+    <div class="controls">
+      <button @click="goToRoot" class="control-button">Reset to Home</button>
+      <button @click="addLevel" class="control-button">Add Level</button>
+    </div>
+
+    <div class="state-display">
+      <h3>Current Path:</h3>
+      <pre>{{ currentPath.join(" > ") }}</pre>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.demo-container {
+  padding: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+h2 {
+  margin-bottom: 0.5rem;
+}
+
+p {
+  color: #6b7280;
+  margin-bottom: 2rem;
+}
+
+.controls {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.control-button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.25rem;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.control-button:hover {
+  background: #f3f4f6;
+}
+
+.state-display {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 0.375rem;
+}
+
+.state-display h3 {
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.state-display pre {
+  font-family: monospace;
+  margin: 0;
+  white-space: pre-wrap;
+}
+</style>
+```
+  :::
+::
+
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <context-menu-demo />
+  :::
+
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
+```vue
+<script setup lang="ts">
+import { ref } from "vue";
+import ContextMenuProvider from "./ContextMenuProvider.vue";
+import ContextMenuItem from "./ContextMenuItem.vue";
+
+const showMenu = ref(false);
+const menuX = ref(0);
+const menuY = ref(0);
+const lastAction = ref("");
+
+const handleContextMenu = (event: MouseEvent) => {
+  event.preventDefault();
+  menuX.value = event.clientX;
+  menuY.value = event.clientY;
+  showMenu.value = true;
+};
+
+const closeMenu = () => {
+  showMenu.value = false;
+};
+
+const handleAction = (action: string) => {
+  lastAction.value = action;
+  console.log("Action:", action);
+};
+</script>
+
+<template>
+  <div class="demo-container">
+    <h2>Context Menu Pattern Demo</h2>
+    <p>
+      Faites un clic droit dans la zone ci-dessous pour afficher le menu
+      contextuel.
+    </p>
+
+    <ContextMenuProvider
+      :show="showMenu"
+      :x="menuX"
+      :y="menuY"
+      @close="closeMenu"
+    >
+      <ContextMenuItem
+        id="open"
+        label="Open"
+        icon="📂"
+        :position="1"
+        @click="handleAction('open')"
+      />
+      <ContextMenuItem
+        id="copy"
+        label="Copy"
+        icon="📋"
+        :position="2"
+        @click="handleAction('copy')"
+      />
+      <ContextMenuItem
+        id="paste"
+        label="Paste"
+        icon="📄"
+        :position="3"
+        @click="handleAction('paste')"
+      />
+      <ContextMenuItem
+        id="rename"
+        label="Rename"
+        icon="✏️"
+        :position="4"
+        @click="handleAction('rename')"
+      />
+
+      <ContextMenuItem
+        id="delete"
+        label="Delete"
+        icon="🗑️"
+        danger
+        :position="1"
+        @click="handleAction('delete')"
+      />
+    </ContextMenuProvider>
+
+    <div class="context-area" @contextmenu="handleContextMenu">
+      Right-click here to open the context menu
+    </div>
+
+    <div class="state-display">
+      <h3>Last Action:</h3>
+      <pre>{{ lastAction || "None" }}</pre>
+      <p class="hint">Menu Position: ({{ menuX }}, {{ menuY }})</p>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.demo-container {
+  padding: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+h2 {
+  margin-bottom: 0.5rem;
+}
+
+p {
+  color: #6b7280;
+  margin-bottom: 2rem;
+}
+
+.context-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  border: 2px dashed #d1d5db;
+  border-radius: 0.375rem;
+  background: #f9fafb;
+  cursor: context-menu;
+  user-select: none;
+  transition: all 0.2s;
+  font-size: 1.125rem;
+  color: #6b7280;
+}
+
+.context-area:hover {
+  border-color: #9ca3af;
+  background: #f3f4f6;
+}
+
+.state-display {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 0.375rem;
+}
+
+.state-display h3 {
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.state-display pre {
+  font-family: monospace;
+  margin: 0.5rem 0;
+}
+
+.state-display .hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+</style>
+```
+  :::
+::
+
+::tabs
+  :::tabs-item{icon="i-lucide-eye" label="Preview"}
+    <notification-demo />
+  :::
+
+  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
+```vue
+<script setup lang="ts">
+import { ref } from "vue";
+import NotificationProvider from "./NotificationProvider.vue";
+import NotificationItem from "./NotificationItem.vue";
+
+const notifications = ref<
+  Array<{
+    id: string;
+    message: string;
+    type: "info" | "success" | "warning" | "error";
+    duration: number;
+  }>
+>([]);
+
+let notificationCounter = 0;
+
+const addNotification = (
+  type: "info" | "success" | "warning" | "error",
+  duration = 5000,
+) => {
+  const id = `notif-${++notificationCounter}`;
+  const messages = {
+    info: "This is an informational message",
+    success: "Operation completed successfully!",
+    warning: "Please be careful with this action",
+    error: "An error occurred during the operation",
+  };
+
+  notifications.value.push({
+    id,
+    message: messages[type],
+    type,
+    duration,
+  });
+
+  if (duration > 0) {
+    setTimeout(() => {
+      const index = notifications.value.findIndex((n) => n.id === id);
+      if (index !== -1) {
+        notifications.value.splice(index, 1);
+      }
+    }, duration);
+  }
+};
+
+const handleDismiss = (id: string) => {
+  console.log("Notification dismissed:", id);
+  const index = notifications.value.findIndex((n) => n.id === id);
+  if (index !== -1) {
+    notifications.value.splice(index, 1);
+  }
+};
+</script>
+
+<template>
+  <div class="demo-container">
+    <h2>Notification Pattern Demo</h2>
+    <p>
+      Les NotificationItem s'enregistrent et sont auto-removed après leur durée.
+    </p>
+
+    <NotificationProvider position="top-right">
+      <NotificationItem
+        v-for="notif in notifications"
+        :key="notif.id"
+        :id="notif.id"
+        :message="notif.message"
+        :type="notif.type"
+        :duration="notif.duration"
+        @dismiss="handleDismiss(notif.id)"
+      />
+    </NotificationProvider>
+
+    <div class="controls">
+      <h3>Add Notification:</h3>
+      <div class="button-group">
+        <button @click="addNotification('info')" class="btn btn-info">
+          Info
+        </button>
+        <button @click="addNotification('success')" class="btn btn-success">
+          Success
+        </button>
+        <button @click="addNotification('warning')" class="btn btn-warning">
+          Warning
+        </button>
+        <button @click="addNotification('error')" class="btn btn-error">
+          Error
+        </button>
+      </div>
+      <button @click="addNotification('info', 0)" class="btn btn-persistent">
+        Add Persistent (no auto-dismiss)
+      </button>
+    </div>
+
+    <div class="state-display">
+      <h3>Active Notifications:</h3>
+      <pre>{{ notifications.length }} notification(s)</pre>
+      <ul v-if="notifications.length > 0">
+        <li v-for="notif in notifications" :key="notif.id">
+          {{ notif.type }}: {{ notif.message }}
+        </li>
+      </ul>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.demo-container {
+  padding: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+h2 {
+  margin-bottom: 0.5rem;
+}
+
+p {
+  color: #6b7280;
+  margin-bottom: 2rem;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.controls h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin: 0;
+}
+
+.button-group {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: white;
+  font-weight: 500;
+}
+
+.btn-info {
+  background: #3b82f6;
+}
+
+.btn-info:hover {
+  background: #2563eb;
+}
+
+.btn-success {
+  background: #22c55e;
+}
+
+.btn-success:hover {
+  background: #16a34a;
+}
+
+.btn-warning {
+  background: #f59e0b;
+}
+
+.btn-warning:hover {
+  background: #d97706;
+}
+
+.btn-error {
+  background: #ef4444;
+}
+
+.btn-error:hover {
+  background: #dc2626;
+}
+
+.btn-persistent {
+  background: #6b7280;
+}
+
+.btn-persistent:hover {
+  background: #4b5563;
+}
+
+.state-display {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 0.375rem;
+}
+
+.state-display h3 {
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.state-display pre {
+  font-family: monospace;
+  margin: 0.5rem 0;
+}
+
+.state-display ul {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.state-display li {
+  font-family: monospace;
+  font-size: 0.875rem;
+  margin: 0.25rem 0;
+}
+</style>
 ```
   :::
 ::
@@ -1599,146 +2236,154 @@ const activeTabData = computed(() => desk.get(activeTab.value));
   :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
-import { ref, computed, provide } from "vue";
-import { useCheckIn } from "../useCheckIn";
+import { ref } from "vue";
+import ToolbarContainer from "./ToolbarContainer.vue";
 import ToolbarButton from "./ToolbarButton.vue";
-import ToolbarSeparator from "./ToolbarSeparator.vue";
 
-interface ToolItemData {
-  label: string;
-  icon?: string;
-  type: "button" | "toggle" | "separator";
-  active?: boolean;
-  disabled?: boolean;
-}
+const showSearch = ref(false);
+const isEditMode = ref(false);
 
-const { createDesk } = useCheckIn<ToolItemData>();
+const handleSave = () => {
+  console.log("Save clicked");
+};
 
-const activeTool = ref<string | number | null>(null);
-const clickHistory = ref<Array<{ id: string | number; time: number }>>([]);
+const handleUndo = () => {
+  console.log("Undo clicked");
+};
 
-const { desk, DeskInjectionKey: toolbarDesk } = createDesk({
-  context: {
-    activeTool,
-    handleClick: (id: string | number, type: "button" | "toggle") => {
-      clickHistory.value.push({ id, time: Date.now() });
+const handleRedo = () => {
+  console.log("Redo clicked");
+};
 
-      if (type === "toggle") {
-        activeTool.value = activeTool.value === id ? null : id;
-      } else {
-        console.log(`Button clicked: ${id}`);
-      }
-    },
-    isActive: (id: string | number) => activeTool.value === id,
-  },
-  onCheckIn: (id, data) => {
-    return true;
-  },
-});
+const toggleSearch = () => {
+  showSearch.value = !showSearch.value;
+};
 
-provide("toolbarDesk", { deskSymbol: toolbarDesk });
+const toggleEditMode = () => {
+  isEditMode.value = !isEditMode.value;
+};
 
-const allTools = computed(() =>
-  desk.getAll().sort((a, b) => String(a.id).localeCompare(String(b.id))),
-);
-
-const lastAction = computed(() => {
-  const last = clickHistory.value[clickHistory.value.length - 1];
-  if (!last) return "None";
-  const tool = desk.get(last.id);
-  return `${tool?.data.label || last.id} at ${new Date(last.time).toLocaleTimeString()}`;
-});
+const handleSettings = () => {
+  console.log("Settings clicked");
+};
 </script>
 
 <template>
-  <div class="w-full max-w-4xl mx-auto space-y-6 p-6">
-    <div class="space-y-2">
-      <h2 class="text-2xl font-bold">useCheckIn - Toolbar Demo</h2>
-      <p class="text-muted-foreground">
-        Dynamic toolbar with buttons, toggles, and separators managed by
-        check-in desk
-      </p>
-    </div>
+  <div class="demo-container">
+    <h2>Toolbar Pattern Demo</h2>
+    <p>
+      Les ToolbarButton sont dans le slot de ToolbarContainer et s'enregistrent
+      automatiquement.
+    </p>
 
-    <div class="border border-border rounded-lg p-2 bg-background">
-      <div class="flex items-center gap-1">
-        <ToolbarButton id="new" label="New" icon="📄" type="button" />
-        <ToolbarButton id="open" label="Open" icon="📂" type="button" />
-        <ToolbarButton id="save" label="Save" icon="💾" type="button" />
+    <ToolbarContainer desk-id="main-toolbar">
+      <ToolbarButton
+        id="save"
+        label="Save"
+        icon="💾"
+        group="start"
+        :position="1"
+        @click="handleSave"
+      />
+      <ToolbarButton
+        id="undo"
+        label="Undo"
+        icon="↶"
+        group="start"
+        :position="2"
+        :disabled="!isEditMode"
+        @click="handleUndo"
+      />
+      <ToolbarButton
+        id="redo"
+        label="Redo"
+        icon="↷"
+        group="start"
+        :position="3"
+        :disabled="!isEditMode"
+        @click="handleRedo"
+      />
 
-        <ToolbarSeparator id="sep1" />
+      <ToolbarButton
+        id="edit"
+        :label="isEditMode ? 'View Mode' : 'Edit Mode'"
+        icon="✏️"
+        group="main"
+        :position="1"
+        @click="toggleEditMode"
+      />
 
-        <ToolbarButton id="bold" label="Bold" icon="B" type="toggle" />
-        <ToolbarButton id="italic" label="Italic" icon="I" type="toggle" />
-        <ToolbarButton
-          id="underline"
-          label="Underline"
-          icon="U"
-          type="toggle"
-        />
+      <ToolbarButton
+        id="search"
+        :label="showSearch ? 'Hide Search' : 'Search'"
+        icon="🔍"
+        group="end"
+        :position="1"
+        @click="toggleSearch"
+      />
+      <ToolbarButton
+        id="settings"
+        label="Settings"
+        icon="⚙️"
+        group="end"
+        :position="2"
+        @click="handleSettings"
+      />
+    </ToolbarContainer>
 
-        <ToolbarSeparator id="sep2" />
-
-        <ToolbarButton
-          id="align-left"
-          label="Align Left"
-          icon="⬅️"
-          type="toggle"
-        />
-        <ToolbarButton
-          id="align-center"
-          label="Align Center"
-          icon="⏸️"
-          type="toggle"
-        />
-        <ToolbarButton
-          id="align-right"
-          label="Align Right"
-          icon="➡️"
-          type="toggle"
-        />
-
-        <ToolbarSeparator id="sep3" />
-
-        <ToolbarButton
-          id="disabled"
-          label="Disabled"
-          icon="🚫"
-          type="button"
-          :disabled="true"
-        />
-      </div>
-    </div>
-
-    <div class="grid grid-cols-2 gap-4">
-      <div class="p-4 border border-border rounded-lg">
-        <h3 class="font-semibold mb-2">Active Toggles</h3>
-        <div class="text-sm text-muted-foreground">
-          {{ activeTool ? desk.get(activeTool)?.data.label : "None" }}
-        </div>
-      </div>
-
-      <div class="p-4 border border-border rounded-lg">
-        <h3 class="font-semibold mb-2">Last Action</h3>
-        <div class="text-sm text-muted-foreground">
-          {{ lastAction }}
-        </div>
-      </div>
-    </div>
-
-    <div class="p-4 bg-muted rounded-lg space-y-2">
-      <h4 class="font-semibold">Debug Info</h4>
-      <div class="text-sm space-y-1">
-        <p><strong>Total Tools:</strong> {{ allTools.length }}</p>
-        <p>
-          <strong>Registered IDs:</strong>
-          {{ allTools.map((t) => t.id).join(", ") }}
-        </p>
-        <p><strong>Click History:</strong> {{ clickHistory.length }} clicks</p>
-      </div>
+    <div class="state-display">
+      <h3>État actuel:</h3>
+      <ul>
+        <li>Edit Mode: {{ isEditMode ? "ON" : "OFF" }}</li>
+        <li>Search: {{ showSearch ? "Visible" : "Hidden" }}</li>
+        <li>Undo/Redo: {{ isEditMode ? "Enabled" : "Disabled" }}</li>
+      </ul>
     </div>
   </div>
 </template>
+
+<style scoped>
+.demo-container {
+  padding: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+h2 {
+  margin-bottom: 0.5rem;
+}
+
+p {
+  color: #6b7280;
+  margin-bottom: 2rem;
+}
+
+.state-display {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 0.375rem;
+}
+
+.state-display h3 {
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.state-display ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.state-display li {
+  padding: 0.25rem 0;
+  font-family: monospace;
+}
+</style>
 ```
   :::
 ::
