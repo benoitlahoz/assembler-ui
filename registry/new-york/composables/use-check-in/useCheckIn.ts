@@ -17,13 +17,10 @@ import {
   ref,
   provide,
   inject,
-  onMounted,
-  onBeforeUnmount,
   onUnmounted,
   watch,
   computed,
   triggerRef,
-  nextTick,
   type InjectionKey,
   type Ref,
   type ComputedRef,
@@ -56,7 +53,7 @@ export interface CheckInDesk<T = any, TContext extends Record<string, any> = {}>
    * Utilisez plutôt les helpers : get(), getAll(), ou le computed getRegistry().
    * Map n'est pas réactive, seul le Ref l'est.
    */
-  registry: Ref<Map<string | number, CheckInItem<T>>>;
+  readonly registry: Ref<Map<string | number, CheckInItem<T>>>;
   checkIn: (id: string | number, data: T, meta?: Record<string, any>) => boolean;
   checkOut: (id: string | number) => boolean;
   get: (id: string | number) => CheckInItem<T> | undefined;

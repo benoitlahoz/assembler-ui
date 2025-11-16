@@ -1720,13 +1720,10 @@ import {
   ref,
   provide,
   inject,
-  onMounted,
-  onBeforeUnmount,
   onUnmounted,
   watch,
   computed,
   triggerRef,
-  nextTick,
   type InjectionKey,
   type Ref,
   type ComputedRef,
@@ -1751,7 +1748,7 @@ export interface CheckInDesk<
   T = any,
   TContext extends Record<string, any> = {},
 > {
-  registry: Ref<Map<string | number, CheckInItem<T>>>;
+  readonly registry: Ref<Map<string | number, CheckInItem<T>>>;
   checkIn: (
     id: string | number,
     data: T,
