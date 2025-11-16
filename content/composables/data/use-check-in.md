@@ -540,11 +540,8 @@ export interface CheckInDesk<
   updateMany: (
     updates: Array<{ id: string | number; data: Partial<T> }>,
   ) => void;
-
   on: (event: DeskEventType, callback: DeskEventCallback<T>) => () => void;
-
   off: (event: DeskEventType, callback: DeskEventCallback<T>) => void;
-
   emit: (
     event: DeskEventType,
     payload: { id?: string | number; data?: T },
@@ -556,37 +553,23 @@ export interface CheckInDeskOptions<
   TContext extends Record<string, any> = {},
 > {
   context?: TContext;
-
   onBeforeCheckIn?: (id: string | number, data: T) => void | boolean;
-
   onCheckIn?: (id: string | number, data: T) => void;
-
   onBeforeCheckOut?: (id: string | number) => void | boolean;
-
   onCheckOut?: (id: string | number) => void;
-
   debug?: boolean;
 }
 
 export interface CheckInOptions<T = any> {
   required?: boolean;
-
   autoCheckIn?: boolean;
-
   id?: string | number;
-
   data?: T | (() => T) | (() => Promise<T>);
-
   generateId?: () => string | number;
-
   watchData?: boolean;
-
   shallow?: boolean;
-
   watchCondition?: (() => boolean) | Ref<boolean>;
-
   meta?: Record<string, any>;
-
   debug?: boolean;
 }
 
@@ -837,10 +820,13 @@ export const useCheckIn = <
     };
   };
 
-  const createDesk = (options?: CheckInDeskOptions<T, TContext>) => {
-    const DeskInjectionKey = Symbol("CheckInDesk") as InjectionKey<
-      CheckInDesk<T, TContext> & TContext
-    >;
+  const createDesk = (
+    injectionKey: string = "checkInDesk",
+    options?: CheckInDeskOptions<T, TContext>,
+  ) => {
+    const DeskInjectionKey = Symbol(
+      `CheckInDesk:${injectionKey}`,
+    ) as InjectionKey<CheckInDesk<T, TContext> & TContext>;
     const deskContext = createDeskContext<T, TContext>(options);
 
     const fullContext = {
@@ -850,13 +836,15 @@ export const useCheckIn = <
 
     provide(DeskInjectionKey, fullContext);
 
+    provide(injectionKey, DeskInjectionKey);
+
     if (options?.debug) {
-      Debug("Desk opened with injection key:", DeskInjectionKey.description);
+      Debug("Desk opened with injection key:", injectionKey);
     }
 
     return {
       desk: fullContext,
-      DeskInjectionKey,
+      injectionKey,
     };
   };
 
@@ -867,16 +855,17 @@ export const useCheckIn = <
     > &
       TContext,
   >(
-    parentDeskOrSymbol:
+    parentDeskOrKey:
       | (CheckInDesk<T, TContext> & TContext)
       | InjectionKey<CheckInDesk<T, TContext> & TContext>
+      | string
       | null
       | undefined,
     checkInOptions?: CheckInOptions<T>,
   ) => {
     const debug = checkInOptions?.debug ? Debug : NoOpDebug;
 
-    if (!parentDeskOrSymbol) {
+    if (!parentDeskOrKey) {
       debug("[useCheckIn] No parent desk provided - skipping check-in");
 
       return {
@@ -888,8 +877,8 @@ export const useCheckIn = <
 
     let desk: (CheckInDesk<T, TContext> & TContext) | null | undefined;
 
-    if (typeof parentDeskOrSymbol === "symbol") {
-      desk = inject(parentDeskOrSymbol);
+    if (typeof parentDeskOrKey === "symbol") {
+      desk = inject(parentDeskOrKey);
       if (!desk) {
         debug("[useCheckIn] Could not inject desk from symbol");
 
@@ -899,8 +888,32 @@ export const useCheckIn = <
           updateSelf: () => {},
         };
       }
+    } else if (typeof parentDeskOrKey === "string") {
+      const injectionKey =
+        inject<InjectionKey<CheckInDesk<T, TContext> & TContext>>(
+          parentDeskOrKey,
+        );
+      if (!injectionKey) {
+        debug("[useCheckIn] Could not find desk with key:", parentDeskOrKey);
+
+        return {
+          desk: null as TDesk | null,
+          checkOut: () => {},
+          updateSelf: () => {},
+        };
+      }
+      desk = inject(injectionKey);
+      if (!desk) {
+        debug("[useCheckIn] Could not inject desk from key:", parentDeskOrKey);
+
+        return {
+          desk: null as TDesk | null,
+          checkOut: () => {},
+          updateSelf: () => {},
+        };
+      }
     } else {
-      desk = parentDeskOrSymbol;
+      desk = parentDeskOrKey;
     }
 
     const itemId = checkInOptions?.id || `item-${Date.now()}-${Math.random()}`;
@@ -1120,7 +1133,7 @@ export const useCheckIn = <
 
   ### Returns
 
-Return both the desk and its symbol for children to inject
+Return the desk and the simple injection key
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -1332,161 +1345,6 @@ p {
 
 ::tabs
   :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <accordion-demo />
-  :::
-
-  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
-```vue
-<script setup lang="ts">
-import { ref, computed, provide } from "vue";
-import { useCheckIn } from "../useCheckIn";
-import AccordionItem from "./AccordionDemoItem.vue";
-
-interface AccordionItemData {
-  title: string;
-  open?: boolean;
-}
-
-const { createDesk } = useCheckIn<AccordionItemData>();
-
-const openItems = ref<Set<string | number>>(new Set());
-const allowMultiple = ref(false);
-
-const { desk, DeskInjectionKey: accordionDesk } = createDesk({
-  context: {
-    openItems,
-    toggle: (id: string | number) => {
-      if (openItems.value.has(id)) {
-        openItems.value.delete(id);
-      } else {
-        if (!allowMultiple.value) {
-          openItems.value.clear();
-        }
-        openItems.value.add(id);
-      }
-
-      openItems.value = new Set(openItems.value);
-    },
-    isOpen: (id: string | number) => openItems.value.has(id),
-  },
-  onCheckIn: (id, data) => {
-    if (data.open) {
-      if (!allowMultiple.value) {
-        openItems.value.clear();
-      }
-      openItems.value.add(id);
-      openItems.value = new Set(openItems.value);
-    }
-    return true;
-  },
-});
-
-provide("accordionDesk", { deskSymbol: accordionDesk });
-
-const itemCount = computed(() => desk.getAll().length);
-</script>
-
-<template>
-  <div class="w-full max-w-2xl mx-auto space-y-6 p-6">
-    <div class="space-y-2">
-      <h2 class="text-2xl font-bold">useCheckIn - Accordion Demo</h2>
-      <p class="text-muted-foreground">
-        Collapsible sections with check-in desk state management
-      </p>
-    </div>
-
-    <div class="flex items-center gap-4 p-4 bg-muted rounded-lg">
-      <label class="flex items-center gap-2">
-        <input v-model="allowMultiple" type="checkbox" class="rounded" />
-        <span class="text-sm font-medium">Allow multiple open</span>
-      </label>
-      <span class="text-sm text-muted-foreground"
-        >{{ itemCount }} items registered</span
-      >
-    </div>
-
-    <div class="border border-border rounded-lg divide-y divide-border">
-      <AccordionItem id="item1" title="What is useCheckIn?" :open="true">
-        <p class="text-muted-foreground">
-          <strong>useCheckIn</strong> is a generic composable for managing
-          parent-child component relationships using Vue's provide/inject
-          pattern. Parent components open a "check-in desk" where children check
-          in with their data, like passengers at an airport.
-        </p>
-      </AccordionItem>
-
-      <AccordionItem id="item2" title="How does it work?">
-        <ul class="space-y-2 text-muted-foreground list-disc list-inside">
-          <li>
-            Parent component opens a check-in desk using
-            <code>createDesk()</code>
-          </li>
-          <li>
-            Child components check in using <code>checkIn()</code> with
-            auto-registration
-          </li>
-          <li>Desk maintains a reactive Map of all checked-in items</li>
-          <li>
-            Changes propagate automatically through Vue's reactivity system
-          </li>
-        </ul>
-      </AccordionItem>
-
-      <AccordionItem id="item3" title="What are the benefits?">
-        <div class="space-y-2 text-muted-foreground">
-          <p><strong>Benefits include:</strong></p>
-          <ul class="list-disc list-inside space-y-1 ml-4">
-            <li>Type-safe with full TypeScript support</li>
-            <li>Auto-cleanup when components unmount</li>
-            <li>Flexible extra context for custom logic</li>
-            <li>Automatic reactivity updates</li>
-            <li>Reusable across different component types</li>
-          </ul>
-        </div>
-      </AccordionItem>
-
-      <AccordionItem id="item4" title="Common use cases">
-        <div class="space-y-2 text-muted-foreground">
-          <p>Common patterns that benefit from this approach:</p>
-          <ul class="list-disc list-inside space-y-1 ml-4">
-            <li>Tabs / Tab Panels</li>
-            <li>Accordions / Collapsible sections</li>
-            <li>Dropdown menus with items</li>
-            <li>Form field registration</li>
-            <li>Wizard steps</li>
-            <li>List items with selection state</li>
-          </ul>
-        </div>
-      </AccordionItem>
-    </div>
-
-    <div class="p-4 bg-muted rounded-lg space-y-2">
-      <h4 class="font-semibold">Debug Info</h4>
-      <div class="text-sm space-y-1">
-        <p>
-          <strong>Open Items:</strong>
-          {{ Array.from(openItems).join(", ") || "None" }}
-        </p>
-        <p><strong>Allow Multiple:</strong> {{ allowMultiple }}</p>
-        <p>
-          <strong>All Items:</strong>
-          {{
-            desk
-              .getAll()
-              .map((i) => `${i.id}: "${i.data.title}"`)
-              .join(", ")
-          }}
-        </p>
-      </div>
-    </div>
-  </div>
-</template>
-```
-  :::
-::
-
-::tabs
-  :::tabs-item{icon="i-lucide-eye" label="Preview"}
     <tabs-demo />
   :::
 
@@ -1606,172 +1464,6 @@ const activeTabData = computed(() => desk.get(activeTab.value));
     </div>
   </div>
 </template>
-```
-  :::
-::
-
-::tabs
-  :::tabs-item{icon="i-lucide-eye" label="Preview"}
-    <toolbar-demo />
-  :::
-
-  :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
-```vue
-<script setup lang="ts">
-import { ref } from "vue";
-import ToolbarContainer from "./ToolbarContainer.vue";
-import ToolbarButton from "./ToolbarButton.vue";
-
-const showSearch = ref(false);
-const isEditMode = ref(false);
-
-const handleSave = () => {
-  console.log("Save clicked");
-};
-
-const handleUndo = () => {
-  console.log("Undo clicked");
-};
-
-const handleRedo = () => {
-  console.log("Redo clicked");
-};
-
-const toggleSearch = () => {
-  showSearch.value = !showSearch.value;
-};
-
-const toggleEditMode = () => {
-  isEditMode.value = !isEditMode.value;
-};
-
-const handleSettings = () => {
-  console.log("Settings clicked");
-};
-</script>
-
-<template>
-  <div class="demo-container">
-    <h2>Toolbar Pattern Demo</h2>
-    <p>
-      Les ToolbarButton sont dans le slot de ToolbarContainer et s'enregistrent
-      automatiquement.
-    </p>
-
-    <ToolbarContainer desk-id="main-toolbar">
-      <ToolbarButton
-        id="save"
-        label="Save"
-        icon="💾"
-        group="start"
-        :position="1"
-        @click="handleSave"
-      />
-      <ToolbarButton
-        id="undo"
-        label="Undo"
-        icon="↶"
-        group="start"
-        :position="2"
-        :disabled="!isEditMode"
-        @click="handleUndo"
-      />
-      <ToolbarButton
-        id="redo"
-        label="Redo"
-        icon="↷"
-        group="start"
-        :position="3"
-        :disabled="!isEditMode"
-        @click="handleRedo"
-      />
-
-      <ToolbarButton
-        id="edit"
-        :label="isEditMode ? 'View Mode' : 'Edit Mode'"
-        icon="✏️"
-        group="main"
-        :position="1"
-        @click="toggleEditMode"
-      />
-
-      <ToolbarButton
-        id="search"
-        :label="showSearch ? 'Hide Search' : 'Search'"
-        icon="🔍"
-        group="end"
-        :position="1"
-        @click="toggleSearch"
-      />
-      <ToolbarButton
-        id="settings"
-        label="Settings"
-        icon="⚙️"
-        group="end"
-        :position="2"
-        @click="handleSettings"
-      />
-    </ToolbarContainer>
-
-    <div class="state-display">
-      <h3>État actuel:</h3>
-      <ul>
-        <li>Edit Mode: {{ isEditMode ? "ON" : "OFF" }}</li>
-        <li>Search: {{ showSearch ? "Visible" : "Hidden" }}</li>
-        <li>Undo/Redo: {{ isEditMode ? "Enabled" : "Disabled" }}</li>
-      </ul>
-    </div>
-  </div>
-</template>
-
-<style scoped>
-.demo-container {
-  padding: 2rem;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  color: hsl(var(--foreground));
-}
-
-p {
-  color: hsl(var(--muted-foreground));
-  margin-bottom: 2rem;
-}
-
-.state-display {
-  margin-top: 2rem;
-  padding: 1rem;
-  background: hsl(var(--muted) / 0.3);
-  border-radius: var(--radius);
-  border: 1px solid hsl(var(--border));
-}
-
-.state-display h3 {
-  margin-bottom: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
-}
-
-.state-display ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.state-display li {
-  padding: 0.25rem 0;
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
-  color: hsl(var(--foreground));
-}
-</style>
 ```
   :::
 ::

@@ -1,43 +1,46 @@
 <script setup lang="ts">
-import { computed, inject, type InjectionKey } from 'vue';
-import { useCheckIn, type CheckInDesk } from '../useCheckIn';
+import { computed, type Ref } from 'vue';
+import { useCheckIn } from '../useCheckIn';
 
 interface TabItemData {
   label: string;
   disabled?: boolean;
-  icon?: string;
 }
 
-// Récupère le Symbol du desk fourni par le parent
-const tabsDesk = inject<{ deskSymbol: InjectionKey<CheckInDesk<TabItemData>> }>('tabsDesk')!;
+interface TabsDeskContext {
+  activeTab: Ref<string>;
+  setActive: (id: string) => void;
+}
 
 const props = withDefaults(
   defineProps<{
     id: string;
     label: string;
     disabled?: boolean;
-    icon?: string;
   }>(),
   {
     disabled: false,
   }
 );
 
-const { checkIn, memoizedId } = useCheckIn<TabItemData>();
+const { checkIn, memoizedId } = useCheckIn<TabItemData, TabsDeskContext>();
 
-const { desk } = checkIn(tabsDesk?.deskSymbol, {
+const { desk } = checkIn('tabsDesk', {
   required: true,
   autoCheckIn: true,
   id: memoizedId(props.id),
   data: () => ({
     label: props.label,
     disabled: props.disabled,
-    icon: props.icon,
   }),
   watchData: true,
 });
 
-const isActive = computed(() => (desk as any)?.activeTab.value === props.id);
+if (!desk) {
+  throw new Error('TabPanel must be used within a tabs desk context');
+}
+
+const isActive = computed(() => desk.activeTab.value === props.id);
 </script>
 
 <template>

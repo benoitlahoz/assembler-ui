@@ -8,9 +8,7 @@
  *
  * @demo AirportDemo
  * @demo FormDemo
- * @demo AccordionDemo
  * @demo TabsDemo
- * @demo ToolbarDemo
  */
 
 import {
@@ -67,49 +65,30 @@ export interface CheckInDesk<T = any, TContext extends Record<string, any> = {}>
   checkInMany: (items: Array<{ id: string | number; data: T; meta?: Record<string, any> }>) => void;
   checkOutMany: (ids: Array<string | number>) => void;
   updateMany: (updates: Array<{ id: string | number; data: Partial<T> }>) => void;
-  /** Écoute un type d'événement */
   on: (event: DeskEventType, callback: DeskEventCallback<T>) => () => void;
-  /** Retire un listener d'événement */
   off: (event: DeskEventType, callback: DeskEventCallback<T>) => void;
-  /** Émet un événement (usage interne principalement) */
   emit: (event: DeskEventType, payload: { id?: string | number; data?: T }) => void;
 }
 
 export interface CheckInDeskOptions<T = any, TContext extends Record<string, any> = {}> {
-  /** Contexte additionnel à merger avec le desk (typé) */
   context?: TContext;
-  /** Callback appelé avant le check-in d'un item */
   onBeforeCheckIn?: (id: string | number, data: T) => void | boolean;
-  /** Callback appelé après le check-in d'un item */
   onCheckIn?: (id: string | number, data: T) => void;
-  /** Callback appelé avant le check-out d'un item */
   onBeforeCheckOut?: (id: string | number) => void | boolean;
-  /** Callback appelé après le check-out d'un item */
   onCheckOut?: (id: string | number) => void;
-  /** Active le mode debug avec logging */
   debug?: boolean;
 }
 
 export interface CheckInOptions<T = any> {
-  /** Lève une erreur si le desk n'existe pas */
   required?: boolean;
-  /** Auto check-in au montage du composant */
   autoCheckIn?: boolean;
-  /** ID de l'item à enregistrer */
   id?: string | number;
-  /** Données de l'item à enregistrer (peut être async) */
   data?: T | (() => T) | (() => Promise<T>);
-  /** Fonction pour générer un ID unique si non fourni */
   generateId?: () => string | number;
-  /** Watch les changements de data pour mettre à jour l'enregistrement */
   watchData?: boolean;
-  /** Watch shallow au lieu de deep (meilleure performance) */
   shallow?: boolean;
-  /** Condition réactive pour check-in/out automatique */
   watchCondition?: (() => boolean) | Ref<boolean>;
-  /** Métadonnées additionnelles */
   meta?: Record<string, any>;
-  /** Active le mode debug avec logging */
   debug?: boolean;
 }
 
@@ -137,13 +116,13 @@ let instanceCounter = 0;
  * ```ts
  * // In parent component - open a desk
  * const { createDesk } = useCheckIn<TabItem, { activeTab: Ref<string> }>();
- * const desk = createDesk({
- *   extraContext: { activeTab: ref('tab1') }
+ * const { desk } = createDesk('tabsDesk', {
+ *   context: { activeTab: ref('tab1') }
  * });
  *
  * // In child component - check in at parent's desk
  * const { checkIn } = useCheckIn<TabItem>();
- * checkIn(desk, {
+ * checkIn('tabsDesk', {
  *   autoCheckIn: true,
  *   id: props.id,
  *   data: () => ({ label: props.label })
@@ -378,8 +357,11 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
    * Opens a check-in desk (parent component provides the desk)
    * @alias createDesk
    */
-  const createDesk = (options?: CheckInDeskOptions<T, TContext>) => {
-    const DeskInjectionKey = Symbol('CheckInDesk') as InjectionKey<
+  const createDesk = (
+    injectionKey: string = 'checkInDesk',
+    options?: CheckInDeskOptions<T, TContext>
+  ) => {
+    const DeskInjectionKey = Symbol(`CheckInDesk:${injectionKey}`) as InjectionKey<
       CheckInDesk<T, TContext> & TContext
     >;
     const deskContext = createDeskContext<T, TContext>(options);
@@ -390,15 +372,17 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
     } as CheckInDesk<T, TContext> & TContext;
 
     provide(DeskInjectionKey, fullContext);
+    // Provide également avec la clé string pour faciliter l'accès
+    provide(injectionKey, DeskInjectionKey);
 
     if (options?.debug) {
-      Debug('Desk opened with injection key:', DeskInjectionKey.description);
+      Debug('Desk opened with injection key:', injectionKey);
     }
 
-    // Return both the desk and its symbol for children to inject
+    // Return the desk and the simple injection key
     return {
       desk: fullContext,
-      DeskInjectionKey,
+      injectionKey,
     };
   };
 
@@ -408,9 +392,10 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
   const checkIn = <
     TDesk extends CheckInDesk<T, TContext> & TContext = CheckInDesk<T, TContext> & TContext,
   >(
-    parentDeskOrSymbol:
+    parentDeskOrKey:
       | (CheckInDesk<T, TContext> & TContext)
       | InjectionKey<CheckInDesk<T, TContext> & TContext>
+      | string
       | null
       | undefined,
     checkInOptions?: CheckInOptions<T>
@@ -418,7 +403,7 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
     const debug = checkInOptions?.debug ? Debug : NoOpDebug;
 
     // Auto-handle null/undefined context - no need for ternary pattern
-    if (!parentDeskOrSymbol) {
+    if (!parentDeskOrKey) {
       debug('[useCheckIn] No parent desk provided - skipping check-in');
 
       return {
@@ -428,11 +413,11 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       };
     }
 
-    // Inject the desk if a symbol is provided
+    // Inject the desk if a symbol or string key is provided
     let desk: (CheckInDesk<T, TContext> & TContext) | null | undefined;
 
-    if (typeof parentDeskOrSymbol === 'symbol') {
-      desk = inject(parentDeskOrSymbol);
+    if (typeof parentDeskOrKey === 'symbol') {
+      desk = inject(parentDeskOrKey);
       if (!desk) {
         debug('[useCheckIn] Could not inject desk from symbol');
 
@@ -442,8 +427,31 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
           updateSelf: () => {},
         };
       }
+    } else if (typeof parentDeskOrKey === 'string') {
+      // Inject le Symbol depuis la clé string
+      const injectionKey =
+        inject<InjectionKey<CheckInDesk<T, TContext> & TContext>>(parentDeskOrKey);
+      if (!injectionKey) {
+        debug('[useCheckIn] Could not find desk with key:', parentDeskOrKey);
+
+        return {
+          desk: null as TDesk | null,
+          checkOut: () => {},
+          updateSelf: () => {},
+        };
+      }
+      desk = inject(injectionKey);
+      if (!desk) {
+        debug('[useCheckIn] Could not inject desk from key:', parentDeskOrKey);
+
+        return {
+          desk: null as TDesk | null,
+          checkOut: () => {},
+          updateSelf: () => {},
+        };
+      }
     } else {
-      desk = parentDeskOrSymbol;
+      desk = parentDeskOrKey;
     }
 
     const itemId = checkInOptions?.id || `item-${Date.now()}-${Math.random()}`;
