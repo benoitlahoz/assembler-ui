@@ -210,7 +210,7 @@ const model = defineModel<Record<string, any> | any[]>({ required: true });
 const editingPath = ref<string[] | null>(null);
 
 const { createDesk } = useCheckIn<ComposerItemData>();
-const { desk, DeskInjectionKey } = createDesk({
+const { desk } = createDesk("objectComposerDesk", {
   context: {
     editingPath,
 
@@ -265,7 +265,7 @@ const { desk, DeskInjectionKey } = createDesk({
   debug: false,
 });
 
-provide("objectComposerDesk", { deskSymbol: DeskInjectionKey, model });
+provide("objectComposerDesk", { model });
 </script>
 
 <template>
@@ -679,7 +679,6 @@ const slots = defineSlots<{
 }>();
 
 const composerDesk = inject<{
-  deskSymbol: InjectionKey<CheckInDesk<ComposerItemData>>;
   model: any;
 }>("objectComposerDesk")!;
 
@@ -706,7 +705,7 @@ const currentPath = computed(() => {
 });
 
 const deskResult = props.itemKey
-  ? checkIn(composerDesk.deskSymbol, {
+  ? checkIn("objectComposerDesk", {
       autoCheckIn: true,
       id: currentPath.value.join("."),
       data: {
@@ -2377,7 +2376,7 @@ export const useCheckIn = <
   ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-| `objectComposerDesk`{.primary .text-primary} | `{ deskSymbol: DeskInjectionKey, model }` | `any` | Provide DeskInjectionKey for child items |
+| `objectComposerDesk`{.primary .text-primary} | `{ model }` | `any` | Provide model for child items |
 
 ---
 

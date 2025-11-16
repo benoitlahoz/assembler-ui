@@ -90,7 +90,7 @@ const isDragging = ref(false);
 
 // Check in with selection desk
 const { desk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+  ? checkIn('leafletFeatures', {
       autoCheckIn: props.selectable,
       id: canvasId.value,
       data: () => ({

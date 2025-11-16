@@ -1475,7 +1475,7 @@ const canvasId = ref<string | number>(
 const isDragging = ref(false);
 
 const { desk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+  ? checkIn("leafletFeatures", {
       autoCheckIn: props.selectable,
       id: canvasId.value,
       data: () => ({
@@ -2181,7 +2181,7 @@ const canvasId = ref<string | number>(
 const isDragging = ref(false);
 
 const { desk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+  ? checkIn("leafletFeatures", {
       autoCheckIn: props.selectable,
       id: canvasId.value,
       data: () => ({
@@ -3055,8 +3055,8 @@ let dragStartMousePoint: any = null;
 
 const { checkIn } = useCheckIn<FeatureReference>();
 
-const { desk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+const { desk: featureDesk } = selectionContext
+  ? checkIn("leafletFeatures", {
       autoCheckIn: props.selectable,
       id: circleId.value,
       data: () => ({
@@ -3388,12 +3388,6 @@ console.log(
   "[LeafletControlItem] Controls context:",
   controlsContext ? "FOUND" : "NOT FOUND",
 );
-if (controlsContext) {
-  console.log(
-    "[LeafletControlItem] DeskInjectionKey:",
-    controlsContext.DeskInjectionKey,
-  );
-}
 
 const { checkIn } = useCheckIn<ControlItemReference>();
 
@@ -3452,8 +3446,8 @@ const getContentHtml = () => {
   return "";
 };
 
-const { desk } = controlsContext?.DeskInjectionKey
-  ? checkIn(controlsContext.DeskInjectionKey, {
+const { desk } = controlsContext
+  ? checkIn("leafletControls", {
       autoCheckIn: true,
       id: props.name,
       data: () => {
@@ -3577,9 +3571,7 @@ export interface ControlItemReference {
   active?: boolean;
 }
 
-export interface LeafletControlsContext {
-  DeskInjectionKey: InjectionKey<CheckInDesk<ControlItemReference>>;
-}
+export interface LeafletControlsContext {}
 
 export interface LeafletControlsProps {
   position?: ControlOptions["position"];
@@ -3607,7 +3599,7 @@ const map = inject(LeafletMapKey, ref(null));
 const control = ref<any>(null);
 
 const { createDesk } = useCheckIn<ControlItemReference>();
-const { desk, DeskInjectionKey } = createDesk({
+const { desk } = createDesk("leafletControls", {
   context: {
     activeItem: () => props.activeItem,
   },
@@ -3819,9 +3811,7 @@ watch(
   { deep: true },
 );
 
-const context: LeafletControlsContext = {
-  DeskInjectionKey,
-};
+const context: LeafletControlsContext = {};
 
 provide(LeafletControlsKey, context);
 </script>
@@ -4803,7 +4793,6 @@ export interface LeafletSelectionContext {
   selectFeature: (type: FeatureShapeType, id: string | number) => void;
   deselectAll: () => void;
   notifyFeatureUpdate: (id: string | number) => void;
-  deskSymbol: InjectionKey<CheckInDesk<FeatureReference>>;
 }
 
 export interface LeafletFeaturesSelectorProps {
@@ -4866,7 +4855,7 @@ const notifyFeatureUpdate = (id: string | number) => {
   }
 };
 
-const { desk, DeskInjectionKey } = createDesk({
+const { desk } = createDesk("leafletFeatures", {
   context: {
     selectedFeature,
     selectFeature,
@@ -5001,7 +4990,6 @@ const context: LeafletSelectionContext = {
   selectFeature,
   deselectAll,
   notifyFeatureUpdate,
-  deskSymbol: DeskInjectionKey,
 };
 
 provide(LeafletSelectionKey, context as any);
@@ -5082,7 +5070,7 @@ const markerId = ref<string | number>(
 const { checkIn } = useCheckIn<FeatureReference>();
 
 const { desk: featureDesk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+  ? checkIn("leafletFeatures", {
       autoCheckIn: props.selectable,
       id: markerId.value,
       data: () => ({
@@ -5927,8 +5915,8 @@ let dragStartMousePoint: L.Point | null = null;
 
 const { checkIn } = useCheckIn<FeatureReference>();
 
-const { desk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+const { desk: featureDesk } = selectionContext
+  ? checkIn("leafletFeatures", {
       autoCheckIn: props.selectable,
       id: polygonId.value,
       data: () => ({
@@ -6413,8 +6401,8 @@ const polylineId = ref<string | number>(
   props.id ?? `polyline-${Date.now()}-${Math.random()}`,
 );
 
-const { desk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+const { desk: featureDesk } = selectionContext
+  ? checkIn("leafletFeatures", {
       autoCheckIn: props.selectable,
       id: polylineId.value,
       data: () => ({
@@ -6884,8 +6872,8 @@ const rectangleId = ref<string | number>(
   props.id ?? `rectangle-${Date.now()}-${Math.random()}`,
 );
 
-const { desk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+const { desk: featureDesk } = selectionContext
+  ? checkIn("leafletFeatures", {
       autoCheckIn: props.selectable,
       id: rectangleId.value,
       data: () => ({

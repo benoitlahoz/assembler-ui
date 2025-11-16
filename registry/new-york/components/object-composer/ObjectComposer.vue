@@ -43,7 +43,7 @@ const editingPath = ref<string[] | null>(null);
 
 // Initialize useCheckIn for managing items
 const { createDesk } = useCheckIn<ComposerItemData>();
-const { desk, DeskInjectionKey } = createDesk({
+const { desk } = createDesk('objectComposerDesk', {
   context: {
     // Expose editingPath to child items
     editingPath,
@@ -99,8 +99,8 @@ const { desk, DeskInjectionKey } = createDesk({
   debug: false,
 });
 
-// Provide DeskInjectionKey for child items
-provide('objectComposerDesk', { deskSymbol: DeskInjectionKey, model });
+// Provide model for child items
+provide('objectComposerDesk', { model });
 </script>
 
 <template>

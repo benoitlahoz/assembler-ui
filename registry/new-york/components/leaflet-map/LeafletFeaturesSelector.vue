@@ -30,7 +30,6 @@ export interface LeafletSelectionContext {
   selectFeature: (type: FeatureShapeType, id: string | number) => void;
   deselectAll: () => void;
   notifyFeatureUpdate: (id: string | number) => void;
-  deskSymbol: InjectionKey<CheckInDesk<FeatureReference>>; // For useCheckIn integration
 }
 
 export interface LeafletFeaturesSelectorProps {
@@ -101,7 +100,7 @@ const notifyFeatureUpdate = (id: string | number) => {
 };
 
 // Open desk for feature registration
-const { desk, DeskInjectionKey } = createDesk({
+const { desk } = createDesk('leafletFeatures', {
   context: {
     // Expose selection state and methods to child features
     selectedFeature,
@@ -245,7 +244,6 @@ const context: LeafletSelectionContext = {
   selectFeature,
   deselectAll,
   notifyFeatureUpdate,
-  deskSymbol: DeskInjectionKey,
 };
 
 provide(LeafletSelectionKey, context as any);

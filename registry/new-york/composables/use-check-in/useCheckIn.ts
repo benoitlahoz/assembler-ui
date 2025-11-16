@@ -4,7 +4,7 @@
  * where child components register themselves with their data.
  *
  * @type registry:hook
- * @category data
+ * @category dependency-injection
  *
  * @demo AirportDemo
  * @demo FormDemo
