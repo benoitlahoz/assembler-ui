@@ -61,15 +61,21 @@ const userProfile = ref({
           </ObjectComposerHeader>
           <Separator class="mb-4" />
           <ObjectComposerItem>
-            <ObjectComposerField as-child v-slot="{ itemKey, displayValue, itemDesk }">
+            <ObjectComposerField
+              as-child
+              v-slot="{ itemKey, displayValue, typeColor, badgeVariant, itemDesk }"
+            >
               <div class="flex items-center gap-2 p-2 rounded hover:bg-accent/50 transition-colors">
+                <!-- Type indicator dot -->
+                <div :class="cn('w-2 h-2 rounded-full', typeColor)" />
+
                 <!-- Key with fixed width -->
                 <span class="font-mono text-xs text-muted-foreground min-w-24">
                   {{ itemKey }}
                 </span>
 
                 <!-- Value as badge -->
-                <Badge class="font-mono text-xs">
+                <Badge :variant="badgeVariant" class="font-mono text-xs">
                   {{ displayValue }}
                 </Badge>
 
@@ -96,15 +102,21 @@ const userProfile = ref({
           </ObjectComposerHeader>
           <Separator class="mb-4" />
           <ObjectComposerItem>
-            <ObjectComposerField as-child v-slot="{ itemKey, displayValue, itemDesk }">
+            <ObjectComposerField
+              as-child
+              v-slot="{ itemKey, displayValue, typeColor, badgeVariant, itemDesk }"
+            >
               <div class="flex items-center gap-2 p-2 rounded hover:bg-accent/50 transition-colors">
+                <!-- Type indicator dot -->
+                <div :class="cn('w-2 h-2 rounded-full', typeColor)" />
+
                 <!-- Key with fixed width -->
                 <span class="font-mono text-xs text-muted-foreground min-w-24">
                   {{ itemKey }}
                 </span>
 
                 <!-- Value as badge -->
-                <Badge class="font-mono text-xs">
+                <Badge :variant="badgeVariant" class="font-mono text-xs">
                   {{ displayValue }}
                 </Badge>
 

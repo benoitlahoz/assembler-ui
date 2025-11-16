@@ -166,7 +166,6 @@ import {
   computed,
   ref,
   provide,
-  triggerRef,
   type HTMLAttributes,
   type InjectionKey,
 } from "vue";
@@ -222,10 +221,7 @@ const { desk, DeskInjectionKey } = createDesk({
         if (key) current = current[key];
       }
       const lastKey = path[path.length - 1];
-      if (lastKey) {
-        current[lastKey] = value;
-        triggerRef(model);
-      }
+      if (lastKey) current[lastKey] = value;
     },
     deleteValue: (path: string[]) => {
       let current: any = model.value;
@@ -240,7 +236,6 @@ const { desk, DeskInjectionKey } = createDesk({
         } else {
           delete current[lastKey];
         }
-        triggerRef(model);
       }
     },
     addValue: (path: string[], key: string, value: any) => {
@@ -252,21 +247,6 @@ const { desk, DeskInjectionKey } = createDesk({
         current.push(value);
       } else {
         current[key] = value;
-      }
-      triggerRef(model);
-    },
-    updateKey: (path: string[], newKey: string) => {
-      const parent = path.length > 1 ? path.slice(0, -1) : [];
-      const oldKey = path[path.length - 1];
-      let current: any = model.value;
-      for (const key of parent) {
-        current = current[key];
-      }
-      if (current && oldKey && !Array.isArray(current) && oldKey !== newKey) {
-        const value = current[oldKey];
-        delete current[oldKey];
-        current[newKey] = value;
-        triggerRef(model);
       }
     },
     startEdit: (path: string[]) => {
@@ -338,7 +318,7 @@ import { inject, computed, ref, type ComputedRef } from "vue";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/Input";
-import { Check, X, Edit, Plus, Trash } from "lucide-vue-next";
+import { Trash } from "lucide-vue-next";
 import type { CheckInDesk } from "~~/registry/new-york/composables/use-check-in/useCheckIn";
 
 interface ObjectComposerFieldProps {
@@ -378,6 +358,32 @@ const initEditValues = () => {
       : JSON.stringify(itemContext.value.value);
 };
 
+const typeColor = computed(() => {
+  switch (itemContext?.valueType.value) {
+    case "string":
+      return "bg-red-500";
+    case "number":
+      return "bg-blue-500";
+    case "boolean":
+      return "bg-purple-500";
+    case "null":
+      return "bg-gray-400";
+    default:
+      return "bg-gray-300";
+  }
+});
+
+const badgeVariant = computed<"destructive" | "default" | "secondary">(() => {
+  switch (itemContext?.valueType.value) {
+    case "string":
+      return "destructive";
+    case "number":
+      return "default";
+    default:
+      return "secondary";
+  }
+});
+
 const slotProps = computed(() => ({
   itemKey: itemContext?.itemKey.value,
   value: itemContext?.value.value,
@@ -387,6 +393,8 @@ const slotProps = computed(() => ({
   isEditing: itemContext?.isEditing.value,
   desk: itemContext?.desk,
   itemDesk: itemContext?.desk,
+  typeColor: typeColor.value,
+  badgeVariant: badgeVariant.value,
   handleStartEdit: () => {
     initEditValues();
     itemContext?.handleStartEdit();
@@ -446,7 +454,19 @@ const handleEditStart = () => {
         title="Sauvegarder"
         @click="handleSaveEdit"
       >
-        <Check :size="14" />
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
       </Button>
       <Button
         variant="ghost"
@@ -454,7 +474,20 @@ const handleEditStart = () => {
         title="Annuler"
         @click="itemContext?.handleCancelEdit"
       >
-        <X :size="14" />
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
       </Button>
     </div>
   </div>
@@ -496,7 +529,22 @@ const handleEditStart = () => {
         title="Éditer"
         @click="handleEditStart"
       >
-        <Edit :size="14" />
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path
+            d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+          />
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+        </svg>
       </Button>
 
       <Button
@@ -506,7 +554,22 @@ const handleEditStart = () => {
         title="Éditer la clé"
         @click="handleEditStart"
       >
-        <Edit :size="14" />
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path
+            d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+          />
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+        </svg>
       </Button>
 
       <Button
@@ -516,7 +579,20 @@ const handleEditStart = () => {
         title="Ajouter un enfant"
         @click="itemContext?.addChild"
       >
-        <Plus :size="14" />
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
       </Button>
 
       <Button
@@ -525,7 +601,7 @@ const handleEditStart = () => {
         title="Supprimer"
         @click="itemContext?.deleteItem"
       >
-        <Trash :size="14" />
+        <Trash class="w-4 h-4" />
       </Button>
     </div>
   </div>
@@ -646,41 +722,30 @@ const deskResult = props.itemKey
 const desk = deskResult?.desk;
 
 const editingPath = desk ? (desk as any).editingPath : ref(null);
-const updateValueInDesk = desk
-  ? (desk as any).updateValue
-  : () => console.warn("No desk available");
-const deleteValueInDesk = desk
-  ? (desk as any).deleteValue
-  : () => console.warn("No desk available");
-const addValueInDesk = desk
-  ? (desk as any).addValue
-  : () => console.warn("No desk available");
-const updateKeyInDesk = desk
-  ? (desk as any).updateKey
-  : () => console.warn("No desk available");
-const startEditInDesk = desk
-  ? (desk as any).startEdit
-  : () => console.warn("No desk available");
-const cancelEditInDesk = desk
-  ? (desk as any).cancelEdit
-  : () => console.warn("No desk available");
+const updateValueInDesk = desk ? (desk as any).updateValue : () => {};
+const deleteValueInDesk = desk ? (desk as any).deleteValue : () => {};
+const addValueInDesk = desk ? (desk as any).addValue : () => {};
+const startEditInDesk = desk ? (desk as any).startEdit : () => {};
+const cancelEditInDesk = desk ? (desk as any).cancelEdit : () => {};
 
-provide("objectComposerItemContext", {
-  desk,
-  itemKey: computed(() => props.itemKey),
-  value: computed(() => props.value),
-  valueType: computed(() => valueType.value),
-  displayValue: computed(() => displayValue.value),
-  isExpandable: computed(() => isExpandable.value),
-  isEditing: computed(() => isEditing.value),
-  isInArray: computed(() => props.isInArray),
-  currentPath: computed(() => currentPath.value),
-  handleStartEdit,
-  handleCancelEdit,
-  saveEdit,
-  deleteItem,
-  addChild,
-});
+if (desk) {
+  provide("objectComposerItemContext", {
+    desk,
+    itemKey: computed(() => props.itemKey),
+    value: computed(() => props.value),
+    valueType: computed(() => valueType.value),
+    displayValue: computed(() => displayValue.value),
+    isExpandable: computed(() => isExpandable.value),
+    isEditing: computed(() => isEditing.value),
+    isInArray: computed(() => props.isInArray),
+    currentPath: computed(() => currentPath.value),
+    handleStartEdit,
+    handleCancelEdit,
+    saveEdit,
+    deleteItem,
+    addChild,
+  });
+}
 
 const accordionValue = ref<string>("item-1");
 
@@ -748,9 +813,6 @@ function saveEdit(newKey: string, newValueStr: string) {
       newValue = JSON.parse(newValueStr);
     } else if (valueType.value === "number") {
       newValue = Number(newValueStr);
-      if (isNaN(newValue)) {
-        throw new Error("Valeur numérique invalide");
-      }
     } else if (valueType.value === "boolean") {
       newValue = newValueStr === "true";
     } else if (valueType.value === "null") {
@@ -761,17 +823,12 @@ function saveEdit(newKey: string, newValueStr: string) {
 
     updateValueInDesk(currentPath.value, newValue);
 
-    if (newKey !== props.itemKey && !props.isInArray && newKey.trim() !== "") {
-      updateKeyInDesk(currentPath.value, newKey);
+    if (newKey !== props.itemKey && !props.isInArray) {
     }
 
     cancelEditInDesk();
   } catch (e) {
-    console.error("Invalid value:", e);
-
-    alert(
-      `Erreur de sauvegarde: ${e instanceof Error ? e.message : "Valeur invalide"}`,
-    );
+    console.error("Invalid value", e);
   }
 }
 
@@ -2352,14 +2409,6 @@ export const useCheckIn = <
 
   `Button`{.primary .text-primary}
 
-  `Check`{.primary .text-primary}
-
-  `X`{.primary .text-primary}
-
-  `Edit`{.primary .text-primary}
-
-  `Plus`{.primary .text-primary}
-
   `Trash`{.primary .text-primary}
 
 ---
@@ -2402,21 +2451,21 @@ export const useCheckIn = <
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
 | `objectComposerItemContext`{.primary .text-primary} | `{
-  desk,
-  itemKey: computed(() => props.itemKey),
-  value: computed(() => props.value),
-  valueType: computed(() => valueType.value),
-  displayValue: computed(() => displayValue.value),
-  isExpandable: computed(() => isExpandable.value),
-  isEditing: computed(() => isEditing.value),
-  isInArray: computed(() => props.isInArray),
-  currentPath: computed(() => currentPath.value),
-  handleStartEdit,
-  handleCancelEdit,
-  saveEdit,
-  deleteItem,
-  addChild,
-}` | `any` | Always provide context to ObjectComposerField (even without desk for auto-iterate mode) |
+    desk,
+    itemKey: computed(() => props.itemKey),
+    value: computed(() => props.value),
+    valueType: computed(() => valueType.value),
+    displayValue: computed(() => displayValue.value),
+    isExpandable: computed(() => isExpandable.value),
+    isEditing: computed(() => isEditing.value),
+    isInArray: computed(() => props.isInArray),
+    currentPath: computed(() => currentPath.value),
+    handleStartEdit,
+    handleCancelEdit,
+    saveEdit,
+    deleteItem,
+    addChild,
+  }` | `any` | — |
 
   ### Inject
 | Key | Default | Type | Description |
@@ -2532,6 +2581,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import CustomObjectComposerField from "./CustomObjectComposerField.vue";
 
 const serverMetrics = ref({
   cpu: 78,
@@ -2586,16 +2636,24 @@ const userProfile = ref({
           <ObjectComposerItem>
             <ObjectComposerField
               as-child
-              v-slot="{ itemKey, displayValue, itemDesk }"
+              v-slot="{
+                itemKey,
+                displayValue,
+                typeColor,
+                badgeVariant,
+                itemDesk,
+              }"
             >
               <div
                 class="flex items-center gap-2 p-2 rounded hover:bg-accent/50 transition-colors"
               >
+                <div :class="cn('w-2 h-2 rounded-full', typeColor)" />
+
                 <span class="font-mono text-xs text-muted-foreground min-w-24">
                   {{ itemKey }}
                 </span>
 
-                <Badge class="font-mono text-xs">
+                <Badge :variant="badgeVariant" class="font-mono text-xs">
                   {{ displayValue }}
                 </Badge>
 
@@ -2626,16 +2684,24 @@ const userProfile = ref({
           <ObjectComposerItem>
             <ObjectComposerField
               as-child
-              v-slot="{ itemKey, displayValue, itemDesk }"
+              v-slot="{
+                itemKey,
+                displayValue,
+                typeColor,
+                badgeVariant,
+                itemDesk,
+              }"
             >
               <div
                 class="flex items-center gap-2 p-2 rounded hover:bg-accent/50 transition-colors"
               >
+                <div :class="cn('w-2 h-2 rounded-full', typeColor)" />
+
                 <span class="font-mono text-xs text-muted-foreground min-w-24">
                   {{ itemKey }}
                 </span>
 
-                <Badge class="font-mono text-xs">
+                <Badge :variant="badgeVariant" class="font-mono text-xs">
                   {{ displayValue }}
                 </Badge>
 
