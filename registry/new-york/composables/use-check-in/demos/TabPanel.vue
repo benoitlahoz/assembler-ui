@@ -23,12 +23,12 @@ const props = withDefaults(
   }
 );
 
-const { checkIn } = useCheckIn<TabItemData>();
+const { checkIn, memoizedId } = useCheckIn<TabItemData>();
 
 const { desk } = checkIn(tabsDesk?.deskSymbol, {
   required: true,
   autoCheckIn: true,
-  id: props.id,
+  id: memoizedId(props.id),
   data: () => ({
     label: props.label,
     disabled: props.disabled,

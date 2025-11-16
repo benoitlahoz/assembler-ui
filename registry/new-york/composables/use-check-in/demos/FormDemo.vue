@@ -12,13 +12,13 @@ interface FormFieldData {
 }
 
 // Parent: Form Container
-const { openDesk } = useCheckIn<FormFieldData>();
+const { createDesk } = useCheckIn<FormFieldData>();
 
 const formData = ref<Record<string, any>>({});
 const errors = ref<Record<string, string>>({});
 
 // Le parent ouvre un desk et le fournit à ses enfants
-const { desk, DeskInjectionKey: formDesk } = openDesk({
+const { desk, DeskInjectionKey: formDesk } = createDesk({
   context: {
     updateValue: (name: string, value: any) => {
       formData.value[name] = value;
@@ -38,9 +38,11 @@ const { desk, DeskInjectionKey: formDesk } = openDesk({
     if (data.value !== undefined) {
       formData.value[data.name] = data.value;
     }
+    return true; // Confirmer l'enregistrement
   },
   onCheckOut: (id) => {
     // console.log('Field checked out:', id);
+    return true;
   },
 });
 

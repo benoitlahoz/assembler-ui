@@ -28,12 +28,12 @@ const props = withDefaults(
   }
 );
 
-const { checkIn } = useCheckIn<FormFieldData>();
+const { checkIn, memoizedId } = useCheckIn<FormFieldData>();
 
 const { desk } = checkIn(formDesk?.deskSymbol, {
   required: true,
   autoCheckIn: true,
-  id: props.name,
+  id: memoizedId(props.name),
   data: () => ({
     name: props.name,
     label: props.label,
@@ -47,16 +47,16 @@ const localValue = ref(props.value);
 watch(
   localValue,
   (newValue) => {
-    if (desk) {
-      (desk as any).updateValue(props.name, newValue);
+    if (desk && 'updateValue' in desk) {
+      desk.updateValue(props.name, newValue);
     }
   },
   { immediate: true }
 );
 
 const error = computed(() => {
-  if (!desk) return '';
-  return (desk as any).getError(props.name) || '';
+  if (!desk || !('getError' in desk)) return '';
+  return desk.getError(props.name) || '';
 });
 
 const inputId = computed(() => `field-${props.name}`);

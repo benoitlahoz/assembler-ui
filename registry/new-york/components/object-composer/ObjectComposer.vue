@@ -42,8 +42,8 @@ const model = defineModel<Record<string, any> | any[]>({ required: true });
 const editingPath = ref<string[] | null>(null);
 
 // Initialize useCheckIn for managing items
-const { openDesk } = useCheckIn<ComposerItemData>();
-const { desk, DeskInjectionKey } = openDesk({
+const { createDesk } = useCheckIn<ComposerItemData>();
+const { desk, DeskInjectionKey } = createDesk({
   context: {
     // Expose editingPath to child items
     editingPath,

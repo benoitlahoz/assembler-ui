@@ -15,13 +15,13 @@ interface AccordionItemData {
 // ==========================================
 // Parent: Accordion Container
 // ==========================================
-const { openDesk } = useCheckIn<AccordionItemData>();
+const { createDesk } = useCheckIn<AccordionItemData>();
 
 const openItems = ref<Set<string | number>>(new Set());
 const allowMultiple = ref(false);
 
 // Le parent ouvre un desk et le fournit à ses enfants
-const { desk, DeskInjectionKey: accordionDesk } = openDesk({
+const { desk, DeskInjectionKey: accordionDesk } = createDesk({
   context: {
     openItems,
     toggle: (id: string | number) => {
@@ -46,6 +46,7 @@ const { desk, DeskInjectionKey: accordionDesk } = openDesk({
       openItems.value.add(id);
       openItems.value = new Set(openItems.value);
     }
+    return true; // Confirmer l'enregistrement
   },
 });
 
@@ -83,7 +84,7 @@ const itemCount = computed(() => desk.getAll().length);
 
       <AccordionItem id="item2" title="How does it work?">
         <ul class="space-y-2 text-muted-foreground list-disc list-inside">
-          <li>Parent component opens a check-in desk using <code>openDesk()</code></li>
+          <li>Parent component opens a check-in desk using <code>createDesk()</code></li>
           <li>Child components check in using <code>checkIn()</code> with auto-registration</li>
           <li>Desk maintains a reactive Map of all checked-in items</li>
           <li>Changes propagate automatically through Vue's reactivity system</li>

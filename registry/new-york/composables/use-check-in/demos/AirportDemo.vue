@@ -89,11 +89,13 @@ const addBaggage = (passengerId: string, weight: number = 10): boolean => {
   }
 
   // Using update() to update baggage
-  airportDesk.desk.update(passengerId, { baggage: newWeight });
-  console.log(
-    `➕ ${passenger.data.name}: Adding ${weight}kg of baggage (${currentWeight}kg → ${newWeight}kg)`
-  );
-  return true;
+  const success = airportDesk.desk.update(passengerId, { baggage: newWeight });
+  if (success) {
+    console.log(
+      `➕ ${passenger.data.name}: Adding ${weight}kg of baggage (${currentWeight}kg → ${newWeight}kg)`
+    );
+  }
+  return success;
 };
 
 // Function to remove baggage
@@ -105,11 +107,13 @@ const removeBaggage = (passengerId: string, weight: number = 10): boolean => {
   const newWeight = Math.max(0, currentWeight - weight);
 
   // Using update() to update baggage
-  airportDesk.desk.update(passengerId, { baggage: newWeight });
-  console.log(
-    `➖ ${passenger.data.name}: Removing ${weight}kg of baggage (${currentWeight}kg → ${newWeight}kg)`
-  );
-  return true;
+  const success = airportDesk.desk.update(passengerId, { baggage: newWeight });
+  if (success) {
+    console.log(
+      `➖ ${passenger.data.name}: Removing ${weight}kg of baggage (${currentWeight}kg → ${newWeight}kg)`
+    );
+  }
+  return success;
 };
 
 // Function to assign a new seat (desk's responsibility)
@@ -159,7 +163,11 @@ const assignSeat = (
 
     // Occupy the new seat
     occupiedSeats.value.add(newSeat);
-    airportDesk.desk.update(passengerId, { seat: newSeat });
+    const success = airportDesk.desk.update(passengerId, { seat: newSeat });
+    if (!success) {
+      console.log(`❌ Failed to update seat for ${passengerName}`);
+      return null;
+    }
   }
 
   if (oldSeat) {
@@ -171,7 +179,7 @@ const assignSeat = (
   return newSeat;
 };
 
-const { openDesk } = useCheckIn<
+const { createDesk } = useCheckIn<
   PassengerData,
   {
     flightNumber: typeof flightNumber;
@@ -186,7 +194,7 @@ const { openDesk } = useCheckIn<
 >();
 
 // Opening the check-in desk with flight information
-const airportDesk = openDesk({
+const airportDesk = createDesk({
   context: {
     flightNumber,
     gate,
@@ -205,9 +213,11 @@ const airportDesk = openDesk({
       const assignedSeat = assignSeat(String(id), data.name, data.fareClass);
       console.log(`✅ ${data.name} has checked in at the desk with seat ${assignedSeat}!`);
     }
+    return true; // Confirmer l'enregistrement
   },
   onCheckOut: (id) => {
     console.log(`🚪 Passenger ${id} has left the desk`);
+    return true;
   },
 });
 
@@ -393,7 +403,7 @@ const changeAircraft = () => {
     </div>
 
     <!-- Passenger list (auto check-in via their components) -->
-    <!-- The desk is injected via provide/inject by openDesk -->
+    <!-- The desk is injected via provide/inject by createDesk -->
     <div class="space-y-2">
       <h4 class="font-semibold">🛂 Check-in Desk</h4>
       <div class="space-y-2">

@@ -27,13 +27,13 @@ const props = defineProps<{
 const isCheckedIn = ref(true);
 const checkInTime = ref<Date>(new Date());
 
-const { checkIn } = useCheckIn<PassengerData>();
+const { checkIn, memoizedId } = useCheckIn<PassengerData>();
 
 // The passenger checks in at the desk using the injected deskSymbol
 const { desk } = checkIn(airportDesk?.deskSymbol, {
   required: true,
   autoCheckIn: true,
-  id: props.id,
+  id: memoizedId(props.id),
   data: {
     name: props.name,
     seat: '', // The seat will be assigned by the desk via onCheckIn
@@ -47,12 +47,12 @@ if (!desk) {
   throw new Error('AirportPassenger must be used within a desk context');
 }
 
-// Access context via the desk (merged in openDesk)
+// Access context via the desk (merged in createDesk)
 const context = {
-  flightNumber: (desk as any).flightNumber,
-  gate: (desk as any).gate,
-  departureTime: (desk as any).departureTime,
-  boardingGroups: (desk as any).boardingGroups,
+  flightNumber: 'flightNumber' in desk ? desk.flightNumber : ref(''),
+  gate: 'gate' in desk ? desk.gate : ref(''),
+  departureTime: 'departureTime' in desk ? desk.departureTime : ref(''),
+  boardingGroups: 'boardingGroups' in desk ? desk.boardingGroups : ref({}),
 };
 
 console.log(
@@ -66,19 +66,28 @@ const currentSeat = computed(() => desk.get(props.id)?.data.seat || '');
 const currentBaggageWeight = computed(() => desk.get(props.id)?.data.baggage || 0);
 
 // Maximum weight for this class
-const maxWeight = computed(() => (desk as any).maxBaggageWeight[props.fareClass]);
+const maxWeight = computed(() => {
+  if ('maxBaggageWeight' in desk) {
+    return desk.maxBaggageWeight[props.fareClass];
+  }
+  return 0;
+});
 
 // Check if we can add baggage
 const canAddBaggage = computed(() => currentBaggageWeight.value < maxWeight.value);
 
 // Add baggage
 const handleAddBaggage = () => {
-  (desk as any).addBaggage(props.id, 10);
+  if ('addBaggage' in desk) {
+    desk.addBaggage(props.id, 10);
+  }
 };
 
 // Remove baggage
 const handleRemoveBaggage = () => {
-  (desk as any).removeBaggage(props.id, 10);
+  if ('removeBaggage' in desk) {
+    desk.removeBaggage(props.id, 10);
+  }
 };
 
 // Access flight information shared via injected extraContext

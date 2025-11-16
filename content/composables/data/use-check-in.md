@@ -102,11 +102,13 @@ const addBaggage = (passengerId: string, weight: number = 10): boolean => {
     return false;
   }
 
-  airportDesk.desk.update(passengerId, { baggage: newWeight });
-  console.log(
-    `➕ ${passenger.data.name}: Adding ${weight}kg of baggage (${currentWeight}kg → ${newWeight}kg)`,
-  );
-  return true;
+  const success = airportDesk.desk.update(passengerId, { baggage: newWeight });
+  if (success) {
+    console.log(
+      `➕ ${passenger.data.name}: Adding ${weight}kg of baggage (${currentWeight}kg → ${newWeight}kg)`,
+    );
+  }
+  return success;
 };
 
 const removeBaggage = (passengerId: string, weight: number = 10): boolean => {
@@ -116,11 +118,13 @@ const removeBaggage = (passengerId: string, weight: number = 10): boolean => {
   const currentWeight = passenger.data.baggage;
   const newWeight = Math.max(0, currentWeight - weight);
 
-  airportDesk.desk.update(passengerId, { baggage: newWeight });
-  console.log(
-    `➖ ${passenger.data.name}: Removing ${weight}kg of baggage (${currentWeight}kg → ${newWeight}kg)`,
-  );
-  return true;
+  const success = airportDesk.desk.update(passengerId, { baggage: newWeight });
+  if (success) {
+    console.log(
+      `➖ ${passenger.data.name}: Removing ${weight}kg of baggage (${currentWeight}kg → ${newWeight}kg)`,
+    );
+  }
+  return success;
 };
 
 const assignSeat = (
@@ -166,7 +170,11 @@ const assignSeat = (
     }
 
     occupiedSeats.value.add(newSeat);
-    airportDesk.desk.update(passengerId, { seat: newSeat });
+    const success = airportDesk.desk.update(passengerId, { seat: newSeat });
+    if (!success) {
+      console.log(`❌ Failed to update seat for ${passengerName}`);
+      return null;
+    }
   }
 
   if (oldSeat) {
@@ -182,7 +190,7 @@ const assignSeat = (
   return newSeat;
 };
 
-const { openDesk } = useCheckIn<
+const { createDesk } = useCheckIn<
   PassengerData,
   {
     flightNumber: typeof flightNumber;
@@ -196,7 +204,7 @@ const { openDesk } = useCheckIn<
   }
 >();
 
-const airportDesk = openDesk({
+const airportDesk = createDesk({
   context: {
     flightNumber,
     gate,
@@ -215,9 +223,11 @@ const airportDesk = openDesk({
         `✅ ${data.name} has checked in at the desk with seat ${assignedSeat}!`,
       );
     }
+    return true;
   },
   onCheckOut: (id) => {
     console.log(`🚪 Passenger ${id} has left the desk`);
+    return true;
   },
 });
 
@@ -492,6 +502,14 @@ import {
   type ComputedRef,
 } from "vue";
 
+export type DeskEventType = "check-in" | "check-out" | "update" | "clear";
+
+export type DeskEventCallback<T = any> = (payload: {
+  id?: string | number;
+  data?: T;
+  timestamp: number;
+}) => void;
+
 export interface CheckInItem<T = any> {
   id: string | number;
   data: T;
@@ -504,14 +522,18 @@ export interface CheckInDesk<
   TContext extends Record<string, any> = {},
 > {
   registry: Ref<Map<string | number, CheckInItem<T>>>;
-  checkIn: (id: string | number, data: T, meta?: Record<string, any>) => void;
-  checkOut: (id: string | number) => void;
+  checkIn: (
+    id: string | number,
+    data: T,
+    meta?: Record<string, any>,
+  ) => boolean;
+  checkOut: (id: string | number) => boolean;
   get: (id: string | number) => CheckInItem<T> | undefined;
   getAll: (options?: {
     sortBy?: keyof T | "timestamp";
     order?: "asc" | "desc";
   }) => CheckInItem<T>[];
-  update: (id: string | number, data: Partial<T>) => void;
+  update: (id: string | number, data: Partial<T>) => boolean;
   has: (id: string | number) => boolean;
   clear: () => void;
   checkInMany: (
@@ -520,6 +542,15 @@ export interface CheckInDesk<
   checkOutMany: (ids: Array<string | number>) => void;
   updateMany: (
     updates: Array<{ id: string | number; data: Partial<T> }>,
+  ) => void;
+
+  on: (event: DeskEventType, callback: DeskEventCallback<T>) => () => void;
+
+  off: (event: DeskEventType, callback: DeskEventCallback<T>) => void;
+
+  emit: (
+    event: DeskEventType,
+    payload: { id?: string | number; data?: T },
   ) => void;
 }
 
@@ -568,6 +599,11 @@ const Debug = (message: string, ...args: any[]) => {
   console.log(`[useCheckIn] ${message}`, ...args);
 };
 
+const instanceIdMap = new WeakMap<object, string>();
+
+const customIdMap = new Map<string, string>();
+let instanceCounter = 0;
+
 export const useCheckIn = <
   T = any,
   TContext extends Record<string, any> = {},
@@ -584,18 +620,59 @@ export const useCheckIn = <
 
     const debug = options?.debug ? Debug : NoOpDebug;
 
+    const eventListeners = new Map<DeskEventType, Set<DeskEventCallback<T>>>();
+
+    const emit = (
+      event: DeskEventType,
+      payload: { id?: string | number; data?: T },
+    ) => {
+      const listeners = eventListeners.get(event);
+      if (!listeners) return;
+
+      const eventPayload = {
+        ...payload,
+        timestamp: Date.now(),
+      };
+
+      debug(`[Event] ${event}`, eventPayload);
+      listeners.forEach((callback) => callback(eventPayload));
+    };
+
+    const on = (event: DeskEventType, callback: DeskEventCallback<T>) => {
+      if (!eventListeners.has(event)) {
+        eventListeners.set(event, new Set());
+      }
+      eventListeners.get(event)!.add(callback);
+
+      debug(
+        `[Event] Listener added for '${event}', total: ${eventListeners.get(event)!.size}`,
+      );
+
+      return () => off(event, callback);
+    };
+
+    const off = (event: DeskEventType, callback: DeskEventCallback<T>) => {
+      const listeners = eventListeners.get(event);
+      if (listeners) {
+        listeners.delete(callback);
+        debug(
+          `[Event] Listener removed for '${event}', remaining: ${listeners.size}`,
+        );
+      }
+    };
+
     const checkIn = (
       id: string | number,
       data: T,
       meta?: Record<string, any>,
-    ) => {
+    ): boolean => {
       debug("checkIn", { id, data, meta });
 
       if (options?.onBeforeCheckIn) {
         const result = options.onBeforeCheckIn(id, data);
         if (result === false) {
           debug("checkIn cancelled by onBeforeCheckIn", id);
-          return;
+          return false;
         }
       }
 
@@ -607,27 +684,49 @@ export const useCheckIn = <
       });
       triggerRef(registry);
 
+      emit("check-in", { id, data });
+
       options?.onCheckIn?.(id, data);
+
+      if (options?.debug) {
+        debug("Registry state after check-in:", {
+          total: registry.value.size,
+          items: Array.from(registry.value.keys()),
+        });
+      }
+
+      return true;
     };
 
-    const checkOut = (id: string | number) => {
+    const checkOut = (id: string | number): boolean => {
       debug("checkOut", id);
 
       const existed = registry.value.has(id);
-      if (!existed) return;
+      if (!existed) return false;
 
       if (options?.onBeforeCheckOut) {
         const result = options.onBeforeCheckOut(id);
         if (result === false) {
           debug("checkOut cancelled by onBeforeCheckOut", id);
-          return;
+          return false;
         }
       }
 
       registry.value.delete(id);
       triggerRef(registry);
 
+      emit("check-out", { id });
+
       options?.onCheckOut?.(id);
+
+      if (options?.debug) {
+        debug("Registry state after check-out:", {
+          total: registry.value.size,
+          items: Array.from(registry.value.keys()),
+        });
+      }
+
+      return true;
     };
 
     const get = (id: string | number) => registry.value.get(id);
@@ -657,23 +756,47 @@ export const useCheckIn = <
       });
     };
 
-    const update = (id: string | number, data: Partial<T>) => {
+    const update = (id: string | number, data: Partial<T>): boolean => {
       const existing = registry.value.get(id);
-      if (
-        existing &&
-        typeof existing.data === "object" &&
-        typeof data === "object"
-      ) {
-        checkIn(id, { ...existing.data, ...data } as T, existing.meta);
+      if (!existing) {
+        debug("update failed: item not found", id);
+        return false;
       }
+
+      if (typeof existing.data === "object" && typeof data === "object") {
+        const previousData = { ...existing.data };
+
+        Object.assign(existing.data as object, data);
+        triggerRef(registry);
+
+        emit("update", { id, data: existing.data });
+
+        if (options?.debug) {
+          debug("update diff:", {
+            id,
+            before: previousData,
+            after: existing.data,
+            changes: data,
+          });
+        }
+
+        return true;
+      }
+
+      return false;
     };
 
     const has = (id: string | number) => registry.value.has(id);
 
     const clear = () => {
       debug("clear");
+      const count = registry.value.size;
       registry.value.clear();
       triggerRef(registry);
+
+      emit("clear", {});
+
+      debug(`Cleared ${count} items from registry`);
     };
 
     const checkInMany = (
@@ -711,10 +834,13 @@ export const useCheckIn = <
       checkInMany,
       checkOutMany,
       updateMany,
+      on,
+      off,
+      emit,
     };
   };
 
-  const openDesk = (options?: CheckInDeskOptions<T, TContext>) => {
+  const createDesk = (options?: CheckInDeskOptions<T, TContext>) => {
     const DeskInjectionKey = Symbol("CheckInDesk") as InjectionKey<
       CheckInDesk<T, TContext> & TContext
     >;
@@ -726,6 +852,10 @@ export const useCheckIn = <
     } as CheckInDesk<T, TContext> & TContext;
 
     provide(DeskInjectionKey, fullContext);
+
+    if (options?.debug) {
+      Debug("Desk opened with injection key:", DeskInjectionKey.description);
+    }
 
     return {
       desk: fullContext,
@@ -791,14 +921,20 @@ export const useCheckIn = <
       return dataValue instanceof Promise ? await dataValue : dataValue;
     };
 
-    const performCheckIn = async () => {
-      if (isCheckedIn.value) return;
+    const performCheckIn = async (): Promise<boolean> => {
+      if (isCheckedIn.value) return true;
 
       const data = await getCurrentData();
-      desk!.checkIn(itemId, data, checkInOptions?.meta);
-      isCheckedIn.value = true;
+      const success = desk!.checkIn(itemId, data, checkInOptions?.meta);
 
-      debug(`[useCheckIn] Checked in: ${itemId}`, data);
+      if (success) {
+        isCheckedIn.value = true;
+        debug(`[useCheckIn] Checked in: ${itemId}`, data);
+      } else {
+        debug(`[useCheckIn] Check-in cancelled for: ${itemId}`);
+      }
+
+      return success;
     };
 
     const performCheckOut = () => {
@@ -885,8 +1021,66 @@ export const useCheckIn = <
     };
   };
 
-  const generateId = (prefix = "passenger"): string => {
-    return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const generateId = (prefix = "item"): string => {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+      return `${prefix}-${crypto.randomUUID()}`;
+    }
+
+    if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+      const array = new Uint8Array(16);
+      crypto.getRandomValues(array);
+      const id = Array.from(array, (b) => b.toString(16).padStart(2, "0")).join(
+        "",
+      );
+      return `${prefix}-${id}`;
+    }
+
+    const isDev =
+      typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+    if (isDev) {
+      console.warn(
+        "[useCheckIn] crypto API not available, using Math.random fallback. " +
+          "Consider upgrading to a modern environment.",
+      );
+    }
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 15);
+    return `${prefix}-${timestamp}-${random}`;
+  };
+
+  const memoizedId = (
+    instanceOrId: object | string | number | null | undefined,
+    prefix = "item",
+  ): string => {
+    if (typeof instanceOrId === "string" || typeof instanceOrId === "number") {
+      const key = `${prefix}-${instanceOrId}`;
+      let id = customIdMap.get(key);
+      if (!id) {
+        id = String(instanceOrId);
+        customIdMap.set(key, id);
+      }
+      return id;
+    }
+
+    if (instanceOrId && typeof instanceOrId === "object") {
+      let id = instanceIdMap.get(instanceOrId);
+      if (!id) {
+        id = `${prefix}-${++instanceCounter}`;
+        instanceIdMap.set(instanceOrId, id);
+      }
+      return id;
+    }
+
+    const isDev =
+      typeof process !== "undefined" && process.env?.NODE_ENV === "development";
+    if (isDev) {
+      console.warn(
+        `[useCheckIn] memoizedId: no instance or custom ID provided. ` +
+          `Generated cryptographically secure ID. ` +
+          `Consider passing getCurrentInstance() or a custom ID (nanoid, uuid, props.id, etc.).`,
+      );
+    }
+    return generateId(prefix);
   };
 
   const standaloneDesk = <T = any,>(options?: CheckInDeskOptions<T>) => {
@@ -911,9 +1105,10 @@ export const useCheckIn = <
   };
 
   return {
-    openDesk,
+    createDesk,
     checkIn,
     generateId,
+    memoizedId,
     standaloneDesk,
     isCheckedIn,
     getRegistry,
@@ -932,9 +1127,10 @@ Return both the desk and its symbol for children to inject
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `openDesk`{.primary .text-primary} | `any` | — |
+| `createDesk`{.primary .text-primary} | `any` | — |
 | `checkIn`{.primary .text-primary} | `any` | — |
 | `generateId`{.primary .text-primary} | `any` | — |
+| `memoizedId`{.primary .text-primary} | `any` | — |
 | `standaloneDesk`{.primary .text-primary} | `any` | — |
 | `isCheckedIn`{.primary .text-primary} | `Ref<any>` | — |
 | `getRegistry`{.primary .text-primary} | `any` | — |
@@ -942,6 +1138,8 @@ Return both the desk and its symbol for children to inject
   ### Types
 | Name | Type | Description |
 |------|------|-------------|
+| `DeskEventType`{.primary .text-primary} | `type` | — |
+| `DeskEventCallback`{.primary .text-primary} | `type` | — |
 | `CheckInItem`{.primary .text-primary} | `interface` | — |
 | `CheckInDesk`{.primary .text-primary} | `interface` | — |
 | `CheckInDeskOptions`{.primary .text-primary} | `interface` | — |
@@ -972,12 +1170,12 @@ interface FormFieldData {
   required?: boolean;
 }
 
-const { openDesk } = useCheckIn<FormFieldData>();
+const { createDesk } = useCheckIn<FormFieldData>();
 
 const formData = ref<Record<string, any>>({});
 const errors = ref<Record<string, string>>({});
 
-const { desk, DeskInjectionKey: formDesk } = openDesk({
+const { desk, DeskInjectionKey: formDesk } = createDesk({
   context: {
     updateValue: (name: string, value: any) => {
       formData.value[name] = value;
@@ -997,8 +1195,11 @@ const { desk, DeskInjectionKey: formDesk } = openDesk({
     if (data.value !== undefined) {
       formData.value[data.name] = data.value;
     }
+    return true;
   },
-  onCheckOut: (id) => {},
+  onCheckOut: (id) => {
+    return true;
+  },
 });
 
 provide("formDesk", { deskSymbol: formDesk });
@@ -1127,12 +1328,12 @@ interface AccordionItemData {
   open?: boolean;
 }
 
-const { openDesk } = useCheckIn<AccordionItemData>();
+const { createDesk } = useCheckIn<AccordionItemData>();
 
 const openItems = ref<Set<string | number>>(new Set());
 const allowMultiple = ref(false);
 
-const { desk, DeskInjectionKey: accordionDesk } = openDesk({
+const { desk, DeskInjectionKey: accordionDesk } = createDesk({
   context: {
     openItems,
     toggle: (id: string | number) => {
@@ -1157,6 +1358,7 @@ const { desk, DeskInjectionKey: accordionDesk } = openDesk({
       openItems.value.add(id);
       openItems.value = new Set(openItems.value);
     }
+    return true;
   },
 });
 
@@ -1197,7 +1399,8 @@ const itemCount = computed(() => desk.getAll().length);
       <AccordionItem id="item2" title="How does it work?">
         <ul class="space-y-2 text-muted-foreground list-disc list-inside">
           <li>
-            Parent component opens a check-in desk using <code>openDesk()</code>
+            Parent component opens a check-in desk using
+            <code>createDesk()</code>
           </li>
           <li>
             Child components check in using <code>checkIn()</code> with
@@ -1284,7 +1487,7 @@ interface TabItemData {
 const activeTab = ref<string>("tab1");
 const tabCount = ref(0);
 
-const { openDesk } = useCheckIn<
+const { createDesk } = useCheckIn<
   TabItemData,
   {
     activeTab: Ref<string>;
@@ -1292,7 +1495,7 @@ const { openDesk } = useCheckIn<
   }
 >();
 
-const { desk, DeskInjectionKey: tabsDesk } = openDesk({
+const { desk, DeskInjectionKey: tabsDesk } = createDesk({
   context: {
     activeTab,
     setActive: (id: string) => {
@@ -1302,15 +1505,17 @@ const { desk, DeskInjectionKey: tabsDesk } = openDesk({
       }
     },
   },
-  onCheckIn: (id, data) => {
-    tabCount.value++;
-    if (tabCount.value === 1) {
-      activeTab.value = id as string;
-    }
-  },
-  onCheckOut: (id) => {
-    tabCount.value--;
-  },
+});
+
+desk.on("check-in", (id, data) => {
+  tabCount.value++;
+  if (tabCount.value === 1) {
+    activeTab.value = id as string;
+  }
+});
+
+desk.on("check-out", (id) => {
+  tabCount.value--;
 });
 
 provide("tabsDesk", { deskSymbol: tabsDesk });
@@ -1407,12 +1612,12 @@ interface ToolItemData {
   disabled?: boolean;
 }
 
-const { openDesk } = useCheckIn<ToolItemData>();
+const { createDesk } = useCheckIn<ToolItemData>();
 
 const activeTool = ref<string | number | null>(null);
 const clickHistory = ref<Array<{ id: string | number; time: number }>>([]);
 
-const { desk, DeskInjectionKey: toolbarDesk } = openDesk({
+const { desk, DeskInjectionKey: toolbarDesk } = createDesk({
   context: {
     activeTool,
     handleClick: (id: string | number, type: "button" | "toggle") => {
@@ -1426,7 +1631,9 @@ const { desk, DeskInjectionKey: toolbarDesk } = openDesk({
     },
     isActive: (id: string | number) => activeTool.value === id,
   },
-  onCheckIn: (id, data) => {},
+  onCheckIn: (id, data) => {
+    return true;
+  },
 });
 
 provide("toolbarDesk", { deskSymbol: toolbarDesk });
