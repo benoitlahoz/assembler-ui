@@ -722,30 +722,41 @@ const deskResult = props.itemKey
 const desk = deskResult?.desk;
 
 const editingPath = desk ? (desk as any).editingPath : ref(null);
-const updateValueInDesk = desk ? (desk as any).updateValue : () => {};
-const deleteValueInDesk = desk ? (desk as any).deleteValue : () => {};
-const addValueInDesk = desk ? (desk as any).addValue : () => {};
-const startEditInDesk = desk ? (desk as any).startEdit : () => {};
-const cancelEditInDesk = desk ? (desk as any).cancelEdit : () => {};
+const updateValueInDesk = desk
+  ? (desk as any).updateValue
+  : () => console.warn("No desk available");
+const deleteValueInDesk = desk
+  ? (desk as any).deleteValue
+  : () => console.warn("No desk available");
+const addValueInDesk = desk
+  ? (desk as any).addValue
+  : () => console.warn("No desk available");
+const updateKeyInDesk = desk
+  ? (desk as any).updateKey
+  : () => console.warn("No desk available");
+const startEditInDesk = desk
+  ? (desk as any).startEdit
+  : () => console.warn("No desk available");
+const cancelEditInDesk = desk
+  ? (desk as any).cancelEdit
+  : () => console.warn("No desk available");
 
-if (desk) {
-  provide("objectComposerItemContext", {
-    desk,
-    itemKey: computed(() => props.itemKey),
-    value: computed(() => props.value),
-    valueType: computed(() => valueType.value),
-    displayValue: computed(() => displayValue.value),
-    isExpandable: computed(() => isExpandable.value),
-    isEditing: computed(() => isEditing.value),
-    isInArray: computed(() => props.isInArray),
-    currentPath: computed(() => currentPath.value),
-    handleStartEdit,
-    handleCancelEdit,
-    saveEdit,
-    deleteItem,
-    addChild,
-  });
-}
+provide("objectComposerItemContext", {
+  desk,
+  itemKey: computed(() => props.itemKey),
+  value: computed(() => props.value),
+  valueType: computed(() => valueType.value),
+  displayValue: computed(() => displayValue.value),
+  isExpandable: computed(() => isExpandable.value),
+  isEditing: computed(() => isEditing.value),
+  isInArray: computed(() => props.isInArray),
+  currentPath: computed(() => currentPath.value),
+  handleStartEdit,
+  handleCancelEdit,
+  saveEdit,
+  deleteItem,
+  addChild,
+});
 
 const accordionValue = ref<string>("item-1");
 
@@ -813,6 +824,9 @@ function saveEdit(newKey: string, newValueStr: string) {
       newValue = JSON.parse(newValueStr);
     } else if (valueType.value === "number") {
       newValue = Number(newValueStr);
+      if (isNaN(newValue)) {
+        throw new Error("Valeur numérique invalide");
+      }
     } else if (valueType.value === "boolean") {
       newValue = newValueStr === "true";
     } else if (valueType.value === "null") {
@@ -823,12 +837,17 @@ function saveEdit(newKey: string, newValueStr: string) {
 
     updateValueInDesk(currentPath.value, newValue);
 
-    if (newKey !== props.itemKey && !props.isInArray) {
+    if (newKey !== props.itemKey && !props.isInArray && newKey.trim() !== "") {
+      updateKeyInDesk(currentPath.value, newKey);
     }
 
     cancelEditInDesk();
   } catch (e) {
-    console.error("Invalid value", e);
+    console.error("Invalid value:", e);
+
+    alert(
+      `Erreur de sauvegarde: ${e instanceof Error ? e.message : "Valeur invalide"}`,
+    );
   }
 }
 
@@ -2451,21 +2470,21 @@ export const useCheckIn = <
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
 | `objectComposerItemContext`{.primary .text-primary} | `{
-    desk,
-    itemKey: computed(() => props.itemKey),
-    value: computed(() => props.value),
-    valueType: computed(() => valueType.value),
-    displayValue: computed(() => displayValue.value),
-    isExpandable: computed(() => isExpandable.value),
-    isEditing: computed(() => isEditing.value),
-    isInArray: computed(() => props.isInArray),
-    currentPath: computed(() => currentPath.value),
-    handleStartEdit,
-    handleCancelEdit,
-    saveEdit,
-    deleteItem,
-    addChild,
-  }` | `any` | — |
+  desk,
+  itemKey: computed(() => props.itemKey),
+  value: computed(() => props.value),
+  valueType: computed(() => valueType.value),
+  displayValue: computed(() => displayValue.value),
+  isExpandable: computed(() => isExpandable.value),
+  isEditing: computed(() => isEditing.value),
+  isInArray: computed(() => props.isInArray),
+  currentPath: computed(() => currentPath.value),
+  handleStartEdit,
+  handleCancelEdit,
+  saveEdit,
+  deleteItem,
+  addChild,
+}` | `any` | Always provide context to ObjectComposerField (even without desk for auto-iterate mode) |
 
   ### Inject
 | Key | Default | Type | Description |
@@ -2581,7 +2600,6 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import CustomObjectComposerField from "./CustomObjectComposerField.vue";
 
 const serverMetrics = ref({
   cpu: 78,

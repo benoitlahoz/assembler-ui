@@ -1159,154 +1159,176 @@ Return both the desk and its symbol for children to inject
   :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
-import { ref, computed, provide } from "vue";
-import { useCheckIn } from "../useCheckIn";
+import { ref } from "vue";
+import { Button } from "~/components/ui/button";
+import FormContainer from "./FormContainer.vue";
 import FormField from "./FormField.vue";
 
-interface FormFieldData {
-  name: string;
-  label: string;
-  value: any;
-  required?: boolean;
-}
-
-const { createDesk } = useCheckIn<FormFieldData>();
-
-const formData = ref<Record<string, any>>({});
-const errors = ref<Record<string, string>>({});
-
-const { desk, DeskInjectionKey: formDesk } = createDesk({
-  context: {
-    updateValue: (name: string, value: any) => {
-      formData.value[name] = value;
-      if (errors.value[name]) {
-        delete errors.value[name];
-        errors.value = { ...errors.value };
-      }
-    },
-    getValue: (name: string) => formData.value[name],
-    setError: (name: string, error: string) => {
-      errors.value[name] = error;
-      errors.value = { ...errors.value };
-    },
-    getError: (name: string) => errors.value[name],
-  },
-  onCheckIn: (id, data) => {
-    if (data.value !== undefined) {
-      formData.value[data.name] = data.value;
-    }
-    return true;
-  },
-  onCheckOut: (id) => {
-    return true;
-  },
+const formData = ref({
+  name: "",
+  email: "",
+  password: "",
+  message: "",
 });
 
-provide("formDesk", { deskSymbol: formDesk });
+const submittedData = ref<Record<string, any> | null>(null);
 
-const allFields = computed(() => desk.getAll());
-const isValid = computed(() => Object.keys(errors.value).length === 0);
-const fieldCount = computed(() => allFields.value.length);
-
-const validateForm = () => {
-  errors.value = {};
-  allFields.value.forEach((field) => {
-    if (field.data.required && !formData.value[field.data.name]) {
-      errors.value[field.data.name] = `${field.data.label} is required`;
-    }
-  });
-  errors.value = { ...errors.value };
-  return Object.keys(errors.value).length === 0;
+const handleSubmit = (values: Record<string, any>) => {
+  console.log("Form submitted:", values);
+  submittedData.value = values;
 };
 
-const handleSubmit = () => {
-  if (validateForm()) {
-    alert(`Form submitted!\n\n${JSON.stringify(formData.value, null, 2)}`);
+const handleChange = (values: Record<string, any>) => {
+  console.log("Form changed:", values);
+};
+
+const validateEmail = (value: string) => {
+  if (value && !value.includes("@")) {
+    return "Invalid email format";
+  }
+};
+
+const validatePassword = (value: string) => {
+  if (value && value.length < 6) {
+    return "Password must be at least 6 characters";
   }
 };
 
 const resetForm = () => {
-  formData.value = {};
-  errors.value = {};
+  formData.value = {
+    name: "",
+    email: "",
+    password: "",
+    message: "",
+  };
+  submittedData.value = null;
 };
 </script>
 
 <template>
-  <div class="w-full max-w-2xl mx-auto space-y-6 p-6">
-    <div class="space-y-2">
-      <h2 class="text-2xl font-bold">useCheckIn - Form Demo</h2>
-      <p class="text-muted-foreground">
-        Form fields check in with parent for centralized state management
-      </p>
-    </div>
+  <div class="demo-container">
+    <h2>Form Pattern Demo</h2>
+    <p>
+      Les FormField s'enregistrent et sont validés automatiquement par le
+      FormContainer.
+    </p>
 
-    <div class="flex items-center gap-4 p-4 bg-muted rounded-lg">
-      <span class="text-sm font-medium">{{ fieldCount }} fields</span>
-      <span
-        :class="[
-          'text-sm font-medium',
-          isValid ? 'text-green-600' : 'text-red-600',
-        ]"
-      >
-        {{ isValid ? "✓ Valid" : "✗ Invalid" }}
-      </span>
-    </div>
-
-    <form
-      @submit.prevent="handleSubmit"
-      class="space-y-4 p-6 border border-border rounded-lg"
-    >
+    <FormContainer @submit="handleSubmit" @change="handleChange">
       <FormField
-        name="username"
-        label="Username"
-        :required="true"
-        placeholder="Enter username"
+        id="name"
+        name="name"
+        label="Name"
+        type="text"
+        v-model="formData.name"
+        required
+        :position="1"
       />
+
       <FormField
+        id="email"
         name="email"
         label="Email"
         type="email"
-        :required="true"
-        placeholder="email@example.com"
+        v-model="formData.email"
+        required
+        :position="2"
+        :validate="validateEmail"
       />
+
       <FormField
-        name="bio"
-        label="Bio"
-        type="textarea"
-        placeholder="Tell us about yourself..."
+        id="password"
+        name="password"
+        label="Password"
+        type="password"
+        v-model="formData.password"
+        required
+        :position="3"
+        :validate="validatePassword"
       />
 
-      <div class="flex gap-2 pt-4">
-        <button
-          type="submit"
-          class="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
-        >
-          Submit
-        </button>
-        <button
-          type="button"
-          @click="resetForm"
-          class="px-4 py-2 bg-secondary text-secondary-foreground rounded hover:bg-secondary/80"
-        >
-          Reset
-        </button>
-      </div>
-    </form>
+      <FormField
+        id="message"
+        name="message"
+        label="Message"
+        type="textarea"
+        v-model="formData.message"
+        :position="4"
+      />
 
-    <div class="p-4 bg-muted rounded-lg space-y-2">
-      <h4 class="font-semibold">Debug Info</h4>
-      <div class="text-sm space-y-1">
-        <pre class="bg-background p-2 rounded">{{
-          JSON.stringify(formData, null, 2)
-        }}</pre>
-        <p>
-          <strong>Fields:</strong>
-          {{ allFields.map((f) => f.data.name).join(", ") }}
-        </p>
+      <template #actions>
+        <div class="actions">
+          <Button type="submit">Submit</Button>
+          <Button type="button" variant="outline" @click="resetForm"
+            >Reset</Button
+          >
+        </div>
+      </template>
+    </FormContainer>
+
+    <div class="state-display">
+      <h3>Current Form Data:</h3>
+      <pre>{{ JSON.stringify(formData, null, 2) }}</pre>
+
+      <div v-if="submittedData" class="submitted-data">
+        <h3>Submitted Data:</h3>
+        <pre>{{ JSON.stringify(submittedData, null, 2) }}</pre>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.demo-container {
+  padding: 2rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+h2 {
+  margin-bottom: 0.5rem;
+}
+
+p {
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 2rem;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.state-display {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: hsl(var(--muted) / 0.3);
+  border-radius: var(--radius);
+}
+
+.state-display h3 {
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+.state-display pre {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  margin: 0.5rem 0;
+  white-space: pre-wrap;
+  background: hsl(var(--background));
+  padding: 0.5rem;
+  border-radius: var(--radius);
+}
+
+.submitted-data {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid hsl(var(--border));
+}
+</style>
 ```
   :::
 ::
@@ -1599,146 +1621,160 @@ const activeTabData = computed(() => desk.get(activeTab.value));
   :::tabs-item{icon="i-lucide-code" label="Code" class="h-128 max-h-128 overflow-auto"}
 ```vue
 <script setup lang="ts">
-import { ref, computed, provide } from "vue";
-import { useCheckIn } from "../useCheckIn";
+import { ref } from "vue";
+import ToolbarContainer from "./ToolbarContainer.vue";
 import ToolbarButton from "./ToolbarButton.vue";
-import ToolbarSeparator from "./ToolbarSeparator.vue";
 
-interface ToolItemData {
-  label: string;
-  icon?: string;
-  type: "button" | "toggle" | "separator";
-  active?: boolean;
-  disabled?: boolean;
-}
+const showSearch = ref(false);
+const isEditMode = ref(false);
 
-const { createDesk } = useCheckIn<ToolItemData>();
+const handleSave = () => {
+  console.log("Save clicked");
+};
 
-const activeTool = ref<string | number | null>(null);
-const clickHistory = ref<Array<{ id: string | number; time: number }>>([]);
+const handleUndo = () => {
+  console.log("Undo clicked");
+};
 
-const { desk, DeskInjectionKey: toolbarDesk } = createDesk({
-  context: {
-    activeTool,
-    handleClick: (id: string | number, type: "button" | "toggle") => {
-      clickHistory.value.push({ id, time: Date.now() });
+const handleRedo = () => {
+  console.log("Redo clicked");
+};
 
-      if (type === "toggle") {
-        activeTool.value = activeTool.value === id ? null : id;
-      } else {
-        console.log(`Button clicked: ${id}`);
-      }
-    },
-    isActive: (id: string | number) => activeTool.value === id,
-  },
-  onCheckIn: (id, data) => {
-    return true;
-  },
-});
+const toggleSearch = () => {
+  showSearch.value = !showSearch.value;
+};
 
-provide("toolbarDesk", { deskSymbol: toolbarDesk });
+const toggleEditMode = () => {
+  isEditMode.value = !isEditMode.value;
+};
 
-const allTools = computed(() =>
-  desk.getAll().sort((a, b) => String(a.id).localeCompare(String(b.id))),
-);
-
-const lastAction = computed(() => {
-  const last = clickHistory.value[clickHistory.value.length - 1];
-  if (!last) return "None";
-  const tool = desk.get(last.id);
-  return `${tool?.data.label || last.id} at ${new Date(last.time).toLocaleTimeString()}`;
-});
+const handleSettings = () => {
+  console.log("Settings clicked");
+};
 </script>
 
 <template>
-  <div class="w-full max-w-4xl mx-auto space-y-6 p-6">
-    <div class="space-y-2">
-      <h2 class="text-2xl font-bold">useCheckIn - Toolbar Demo</h2>
-      <p class="text-muted-foreground">
-        Dynamic toolbar with buttons, toggles, and separators managed by
-        check-in desk
-      </p>
-    </div>
+  <div class="demo-container">
+    <h2>Toolbar Pattern Demo</h2>
+    <p>
+      Les ToolbarButton sont dans le slot de ToolbarContainer et s'enregistrent
+      automatiquement.
+    </p>
 
-    <div class="border border-border rounded-lg p-2 bg-background">
-      <div class="flex items-center gap-1">
-        <ToolbarButton id="new" label="New" icon="📄" type="button" />
-        <ToolbarButton id="open" label="Open" icon="📂" type="button" />
-        <ToolbarButton id="save" label="Save" icon="💾" type="button" />
+    <ToolbarContainer desk-id="main-toolbar">
+      <ToolbarButton
+        id="save"
+        label="Save"
+        icon="💾"
+        group="start"
+        :position="1"
+        @click="handleSave"
+      />
+      <ToolbarButton
+        id="undo"
+        label="Undo"
+        icon="↶"
+        group="start"
+        :position="2"
+        :disabled="!isEditMode"
+        @click="handleUndo"
+      />
+      <ToolbarButton
+        id="redo"
+        label="Redo"
+        icon="↷"
+        group="start"
+        :position="3"
+        :disabled="!isEditMode"
+        @click="handleRedo"
+      />
 
-        <ToolbarSeparator id="sep1" />
+      <ToolbarButton
+        id="edit"
+        :label="isEditMode ? 'View Mode' : 'Edit Mode'"
+        icon="✏️"
+        group="main"
+        :position="1"
+        @click="toggleEditMode"
+      />
 
-        <ToolbarButton id="bold" label="Bold" icon="B" type="toggle" />
-        <ToolbarButton id="italic" label="Italic" icon="I" type="toggle" />
-        <ToolbarButton
-          id="underline"
-          label="Underline"
-          icon="U"
-          type="toggle"
-        />
+      <ToolbarButton
+        id="search"
+        :label="showSearch ? 'Hide Search' : 'Search'"
+        icon="🔍"
+        group="end"
+        :position="1"
+        @click="toggleSearch"
+      />
+      <ToolbarButton
+        id="settings"
+        label="Settings"
+        icon="⚙️"
+        group="end"
+        :position="2"
+        @click="handleSettings"
+      />
+    </ToolbarContainer>
 
-        <ToolbarSeparator id="sep2" />
-
-        <ToolbarButton
-          id="align-left"
-          label="Align Left"
-          icon="⬅️"
-          type="toggle"
-        />
-        <ToolbarButton
-          id="align-center"
-          label="Align Center"
-          icon="⏸️"
-          type="toggle"
-        />
-        <ToolbarButton
-          id="align-right"
-          label="Align Right"
-          icon="➡️"
-          type="toggle"
-        />
-
-        <ToolbarSeparator id="sep3" />
-
-        <ToolbarButton
-          id="disabled"
-          label="Disabled"
-          icon="🚫"
-          type="button"
-          :disabled="true"
-        />
-      </div>
-    </div>
-
-    <div class="grid grid-cols-2 gap-4">
-      <div class="p-4 border border-border rounded-lg">
-        <h3 class="font-semibold mb-2">Active Toggles</h3>
-        <div class="text-sm text-muted-foreground">
-          {{ activeTool ? desk.get(activeTool)?.data.label : "None" }}
-        </div>
-      </div>
-
-      <div class="p-4 border border-border rounded-lg">
-        <h3 class="font-semibold mb-2">Last Action</h3>
-        <div class="text-sm text-muted-foreground">
-          {{ lastAction }}
-        </div>
-      </div>
-    </div>
-
-    <div class="p-4 bg-muted rounded-lg space-y-2">
-      <h4 class="font-semibold">Debug Info</h4>
-      <div class="text-sm space-y-1">
-        <p><strong>Total Tools:</strong> {{ allTools.length }}</p>
-        <p>
-          <strong>Registered IDs:</strong>
-          {{ allTools.map((t) => t.id).join(", ") }}
-        </p>
-        <p><strong>Click History:</strong> {{ clickHistory.length }} clicks</p>
-      </div>
+    <div class="state-display">
+      <h3>État actuel:</h3>
+      <ul>
+        <li>Edit Mode: {{ isEditMode ? "ON" : "OFF" }}</li>
+        <li>Search: {{ showSearch ? "Visible" : "Hidden" }}</li>
+        <li>Undo/Redo: {{ isEditMode ? "Enabled" : "Disabled" }}</li>
+      </ul>
     </div>
   </div>
 </template>
+
+<style scoped>
+.demo-container {
+  padding: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: hsl(var(--foreground));
+}
+
+p {
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 2rem;
+}
+
+.state-display {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: hsl(var(--muted) / 0.3);
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+}
+
+.state-display h3 {
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+.state-display ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.state-display li {
+  padding: 0.25rem 0;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: hsl(var(--foreground));
+}
+</style>
 ```
   :::
 ::
