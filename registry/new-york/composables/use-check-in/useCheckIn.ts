@@ -130,6 +130,8 @@ let instanceCounter = 0;
  * ```
  */
 export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>() => {
+  let debug = NoOpDebug;
+
   /**
    * Creates a check-in desk context (internal helper)
    */
@@ -140,7 +142,7 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       Map<string | number, CheckInItem<T>>
     >;
 
-    const debug = options?.debug ? Debug : NoOpDebug;
+    debug = options?.debug ? Debug : NoOpDebug;
 
     // Système d'événements
     const eventListeners = new Map<DeskEventType, Set<DeskEventCallback<T>>>();
@@ -400,8 +402,6 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       | undefined,
     checkInOptions?: CheckInOptions<T>
   ) => {
-    const debug = checkInOptions?.debug ? Debug : NoOpDebug;
-
     // Auto-handle null/undefined context - no need for ternary pattern
     if (!parentDeskOrKey) {
       debug('[useCheckIn] No parent desk provided - skipping check-in');
@@ -660,14 +660,11 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
     }
 
     // Cas 3: null/undefined = génération cryptographiquement sécurisée avec warning
-    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-    if (isDev) {
-      console.warn(
-        `[useCheckIn] memoizedId: no instance or custom ID provided. ` +
-          `Generated cryptographically secure ID. ` +
-          `Consider passing getCurrentInstance() or a custom ID (nanoid, uuid, props.id, etc.).`
-      );
-    }
+    debug(
+      `[useCheckIn] memoizedId: no instance or custom ID provided. ` +
+        `Generated cryptographically secure ID. ` +
+        `Consider passing getCurrentInstance() or a custom ID (nanoid, uuid, props.id, etc.).`
+    );
     return generateId(prefix);
   };
 
@@ -726,13 +723,10 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       instanceCounter = 0;
     }
 
-    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-    if (isDev) {
-      console.log(
-        `[useCheckIn] Cleared ${customIdCount} custom IDs from cache` +
-          (resetCounter ? ' and reset counter' : '')
-      );
-    }
+    debug(
+      `[useCheckIn] Cleared ${customIdCount} custom IDs from cache` +
+        (resetCounter ? ' and reset counter' : '')
+    );
   };
 
   return {
