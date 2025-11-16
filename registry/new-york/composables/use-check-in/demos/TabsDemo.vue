@@ -14,7 +14,7 @@ const activeTab = ref<string>('tab1');
 const tabCount = ref(0);
 
 // Parent: Tabs Container
-const { openDesk } = useCheckIn<
+const { createDesk } = useCheckIn<
   TabItemData,
   {
     activeTab: Ref<string>;
@@ -23,7 +23,7 @@ const { openDesk } = useCheckIn<
 >();
 
 // Le parent ouvre un desk et le fournit à ses enfants
-const { desk, DeskInjectionKey: tabsDesk } = openDesk({
+const { desk, DeskInjectionKey: tabsDesk } = createDesk({
   context: {
     activeTab,
     setActive: (id: string) => {
@@ -33,15 +33,18 @@ const { desk, DeskInjectionKey: tabsDesk } = openDesk({
       }
     },
   },
-  onCheckIn: (id, data) => {
-    tabCount.value++;
-    if (tabCount.value === 1) {
-      activeTab.value = id as string;
-    }
-  },
-  onCheckOut: (id) => {
-    tabCount.value--;
-  },
+});
+
+// Utiliser le système d'événements au lieu de callbacks
+desk.on('check-in', (id, data) => {
+  tabCount.value++;
+  if (tabCount.value === 1) {
+    activeTab.value = id as string;
+  }
+});
+
+desk.on('check-out', (id) => {
+  tabCount.value--;
 });
 
 // Fournir le deskSymbol dans un objet aux enfants

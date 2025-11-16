@@ -3,5 +3,10 @@
   "compilerOptions": {
     "types": ["@types/node", "@nuxt/types"]
   },
-  "include": ["registry/**/*", "scripts/**/*", "**/*.vue"]
+  "include": [
+    "registry/**/*",
+    "scripts/**/*",
+    "**/*.vue",
+    "registry/new-york/composables/use-check-in/.private/examples.ts"
+  ]
 }

@@ -14,13 +14,13 @@ interface ToolItemData {
 }
 
 // Parent: Toolbar Container
-const { openDesk } = useCheckIn<ToolItemData>();
+const { createDesk } = useCheckIn<ToolItemData>();
 
 const activeTool = ref<string | number | null>(null);
 const clickHistory = ref<Array<{ id: string | number; time: number }>>([]);
 
 // Le parent ouvre un desk et le fournit à ses enfants
-const { desk, DeskInjectionKey: toolbarDesk } = openDesk({
+const { desk, DeskInjectionKey: toolbarDesk } = createDesk({
   context: {
     activeTool,
     handleClick: (id: string | number, type: 'button' | 'toggle') => {
@@ -37,6 +37,7 @@ const { desk, DeskInjectionKey: toolbarDesk } = openDesk({
   },
   onCheckIn: (id, data) => {
     // console.log('Tool checked in:', id, data);
+    return true;
   },
 });
 

@@ -57,7 +57,7 @@ const rotationStartPositions = ref<any>(null);
 const rotationCenter = ref<{ lat: number; lng: number } | null>(null);
 
 // Initialize useCheckIn for feature management
-const { openDesk } = useCheckIn<FeatureReference>();
+const { createDesk } = useCheckIn<FeatureReference>();
 
 // Selection methods
 const selectFeature = (type: FeatureShapeType, id: string | number) => {
@@ -101,7 +101,7 @@ const notifyFeatureUpdate = (id: string | number) => {
 };
 
 // Open desk for feature registration
-const { desk, DeskInjectionKey } = openDesk({
+const { desk, DeskInjectionKey } = createDesk({
   context: {
     // Expose selection state and methods to child features
     selectedFeature,

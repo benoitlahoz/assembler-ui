@@ -33,6 +33,16 @@ import {
 // TYPES
 // ==========================================
 
+/** Type d'événement émis par le desk */
+export type DeskEventType = 'check-in' | 'check-out' | 'update' | 'clear';
+
+/** Callback pour les événements du desk */
+export type DeskEventCallback<T = any> = (payload: {
+  id?: string | number;
+  data?: T;
+  timestamp: number;
+}) => void;
+
 export interface CheckInItem<T = any> {
   id: string | number;
   data: T;
@@ -41,20 +51,31 @@ export interface CheckInItem<T = any> {
 }
 
 export interface CheckInDesk<T = any, TContext extends Record<string, any> = {}> {
+  /**
+   * Registry interne des items. ⚠️ NE PAS UTILISER DIRECTEMENT dans les templates.
+   * Utilisez plutôt les helpers : get(), getAll(), ou le computed getRegistry().
+   * Map n'est pas réactive, seul le Ref l'est.
+   */
   registry: Ref<Map<string | number, CheckInItem<T>>>;
-  checkIn: (id: string | number, data: T, meta?: Record<string, any>) => void;
-  checkOut: (id: string | number) => void;
+  checkIn: (id: string | number, data: T, meta?: Record<string, any>) => boolean;
+  checkOut: (id: string | number) => boolean;
   get: (id: string | number) => CheckInItem<T> | undefined;
   getAll: (options?: {
     sortBy?: keyof T | 'timestamp';
     order?: 'asc' | 'desc';
   }) => CheckInItem<T>[];
-  update: (id: string | number, data: Partial<T>) => void;
+  update: (id: string | number, data: Partial<T>) => boolean;
   has: (id: string | number) => boolean;
   clear: () => void;
   checkInMany: (items: Array<{ id: string | number; data: T; meta?: Record<string, any> }>) => void;
   checkOutMany: (ids: Array<string | number>) => void;
   updateMany: (updates: Array<{ id: string | number; data: Partial<T> }>) => void;
+  /** Écoute un type d'événement */
+  on: (event: DeskEventType, callback: DeskEventCallback<T>) => () => void;
+  /** Retire un listener d'événement */
+  off: (event: DeskEventType, callback: DeskEventCallback<T>) => void;
+  /** Émet un événement (usage interne principalement) */
+  emit: (event: DeskEventType, payload: { id?: string | number; data?: T }) => void;
 }
 
 export interface CheckInDeskOptions<T = any, TContext extends Record<string, any> = {}> {
@@ -101,6 +122,12 @@ const Debug = (message: string, ...args: any[]) => {
   console.log(`[useCheckIn] ${message}`, ...args);
 };
 
+// WeakMap pour générer des IDs stables basés sur l'instance du composant
+const instanceIdMap = new WeakMap<object, string>();
+// Map pour les IDs custom fournis par l'utilisateur
+const customIdMap = new Map<string, string>();
+let instanceCounter = 0;
+
 // ==========================================
 // COMPOSABLE PRINCIPAL
 // ==========================================
@@ -112,8 +139,8 @@ const Debug = (message: string, ...args: any[]) => {
  * @example
  * ```ts
  * // In parent component - open a desk
- * const { openDesk } = useCheckIn<TabItem, { activeTab: Ref<string> }>();
- * const desk = openDesk({
+ * const { createDesk } = useCheckIn<TabItem, { activeTab: Ref<string> }>();
+ * const desk = createDesk({
  *   extraContext: { activeTab: ref('tab1') }
  * });
  *
@@ -139,7 +166,43 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
 
     const debug = options?.debug ? Debug : NoOpDebug;
 
-    const checkIn = (id: string | number, data: T, meta?: Record<string, any>) => {
+    // Système d'événements
+    const eventListeners = new Map<DeskEventType, Set<DeskEventCallback<T>>>();
+
+    const emit = (event: DeskEventType, payload: { id?: string | number; data?: T }) => {
+      const listeners = eventListeners.get(event);
+      if (!listeners) return;
+
+      const eventPayload = {
+        ...payload,
+        timestamp: Date.now(),
+      };
+
+      debug(`[Event] ${event}`, eventPayload);
+      listeners.forEach((callback) => callback(eventPayload));
+    };
+
+    const on = (event: DeskEventType, callback: DeskEventCallback<T>) => {
+      if (!eventListeners.has(event)) {
+        eventListeners.set(event, new Set());
+      }
+      eventListeners.get(event)!.add(callback);
+
+      debug(`[Event] Listener added for '${event}', total: ${eventListeners.get(event)!.size}`);
+
+      // Return unsubscribe function
+      return () => off(event, callback);
+    };
+
+    const off = (event: DeskEventType, callback: DeskEventCallback<T>) => {
+      const listeners = eventListeners.get(event);
+      if (listeners) {
+        listeners.delete(callback);
+        debug(`[Event] Listener removed for '${event}', remaining: ${listeners.size}`);
+      }
+    };
+
+    const checkIn = (id: string | number, data: T, meta?: Record<string, any>): boolean => {
       debug('checkIn', { id, data, meta });
 
       // Lifecycle: before
@@ -147,7 +210,7 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
         const result = options.onBeforeCheckIn(id, data);
         if (result === false) {
           debug('checkIn cancelled by onBeforeCheckIn', id);
-          return;
+          return false;
         }
       }
 
@@ -159,30 +222,54 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       });
       triggerRef(registry);
 
+      // Emit event
+      emit('check-in', { id, data });
+
       // Lifecycle: after
       options?.onCheckIn?.(id, data);
+
+      if (options?.debug) {
+        debug('Registry state after check-in:', {
+          total: registry.value.size,
+          items: Array.from(registry.value.keys()),
+        });
+      }
+
+      return true;
     };
 
-    const checkOut = (id: string | number) => {
+    const checkOut = (id: string | number): boolean => {
       debug('checkOut', id);
 
       const existed = registry.value.has(id);
-      if (!existed) return;
+      if (!existed) return false;
 
       // Lifecycle: before
       if (options?.onBeforeCheckOut) {
         const result = options.onBeforeCheckOut(id);
         if (result === false) {
           debug('checkOut cancelled by onBeforeCheckOut', id);
-          return;
+          return false;
         }
       }
 
       registry.value.delete(id);
       triggerRef(registry);
 
+      // Emit event
+      emit('check-out', { id });
+
       // Lifecycle: after
       options?.onCheckOut?.(id);
+
+      if (options?.debug) {
+        debug('Registry state after check-out:', {
+          total: registry.value.size,
+          items: Array.from(registry.value.keys()),
+        });
+      }
+
+      return true;
     };
 
     const get = (id: string | number) => registry.value.get(id);
@@ -209,19 +296,50 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       });
     };
 
-    const update = (id: string | number, data: Partial<T>) => {
+    const update = (id: string | number, data: Partial<T>): boolean => {
       const existing = registry.value.get(id);
-      if (existing && typeof existing.data === 'object' && typeof data === 'object') {
-        checkIn(id, { ...existing.data, ...data } as T, existing.meta);
+      if (!existing) {
+        debug('update failed: item not found', id);
+        return false;
       }
+
+      if (typeof existing.data === 'object' && typeof data === 'object') {
+        const previousData = { ...existing.data };
+
+        // Mise à jour directe sans relancer checkIn pour préserver le lifecycle
+        Object.assign(existing.data as object, data);
+        triggerRef(registry);
+
+        // Emit event
+        emit('update', { id, data: existing.data });
+
+        if (options?.debug) {
+          debug('update diff:', {
+            id,
+            before: previousData,
+            after: existing.data,
+            changes: data,
+          });
+        }
+
+        return true;
+      }
+
+      return false;
     };
 
     const has = (id: string | number) => registry.value.has(id);
 
     const clear = () => {
       debug('clear');
+      const count = registry.value.size;
       registry.value.clear();
       triggerRef(registry);
+
+      // Emit event
+      emit('clear', {});
+
+      debug(`Cleared ${count} items from registry`);
     };
 
     const checkInMany = (
@@ -253,13 +371,17 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       checkInMany,
       checkOutMany,
       updateMany,
+      on,
+      off,
+      emit,
     };
   };
 
   /**
    * Opens a check-in desk (parent component provides the desk)
+   * @alias createDesk
    */
-  const openDesk = (options?: CheckInDeskOptions<T, TContext>) => {
+  const createDesk = (options?: CheckInDeskOptions<T, TContext>) => {
     const DeskInjectionKey = Symbol('CheckInDesk') as InjectionKey<
       CheckInDesk<T, TContext> & TContext
     >;
@@ -271,6 +393,10 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
     } as CheckInDesk<T, TContext> & TContext;
 
     provide(DeskInjectionKey, fullContext);
+
+    if (options?.debug) {
+      Debug('Desk opened with injection key:', DeskInjectionKey.description);
+    }
 
     // Return both the desk and its symbol for children to inject
     return {
@@ -340,14 +466,20 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
     };
 
     // Perform the actual check-in
-    const performCheckIn = async () => {
-      if (isCheckedIn.value) return;
+    const performCheckIn = async (): Promise<boolean> => {
+      if (isCheckedIn.value) return true;
 
       const data = await getCurrentData();
-      desk!.checkIn(itemId, data, checkInOptions?.meta);
-      isCheckedIn.value = true;
+      const success = desk!.checkIn(itemId, data, checkInOptions?.meta);
 
-      debug(`[useCheckIn] Checked in: ${itemId}`, data);
+      if (success) {
+        isCheckedIn.value = true;
+        debug(`[useCheckIn] Checked in: ${itemId}`, data);
+      } else {
+        debug(`[useCheckIn] Check-in cancelled for: ${itemId}`);
+      }
+
+      return success;
     };
 
     // Perform check-out
@@ -439,10 +571,99 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
   };
 
   /**
-   * Generates a unique boarding pass ID
+   * Generates a cryptographically secure unique ID.
+   * Uses crypto.randomUUID if available, otherwise crypto.getRandomValues.
+   * Falls back to timestamp + Math.random for legacy environments.
+   *
+   * @param prefix - Préfixe optionnel pour l'ID
+   * @returns ID unique et sécurisé
    */
-  const generateId = (prefix = 'passenger'): string => {
-    return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const generateId = (prefix = 'item'): string => {
+    // Essaie crypto.randomUUID si disponible (navigateur moderne + Node 19+)
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return `${prefix}-${crypto.randomUUID()}`;
+    }
+
+    // Sinon utilise crypto.getRandomValues (quasi-universel)
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      const array = new Uint8Array(16);
+      crypto.getRandomValues(array);
+      const id = Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('');
+      return `${prefix}-${id}`;
+    }
+
+    // Fallback ultime pour environnements très anciens
+    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+    if (isDev) {
+      console.warn(
+        '[useCheckIn] crypto API not available, using Math.random fallback. ' +
+          'Consider upgrading to a modern environment.'
+      );
+    }
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 15);
+    return `${prefix}-${timestamp}-${random}`;
+  };
+
+  /**
+   * Generates a memoized ID for a component.
+   * Memoizes IDs based on instance or custom ID to ensure stability across remounts.
+   *
+   * @param instanceOrId
+   *   - Instance Vue (getCurrentInstance()) → ID mémorisé via WeakMap (stable au remontage)
+   *   - String/Number (nanoid(), props.id, etc.) → Utilise cet ID (stable si même valeur)
+   *   - null/undefined → Génère un ID cryptographiquement sécurisé (warning en dev)
+   * @param prefix - Préfixe pour l'ID (ex: 'tab', 'field')
+   * @returns ID mémorisé et stable
+   *
+   * @example
+   * ```ts
+   * // Avec instance Vue - mémorisé, toujours le même au remontage
+   * const id = memoizedId(getCurrentInstance(), 'tab');
+   *
+   * // Avec ID custom (nanoid, uuid, etc.)
+   * import { nanoid } from 'nanoid';
+   * const id = memoizedId(nanoid(), 'tab');
+   *
+   * // Avec props.id
+   * const id = memoizedId(props.id, 'tab');
+   * ```
+   */
+  const memoizedId = (
+    instanceOrId: object | string | number | null | undefined,
+    prefix = 'item'
+  ): string => {
+    // Cas 1: C'est un string ou number = ID custom fourni par l'utilisateur
+    if (typeof instanceOrId === 'string' || typeof instanceOrId === 'number') {
+      const key = `${prefix}-${instanceOrId}`;
+      let id = customIdMap.get(key);
+      if (!id) {
+        id = String(instanceOrId);
+        customIdMap.set(key, id);
+      }
+      return id;
+    }
+
+    // Cas 2: C'est un object = instance Vue (getCurrentInstance())
+    if (instanceOrId && typeof instanceOrId === 'object') {
+      let id = instanceIdMap.get(instanceOrId);
+      if (!id) {
+        id = `${prefix}-${++instanceCounter}`;
+        instanceIdMap.set(instanceOrId, id);
+      }
+      return id;
+    }
+
+    // Cas 3: null/undefined = génération cryptographiquement sécurisée avec warning
+    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+    if (isDev) {
+      console.warn(
+        `[useCheckIn] memoizedId: no instance or custom ID provided. ` +
+          `Generated cryptographically secure ID. ` +
+          `Consider passing getCurrentInstance() or a custom ID (nanoid, uuid, props.id, etc.).`
+      );
+    }
+    return generateId(prefix);
   };
 
   /**
@@ -476,9 +697,10 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
   };
 
   return {
-    openDesk,
+    createDesk,
     checkIn,
     generateId,
+    memoizedId,
     standaloneDesk,
     isCheckedIn,
     getRegistry,

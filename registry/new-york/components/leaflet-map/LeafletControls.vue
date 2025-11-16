@@ -57,8 +57,8 @@ const map = inject(LeafletMapKey, ref(null));
 const control = ref<any>(null);
 
 // Initialize useCheckIn for control items management
-const { openDesk } = useCheckIn<ControlItemReference>();
-const { desk, DeskInjectionKey } = openDesk({
+const { createDesk } = useCheckIn<ControlItemReference>();
+const { desk, DeskInjectionKey } = createDesk({
   context: {
     // Expose activeItem to child controls
     activeItem: () => props.activeItem,

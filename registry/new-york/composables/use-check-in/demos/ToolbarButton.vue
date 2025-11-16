@@ -26,12 +26,12 @@ const props = withDefaults(
   }
 );
 
-const { checkIn } = useCheckIn<ToolItemData>();
+const { checkIn, memoizedId } = useCheckIn<ToolItemData>();
 
 const { desk } = checkIn(toolbarDesk?.deskSymbol, {
   required: true,
   autoCheckIn: true,
-  id: props.id,
+  id: memoizedId(props.id),
   data: () => ({
     label: props.label,
     icon: props.icon,
@@ -43,12 +43,12 @@ const { desk } = checkIn(toolbarDesk?.deskSymbol, {
 
 const isActive = computed(() => {
   if (props.type !== 'toggle') return false;
-  return (desk as any)?.isActive(props.id) || false;
+  return desk && 'isActive' in desk ? desk.isActive(props.id) : false;
 });
 
 const handleClick = () => {
-  if (!props.disabled && desk) {
-    (desk as any).handleClick(props.id, props.type);
+  if (!props.disabled && desk && 'handleClick' in desk) {
+    desk.handleClick(props.id, props.type);
   }
 };
 </script>

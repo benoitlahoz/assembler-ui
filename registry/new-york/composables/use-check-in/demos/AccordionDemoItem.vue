@@ -24,12 +24,12 @@ const props = withDefaults(
   }
 );
 
-const { checkIn } = useCheckIn<AccordionItemData>();
+const { checkIn, memoizedId } = useCheckIn<AccordionItemData>();
 
 const { desk } = checkIn(accordionDesk?.deskSymbol, {
   required: true,
   autoCheckIn: true,
-  id: props.id,
+  id: memoizedId(props.id),
   data: () => ({
     title: props.title,
     open: props.open,
@@ -37,10 +37,12 @@ const { desk } = checkIn(accordionDesk?.deskSymbol, {
   watchData: true,
 });
 
-const isOpen = computed(() => (desk as any)?.isOpen(props.id) || false);
+const isOpen = computed(() => (desk && 'isOpen' in desk ? desk.isOpen(props.id) : false));
 
 const toggle = () => {
-  (desk as any)?.toggle(props.id);
+  if (desk && 'toggle' in desk) {
+    desk.toggle(props.id);
+  }
 };
 </script>
 

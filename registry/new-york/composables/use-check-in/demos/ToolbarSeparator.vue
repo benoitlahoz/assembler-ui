@@ -17,12 +17,12 @@ const props = defineProps<{
   id: string;
 }>();
 
-const { checkIn } = useCheckIn<ToolItemData>();
+const { checkIn, memoizedId } = useCheckIn<ToolItemData>();
 
 checkIn(toolbarDesk?.deskSymbol, {
   required: true,
   autoCheckIn: true,
-  id: props.id,
+  id: memoizedId(props.id),
   data: () => ({
     label: 'Separator',
     type: 'separator' as const,
