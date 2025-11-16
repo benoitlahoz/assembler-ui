@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, inject } from 'vue';
-import { useCheckIn } from '../../../composables/use-check-in/useCheckIn';
+import { useCheckIn } from '../useCheckIn';
 import type { ToolbarItemData } from './ToolbarContainer.vue';
 
 const props = withDefaults(

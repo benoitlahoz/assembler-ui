@@ -132,8 +132,8 @@ const getTypeIcon = (type: NotificationType) => {
   align-items: center;
   gap: 0.75rem;
   padding: 1rem;
-  border-radius: 0.375rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 6px hsl(var(--foreground) / 0.1);
   min-width: 300px;
   max-width: 400px;
   pointer-events: auto;
@@ -152,27 +152,27 @@ const getTypeIcon = (type: NotificationType) => {
 }
 
 .notification-info {
-  background: #dbeafe;
-  border-left: 4px solid #3b82f6;
-  color: #1e40af;
+  background: hsl(var(--primary) / 0.1);
+  border-left: 4px solid hsl(var(--primary));
+  color: hsl(var(--primary));
 }
 
 .notification-success {
-  background: #dcfce7;
-  border-left: 4px solid #22c55e;
-  color: #166534;
+  background: hsl(142 76% 36% / 0.1);
+  border-left: 4px solid hsl(142 76% 36%);
+  color: hsl(142 76% 36%);
 }
 
 .notification-warning {
-  background: #fef3c7;
-  border-left: 4px solid #f59e0b;
-  color: #92400e;
+  background: hsl(38 92% 50% / 0.1);
+  border-left: 4px solid hsl(38 92% 50%);
+  color: hsl(38 92% 50%);
 }
 
 .notification-error {
-  background: #fee2e2;
-  border-left: 4px solid #ef4444;
-  color: #991b1b;
+  background: hsl(var(--destructive) / 0.1);
+  border-left: 4px solid hsl(var(--destructive));
+  color: hsl(var(--destructive));
 }
 
 .notification-icon {

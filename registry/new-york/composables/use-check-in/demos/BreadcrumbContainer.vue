@@ -105,23 +105,23 @@ const items = desk.getGroup('breadcrumb', { sortBy: 'meta.position', order: 'asc
 }
 
 .breadcrumb-link {
-  color: #3b82f6;
+  color: hsl(var(--primary));
   text-decoration: none;
   cursor: pointer;
   transition: color 0.2s;
 }
 
 .breadcrumb-link:hover {
-  color: #2563eb;
   text-decoration: underline;
+  opacity: 0.8;
 }
 
 .breadcrumb-text {
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 .breadcrumb-separator {
-  color: #9ca3af;
+  color: hsl(var(--muted-foreground));
   margin: 0 0.25rem;
   user-select: none;
 }

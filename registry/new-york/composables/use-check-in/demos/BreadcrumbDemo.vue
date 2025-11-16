@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { Button } from '~/components/ui/button';
 import BreadcrumbContainer from './BreadcrumbContainer.vue';
 import BreadcrumbItem from './BreadcrumbItem.vue';
 
@@ -44,8 +45,8 @@ const addLevel = () => {
 
     <!-- Controls -->
     <div class="controls">
-      <button @click="goToRoot" class="control-button">Reset to Home</button>
-      <button @click="addLevel" class="control-button">Add Level</button>
+      <Button @click="goToRoot" variant="outline">Reset to Home</Button>
+      <Button @click="addLevel" variant="outline">Add Level</Button>
     </div>
 
     <!-- État actuel -->
@@ -64,38 +65,29 @@ const addLevel = () => {
 }
 
 h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
   margin-bottom: 0.5rem;
+  color: hsl(var(--foreground));
 }
 
 p {
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   margin-bottom: 2rem;
 }
 
 .controls {
   display: flex;
-  gap: 1rem;
+  gap: 0.5rem;
   margin-top: 2rem;
-}
-
-.control-button {
-  padding: 0.5rem 1rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.25rem;
-  background: white;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.control-button:hover {
-  background: #f3f4f6;
 }
 
 .state-display {
   margin-top: 2rem;
   padding: 1rem;
-  background: #f9fafb;
-  border-radius: 0.375rem;
+  background: hsl(var(--muted) / 0.3);
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
 }
 
 .state-display h3 {
@@ -103,12 +95,13 @@ p {
   font-size: 0.875rem;
   font-weight: 600;
   text-transform: uppercase;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 .state-display pre {
-  font-family: monospace;
+  font-family: var(--font-mono);
   margin: 0;
   white-space: pre-wrap;
+  color: hsl(var(--foreground));
 }
 </style>

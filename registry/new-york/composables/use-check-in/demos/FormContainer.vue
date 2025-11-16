@@ -186,17 +186,17 @@ const hasErrors = computed(() => {
 .form-field.has-error .field-input,
 .form-field.has-error .field-textarea,
 .form-field.has-error .field-select {
-  border-color: #ef4444;
+  border-color: hsl(var(--destructive));
 }
 
 .field-label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: hsl(var(--foreground));
 }
 
 .required {
-  color: #ef4444;
+  color: hsl(var(--destructive));
   margin-left: 0.25rem;
 }
 
@@ -204,17 +204,19 @@ const hasErrors = computed(() => {
 .field-textarea,
 .field-select {
   padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
   font-size: 0.875rem;
   transition: border-color 0.2s;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
 }
 
 .field-input:focus,
 .field-textarea:focus,
 .field-select:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: hsl(var(--ring));
 }
 
 .field-textarea {
@@ -224,7 +226,7 @@ const hasErrors = computed(() => {
 
 .field-error {
   font-size: 0.75rem;
-  color: #ef4444;
+  color: hsl(var(--destructive));
 }
 
 .form-actions {
@@ -234,16 +236,16 @@ const hasErrors = computed(() => {
 .submit-button {
   padding: 0.5rem 1.5rem;
   border: none;
-  border-radius: 0.375rem;
-  background: #3b82f6;
-  color: white;
+  border-radius: var(--radius);
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .submit-button:hover:not(:disabled) {
-  background: #2563eb;
+  background: hsl(var(--primary) / 0.9);
 }
 
 .submit-button:disabled {

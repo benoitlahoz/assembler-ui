@@ -118,10 +118,10 @@ const handleBackdropClick = () => {
 .context-menu {
   position: fixed;
   z-index: 9999;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.375rem;
-  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: 0 10px 15px hsl(var(--foreground) / 0.1);
   min-width: 200px;
   padding: 0.25rem;
   animation: menuIn 0.15s ease-out;
@@ -145,7 +145,7 @@ const handleBackdropClick = () => {
 
 .menu-divider {
   height: 1px;
-  background: #e5e7eb;
+  background: hsl(var(--border));
   margin: 0.25rem 0;
 }
 
@@ -159,12 +159,12 @@ const handleBackdropClick = () => {
   text-align: left;
   cursor: pointer;
   transition: background 0.2s;
-  border-radius: 0.25rem;
+  border-radius: var(--radius);
   font-size: 0.875rem;
 }
 
 .menu-item:hover:not(.is-disabled) {
-  background: #f3f4f6;
+  background: hsl(var(--muted) / 0.5);
 }
 
 .menu-item.is-disabled {
@@ -173,15 +173,15 @@ const handleBackdropClick = () => {
 }
 
 .menu-item.is-danger {
-  color: #ef4444;
+  color: hsl(var(--destructive));
 }
 
 .menu-item.is-danger:hover:not(.is-disabled) {
-  background: #fee2e2;
+  background: hsl(var(--destructive) / 0.1);
 }
 
 .menu-item.is-separator {
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid hsl(var(--border));
   margin-bottom: 0.25rem;
 }
 

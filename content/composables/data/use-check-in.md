@@ -1223,6 +1223,7 @@ Return both the desk and its symbol for children to inject
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";
+import { Button } from "~/components/ui/button";
 import FormContainer from "./FormContainer.vue";
 import FormField from "./FormField.vue";
 
@@ -1319,10 +1320,10 @@ const resetForm = () => {
 
       <template #actions>
         <div class="actions">
-          <button type="submit" class="submit-button">Submit</button>
-          <button type="button" class="reset-button" @click="resetForm">
-            Reset
-          </button>
+          <Button type="submit">Submit</Button>
+          <Button type="button" variant="outline" @click="resetForm"
+            >Reset</Button
+          >
         </div>
       </template>
     </FormContainer>
@@ -1351,7 +1352,7 @@ h2 {
 }
 
 p {
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   margin-bottom: 2rem;
 }
 
@@ -1360,39 +1361,11 @@ p {
   gap: 1rem;
 }
 
-.submit-button,
-.reset-button {
-  padding: 0.5rem 1.5rem;
-  border: none;
-  border-radius: 0.375rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.submit-button {
-  background: #3b82f6;
-  color: white;
-}
-
-.submit-button:hover {
-  background: #2563eb;
-}
-
-.reset-button {
-  background: #e5e7eb;
-  color: #374151;
-}
-
-.reset-button:hover {
-  background: #d1d5db;
-}
-
 .state-display {
   margin-top: 2rem;
   padding: 1rem;
-  background: #f9fafb;
-  border-radius: 0.375rem;
+  background: hsl(var(--muted) / 0.3);
+  border-radius: var(--radius);
 }
 
 .state-display h3 {
@@ -1400,23 +1373,23 @@ p {
   font-size: 0.875rem;
   font-weight: 600;
   text-transform: uppercase;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 .state-display pre {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   margin: 0.5rem 0;
   white-space: pre-wrap;
-  background: white;
+  background: hsl(var(--background));
   padding: 0.5rem;
-  border-radius: 0.25rem;
+  border-radius: var(--radius);
 }
 
 .submitted-data {
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid hsl(var(--border));
 }
 </style>
 ```
@@ -1432,6 +1405,7 @@ p {
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";
+import { Button } from "~/components/ui/button";
 import BreadcrumbContainer from "./BreadcrumbContainer.vue";
 import BreadcrumbItem from "./BreadcrumbItem.vue";
 
@@ -1477,8 +1451,8 @@ const addLevel = () => {
     </BreadcrumbContainer>
 
     <div class="controls">
-      <button @click="goToRoot" class="control-button">Reset to Home</button>
-      <button @click="addLevel" class="control-button">Add Level</button>
+      <Button @click="goToRoot" variant="outline">Reset to Home</Button>
+      <Button @click="addLevel" variant="outline">Add Level</Button>
     </div>
 
     <div class="state-display">
@@ -1496,38 +1470,29 @@ const addLevel = () => {
 }
 
 h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
   margin-bottom: 0.5rem;
+  color: hsl(var(--foreground));
 }
 
 p {
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   margin-bottom: 2rem;
 }
 
 .controls {
   display: flex;
-  gap: 1rem;
+  gap: 0.5rem;
   margin-top: 2rem;
-}
-
-.control-button {
-  padding: 0.5rem 1rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.25rem;
-  background: white;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.control-button:hover {
-  background: #f3f4f6;
 }
 
 .state-display {
   margin-top: 2rem;
   padding: 1rem;
-  background: #f9fafb;
-  border-radius: 0.375rem;
+  background: hsl(var(--muted) / 0.3);
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
 }
 
 .state-display h3 {
@@ -1535,13 +1500,14 @@ p {
   font-size: 0.875rem;
   font-weight: 600;
   text-transform: uppercase;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 .state-display pre {
-  font-family: monospace;
+  font-family: var(--font-mono);
   margin: 0;
   white-space: pre-wrap;
+  color: hsl(var(--foreground));
 }
 </style>
 ```
@@ -1659,7 +1625,7 @@ h2 {
 }
 
 p {
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   margin-bottom: 2rem;
 }
 
@@ -1668,26 +1634,26 @@ p {
   align-items: center;
   justify-content: center;
   min-height: 300px;
-  border: 2px dashed #d1d5db;
-  border-radius: 0.375rem;
-  background: #f9fafb;
+  border: 2px dashed hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--muted) / 0.2);
   cursor: context-menu;
   user-select: none;
   transition: all 0.2s;
   font-size: 1.125rem;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 .context-area:hover {
-  border-color: #9ca3af;
-  background: #f3f4f6;
+  border-color: hsl(var(--muted-foreground) / 0.5);
+  background: hsl(var(--muted) / 0.3);
 }
 
 .state-display {
   margin-top: 2rem;
   padding: 1rem;
-  background: #f9fafb;
-  border-radius: 0.375rem;
+  background: hsl(var(--muted) / 0.3);
+  border-radius: var(--radius);
 }
 
 .state-display h3 {
@@ -1695,18 +1661,18 @@ p {
   font-size: 0.875rem;
   font-weight: 600;
   text-transform: uppercase;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 .state-display pre {
-  font-family: monospace;
+  font-family: var(--font-mono);
   margin: 0.5rem 0;
 }
 
 .state-display .hint {
   margin: 0.5rem 0 0;
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: hsl(var(--muted-foreground) / 0.7);
 }
 </style>
 ```
@@ -1722,6 +1688,7 @@ p {
 ```vue
 <script setup lang="ts">
 import { ref } from "vue";
+import { Button } from "~/components/ui/button";
 import NotificationProvider from "./NotificationProvider.vue";
 import NotificationItem from "./NotificationItem.vue";
 
@@ -1796,22 +1763,25 @@ const handleDismiss = (id: string) => {
     <div class="controls">
       <h3>Add Notification:</h3>
       <div class="button-group">
-        <button @click="addNotification('info')" class="btn btn-info">
-          Info
-        </button>
-        <button @click="addNotification('success')" class="btn btn-success">
-          Success
-        </button>
-        <button @click="addNotification('warning')" class="btn btn-warning">
-          Warning
-        </button>
-        <button @click="addNotification('error')" class="btn btn-error">
-          Error
-        </button>
+        <Button @click="addNotification('info')" variant="default" size="sm"
+          >Info</Button
+        >
+        <Button @click="addNotification('success')" variant="default" size="sm"
+          >Success</Button
+        >
+        <Button @click="addNotification('warning')" variant="default" size="sm"
+          >Warning</Button
+        >
+        <Button
+          @click="addNotification('error')"
+          variant="destructive"
+          size="sm"
+          >Error</Button
+        >
       </div>
-      <button @click="addNotification('info', 0)" class="btn btn-persistent">
+      <Button @click="addNotification('info', 0)" variant="outline" size="sm">
         Add Persistent (no auto-dismiss)
-      </button>
+      </Button>
     </div>
 
     <div class="state-display">
@@ -1838,7 +1808,7 @@ h2 {
 }
 
 p {
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   margin-bottom: 2rem;
 }
 
@@ -1853,7 +1823,7 @@ p {
   font-size: 0.875rem;
   font-weight: 600;
   text-transform: uppercase;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   margin: 0;
 }
 
@@ -1863,61 +1833,11 @@ p {
   flex-wrap: wrap;
 }
 
-.btn {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 0.25rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  color: white;
-  font-weight: 500;
-}
-
-.btn-info {
-  background: #3b82f6;
-}
-
-.btn-info:hover {
-  background: #2563eb;
-}
-
-.btn-success {
-  background: #22c55e;
-}
-
-.btn-success:hover {
-  background: #16a34a;
-}
-
-.btn-warning {
-  background: #f59e0b;
-}
-
-.btn-warning:hover {
-  background: #d97706;
-}
-
-.btn-error {
-  background: #ef4444;
-}
-
-.btn-error:hover {
-  background: #dc2626;
-}
-
-.btn-persistent {
-  background: #6b7280;
-}
-
-.btn-persistent:hover {
-  background: #4b5563;
-}
-
 .state-display {
   margin-top: 2rem;
   padding: 1rem;
-  background: #f9fafb;
-  border-radius: 0.375rem;
+  background: hsl(var(--muted) / 0.3);
+  border-radius: var(--radius);
 }
 
 .state-display h3 {
@@ -1925,11 +1845,11 @@ p {
   font-size: 0.875rem;
   font-weight: 600;
   text-transform: uppercase;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 .state-display pre {
-  font-family: monospace;
+  font-family: var(--font-mono);
   margin: 0.5rem 0;
 }
 
@@ -1939,7 +1859,7 @@ p {
 }
 
 .state-display li {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 0.875rem;
   margin: 0.25rem 0;
 }
@@ -2350,19 +2270,23 @@ const handleSettings = () => {
 }
 
 h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
   margin-bottom: 0.5rem;
+  color: hsl(var(--foreground));
 }
 
 p {
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   margin-bottom: 2rem;
 }
 
 .state-display {
   margin-top: 2rem;
   padding: 1rem;
-  background: #f9fafb;
-  border-radius: 0.375rem;
+  background: hsl(var(--muted) / 0.3);
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
 }
 
 .state-display h3 {
@@ -2370,7 +2294,7 @@ p {
   font-size: 0.875rem;
   font-weight: 600;
   text-transform: uppercase;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 .state-display ul {
@@ -2381,7 +2305,9 @@ p {
 
 .state-display li {
   padding: 0.25rem 0;
-  font-family: monospace;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: hsl(var(--foreground));
 }
 </style>
 ```

@@ -98,7 +98,7 @@ h2 {
 }
 
 p {
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   margin-bottom: 2rem;
 }
 
@@ -107,26 +107,26 @@ p {
   align-items: center;
   justify-content: center;
   min-height: 300px;
-  border: 2px dashed #d1d5db;
-  border-radius: 0.375rem;
-  background: #f9fafb;
+  border: 2px dashed hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--muted) / 0.2);
   cursor: context-menu;
   user-select: none;
   transition: all 0.2s;
   font-size: 1.125rem;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 .context-area:hover {
-  border-color: #9ca3af;
-  background: #f3f4f6;
+  border-color: hsl(var(--muted-foreground) / 0.5);
+  background: hsl(var(--muted) / 0.3);
 }
 
 .state-display {
   margin-top: 2rem;
   padding: 1rem;
-  background: #f9fafb;
-  border-radius: 0.375rem;
+  background: hsl(var(--muted) / 0.3);
+  border-radius: var(--radius);
 }
 
 .state-display h3 {
@@ -134,17 +134,17 @@ p {
   font-size: 0.875rem;
   font-weight: 600;
   text-transform: uppercase;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 .state-display pre {
-  font-family: monospace;
+  font-family: var(--font-mono);
   margin: 0.5rem 0;
 }
 
 .state-display .hint {
   margin: 0.5rem 0 0;
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: hsl(var(--muted-foreground) / 0.7);
 }
 </style>

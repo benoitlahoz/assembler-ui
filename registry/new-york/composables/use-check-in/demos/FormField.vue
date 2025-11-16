@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { inject, ref, watch } from 'vue';
-import { useCheckIn } from '../../../composables/use-check-in/useCheckIn';
+import { useCheckIn } from '../useCheckIn';
 import type { FormFieldData } from './FormContainer.vue';
 
 const props = withDefaults(

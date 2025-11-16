@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { provide } from 'vue';
-import { useCheckIn } from '../../../composables/use-check-in/useCheckIn';
+import { useCheckIn } from '../useCheckIn';
+import { Button } from '~/components/ui/button';
 
 export interface ToolbarItemData {
   label: string;
@@ -46,44 +47,47 @@ const endItems = desk.getGroup('end', { sortBy: 'meta.position', order: 'asc' })
     <div class="toolbar-groups">
       <!-- Groupe Start -->
       <div v-if="startItems.length > 0" class="toolbar-group toolbar-start">
-        <button
+        <Button
           v-for="item in startItems"
           :key="item.id"
           :disabled="item.data.disabled"
           @click="item.data.onClick"
-          class="toolbar-button"
+          variant="outline"
+          size="sm"
         >
-          <span v-if="item.data.icon" class="icon">{{ item.data.icon }}</span>
+          <span v-if="item.data.icon" class="mr-2">{{ item.data.icon }}</span>
           {{ item.data.label }}
-        </button>
+        </Button>
       </div>
 
       <!-- Groupe Main -->
       <div v-if="mainItems.length > 0" class="toolbar-group toolbar-main">
-        <button
+        <Button
           v-for="item in mainItems"
           :key="item.id"
           :disabled="item.data.disabled"
           @click="item.data.onClick"
-          class="toolbar-button"
+          variant="outline"
+          size="sm"
         >
-          <span v-if="item.data.icon" class="icon">{{ item.data.icon }}</span>
+          <span v-if="item.data.icon" class="mr-2">{{ item.data.icon }}</span>
           {{ item.data.label }}
-        </button>
+        </Button>
       </div>
 
       <!-- Groupe End -->
       <div v-if="endItems.length > 0" class="toolbar-group toolbar-end">
-        <button
+        <Button
           v-for="item in endItems"
           :key="item.id"
           :disabled="item.data.disabled"
           @click="item.data.onClick"
-          class="toolbar-button"
+          variant="outline"
+          size="sm"
         >
-          <span v-if="item.data.icon" class="icon">{{ item.data.icon }}</span>
+          <span v-if="item.data.icon" class="mr-2">{{ item.data.icon }}</span>
           {{ item.data.label }}
-        </button>
+        </Button>
       </div>
     </div>
   </div>
@@ -98,12 +102,12 @@ const endItems = desk.getGroup('end', { sortBy: 'meta.position', order: 'asc' })
 
 .toolbar-groups {
   display: flex;
-  gap: 1rem;
+  gap: 0.5rem;
   align-items: center;
   padding: 0.5rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.375rem;
-  background: white;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--background));
 }
 
 .toolbar-group {
@@ -122,30 +126,5 @@ const endItems = desk.getGroup('end', { sortBy: 'meta.position', order: 'asc' })
 
 .toolbar-end {
   margin-left: auto;
-}
-
-.toolbar-button {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.5rem 1rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.25rem;
-  background: white;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.toolbar-button:hover:not(:disabled) {
-  background: #f3f4f6;
-}
-
-.toolbar-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.icon {
-  font-size: 1.25rem;
 }
 </style>

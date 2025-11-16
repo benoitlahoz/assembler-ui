@@ -116,19 +116,23 @@ const handleSettings = () => {
 }
 
 h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
   margin-bottom: 0.5rem;
+  color: hsl(var(--foreground));
 }
 
 p {
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   margin-bottom: 2rem;
 }
 
 .state-display {
   margin-top: 2rem;
   padding: 1rem;
-  background: #f9fafb;
-  border-radius: 0.375rem;
+  background: hsl(var(--muted) / 0.3);
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
 }
 
 .state-display h3 {
@@ -136,7 +140,7 @@ p {
   font-size: 0.875rem;
   font-weight: 600;
   text-transform: uppercase;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 .state-display ul {
@@ -147,6 +151,8 @@ p {
 
 .state-display li {
   padding: 0.25rem 0;
-  font-family: monospace;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: hsl(var(--foreground));
 }
 </style>

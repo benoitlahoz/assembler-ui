@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { Button } from '~/components/ui/button';
 import NotificationProvider from './NotificationProvider.vue';
 import NotificationItem from './NotificationItem.vue';
 
@@ -72,14 +73,14 @@ const handleDismiss = (id: string) => {
     <div class="controls">
       <h3>Add Notification:</h3>
       <div class="button-group">
-        <button @click="addNotification('info')" class="btn btn-info">Info</button>
-        <button @click="addNotification('success')" class="btn btn-success">Success</button>
-        <button @click="addNotification('warning')" class="btn btn-warning">Warning</button>
-        <button @click="addNotification('error')" class="btn btn-error">Error</button>
+        <Button @click="addNotification('info')" variant="default" size="sm">Info</Button>
+        <Button @click="addNotification('success')" variant="default" size="sm">Success</Button>
+        <Button @click="addNotification('warning')" variant="default" size="sm">Warning</Button>
+        <Button @click="addNotification('error')" variant="destructive" size="sm">Error</Button>
       </div>
-      <button @click="addNotification('info', 0)" class="btn btn-persistent">
+      <Button @click="addNotification('info', 0)" variant="outline" size="sm">
         Add Persistent (no auto-dismiss)
-      </button>
+      </Button>
     </div>
 
     <!-- État actuel -->
@@ -107,7 +108,7 @@ h2 {
 }
 
 p {
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   margin-bottom: 2rem;
 }
 
@@ -122,7 +123,7 @@ p {
   font-size: 0.875rem;
   font-weight: 600;
   text-transform: uppercase;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
   margin: 0;
 }
 
@@ -132,61 +133,11 @@ p {
   flex-wrap: wrap;
 }
 
-.btn {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 0.25rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  color: white;
-  font-weight: 500;
-}
-
-.btn-info {
-  background: #3b82f6;
-}
-
-.btn-info:hover {
-  background: #2563eb;
-}
-
-.btn-success {
-  background: #22c55e;
-}
-
-.btn-success:hover {
-  background: #16a34a;
-}
-
-.btn-warning {
-  background: #f59e0b;
-}
-
-.btn-warning:hover {
-  background: #d97706;
-}
-
-.btn-error {
-  background: #ef4444;
-}
-
-.btn-error:hover {
-  background: #dc2626;
-}
-
-.btn-persistent {
-  background: #6b7280;
-}
-
-.btn-persistent:hover {
-  background: #4b5563;
-}
-
 .state-display {
   margin-top: 2rem;
   padding: 1rem;
-  background: #f9fafb;
-  border-radius: 0.375rem;
+  background: hsl(var(--muted) / 0.3);
+  border-radius: var(--radius);
 }
 
 .state-display h3 {
@@ -194,11 +145,11 @@ p {
   font-size: 0.875rem;
   font-weight: 600;
   text-transform: uppercase;
-  color: #6b7280;
+  color: hsl(var(--muted-foreground));
 }
 
 .state-display pre {
-  font-family: monospace;
+  font-family: var(--font-mono);
   margin: 0.5rem 0;
 }
 
@@ -208,7 +159,7 @@ p {
 }
 
 .state-display li {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 0.875rem;
   margin: 0.25rem 0;
 }
