@@ -109,8 +109,12 @@ const desk = deskResult?.desk;
 
 // Access context from desk with fallbacks for auto-iterate mode
 const editingPath = desk ? (desk as any).editingPath : ref(null);
-const updateValueInDesk = desk ? (desk as any).updateValue : () => console.warn('No desk available');
-const deleteValueInDesk = desk ? (desk as any).deleteValue : () => console.warn('No desk available');
+const updateValueInDesk = desk
+  ? (desk as any).updateValue
+  : () => console.warn('No desk available');
+const deleteValueInDesk = desk
+  ? (desk as any).deleteValue
+  : () => console.warn('No desk available');
 const addValueInDesk = desk ? (desk as any).addValue : () => console.warn('No desk available');
 const updateKeyInDesk = desk ? (desk as any).updateKey : () => console.warn('No desk available');
 const startEditInDesk = desk ? (desk as any).startEdit : () => console.warn('No desk available');
