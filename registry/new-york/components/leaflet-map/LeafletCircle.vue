@@ -66,8 +66,8 @@ let dragStartMousePoint: any = null;
 const { checkIn } = useCheckIn<FeatureReference>();
 
 // Check in with selection desk
-const { desk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+const { desk: featureDesk } = selectionContext
+  ? checkIn('leafletFeatures', {
       autoCheckIn: props.selectable,
       id: circleId.value,
       data: () => ({

@@ -33,9 +33,6 @@ const wrapperRef = useTemplateRef('wrapperRef');
 
 const controlsContext = inject(LeafletControlsKey);
 console.log('[LeafletControlItem] Controls context:', controlsContext ? 'FOUND' : 'NOT FOUND');
-if (controlsContext) {
-  console.log('[LeafletControlItem] DeskInjectionKey:', controlsContext.DeskInjectionKey);
-}
 
 // Use checkIn for automatic registration/cleanup
 const { checkIn } = useCheckIn<ControlItemReference>();
@@ -88,8 +85,8 @@ const getContentHtml = () => {
 };
 
 // Check in with controls desk
-const { desk } = controlsContext?.DeskInjectionKey
-  ? checkIn(controlsContext.DeskInjectionKey, {
+const { desk } = controlsContext
+  ? checkIn('leafletControls', {
       autoCheckIn: true,
       id: props.name,
       data: () => {

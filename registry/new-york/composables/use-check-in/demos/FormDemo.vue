@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, provide } from 'vue';
+import { ref, computed, type Ref } from 'vue';
 import { useCheckIn } from '../useCheckIn';
 import FormField from './FormField.vue';
 
-// Type de données pour les champs de formulaire
 interface FormFieldData {
   name: string;
   label: string;
@@ -11,43 +10,42 @@ interface FormFieldData {
   required?: boolean;
 }
 
-// Parent: Form Container
-const { createDesk } = useCheckIn<FormFieldData>();
+interface FormDeskContext {
+  updateValue: (name: string, value: any) => void;
+  getValue: (name: string) => any;
+  setError: (name: string, error: string) => void;
+  getError: (name: string) => string | undefined;
+  clearError: (name: string) => void;
+}
+
+const { createDesk } = useCheckIn<FormFieldData, FormDeskContext>();
 
 const formData = ref<Record<string, any>>({});
 const errors = ref<Record<string, string>>({});
 
-// Le parent ouvre un desk et le fournit à ses enfants
-const { desk, DeskInjectionKey: formDesk } = createDesk({
+const { desk } = createDesk('formDesk', {
   context: {
     updateValue: (name: string, value: any) => {
       formData.value[name] = value;
       if (errors.value[name]) {
         delete errors.value[name];
-        errors.value = { ...errors.value };
       }
     },
     getValue: (name: string) => formData.value[name],
     setError: (name: string, error: string) => {
       errors.value[name] = error;
-      errors.value = { ...errors.value };
     },
     getError: (name: string) => errors.value[name],
+    clearError: (name: string) => {
+      delete errors.value[name];
+    },
   },
   onCheckIn: (id, data) => {
     if (data.value !== undefined) {
       formData.value[data.name] = data.value;
     }
-    return true; // Confirmer l'enregistrement
-  },
-  onCheckOut: (id) => {
-    // console.log('Field checked out:', id);
-    return true;
   },
 });
-
-// Fournir le deskSymbol dans un objet aux enfants
-provide('formDesk', { deskSymbol: formDesk });
 
 const allFields = computed(() => desk.getAll());
 const isValid = computed(() => Object.keys(errors.value).length === 0);
@@ -55,18 +53,34 @@ const fieldCount = computed(() => allFields.value.length);
 
 const validateForm = () => {
   errors.value = {};
+  let isFormValid = true;
+
   allFields.value.forEach((field) => {
-    if (field.data.required && !formData.value[field.data.name]) {
+    const value = formData.value[field.data.name];
+
+    if (field.data.required && (!value || value.trim() === '')) {
       errors.value[field.data.name] = `${field.data.label} is required`;
+      isFormValid = false;
+    }
+
+    // Email validation
+    if (field.data.name === 'email' && value) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(value)) {
+        errors.value[field.data.name] = 'Invalid email format';
+        isFormValid = false;
+      }
     }
   });
-  errors.value = { ...errors.value };
-  return Object.keys(errors.value).length === 0;
+
+  return isFormValid;
 };
 
 const handleSubmit = () => {
   if (validateForm()) {
-    alert(`Form submitted!\n\n${JSON.stringify(formData.value, null, 2)}`);
+    alert(`✅ Form submitted successfully!\n\n${JSON.stringify(formData.value, null, 2)}`);
+  } else {
+    alert('❌ Please fix the errors before submitting');
   }
 };
 
@@ -74,61 +88,120 @@ const resetForm = () => {
   formData.value = {};
   errors.value = {};
 };
+
+const fillSample = () => {
+  formData.value = {
+    name: 'John Doe',
+    email: 'john.doe@example.com',
+    message: 'This is a sample message for testing purposes.',
+  };
+};
 </script>
 
 <template>
   <div class="w-full max-w-2xl mx-auto space-y-6 p-6">
+    <!-- Header -->
     <div class="space-y-2">
-      <h2 class="text-2xl font-bold">useCheckIn - Form Demo</h2>
+      <h2 class="text-2xl font-bold">📝 Form Demo - useCheckIn</h2>
       <p class="text-muted-foreground">
-        Form fields check in with parent for centralized state management
+        A dynamic form system where fields register themselves at a central desk. The desk manages
+        validation, errors, and form state.
       </p>
     </div>
 
-    <!-- Form Stats -->
-    <div class="flex items-center gap-4 p-4 bg-muted rounded-lg">
-      <span class="text-sm font-medium">{{ fieldCount }} fields</span>
-      <span :class="['text-sm font-medium', isValid ? 'text-green-600' : 'text-red-600']">
-        {{ isValid ? '✓ Valid' : '✗ Invalid' }}
-      </span>
+    <!-- Stats -->
+    <div class="grid grid-cols-3 gap-4">
+      <div class="bg-muted p-4 rounded-lg">
+        <div class="text-sm text-muted-foreground">Fields</div>
+        <div class="text-2xl font-bold">{{ fieldCount }}</div>
+      </div>
+      <div class="bg-muted p-4 rounded-lg">
+        <div class="text-sm text-muted-foreground">Status</div>
+        <div :class="['text-lg font-bold', isValid ? 'text-green-600' : 'text-red-600']">
+          {{ isValid ? '✓ Valid' : '✗ Invalid' }}
+        </div>
+      </div>
+      <div class="bg-muted p-4 rounded-lg">
+        <div class="text-sm text-muted-foreground">Errors</div>
+        <div class="text-2xl font-bold text-red-600">{{ Object.keys(errors).length }}</div>
+      </div>
     </div>
 
     <!-- Form -->
     <form @submit.prevent="handleSubmit" class="space-y-4 p-6 border border-border rounded-lg">
-      <FormField name="username" label="Username" :required="true" placeholder="Enter username" />
+      <FormField
+        name="name"
+        label="Full Name"
+        type="text"
+        placeholder="Enter your name"
+        :required="true"
+      />
+
       <FormField
         name="email"
-        label="Email"
+        label="Email Address"
         type="email"
+        placeholder="your.email@example.com"
         :required="true"
-        placeholder="email@example.com"
       />
-      <FormField name="bio" label="Bio" type="textarea" placeholder="Tell us about yourself..." />
 
+      <FormField
+        name="message"
+        label="Message"
+        type="textarea"
+        placeholder="Type your message here..."
+        :required="true"
+      />
+
+      <!-- Actions -->
       <div class="flex gap-2 pt-4">
         <button
           type="submit"
           class="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
         >
-          Submit
+          📤 Submit Form
         </button>
         <button
           type="button"
           @click="resetForm"
-          class="px-4 py-2 bg-secondary text-secondary-foreground rounded hover:bg-secondary/80"
+          class="px-4 py-2 bg-secondary text-secondary-foreground rounded hover:bg-secondary/90"
         >
-          Reset
+          🔄 Reset
+        </button>
+        <button
+          type="button"
+          @click="fillSample"
+          class="px-4 py-2 bg-muted text-muted-foreground rounded hover:bg-muted/80"
+        >
+          💡 Fill Sample
         </button>
       </div>
     </form>
 
-    <!-- Debug Info -->
-    <div class="p-4 bg-muted rounded-lg space-y-2">
-      <h4 class="font-semibold">Debug Info</h4>
-      <div class="text-sm space-y-1">
-        <pre class="bg-background p-2 rounded">{{ JSON.stringify(formData, null, 2) }}</pre>
-        <p><strong>Fields:</strong> {{ allFields.map((f) => f.data.name).join(', ') }}</p>
+    <!-- Form State Debug -->
+    <div class="p-4 bg-muted/50 rounded-lg text-xs space-y-2">
+      <div class="font-bold">📊 Form State:</div>
+      <div>
+        <strong>Fields:</strong>
+        {{ allFields.map((f) => f.data.name).join(', ') || 'None' }}
       </div>
+      <div>
+        <strong>Data:</strong>
+        <pre class="mt-1 overflow-auto">{{ JSON.stringify(formData, null, 2) }}</pre>
+      </div>
+      <div v-if="Object.keys(errors).length > 0">
+        <strong>Errors:</strong>
+        <pre class="mt-1 overflow-auto text-red-600">{{ JSON.stringify(errors, null, 2) }}</pre>
+      </div>
+    </div>
+
+    <!-- Info -->
+    <div class="text-xs text-muted-foreground space-y-1 border-t pt-4">
+      <div><strong>💡 How it works:</strong></div>
+      <div>• Form creates a desk with <code>createDesk('formDesk', ...)</code></div>
+      <div>• Each field auto-registers using <code>checkIn('formDesk', ...)</code></div>
+      <div>• The desk provides centralized validation and error management</div>
+      <div>• Fields communicate through the desk's context methods</div>
     </div>
   </div>
 </template>

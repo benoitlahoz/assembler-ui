@@ -194,7 +194,7 @@ const { createDesk } = useCheckIn<
 >();
 
 // Opening the check-in desk with flight information
-const airportDesk = createDesk({
+const airportDesk = createDesk('airportDesk', {
   context: {
     flightNumber,
     gate,
@@ -220,9 +220,6 @@ const airportDesk = createDesk({
     return true;
   },
 });
-
-// Provide the deskSymbol so children can inject it
-provide('airportDesk', { deskSymbol: airportDesk.DeskInjectionKey });
 
 // List of registered passengers
 const passengers = computed(() => {

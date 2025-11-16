@@ -54,8 +54,8 @@ const isDragging = ref(false);
 const rectangleId = ref<string | number>(props.id ?? `rectangle-${Date.now()}-${Math.random()}`);
 
 // Check in with selection desk
-const { desk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+const { desk: featureDesk } = selectionContext
+  ? checkIn('leafletFeatures', {
       autoCheckIn: props.selectable,
       id: rectangleId.value,
       data: () => ({

@@ -210,7 +210,7 @@ const model = defineModel<Record<string, any> | any[]>({ required: true });
 const editingPath = ref<string[] | null>(null);
 
 const { createDesk } = useCheckIn<ComposerItemData>();
-const { desk, DeskInjectionKey } = createDesk({
+const { desk } = createDesk("objectComposerDesk", {
   context: {
     editingPath,
 
@@ -265,7 +265,7 @@ const { desk, DeskInjectionKey } = createDesk({
   debug: false,
 });
 
-provide("objectComposerDesk", { deskSymbol: DeskInjectionKey, model });
+provide("objectComposerDesk", { model });
 </script>
 
 <template>
@@ -679,7 +679,6 @@ const slots = defineSlots<{
 }>();
 
 const composerDesk = inject<{
-  deskSymbol: InjectionKey<CheckInDesk<ComposerItemData>>;
   model: any;
 }>("objectComposerDesk")!;
 
@@ -706,7 +705,7 @@ const currentPath = computed(() => {
 });
 
 const deskResult = props.itemKey
-  ? checkIn(composerDesk.deskSymbol, {
+  ? checkIn("objectComposerDesk", {
       autoCheckIn: true,
       id: currentPath.value.join("."),
       data: {
@@ -1720,13 +1719,10 @@ import {
   ref,
   provide,
   inject,
-  onMounted,
-  onBeforeUnmount,
   onUnmounted,
   watch,
   computed,
   triggerRef,
-  nextTick,
   type InjectionKey,
   type Ref,
   type ComputedRef,
@@ -1751,7 +1747,7 @@ export interface CheckInDesk<
   T = any,
   TContext extends Record<string, any> = {},
 > {
-  registry: Ref<Map<string | number, CheckInItem<T>>>;
+  readonly registry: Ref<Map<string | number, CheckInItem<T>>>;
   checkIn: (
     id: string | number,
     data: T,
@@ -1773,11 +1769,8 @@ export interface CheckInDesk<
   updateMany: (
     updates: Array<{ id: string | number; data: Partial<T> }>,
   ) => void;
-
   on: (event: DeskEventType, callback: DeskEventCallback<T>) => () => void;
-
   off: (event: DeskEventType, callback: DeskEventCallback<T>) => void;
-
   emit: (
     event: DeskEventType,
     payload: { id?: string | number; data?: T },
@@ -1789,37 +1782,23 @@ export interface CheckInDeskOptions<
   TContext extends Record<string, any> = {},
 > {
   context?: TContext;
-
   onBeforeCheckIn?: (id: string | number, data: T) => void | boolean;
-
   onCheckIn?: (id: string | number, data: T) => void;
-
   onBeforeCheckOut?: (id: string | number) => void | boolean;
-
   onCheckOut?: (id: string | number) => void;
-
   debug?: boolean;
 }
 
 export interface CheckInOptions<T = any> {
   required?: boolean;
-
   autoCheckIn?: boolean;
-
   id?: string | number;
-
   data?: T | (() => T) | (() => Promise<T>);
-
   generateId?: () => string | number;
-
   watchData?: boolean;
-
   shallow?: boolean;
-
   watchCondition?: (() => boolean) | Ref<boolean>;
-
   meta?: Record<string, any>;
-
   debug?: boolean;
 }
 
@@ -2070,10 +2049,13 @@ export const useCheckIn = <
     };
   };
 
-  const createDesk = (options?: CheckInDeskOptions<T, TContext>) => {
-    const DeskInjectionKey = Symbol("CheckInDesk") as InjectionKey<
-      CheckInDesk<T, TContext> & TContext
-    >;
+  const createDesk = (
+    injectionKey: string = "checkInDesk",
+    options?: CheckInDeskOptions<T, TContext>,
+  ) => {
+    const DeskInjectionKey = Symbol(
+      `CheckInDesk:${injectionKey}`,
+    ) as InjectionKey<CheckInDesk<T, TContext> & TContext>;
     const deskContext = createDeskContext<T, TContext>(options);
 
     const fullContext = {
@@ -2083,13 +2065,15 @@ export const useCheckIn = <
 
     provide(DeskInjectionKey, fullContext);
 
+    provide(injectionKey, DeskInjectionKey);
+
     if (options?.debug) {
-      Debug("Desk opened with injection key:", DeskInjectionKey.description);
+      Debug("Desk opened with injection key:", injectionKey);
     }
 
     return {
       desk: fullContext,
-      DeskInjectionKey,
+      injectionKey,
     };
   };
 
@@ -2100,16 +2084,17 @@ export const useCheckIn = <
     > &
       TContext,
   >(
-    parentDeskOrSymbol:
+    parentDeskOrKey:
       | (CheckInDesk<T, TContext> & TContext)
       | InjectionKey<CheckInDesk<T, TContext> & TContext>
+      | string
       | null
       | undefined,
     checkInOptions?: CheckInOptions<T>,
   ) => {
     const debug = checkInOptions?.debug ? Debug : NoOpDebug;
 
-    if (!parentDeskOrSymbol) {
+    if (!parentDeskOrKey) {
       debug("[useCheckIn] No parent desk provided - skipping check-in");
 
       return {
@@ -2121,8 +2106,8 @@ export const useCheckIn = <
 
     let desk: (CheckInDesk<T, TContext> & TContext) | null | undefined;
 
-    if (typeof parentDeskOrSymbol === "symbol") {
-      desk = inject(parentDeskOrSymbol);
+    if (typeof parentDeskOrKey === "symbol") {
+      desk = inject(parentDeskOrKey);
       if (!desk) {
         debug("[useCheckIn] Could not inject desk from symbol");
 
@@ -2132,8 +2117,32 @@ export const useCheckIn = <
           updateSelf: () => {},
         };
       }
+    } else if (typeof parentDeskOrKey === "string") {
+      const injectionKey =
+        inject<InjectionKey<CheckInDesk<T, TContext> & TContext>>(
+          parentDeskOrKey,
+        );
+      if (!injectionKey) {
+        debug("[useCheckIn] Could not find desk with key:", parentDeskOrKey);
+
+        return {
+          desk: null as TDesk | null,
+          checkOut: () => {},
+          updateSelf: () => {},
+        };
+      }
+      desk = inject(injectionKey);
+      if (!desk) {
+        debug("[useCheckIn] Could not inject desk from key:", parentDeskOrKey);
+
+        return {
+          desk: null as TDesk | null,
+          checkOut: () => {},
+          updateSelf: () => {},
+        };
+      }
     } else {
-      desk = parentDeskOrSymbol;
+      desk = parentDeskOrKey;
     }
 
     const itemId = checkInOptions?.id || `item-${Date.now()}-${Math.random()}`;
@@ -2367,7 +2376,7 @@ export const useCheckIn = <
   ### Provide
 | Key | Value | Type | Description |
 |-----|-------|------|-------------|
-| `objectComposerDesk`{.primary .text-primary} | `{ deskSymbol: DeskInjectionKey, model }` | `any` | Provide DeskInjectionKey for child items |
+| `objectComposerDesk`{.primary .text-primary} | `{ model }` | `any` | Provide model for child items |
 
 ---
 

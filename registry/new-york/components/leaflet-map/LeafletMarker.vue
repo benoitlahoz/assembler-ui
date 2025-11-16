@@ -39,7 +39,7 @@ const { checkIn } = useCheckIn<FeatureReference>();
 
 // Check-in with the selection desk when selectable (only if context exists)
 const { desk: featureDesk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+  ? checkIn('leafletFeatures', {
       autoCheckIn: props.selectable,
       id: markerId.value,
       data: () => ({

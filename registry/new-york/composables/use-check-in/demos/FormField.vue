@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch, inject, type InjectionKey } from 'vue';
-import { useCheckIn, type CheckInDesk } from '../useCheckIn';
+import { computed, ref, watch, type Ref } from 'vue';
+import { useCheckIn } from '../useCheckIn';
 
 interface FormFieldData {
   name: string;
@@ -9,8 +9,13 @@ interface FormFieldData {
   required?: boolean;
 }
 
-// Récupère le Symbol du desk fourni par le parent
-const formDesk = inject<{ deskSymbol: InjectionKey<CheckInDesk<FormFieldData>> }>('formDesk')!;
+interface FormDeskContext {
+  updateValue: (name: string, value: any) => void;
+  getValue: (name: string) => any;
+  setError: (name: string, error: string) => void;
+  getError: (name: string) => string | undefined;
+  clearError: (name: string) => void;
+}
 
 const props = withDefaults(
   defineProps<{
@@ -28,9 +33,9 @@ const props = withDefaults(
   }
 );
 
-const { checkIn, memoizedId } = useCheckIn<FormFieldData>();
+const { checkIn, memoizedId } = useCheckIn<FormFieldData, FormDeskContext>();
 
-const { desk } = checkIn(formDesk?.deskSymbol, {
+const { desk } = checkIn('formDesk', {
   required: true,
   autoCheckIn: true,
   id: memoizedId(props.name),
@@ -42,57 +47,58 @@ const { desk } = checkIn(formDesk?.deskSymbol, {
   }),
 });
 
-const localValue = ref(props.value);
+if (!desk) {
+  throw new Error('FormField must be used within a form desk context');
+}
+
+const localValue = ref(desk.getValue(props.name) || props.value);
 
 watch(
   localValue,
   (newValue) => {
-    if (desk && 'updateValue' in desk) {
-      desk.updateValue(props.name, newValue);
-    }
+    desk.updateValue(props.name, newValue);
   },
-  { immediate: true }
+  { deep: true }
 );
 
-const error = computed(() => {
-  if (!desk || !('getError' in desk)) return '';
-  return desk.getError(props.name) || '';
-});
-
-const inputId = computed(() => `field-${props.name}`);
+const error = computed(() => desk.getError(props.name));
+const hasError = computed(() => !!error.value);
 </script>
 
 <template>
   <div class="space-y-2">
-    <label :for="inputId" class="block text-sm font-medium">
+    <label :for="name" class="block text-sm font-medium">
       {{ label }}
       <span v-if="required" class="text-red-500">*</span>
     </label>
 
-    <input
-      v-if="type !== 'textarea'"
-      :id="inputId"
-      v-model="localValue"
-      :type="type"
-      :placeholder="placeholder"
-      :class="[
-        'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2',
-        error ? 'border-red-500 focus:ring-red-500' : 'border-border focus:ring-primary',
-      ]"
-    />
-
     <textarea
-      v-else
-      :id="inputId"
+      v-if="type === 'textarea'"
+      :id="name"
       v-model="localValue"
       :placeholder="placeholder"
-      rows="4"
       :class="[
-        'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2',
-        error ? 'border-red-500 focus:ring-red-500' : 'border-border focus:ring-primary',
+        'w-full px-3 py-2 border rounded-md resize-y min-h-[100px]',
+        hasError
+          ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+          : 'border-input focus:ring-primary focus:border-primary',
       ]"
     />
 
-    <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
+    <input
+      v-else
+      :id="name"
+      :type="type"
+      v-model="localValue"
+      :placeholder="placeholder"
+      :class="[
+        'w-full px-3 py-2 border rounded-md',
+        hasError
+          ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+          : 'border-input focus:ring-primary focus:border-primary',
+      ]"
+    />
+
+    <div v-if="hasError" class="text-sm text-red-600">{{ error }}</div>
   </div>
 </template>

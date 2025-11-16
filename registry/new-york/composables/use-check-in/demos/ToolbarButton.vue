@@ -1,54 +1,44 @@
 <script setup lang="ts">
-import { computed, inject, type InjectionKey } from 'vue';
-import { useCheckIn, type CheckInDesk } from '../useCheckIn';
+import { inject, type InjectionKey } from 'vue';
+import { useCheckIn } from '../useCheckIn';
 
 interface ToolItemData {
-  label: string;
+  type: 'button' | 'separator';
+  label?: string;
   icon?: string;
-  type: 'button' | 'toggle' | 'separator';
-  active?: boolean;
+  action?: () => void;
   disabled?: boolean;
 }
 
-// Récupère le Symbol du desk fourni par le parent
-const toolbarDesk = inject<{ deskSymbol: InjectionKey<CheckInDesk<ToolItemData>> }>('toolbarDesk')!;
-
-const props = withDefaults(
-  defineProps<{
-    id: string;
-    label: string;
-    icon?: string;
-    type: 'button' | 'toggle';
-    disabled?: boolean;
-  }>(),
-  {
-    disabled: false,
-  }
-);
+const props = defineProps<{
+  id: string;
+  label: string;
+  icon?: string;
+  action?: () => void;
+  disabled?: boolean;
+}>();
 
 const { checkIn, memoizedId } = useCheckIn<ToolItemData>();
 
-const { desk } = checkIn(toolbarDesk?.deskSymbol, {
+const { desk } = checkIn('toolbarDesk', {
   required: true,
   autoCheckIn: true,
   id: memoizedId(props.id),
   data: () => ({
+    type: 'button' as const,
     label: props.label,
     icon: props.icon,
-    type: props.type,
+    action: props.action,
     disabled: props.disabled,
   }),
   watchData: true,
 });
 
-const isActive = computed(() => {
-  if (props.type !== 'toggle') return false;
-  return desk && 'isActive' in desk ? desk.isActive(props.id) : false;
-});
+const isActive = (desk as any)?.activeButtonId?.value === props.id;
 
 const handleClick = () => {
-  if (!props.disabled && desk && 'handleClick' in desk) {
-    desk.handleClick(props.id, props.type);
+  if (props.action) {
+    props.action();
   }
 };
 </script>

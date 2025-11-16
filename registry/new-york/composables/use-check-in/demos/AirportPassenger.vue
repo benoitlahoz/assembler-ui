@@ -1,9 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, inject, type InjectionKey } from 'vue';
-import {
-  useCheckIn,
-  type CheckInDesk,
-} from '~~/registry/new-york/composables/use-check-in/useCheckIn';
+import { ref, computed, type Ref } from 'vue';
+import { useCheckIn } from '~~/registry/new-york/composables/use-check-in/useCheckIn';
 
 interface PassengerData {
   name: string;
@@ -13,10 +10,20 @@ interface PassengerData {
   checkedInAt?: Date;
 }
 
-// Retrieve the desk Symbol provided by the parent
-const airportDesk = inject<{ deskSymbol: InjectionKey<CheckInDesk<PassengerData>> }>(
-  'airportDesk'
-)!;
+interface AirportDeskContext {
+  flightNumber: Ref<string>;
+  gate: Ref<string>;
+  departureTime: Ref<string>;
+  boardingGroups: Ref<Record<string, string>>;
+  maxBaggageWeight: Record<string, number>;
+  assignSeat: (
+    passengerId: string,
+    passengerName: string,
+    fareClass: 'Business' | 'Premium' | 'Eco'
+  ) => string | null;
+  addBaggage: (passengerId: string, weight?: number) => boolean;
+  removeBaggage: (passengerId: string, weight?: number) => boolean;
+}
 
 const props = defineProps<{
   id: string;
@@ -27,10 +34,10 @@ const props = defineProps<{
 const isCheckedIn = ref(true);
 const checkInTime = ref<Date>(new Date());
 
-const { checkIn, memoizedId } = useCheckIn<PassengerData>();
+const { checkIn, memoizedId } = useCheckIn<PassengerData, AirportDeskContext>();
 
-// The passenger checks in at the desk using the injected deskSymbol
-const { desk } = checkIn(airportDesk?.deskSymbol, {
+// The passenger checks in at the desk using the injected desk key
+const { desk } = checkIn('airportDesk', {
   required: true,
   autoCheckIn: true,
   id: memoizedId(props.id),
@@ -47,16 +54,8 @@ if (!desk) {
   throw new Error('AirportPassenger must be used within a desk context');
 }
 
-// Access context via the desk (merged in createDesk)
-const context = {
-  flightNumber: 'flightNumber' in desk ? desk.flightNumber : ref(''),
-  gate: 'gate' in desk ? desk.gate : ref(''),
-  departureTime: 'departureTime' in desk ? desk.departureTime : ref(''),
-  boardingGroups: 'boardingGroups' in desk ? desk.boardingGroups : ref({}),
-};
-
 console.log(
-  `🚶 ${props.name} arrives at the desk... Class ${props.fareClass} (Group ${context.boardingGroups.value[props.fareClass]})`
+  `🚶 ${props.name} arrives at the desk... Class ${props.fareClass} (Group ${desk.boardingGroups.value[props.fareClass]})`
 );
 
 // The seat is managed only by the desk - we read it directly
@@ -66,39 +65,30 @@ const currentSeat = computed(() => desk.get(props.id)?.data.seat || '');
 const currentBaggageWeight = computed(() => desk.get(props.id)?.data.baggage || 0);
 
 // Maximum weight for this class
-const maxWeight = computed(() => {
-  if ('maxBaggageWeight' in desk) {
-    return desk.maxBaggageWeight[props.fareClass];
-  }
-  return 0;
-});
+const maxWeight = computed(() => desk?.maxBaggageWeight[props.fareClass] ?? 0);
 
 // Check if we can add baggage
 const canAddBaggage = computed(() => currentBaggageWeight.value < maxWeight.value);
 
 // Add baggage
 const handleAddBaggage = () => {
-  if ('addBaggage' in desk) {
-    desk.addBaggage(props.id, 10);
-  }
+  desk.addBaggage(props.id, 10);
 };
 
 // Remove baggage
 const handleRemoveBaggage = () => {
-  if ('removeBaggage' in desk) {
-    desk.removeBaggage(props.id, 10);
-  }
+  desk.removeBaggage(props.id, 10);
 };
 
 // Access flight information shared via injected extraContext
 const flightInfo = computed(() => ({
-  flightNumber: context.flightNumber,
-  gate: context.gate,
-  departureTime: context.departureTime,
+  flightNumber: desk.flightNumber,
+  gate: desk.gate,
+  departureTime: desk.departureTime,
 }));
 
 // Calculate the boarding group from the fare class
-const boardingGroup = computed(() => context.boardingGroups.value[props.fareClass]);
+const boardingGroup = computed(() => desk.boardingGroups.value[props.fareClass]);
 
 // Color badge according to fare class
 const groupColor = computed(() => {

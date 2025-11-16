@@ -1475,7 +1475,7 @@ const canvasId = ref<string | number>(
 const isDragging = ref(false);
 
 const { desk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+  ? checkIn("leafletFeatures", {
       autoCheckIn: props.selectable,
       id: canvasId.value,
       data: () => ({
@@ -2181,7 +2181,7 @@ const canvasId = ref<string | number>(
 const isDragging = ref(false);
 
 const { desk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+  ? checkIn("leafletFeatures", {
       autoCheckIn: props.selectable,
       id: canvasId.value,
       data: () => ({
@@ -3055,8 +3055,8 @@ let dragStartMousePoint: any = null;
 
 const { checkIn } = useCheckIn<FeatureReference>();
 
-const { desk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+const { desk: featureDesk } = selectionContext
+  ? checkIn("leafletFeatures", {
       autoCheckIn: props.selectable,
       id: circleId.value,
       data: () => ({
@@ -3388,12 +3388,6 @@ console.log(
   "[LeafletControlItem] Controls context:",
   controlsContext ? "FOUND" : "NOT FOUND",
 );
-if (controlsContext) {
-  console.log(
-    "[LeafletControlItem] DeskInjectionKey:",
-    controlsContext.DeskInjectionKey,
-  );
-}
 
 const { checkIn } = useCheckIn<ControlItemReference>();
 
@@ -3452,8 +3446,8 @@ const getContentHtml = () => {
   return "";
 };
 
-const { desk } = controlsContext?.DeskInjectionKey
-  ? checkIn(controlsContext.DeskInjectionKey, {
+const { desk } = controlsContext
+  ? checkIn("leafletControls", {
       autoCheckIn: true,
       id: props.name,
       data: () => {
@@ -3577,9 +3571,7 @@ export interface ControlItemReference {
   active?: boolean;
 }
 
-export interface LeafletControlsContext {
-  DeskInjectionKey: InjectionKey<CheckInDesk<ControlItemReference>>;
-}
+export interface LeafletControlsContext {}
 
 export interface LeafletControlsProps {
   position?: ControlOptions["position"];
@@ -3607,7 +3599,7 @@ const map = inject(LeafletMapKey, ref(null));
 const control = ref<any>(null);
 
 const { createDesk } = useCheckIn<ControlItemReference>();
-const { desk, DeskInjectionKey } = createDesk({
+const { desk } = createDesk("leafletControls", {
   context: {
     activeItem: () => props.activeItem,
   },
@@ -3819,9 +3811,7 @@ watch(
   { deep: true },
 );
 
-const context: LeafletControlsContext = {
-  DeskInjectionKey,
-};
+const context: LeafletControlsContext = {};
 
 provide(LeafletControlsKey, context);
 </script>
@@ -4803,7 +4793,6 @@ export interface LeafletSelectionContext {
   selectFeature: (type: FeatureShapeType, id: string | number) => void;
   deselectAll: () => void;
   notifyFeatureUpdate: (id: string | number) => void;
-  deskSymbol: InjectionKey<CheckInDesk<FeatureReference>>;
 }
 
 export interface LeafletFeaturesSelectorProps {
@@ -4866,7 +4855,7 @@ const notifyFeatureUpdate = (id: string | number) => {
   }
 };
 
-const { desk, DeskInjectionKey } = createDesk({
+const { desk } = createDesk("leafletFeatures", {
   context: {
     selectedFeature,
     selectFeature,
@@ -5001,7 +4990,6 @@ const context: LeafletSelectionContext = {
   selectFeature,
   deselectAll,
   notifyFeatureUpdate,
-  deskSymbol: DeskInjectionKey,
 };
 
 provide(LeafletSelectionKey, context as any);
@@ -5082,7 +5070,7 @@ const markerId = ref<string | number>(
 const { checkIn } = useCheckIn<FeatureReference>();
 
 const { desk: featureDesk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+  ? checkIn("leafletFeatures", {
       autoCheckIn: props.selectable,
       id: markerId.value,
       data: () => ({
@@ -5927,8 +5915,8 @@ let dragStartMousePoint: L.Point | null = null;
 
 const { checkIn } = useCheckIn<FeatureReference>();
 
-const { desk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+const { desk: featureDesk } = selectionContext
+  ? checkIn("leafletFeatures", {
       autoCheckIn: props.selectable,
       id: polygonId.value,
       data: () => ({
@@ -6413,8 +6401,8 @@ const polylineId = ref<string | number>(
   props.id ?? `polyline-${Date.now()}-${Math.random()}`,
 );
 
-const { desk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+const { desk: featureDesk } = selectionContext
+  ? checkIn("leafletFeatures", {
       autoCheckIn: props.selectable,
       id: polylineId.value,
       data: () => ({
@@ -6884,8 +6872,8 @@ const rectangleId = ref<string | number>(
   props.id ?? `rectangle-${Date.now()}-${Math.random()}`,
 );
 
-const { desk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+const { desk: featureDesk } = selectionContext
+  ? checkIn("leafletFeatures", {
       autoCheckIn: props.selectable,
       id: rectangleId.value,
       data: () => ({
@@ -8413,13 +8401,10 @@ import {
   ref,
   provide,
   inject,
-  onMounted,
-  onBeforeUnmount,
   onUnmounted,
   watch,
   computed,
   triggerRef,
-  nextTick,
   type InjectionKey,
   type Ref,
   type ComputedRef,
@@ -8444,7 +8429,7 @@ export interface CheckInDesk<
   T = any,
   TContext extends Record<string, any> = {},
 > {
-  registry: Ref<Map<string | number, CheckInItem<T>>>;
+  readonly registry: Ref<Map<string | number, CheckInItem<T>>>;
   checkIn: (
     id: string | number,
     data: T,
@@ -8466,11 +8451,8 @@ export interface CheckInDesk<
   updateMany: (
     updates: Array<{ id: string | number; data: Partial<T> }>,
   ) => void;
-
   on: (event: DeskEventType, callback: DeskEventCallback<T>) => () => void;
-
   off: (event: DeskEventType, callback: DeskEventCallback<T>) => void;
-
   emit: (
     event: DeskEventType,
     payload: { id?: string | number; data?: T },
@@ -8482,37 +8464,23 @@ export interface CheckInDeskOptions<
   TContext extends Record<string, any> = {},
 > {
   context?: TContext;
-
   onBeforeCheckIn?: (id: string | number, data: T) => void | boolean;
-
   onCheckIn?: (id: string | number, data: T) => void;
-
   onBeforeCheckOut?: (id: string | number) => void | boolean;
-
   onCheckOut?: (id: string | number) => void;
-
   debug?: boolean;
 }
 
 export interface CheckInOptions<T = any> {
   required?: boolean;
-
   autoCheckIn?: boolean;
-
   id?: string | number;
-
   data?: T | (() => T) | (() => Promise<T>);
-
   generateId?: () => string | number;
-
   watchData?: boolean;
-
   shallow?: boolean;
-
   watchCondition?: (() => boolean) | Ref<boolean>;
-
   meta?: Record<string, any>;
-
   debug?: boolean;
 }
 
@@ -8763,10 +8731,13 @@ export const useCheckIn = <
     };
   };
 
-  const createDesk = (options?: CheckInDeskOptions<T, TContext>) => {
-    const DeskInjectionKey = Symbol("CheckInDesk") as InjectionKey<
-      CheckInDesk<T, TContext> & TContext
-    >;
+  const createDesk = (
+    injectionKey: string = "checkInDesk",
+    options?: CheckInDeskOptions<T, TContext>,
+  ) => {
+    const DeskInjectionKey = Symbol(
+      `CheckInDesk:${injectionKey}`,
+    ) as InjectionKey<CheckInDesk<T, TContext> & TContext>;
     const deskContext = createDeskContext<T, TContext>(options);
 
     const fullContext = {
@@ -8776,13 +8747,15 @@ export const useCheckIn = <
 
     provide(DeskInjectionKey, fullContext);
 
+    provide(injectionKey, DeskInjectionKey);
+
     if (options?.debug) {
-      Debug("Desk opened with injection key:", DeskInjectionKey.description);
+      Debug("Desk opened with injection key:", injectionKey);
     }
 
     return {
       desk: fullContext,
-      DeskInjectionKey,
+      injectionKey,
     };
   };
 
@@ -8793,16 +8766,17 @@ export const useCheckIn = <
     > &
       TContext,
   >(
-    parentDeskOrSymbol:
+    parentDeskOrKey:
       | (CheckInDesk<T, TContext> & TContext)
       | InjectionKey<CheckInDesk<T, TContext> & TContext>
+      | string
       | null
       | undefined,
     checkInOptions?: CheckInOptions<T>,
   ) => {
     const debug = checkInOptions?.debug ? Debug : NoOpDebug;
 
-    if (!parentDeskOrSymbol) {
+    if (!parentDeskOrKey) {
       debug("[useCheckIn] No parent desk provided - skipping check-in");
 
       return {
@@ -8814,8 +8788,8 @@ export const useCheckIn = <
 
     let desk: (CheckInDesk<T, TContext> & TContext) | null | undefined;
 
-    if (typeof parentDeskOrSymbol === "symbol") {
-      desk = inject(parentDeskOrSymbol);
+    if (typeof parentDeskOrKey === "symbol") {
+      desk = inject(parentDeskOrKey);
       if (!desk) {
         debug("[useCheckIn] Could not inject desk from symbol");
 
@@ -8825,8 +8799,32 @@ export const useCheckIn = <
           updateSelf: () => {},
         };
       }
+    } else if (typeof parentDeskOrKey === "string") {
+      const injectionKey =
+        inject<InjectionKey<CheckInDesk<T, TContext> & TContext>>(
+          parentDeskOrKey,
+        );
+      if (!injectionKey) {
+        debug("[useCheckIn] Could not find desk with key:", parentDeskOrKey);
+
+        return {
+          desk: null as TDesk | null,
+          checkOut: () => {},
+          updateSelf: () => {},
+        };
+      }
+      desk = inject(injectionKey);
+      if (!desk) {
+        debug("[useCheckIn] Could not inject desk from key:", parentDeskOrKey);
+
+        return {
+          desk: null as TDesk | null,
+          checkOut: () => {},
+          updateSelf: () => {},
+        };
+      }
     } else {
-      desk = parentDeskOrSymbol;
+      desk = parentDeskOrKey;
     }
 
     const itemId = checkInOptions?.id || `item-${Date.now()}-${Math.random()}`;

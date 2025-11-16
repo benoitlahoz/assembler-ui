@@ -57,8 +57,8 @@ const isDragging = ref(false);
 const polylineId = ref<string | number>(props.id ?? `polyline-${Date.now()}-${Math.random()}`);
 
 // Check in with selection desk
-const { desk } = selectionContext
-  ? checkIn(selectionContext.deskSymbol, {
+const { desk: featureDesk } = selectionContext
+  ? checkIn('leafletFeatures', {
       autoCheckIn: props.selectable,
       id: polylineId.value,
       data: () => ({

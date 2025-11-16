@@ -28,7 +28,7 @@ export interface ControlItemReference {
 }
 
 export interface LeafletControlsContext {
-  DeskInjectionKey: InjectionKey<CheckInDesk<ControlItemReference>>;
+  // No longer needed with string-based injection keys
 }
 
 export interface LeafletControlsProps {
@@ -58,7 +58,7 @@ const control = ref<any>(null);
 
 // Initialize useCheckIn for control items management
 const { createDesk } = useCheckIn<ControlItemReference>();
-const { desk, DeskInjectionKey } = createDesk({
+const { desk } = createDesk('leafletControls', {
   context: {
     // Expose activeItem to child controls
     activeItem: () => props.activeItem,
@@ -277,7 +277,7 @@ watch(
 );
 
 const context: LeafletControlsContext = {
-  DeskInjectionKey,
+  // Context is now empty as we use string-based injection
 };
 
 provide(LeafletControlsKey, context);
