@@ -9,6 +9,11 @@
  * @demo AirportDemo
  * @demo FormDemo
  * @demo TabsDemo
+ * @demo ActiveItemPluginDemo
+ * @demo HistoryPluginDemo
+ * @demo LoggerPluginDemo
+ * @demo ValidationPluginDemo
+ * @demo CombinedPluginsDemo
  */
 
 import {
@@ -23,6 +28,7 @@ import {
   type Ref,
   type ComputedRef,
 } from 'vue';
+import type { CheckInPlugin } from './types';
 
 // ==========================================
 // TYPES
@@ -77,6 +83,7 @@ export interface CheckInDeskOptions<T = any, TContext extends Record<string, any
   onBeforeCheckOut?: (id: string | number) => void | boolean;
   onCheckOut?: (id: string | number) => void;
   debug?: boolean;
+  plugins?: CheckInPlugin<T>[];
 }
 
 export interface CheckInOptions<T = any> {
@@ -147,6 +154,9 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
     // Système d'événements
     const eventListeners = new Map<DeskEventType, Set<DeskEventCallback<T>>>();
 
+    // Plugin system: storage for cleanup functions
+    const pluginCleanups: Array<() => void> = [];
+
     const emit = (event: DeskEventType, payload: { id?: string | number; data?: T }) => {
       const listeners = eventListeners.get(event);
       if (!listeners) return;
@@ -183,7 +193,19 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
     const checkIn = (id: string | number, data: T, meta?: Record<string, any>): boolean => {
       debug('checkIn', { id, data, meta });
 
-      // Lifecycle: before
+      // Lifecycle: before (plugins first, then user hook)
+      if (options?.plugins) {
+        for (const plugin of options.plugins) {
+          if (plugin.onBeforeCheckIn) {
+            const result = plugin.onBeforeCheckIn(id, data);
+            if (result === false) {
+              debug('checkIn cancelled by plugin:', plugin.name);
+              return false;
+            }
+          }
+        }
+      }
+
       if (options?.onBeforeCheckIn) {
         const result = options.onBeforeCheckIn(id, data);
         if (result === false) {
@@ -222,7 +244,19 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       const existed = registry.value.has(id);
       if (!existed) return false;
 
-      // Lifecycle: before
+      // Lifecycle: before (plugins first, then user hook)
+      if (options?.plugins) {
+        for (const plugin of options.plugins) {
+          if (plugin.onBeforeCheckOut) {
+            const result = plugin.onBeforeCheckOut(id);
+            if (result === false) {
+              debug('checkOut cancelled by plugin:', plugin.name);
+              return false;
+            }
+          }
+        }
+      }
+
       if (options?.onBeforeCheckOut) {
         const result = options.onBeforeCheckOut(id);
         if (result === false) {
@@ -317,6 +351,10 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       // Emit event
       emit('clear', {});
 
+      // Cleanup plugins
+      pluginCleanups.forEach((cleanup) => cleanup());
+      pluginCleanups.length = 0;
+
       debug(`Cleared ${count} items from registry`);
     };
 
@@ -337,7 +375,7 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       updates.forEach(({ id, data }) => update(id, data));
     };
 
-    return {
+    const desk: CheckInDesk<T, TContext> = {
       registry,
       checkIn,
       checkOut,
@@ -353,6 +391,54 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
       off,
       emit,
     };
+
+    // Apply plugins if provided
+    if (options?.plugins) {
+      options.plugins.forEach((plugin) => {
+        debug('Installing plugin:', plugin.name);
+
+        // 1. Install plugin
+        if (plugin.install) {
+          const cleanup = plugin.install(desk);
+          if (cleanup) {
+            pluginCleanups.push(cleanup);
+          }
+        }
+
+        // 2. Hook events via event system
+        if (plugin.onCheckIn) {
+          desk.on('check-in', ({ id, data }) => {
+            plugin.onCheckIn!(id!, data!);
+          });
+        }
+
+        if (plugin.onCheckOut) {
+          desk.on('check-out', ({ id }) => {
+            plugin.onCheckOut!(id!);
+          });
+        }
+
+        // 3. Add custom methods
+        if (plugin.methods) {
+          Object.entries(plugin.methods).forEach(([name, method]) => {
+            (desk as any)[name] = (...args: any[]) => method(desk, ...args);
+          });
+        }
+
+        // 4. Add computed properties
+        if (plugin.computed) {
+          Object.entries(plugin.computed).forEach(([name, getter]) => {
+            Object.defineProperty(desk, name, {
+              get: () => getter(desk),
+              enumerable: true,
+              configurable: true,
+            });
+          });
+        }
+      });
+    }
+
+    return desk;
   };
 
   /**
@@ -740,3 +826,19 @@ export const useCheckIn = <T = any, TContext extends Record<string, any> = {}>()
     clearIdCache,
   };
 };
+
+// ==========================================
+// RE-EXPORTS
+// ==========================================
+
+export type { CheckInPlugin } from './types';
+export {
+  createActiveItemPlugin,
+  createValidationPlugin,
+  createLoggerPlugin,
+  createHistoryPlugin,
+  type ValidationOptions,
+  type LoggerOptions,
+  type HistoryOptions,
+  type HistoryEntry,
+} from './plugins';
